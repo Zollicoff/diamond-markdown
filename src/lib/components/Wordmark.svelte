@@ -5,9 +5,11 @@
 		/** Animate the crystal facets on hover/loop. */
 		animated?: boolean;
 		href?: string | null;
+		/** Override the default wordmark text. */
+		text?: string;
 	}
 
-	let { size = 'md', animated = true, href = null }: Props = $props();
+	let { size = 'md', animated = true, href = null, text = 'Diamond' }: Props = $props();
 
 	const dims: Record<Required<Props>['size'], { wm: number; text: string; tracking: string }> = {
 		xs: { wm: 18, text: '1rem',    tracking: '-0.02em' },
@@ -63,7 +65,7 @@
 		<!-- Highlight glint -->
 		<polygon class="glint" points="38,18 32,30 44,30" fill="rgba(255,255,255,0.6)" />
 	</svg>
-	<span class="word">Diamond</span>
+	<span class="word">{text}</span>
 </svelte:element>
 
 <style>

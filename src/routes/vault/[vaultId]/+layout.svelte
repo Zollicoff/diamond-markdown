@@ -267,7 +267,7 @@
 		}}
 	>
 		<header class="sidebar-head">
-			<Wordmark size="sm" href="/" />
+			<Wordmark size="xs" href="/" text="Diamond Markdown" />
 			<span class="vault-name">{data.vault.name}</span>
 		</header>
 
