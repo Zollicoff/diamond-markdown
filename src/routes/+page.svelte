@@ -73,7 +73,7 @@
 </script>
 
 <svelte:head>
-	<title>Diamond</title>
+	<title>Diamond Markdown</title>
 </svelte:head>
 
 <div class="home">
