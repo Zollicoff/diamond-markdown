@@ -1,15 +1,16 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { invalidate } from '$app/navigation';
+	import { invalidate, goto } from '$app/navigation';
 	import { untrack } from 'svelte';
 	import Editor from '$lib/components/Editor.svelte';
 	import Preview from '$lib/components/Preview.svelte';
 	import BacklinksPanel from '$lib/components/BacklinksPanel.svelte';
+	import type { LinkResolver } from '$lib/editor/live-preview';
 
 	let { data }: { data: PageData } = $props();
 
-	type Mode = 'edit' | 'preview' | 'split';
-	let mode = $state<Mode>('split');
+	type Mode = 'live' | 'source' | 'read';
+	let mode = $state<Mode>('live');
 
 	// Editor source of truth while editing. Re-seeded when the note changes.
 	let content = $state(data.note.content);
@@ -31,6 +32,44 @@
 		}
 	});
 
+	// Build a resolver for the live-preview extension. Uses the backlinks
+	// + outgoing links index that the server already sent us.
+	const knownLinks = $derived(() => {
+		const out = new Map<string, string>();
+		for (const link of data.note.outgoingLinks) {
+			if (link.resolved) out.set(link.target.toLowerCase(), link.resolved);
+		}
+		// Also include a couple of backlinks the server gave us (so existing
+		// pages the user links to stay resolvable even after a fresh render).
+		for (const b of data.note.backlinks) {
+			out.set(b.title.toLowerCase(), b.path);
+			out.set(b.path.toLowerCase(), b.path);
+		}
+		return out;
+	});
+
+	const resolveLink: LinkResolver = (target: string) => {
+		const resolvedPath = knownLinks().get(target.trim().toLowerCase());
+		if (!resolvedPath) return { resolved: false };
+		return {
+			resolved: true,
+			href: `/vault/${data.vault.id}/note/${encodeURI(resolvedPath)}`
+		};
+	};
+
+	function handleWikilinkClick(target: string, href: string | null, resolved: boolean): void {
+		if (resolved && href) {
+			goto(href);
+			return;
+		}
+		// Broken link — prompt to create it in the current folder.
+		const newPath = confirm(`Create note "${target}"?`)
+			? (target.endsWith('.md') ? target : `${target}.md`)
+			: null;
+		if (!newPath) return;
+		goto(`/vault/${data.vault.id}/note/${encodeURI(newPath)}`);
+	}
+
 	async function save(): Promise<void> {
 		if (saving) return;
 		saving = true;
@@ -48,7 +87,6 @@
 			}
 			dirty = false;
 			savedAt = Date.now();
-			// Re-run page.server load — fresh html + backlinks.
 			await invalidate(`/vault/${data.vault.id}/note/${data.note.path}`);
 		} catch (e) {
 			err = (e as Error).message;
@@ -89,9 +127,9 @@
 		<div class="crumbs mono">{data.note.path}</div>
 		<div class="tools">
 			<div class="mode-group" role="tablist" aria-label="View mode">
-				<button class:active={mode === 'edit'}    onclick={() => (mode = 'edit')}>Edit</button>
-				<button class:active={mode === 'split'}   onclick={() => (mode = 'split')}>Split</button>
-				<button class:active={mode === 'preview'} onclick={() => (mode = 'preview')}>Preview</button>
+				<button class:active={mode === 'live'}   onclick={() => (mode = 'live')}>Live</button>
+				<button class:active={mode === 'source'} onclick={() => (mode = 'source')}>Source</button>
+				<button class:active={mode === 'read'}   onclick={() => (mode = 'read')}>Read</button>
 			</div>
 			<div class="save-status">
 				{#if saving}
@@ -108,15 +146,21 @@
 		</div>
 	</header>
 
-	<div class="body mode-{mode}">
-		{#if mode !== 'preview'}
-			<div class="pane edit-pane">
-				<Editor value={content} onChange={onContentChange} onSave={save} />
-			</div>
-		{/if}
-		{#if mode !== 'edit'}
+	<div class="body">
+		{#if mode === 'read'}
 			<div class="pane preview-pane">
 				<Preview html={data.note.html} />
+			</div>
+		{:else}
+			<div class="pane edit-pane">
+				<Editor
+					value={content}
+					mode={mode as 'live' | 'source'}
+					{resolveLink}
+					onChange={onContentChange}
+					onSave={save}
+					onWikilinkClick={handleWikilinkClick}
+				/>
 			</div>
 		{/if}
 	</div>
@@ -190,9 +234,9 @@
 		color: var(--fg-dim);
 	}
 	.status.saving { color: var(--fg-muted); }
-	.status.dirty { color: var(--accent); font-size: 1.2em; line-height: 1; }
-	.status.saved { color: var(--success); }
-	.status.err { color: var(--danger); }
+	.status.dirty  { color: var(--accent); font-size: 1.2em; line-height: 1; }
+	.status.saved  { color: var(--success); }
+	.status.err    { color: var(--danger); }
 	.btn {
 		padding: 4px 12px;
 		background: var(--bg-elev);
@@ -208,16 +252,9 @@
 	.body {
 		flex: 1;
 		min-height: 0;
-		display: grid;
 		overflow: hidden;
 	}
-	.body.mode-edit    { grid-template-columns: 1fr; }
-	.body.mode-preview { grid-template-columns: 1fr; }
-	.body.mode-split   { grid-template-columns: 1fr 1fr; }
-
-	.pane { overflow: hidden; min-height: 0; }
-	.edit-pane { border-right: 1px solid var(--border); }
-	.body.mode-edit .edit-pane { border-right: 0; }
+	.pane { height: 100%; overflow: hidden; min-height: 0; }
 
 	.right-panel {
 		overflow: hidden;

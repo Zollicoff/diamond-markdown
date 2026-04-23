@@ -36,7 +36,7 @@
 
 <div class="welcome">
 	<header>
-		<h1>DiamondMD</h1>
+		<h1>Diamond</h1>
 		<p class="tagline">Self-hosted markdown knowledge base — Obsidian-style links, git-native history, web-first.</p>
 	</header>
 
@@ -90,10 +90,10 @@
 		padding: 5rem 2rem 3rem;
 	}
 	header h1 {
-		font-family: var(--serif);
 		font-size: 3.5rem;
+		font-weight: 800;
 		line-height: 1;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.03em;
 		margin: 0 0 0.5rem;
 	}
 	.tagline { color: var(--fg-muted); font-size: 1.08rem; margin: 0 0 3rem; }

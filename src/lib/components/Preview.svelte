@@ -39,13 +39,13 @@
 		overflow-y: auto;
 		height: 100%;
 		color: var(--fg);
-		font-family: var(--serif);
+		font-family: var(--sans);
 		font-size: 17px;
 		line-height: 1.7;
 	}
-	.preview :global(h1) { font-family: var(--serif); font-size: 2.2em; margin: 0 0 0.6em; line-height: 1.1; letter-spacing: -0.01em; }
-	.preview :global(h2) { font-family: var(--serif); font-size: 1.6em; margin: 1.8em 0 0.5em; line-height: 1.15; }
-	.preview :global(h3) { font-family: var(--serif); font-size: 1.3em; margin: 1.5em 0 0.4em; }
+	.preview :global(h1) { font-family: var(--sans); font-size: 2.2em; margin: 0 0 0.6em; line-height: 1.1; letter-spacing: -0.01em; }
+	.preview :global(h2) { font-family: var(--sans); font-size: 1.6em; margin: 1.8em 0 0.5em; line-height: 1.15; }
+	.preview :global(h3) { font-family: var(--sans); font-size: 1.3em; margin: 1.5em 0 0.4em; }
 	.preview :global(h4) { font-size: 1.1em; margin: 1.3em 0 0.3em; font-family: var(--sans); font-weight: 700; }
 	.preview :global(p) { margin: 0 0 1em; }
 	.preview :global(ul), .preview :global(ol) { margin: 0 0 1em; padding-left: 1.4em; }

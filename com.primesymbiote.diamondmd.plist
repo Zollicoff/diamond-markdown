@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Launchd plist for DiamondMD on the Prime Symbiote fleet.
+  Runs the production `node build/index.js` from the diamondmd repo.
+
+  Install:
+    cp com.primesymbiote.diamondmd.plist ~/Library/LaunchAgents/
+    launchctl bootout gui/$(id -u)/com.primesymbiote.diamondmd 2>/dev/null
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.primesymbiote.diamondmd.plist
+  Tail:
+    tail -f ~/.prime/logs/diamondmd.log
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.primesymbiote.diamondmd</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/node</string>
+		<string>/Users/primesymbiote/Github/diamondmd/build/index.js</string>
+	</array>
+
+	<key>WorkingDirectory</key>
+	<string>/Users/primesymbiote/Github/diamondmd</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>HOST</key>
+		<string>127.0.0.1</string>
+		<key>PORT</key>
+		<string>3045</string>
+		<key>BODY_SIZE_LIMIT</key>
+		<string>10485760</string>
+		<key>ORIGIN</key>
+		<string>https://zach-macmini26.tail044ad4.ts.net:3045</string>
+	</dict>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>KeepAlive</key>
+	<true/>
+
+	<key>StandardOutPath</key>
+	<string>/Users/primesymbiote/.prime/logs/diamondmd.log</string>
+
+	<key>StandardErrorPath</key>
+	<string>/Users/primesymbiote/.prime/logs/diamondmd.err</string>
+</dict>
+</plist>

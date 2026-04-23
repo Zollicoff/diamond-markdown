@@ -25,7 +25,6 @@
 
 	--mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 	--sans: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', system-ui, sans-serif;
-	--serif: 'Charter', Georgia, 'Noto Serif', serif;
 }
 
 :root[data-theme='light'] {

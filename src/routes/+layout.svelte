@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>DiamondMD</title>
+	<title>Diamond</title>
 </svelte:head>
 
 {@render children()}

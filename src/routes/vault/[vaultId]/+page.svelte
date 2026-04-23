@@ -19,10 +19,10 @@
 		text-align: center;
 	}
 	h1 {
-		font-family: var(--serif);
 		font-size: 2.5rem;
+		font-weight: 800;
 		margin: 0 0 0.5rem;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 	}
 	.muted { color: var(--fg-muted); font-size: 1rem; }
 	kbd {
