@@ -4,6 +4,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import FileTree, { type TreeNode } from '$lib/components/FileTree.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
+	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 
 	let { data, children }: { data: LayoutData; children: () => unknown } = $props();
 
@@ -11,44 +12,219 @@
 		page.params.path ? decodeURIComponent(page.params.path) : null
 	);
 
-	// Root-level dirs auto-expanded for nicer first load.
 	let rootExpand = $derived(new Set(data.tree.filter((n) => n.type === 'directory').map((n) => n.path)));
 
-	async function createFolder(): Promise<void> {
-		const name = prompt('Folder name (can include nested path like "Projects/Client A")');
-		if (!name || !name.trim()) return;
-		const res = await fetch(`/api/vaults/${data.vault.id}/folder`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path: name.trim() })
-		});
-		if (!res.ok) {
-			const body = await res.text();
-			alert(`Folder failed: HTTP ${res.status} ${body.slice(0, 120)}`);
-			return;
-		}
-		await invalidateAll();
+	// ── Context menu state ────────────────────────────────────────────
+	let menuOpen = $state(false);
+	let menuPos = $state<Position>({ x: 0, y: 0 });
+	let menuItems = $state<MenuItem[]>([]);
+
+	// ── Inline rename state ───────────────────────────────────────────
+	let renamingPath = $state<string | null>(null);
+
+	function showMenu(e: MouseEvent, items: MenuItem[]): void {
+		menuPos = { x: e.clientX, y: e.clientY };
+		menuItems = items;
+		menuOpen = true;
 	}
 
-	async function createNote(): Promise<void> {
-		const name = prompt('New note (path + title, e.g. "Projects/Ideas/Foo")');
-		if (!name || !name.trim()) return;
-		const notePath = name.trim().endsWith('.md') ? name.trim() : `${name.trim()}.md`;
-		// Save a minimal stub.
-		const body = `---\ntitle: ${name.trim().split('/').pop()!.replace(/\.md$/, '')}\n---\n\n`;
-		const res = await fetch(`/api/vaults/${data.vault.id}/note`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path: notePath, content: body })
-		});
+	function closeMenu(): void { menuOpen = false; }
+
+	async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
+		const res = await fetch(url, init);
 		if (!res.ok) {
-			const text = await res.text();
-			alert(`Create failed: HTTP ${res.status} ${text.slice(0, 120)}`);
+			const body = await res.text();
+			throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+		}
+		return res.json() as Promise<T>;
+	}
+
+	function notify(msg: string, kind: 'ok' | 'err' = 'ok'): void {
+		// Simple native alert for now; Obsidian-style toasts are a v0.3 polish.
+		if (kind === 'err') alert(msg);
+	}
+
+	async function createNoteAt(dir: string): Promise<void> {
+		const raw = prompt(`New note in "${dir || '(root)'}"`);
+		if (!raw || !raw.trim()) return;
+		const rel = (dir ? `${dir}/` : '') + (raw.trim().endsWith('.md') ? raw.trim() : `${raw.trim()}.md`);
+		try {
+			const title = raw.trim().split('/').pop()!.replace(/\.md$/, '');
+			await api(`/api/vaults/${data.vault.id}/note`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: rel, content: `---\ntitle: ${title}\n---\n\n` })
+			});
+			await invalidateAll();
+			goto(`/vault/${data.vault.id}/note/${encodeURI(rel)}`);
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	async function createFolderAt(parent: string): Promise<void> {
+		const raw = prompt(`New folder in "${parent || '(root)'}"`);
+		if (!raw || !raw.trim()) return;
+		const rel = (parent ? `${parent}/` : '') + raw.trim().replace(/^\/+|\/+$/g, '');
+		try {
+			await api(`/api/vaults/${data.vault.id}/folder`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: rel })
+			});
+			await invalidateAll();
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	function beginRename(node: TreeNode): void {
+		renamingPath = node.path;
+	}
+
+	async function commitRename(node: TreeNode, newName: string): Promise<void> {
+		if (!newName || newName === node.name.replace(/\.md$/, '') || newName === node.name) {
+			renamingPath = null;
 			return;
 		}
-		await invalidateAll();
-		goto(`/vault/${data.vault.id}/note/${encodeURI(notePath)}`);
+		const parent = node.path.split('/').slice(0, -1).join('/');
+		const newPath = (parent ? `${parent}/` : '') + (node.type === 'file' ? `${newName}.md` : newName);
+		renamingPath = null;
+		try {
+			if (node.type === 'file') {
+				await api(`/api/vaults/${data.vault.id}/note`, {
+					method: 'PATCH',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ from: node.path, to: newPath })
+				});
+				await invalidateAll();
+				// If we renamed the currently-open note, nav to the new URL.
+				if (activePath === node.path) {
+					goto(`/vault/${data.vault.id}/note/${encodeURI(newPath)}`, { replaceState: true });
+				}
+			} else {
+				await api(`/api/vaults/${data.vault.id}/folder`, {
+					method: 'PATCH',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ from: node.path, to: newPath })
+				});
+				await invalidateAll();
+				// If current note was inside, redirect.
+				if (activePath && activePath.startsWith(node.path + '/')) {
+					const rel = activePath.slice(node.path.length + 1);
+					goto(`/vault/${data.vault.id}/note/${encodeURI(newPath + '/' + rel)}`, { replaceState: true });
+				}
+			}
+		} catch (e) { notify((e as Error).message, 'err'); }
 	}
+
+	async function deleteFile(node: TreeNode): Promise<void> {
+		if (!confirm(`Delete "${node.name}"? This is reversible via git log.`)) return;
+		try {
+			await api(`/api/vaults/${data.vault.id}/note?path=${encodeURIComponent(node.path)}`, { method: 'DELETE' });
+			await invalidateAll();
+			if (activePath === node.path) goto(`/vault/${data.vault.id}`, { replaceState: true });
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	async function deleteFolder(node: TreeNode, force: boolean): Promise<void> {
+		const msg = force
+			? `Delete folder "${node.path}" and everything inside it? Reversible via git log.`
+			: `Delete empty folder "${node.path}"?`;
+		if (!confirm(msg)) return;
+		try {
+			const url = `/api/vaults/${data.vault.id}/folder?path=${encodeURIComponent(node.path)}${force ? '&force=1' : ''}`;
+			await api(url, { method: 'DELETE' });
+			await invalidateAll();
+			if (activePath && (activePath === node.path || activePath.startsWith(node.path + '/'))) {
+				goto(`/vault/${data.vault.id}`, { replaceState: true });
+			}
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	async function duplicateFile(node: TreeNode): Promise<void> {
+		try {
+			const res = await api<{ path: string }>(`/api/vaults/${data.vault.id}/note`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ from: node.path, duplicate: true })
+			});
+			await invalidateAll();
+			goto(`/vault/${data.vault.id}/note/${encodeURI(res.path)}`);
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	function copyPath(node: TreeNode): void {
+		navigator.clipboard?.writeText(node.path).catch(() => {});
+	}
+
+	// ── drag-drop move ───────────────────────────────────────────────
+	async function handleDropMove(srcPath: string, destFolder: string): Promise<void> {
+		const isFolder = !srcPath.endsWith('.md');
+		const name = srcPath.split('/').pop()!;
+		const newPath = destFolder ? `${destFolder}/${name}` : name;
+		if (newPath === srcPath) return;
+		try {
+			const url = isFolder
+				? `/api/vaults/${data.vault.id}/folder`
+				: `/api/vaults/${data.vault.id}/note`;
+			await api(url, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ from: srcPath, to: newPath })
+			});
+			await invalidateAll();
+			if (!isFolder && activePath === srcPath) {
+				goto(`/vault/${data.vault.id}/note/${encodeURI(newPath)}`, { replaceState: true });
+			}
+		} catch (e) { notify((e as Error).message, 'err'); }
+	}
+
+	// ── Context menu builders ────────────────────────────────────────
+	function menuForFile(node: TreeNode): MenuItem[] {
+		return [
+			{ label: 'Open', icon: '→', action: () => goto(`/vault/${data.vault.id}/note/${encodeURI(node.path)}`) },
+			{ separator: true, label: '' },
+			{ label: 'Rename', icon: '✎', shortcut: 'F2', action: () => beginRename(node) },
+			{ label: 'Duplicate', icon: '❏', action: () => duplicateFile(node) },
+			{ label: 'Copy path', icon: '⎘', action: () => copyPath(node) },
+			{ separator: true, label: '' },
+			{ label: 'Delete', icon: '🗑', danger: true, action: () => deleteFile(node) }
+		];
+	}
+
+	function menuForFolder(node: TreeNode): MenuItem[] {
+		const empty = !node.children || node.children.length === 0;
+		return [
+			{ label: 'New note here', icon: '＋', action: () => createNoteAt(node.path) },
+			{ label: 'New folder here', icon: '📁', action: () => createFolderAt(node.path) },
+			{ separator: true, label: '' },
+			{ label: 'Rename', icon: '✎', shortcut: 'F2', action: () => beginRename(node) },
+			{ label: 'Copy path', icon: '⎘', action: () => copyPath(node) },
+			{ separator: true, label: '' },
+			{
+				label: empty ? 'Delete empty folder' : 'Delete folder + contents',
+				icon: '🗑',
+				danger: true,
+				action: () => deleteFolder(node, !empty)
+			}
+		];
+	}
+
+	function menuForRoot(): MenuItem[] {
+		return [
+			{ label: 'New note', icon: '＋', action: () => createNoteAt('') },
+			{ label: 'New folder', icon: '📁', action: () => createFolderAt('') }
+		];
+	}
+
+	function onNodeContext(e: MouseEvent, node: TreeNode): void {
+		showMenu(e, node.type === 'file' ? menuForFile(node) : menuForFolder(node));
+	}
+
+	function onRootContextFire(e: MouseEvent): void {
+		showMenu(e, menuForRoot());
+	}
+
+	// ── Top-of-tree buttons (delegated to same handlers) ─────────────
+	function topCreateNote(): void { void createNoteAt(''); }
+	function topCreateFolder(): void { void createFolderAt(''); }
 </script>
 
 <div class="shell">
@@ -59,12 +235,23 @@
 		</header>
 
 		<div class="tree-tools">
-			<button class="tool-btn" onclick={createNote} title="New note (⌘N)">＋ Note</button>
-			<button class="tool-btn" onclick={createFolder} title="New folder">📁 Folder</button>
+			<button class="tool-btn" onclick={topCreateNote} title="New note">＋ Note</button>
+			<button class="tool-btn" onclick={topCreateFolder} title="New folder">📁 Folder</button>
 		</div>
 
 		<div class="tree-wrap">
-			<FileTree nodes={data.tree as TreeNode[]} vaultId={data.vault.id} {activePath} expanded={rootExpand} />
+			<FileTree
+				nodes={data.tree as TreeNode[]}
+				vaultId={data.vault.id}
+				{activePath}
+				expanded={rootExpand}
+				{renamingPath}
+				onContext={onNodeContext}
+				onRootContext={onRootContextFire}
+				onDropMove={handleDropMove}
+				onRenameCommit={commitRename}
+				onRenameCancel={() => (renamingPath = null)}
+			/>
 		</div>
 
 		<footer class="sidebar-foot">
@@ -78,6 +265,10 @@
 </div>
 
 <QuickSwitcher vaultId={data.vault.id} />
+
+{#if menuOpen}
+	<ContextMenu items={menuItems} pos={menuPos} onClose={closeMenu} />
+{/if}
 
 <style>
 	.shell {

@@ -8,6 +8,7 @@ import { upsertNote, removeNote, getIndex } from '$lib/server/indexer';
 import { renderMarkdown } from '$lib/server/markdown';
 import { splitFrontmatter } from '$lib/server/frontmatter';
 import { commitChange } from '$lib/server/git';
+import { renameNoteAtomically, duplicateNoteAtomically } from '$lib/server/rename';
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
@@ -59,6 +60,38 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		sha = res?.sha ?? null;
 	}
 	return json({ ok: true, created: !existed, sha });
+};
+
+/**
+ * Rename or move a note. Body: { from, to }. Rewrites incoming wikilinks
+ * across the vault and commits everything as one `rename:` commit.
+ */
+export const PATCH: RequestHandler = async ({ params, request }) => {
+	const vault = getVault(params.vaultId);
+	if (!vault) throw error(404, 'vault not found');
+	const body = (await request.json().catch(() => ({}))) as { from?: string; to?: string; duplicate?: boolean };
+	if (!body.from) throw error(400, 'from required');
+
+	if (body.duplicate) {
+		const src = ensureMdExt(body.from);
+		const dst = body.to ? ensureMdExt(body.to) : undefined;
+		try {
+			const res = await duplicateNoteAtomically(vault, src, dst);
+			return json({ ok: true, ...res });
+		} catch (e) {
+			throw error(409, (e as Error).message);
+		}
+	}
+
+	if (!body.to) throw error(400, 'to required for rename');
+	const from = ensureMdExt(body.from);
+	const to = ensureMdExt(body.to);
+	try {
+		const res = await renameNoteAtomically(vault, from, to);
+		return json({ ok: true, from, to, ...res });
+	} catch (e) {
+		throw error(409, (e as Error).message);
+	}
 };
 
 export const DELETE: RequestHandler = async ({ params, url }) => {
