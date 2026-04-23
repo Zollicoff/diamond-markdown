@@ -20,6 +20,10 @@
 		onDropMove?: (src: string, destFolder: string) => void;
 		onRenameCommit?: (node: TreeNode, newName: string) => void;
 		onRenameCancel?: () => void;
+		/** When provided, file clicks go through this callback instead of
+		 *  the default `<a href>` nav. Lets the parent decide which pane/
+		 *  tab mode to open in based on modifier keys. */
+		onFileClick?: (e: MouseEvent, node: TreeNode) => void;
 	}
 
 	let {
@@ -32,7 +36,8 @@
 		onRootContext,
 		onDropMove,
 		onRenameCommit,
-		onRenameCancel
+		onRenameCancel,
+		onFileClick
 	}: Props = $props();
 
 	let expand = $state(expanded);
@@ -174,6 +179,7 @@
 							{onDropMove}
 							{onRenameCommit}
 							{onRenameCancel}
+							{onFileClick}
 						/>
 					</div>
 				{/if}
@@ -202,6 +208,12 @@
 						<a
 							href={`/vault/${vaultId}/note/${encodeURI(n.path)}`}
 							class="file-link"
+							onclick={(e) => {
+								if (onFileClick) { e.preventDefault(); onFileClick(e, n); }
+							}}
+							onauxclick={(e) => {
+								if (e.button === 1 && onFileClick) { e.preventDefault(); onFileClick(e, n); }
+							}}
 						>
 							<span class="file-name">{n.name.replace(/\.md$/, '')}</span>
 						</a>

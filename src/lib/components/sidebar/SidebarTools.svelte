@@ -1,0 +1,32 @@
+<script lang="ts">
+	import { exec } from '$lib/commands';
+
+	interface Props { vaultId: string; }
+	let { vaultId }: Props = $props();
+</script>
+
+<div class="tools">
+	<button class="t-btn" onclick={() => exec('note.create', { vaultId })} title="New note">＋ Note</button>
+	<button class="t-btn" onclick={() => exec('folder.create', { vaultId })} title="New folder">📁 Folder</button>
+</div>
+
+<style>
+	.tools {
+		display: flex;
+		gap: 6px;
+		padding: 6px 10px 10px;
+		border-bottom: 1px solid var(--border);
+	}
+	.t-btn {
+		flex: 1;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		padding: 5px 8px;
+		border-radius: 5px;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.78rem;
+	}
+	.t-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
