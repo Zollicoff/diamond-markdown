@@ -10,7 +10,7 @@ DiamondMD is a markdown knowledge base. The features below are what ships in [[V
 ## Core
 
 - **[[Wikilinks]]** — `[[Note Title]]` resolves to another note in the vault
-- **[[Backlinks]]** — automatic index of every note linking *to* the one you're reading
+- **[[test/Backlinks]]** — automatic index of every note linking *to* the one you're reading
 - **[[Tags]]** — `#tag` in body or `tags: [...]` in frontmatter
 - **[[Frontmatter]]** — YAML metadata at the top of a note
 - **[[Search]]** — fuzzy quick-switcher + full-text search

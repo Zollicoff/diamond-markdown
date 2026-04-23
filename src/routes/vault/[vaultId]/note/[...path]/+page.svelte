@@ -5,21 +5,31 @@
 	import Editor from '$lib/components/Editor.svelte';
 	import Preview from '$lib/components/Preview.svelte';
 	import BacklinksPanel from '$lib/components/BacklinksPanel.svelte';
+	import EditorToolbar from '$lib/components/EditorToolbar.svelte';
+	import TabBar from '$lib/components/TabBar.svelte';
 	import type { LinkResolver } from '$lib/editor/live-preview';
+	import type { EditorApi } from '$lib/editor/commands';
+	import { tabsStore } from '$lib/tabs.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	type Mode = 'live' | 'source' | 'read';
 	let mode = $state<Mode>('live');
 
-	// Editor source of truth while editing. Re-seeded when the note changes.
 	let content = $state(data.note.content);
 	let dirty = $state(false);
 	let saving = $state(false);
 	let savedAt = $state<number | null>(null);
 	let err = $state<string | null>(null);
+	let editorApi = $state<EditorApi | null>(null);
 
 	let lastLoadedPath = data.note.path;
+
+	$effect(() => {
+		// Register (or refresh title on) the active tab whenever the note changes.
+		const title = (data.note.frontmatter?.title as string | undefined) ?? data.note.path.split('/').pop()!.replace(/\.md$/, '');
+		tabsStore.open(data.vault.id, data.note.path, title);
+	});
 
 	$effect(() => {
 		if (data.note.path !== lastLoadedPath) {
@@ -32,15 +42,11 @@
 		}
 	});
 
-	// Build a resolver for the live-preview extension. Uses the backlinks
-	// + outgoing links index that the server already sent us.
 	const knownLinks = $derived(() => {
 		const out = new Map<string, string>();
 		for (const link of data.note.outgoingLinks) {
 			if (link.resolved) out.set(link.target.toLowerCase(), link.resolved);
 		}
-		// Also include a couple of backlinks the server gave us (so existing
-		// pages the user links to stay resolvable even after a fresh render).
 		for (const b of data.note.backlinks) {
 			out.set(b.title.toLowerCase(), b.path);
 			out.set(b.path.toLowerCase(), b.path);
@@ -62,7 +68,6 @@
 			goto(href);
 			return;
 		}
-		// Broken link — prompt to create it in the current folder.
 		const newPath = confirm(`Create note "${target}"?`)
 			? (target.endsWith('.md') ? target : `${target}.md`)
 			: null;
@@ -95,7 +100,6 @@
 		}
 	}
 
-	// Auto-save 1.5s after idle.
 	let idleTimer: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
 		if (!dirty) return;
@@ -123,6 +127,8 @@
 </svelte:head>
 
 <div class="page">
+	<TabBar vaultId={data.vault.id} activePath={data.note.path} />
+
 	<header class="topbar">
 		<div class="crumbs mono">{data.note.path}</div>
 		<div class="tools">
@@ -146,6 +152,10 @@
 		</div>
 	</header>
 
+	{#if mode !== 'read'}
+		<EditorToolbar api={editorApi} />
+	{/if}
+
 	<div class="body">
 		{#if mode === 'read'}
 			<div class="pane preview-pane">
@@ -160,6 +170,7 @@
 					onChange={onContentChange}
 					onSave={save}
 					onWikilinkClick={handleWikilinkClick}
+					onReady={(api) => (editorApi = api)}
 				/>
 			</div>
 		{/if}
@@ -194,13 +205,13 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 10px 16px;
+		padding: 8px 16px;
 		border-bottom: 1px solid var(--border);
 		gap: 16px;
 	}
 	.crumbs {
 		color: var(--fg-muted);
-		font-size: 0.82rem;
+		font-size: 0.8rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -222,15 +233,15 @@
 		background: transparent;
 		border: 0;
 		color: var(--fg-muted);
-		padding: 4px 12px;
+		padding: 3px 10px;
 		border-radius: 4px;
-		font-size: 0.82rem;
+		font-size: 0.8rem;
 		cursor: pointer;
 	}
 	.mode-group button.active { background: var(--bg); color: var(--accent); }
 	.save-status {
 		display: flex; align-items: center; gap: 10px;
-		font-size: 0.82rem;
+		font-size: 0.8rem;
 		color: var(--fg-dim);
 	}
 	.status.saving { color: var(--fg-muted); }
@@ -238,12 +249,12 @@
 	.status.saved  { color: var(--success); }
 	.status.err    { color: var(--danger); }
 	.btn {
-		padding: 4px 12px;
+		padding: 3px 12px;
 		background: var(--bg-elev);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		color: var(--fg);
-		font-size: 0.82rem;
+		font-size: 0.8rem;
 		cursor: pointer;
 	}
 	.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }

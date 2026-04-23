@@ -5,6 +5,7 @@
 	import FileTree, { type TreeNode } from '$lib/components/FileTree.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import { tabsStore } from '$lib/tabs.svelte';
 
 	let { data, children }: { data: LayoutData; children: () => unknown } = $props();
 
@@ -93,6 +94,8 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ from: node.path, to: newPath })
 				});
+				const titleFromNew = newPath.split('/').pop()!.replace(/\.md$/, '');
+				tabsStore.rename(data.vault.id, node.path, newPath, titleFromNew);
 				await invalidateAll();
 				// If we renamed the currently-open note, nav to the new URL.
 				if (activePath === node.path) {
@@ -104,8 +107,14 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ from: node.path, to: newPath })
 				});
+				// Folder rename — every tab whose path starts with the old folder moves too.
+				for (const t of [...tabsStore.tabs]) {
+					if (t.path === node.path || t.path.startsWith(node.path + '/')) {
+						const newT = newPath + t.path.slice(node.path.length);
+						tabsStore.rename(data.vault.id, t.path, newT, t.title);
+					}
+				}
 				await invalidateAll();
-				// If current note was inside, redirect.
 				if (activePath && activePath.startsWith(node.path + '/')) {
 					const rel = activePath.slice(node.path.length + 1);
 					goto(`/vault/${data.vault.id}/note/${encodeURI(newPath + '/' + rel)}`, { replaceState: true });
@@ -118,6 +127,7 @@
 		if (!confirm(`Delete "${node.name}"? This is reversible via git log.`)) return;
 		try {
 			await api(`/api/vaults/${data.vault.id}/note?path=${encodeURIComponent(node.path)}`, { method: 'DELETE' });
+			tabsStore.close(data.vault.id, node.path);
 			await invalidateAll();
 			if (activePath === node.path) goto(`/vault/${data.vault.id}`, { replaceState: true });
 		} catch (e) { notify((e as Error).message, 'err'); }
@@ -131,6 +141,12 @@
 		try {
 			const url = `/api/vaults/${data.vault.id}/folder?path=${encodeURIComponent(node.path)}${force ? '&force=1' : ''}`;
 			await api(url, { method: 'DELETE' });
+			// Close every tab under the deleted folder.
+			for (const t of [...tabsStore.tabs]) {
+				if (t.path === node.path || t.path.startsWith(node.path + '/')) {
+					tabsStore.close(data.vault.id, t.path);
+				}
+			}
 			await invalidateAll();
 			if (activePath && (activePath === node.path || activePath.startsWith(node.path + '/'))) {
 				goto(`/vault/${data.vault.id}`, { replaceState: true });
@@ -169,6 +185,18 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ from: srcPath, to: newPath })
 			});
+			// Tab bookkeeping for the move.
+			if (isFolder) {
+				for (const t of [...tabsStore.tabs]) {
+					if (t.path === srcPath || t.path.startsWith(srcPath + '/')) {
+						const newT = newPath + t.path.slice(srcPath.length);
+						tabsStore.rename(data.vault.id, t.path, newT, t.title);
+					}
+				}
+			} else {
+				const newTitle = newPath.split('/').pop()!.replace(/\.md$/, '');
+				tabsStore.rename(data.vault.id, srcPath, newPath, newTitle);
+			}
 			await invalidateAll();
 			if (!isFolder && activePath === srcPath) {
 				goto(`/vault/${data.vault.id}/note/${encodeURI(newPath)}`, { replaceState: true });
@@ -228,7 +256,15 @@
 </script>
 
 <div class="shell">
-	<aside class="sidebar">
+	<aside
+		class="sidebar"
+		oncontextmenu={(e) => {
+			// Only fire the root menu when the click didn't originate on a tree node.
+			if ((e.target as HTMLElement).closest('.node')) return;
+			e.preventDefault();
+			onRootContextFire(e);
+		}}
+	>
 		<header class="sidebar-head">
 			<a class="brand" href="/">Diamond</a>
 			<span class="vault-name">{data.vault.name}</span>

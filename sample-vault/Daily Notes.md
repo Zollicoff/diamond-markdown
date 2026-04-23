@@ -40,7 +40,7 @@ tags: [daily]
 
 ## Use it as an index
 
-A common pattern: link out from a daily note to any long-form note you worked on that day. Over time the [[Backlinks]] panel on each long-form note becomes a timeline of when you touched it.
+A common pattern: link out from a daily note to any long-form note you worked on that day. Over time the [[test/Backlinks]] panel on each long-form note becomes a timeline of when you touched it.
 
 ## See also
 

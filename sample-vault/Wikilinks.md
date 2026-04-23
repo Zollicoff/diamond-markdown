@@ -30,7 +30,7 @@ Order matches [[Philosophy|Obsidian's rules]] so existing vaults port over clean
 
 ## See also
 
-- [[Backlinks]] — the reverse view
+- [[test/Backlinks]] — the reverse view
 - [[Frontmatter]] — where `aliases` are declared
 - [[Search]] — wikilinks share the same title index as the search box
 

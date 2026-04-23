@@ -70,6 +70,7 @@ Deliberately smaller surface than Obsidian's plugin API — too much API = too m
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
 - **Export to Obsidian** — ensure our vault is 100% Obsidian-readable at all times (already true — we use the same wikilink syntax).
+- **Tauri binary** — wrap the existing web app in Tauri v2 for an offline-first desktop experience without giving up the web-first architecture. Reuses 100% of the current code; the binary just hosts the SvelteKit build against a local filesystem vault. Small Rust shim for filesystem + git; the rest stays as-is. Lands us on macOS / Windows / Linux App Stores without a rewrite.
 
 ## Non-goals
 

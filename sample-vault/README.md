@@ -17,7 +17,7 @@ This vault is a working demo **and** the documentation. Click any `[[wikilink]]`
 ## Feature tour
 
 - [[Wikilinks]] — the `[[double bracket]]` syntax
-- [[Backlinks]] — who's linking here?
+- [[test/Backlinks]] — who's linking here?
 - [[Tags]] — `#hashtags` and tag pages
 - [[Frontmatter]] — YAML metadata
 - [[Git Versioning]] — every save is a commit

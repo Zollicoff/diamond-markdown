@@ -8,6 +8,7 @@
 	import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 	import { tags } from '@lezer/highlight';
 	import { livePreview, type LinkResolver } from '$lib/editor/live-preview';
+	import { makeEditorApi, type EditorApi } from '$lib/editor/commands';
 
 	interface Props {
 		value: string;
@@ -18,6 +19,8 @@
 		onSave?: () => void;
 		/** Called when a wikilink pill is clicked. Target is the resolved href. */
 		onWikilinkClick?: (target: string, href: string | null, resolved: boolean) => void;
+		/** Called once after the editor mounts, giving the parent an API handle. */
+		onReady?: (api: EditorApi) => void;
 	}
 
 	let {
@@ -26,7 +29,8 @@
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
-		onWikilinkClick
+		onWikilinkClick,
+		onReady
 	}: Props = $props();
 
 	let host: HTMLElement;
@@ -129,6 +133,8 @@
 			state: EditorState.create({ doc: value, extensions }),
 			parent: host
 		});
+
+		if (onReady) onReady(makeEditorApi(() => view));
 	});
 
 	onDestroy(() => {
