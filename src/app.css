@@ -1,0 +1,108 @@
+/*
+ * Global theme — vanilla CSS, dark default with a light variant.
+ */
+
+:root {
+	--bg:            #0e1117;
+	--bg-elev:       #161b22;
+	--bg-elev-2:     #1c2230;
+	--bg-hover:      #1f2836;
+	--border:        #2a3140;
+	--border-strong: #3a4354;
+
+	--fg:            #e6edf3;
+	--fg-muted:      #8b949e;
+	--fg-dim:        #6e7681;
+
+	--accent:        #ffcb6b;
+	--accent-soft:   rgba(255, 203, 107, 0.14);
+	--link:          #79c0ff;
+	--link-broken:   #f85149;
+
+	--success:       #3fb950;
+	--warn:          #d29922;
+	--danger:        #f85149;
+
+	--mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+	--sans: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', system-ui, sans-serif;
+	--serif: 'Charter', Georgia, 'Noto Serif', serif;
+}
+
+:root[data-theme='light'] {
+	--bg:            #ffffff;
+	--bg-elev:       #f6f8fa;
+	--bg-elev-2:     #eaeef2;
+	--bg-hover:      #e6ebf0;
+	--border:        #d0d7de;
+	--border-strong: #afb8c1;
+	--fg:            #1f2328;
+	--fg-muted:      #656d76;
+	--fg-dim:        #878f98;
+	--accent:        #bf8700;
+	--accent-soft:   rgba(191, 135, 0, 0.12);
+	--link:          #0969da;
+	--link-broken:   #cf222e;
+	--success:       #1a7f37;
+	--warn:          #9a6700;
+	--danger:        #cf222e;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	overflow: hidden;
+}
+
+a {
+	color: var(--link);
+	text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+button {
+	font-family: inherit;
+}
+
+/* Scrollbar polish (WebKit) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* Wikilink + tag defaults (used by server-rendered preview) */
+.wikilink {
+	color: var(--link);
+	border-bottom: 1px dashed transparent;
+}
+.wikilink:hover {
+	text-decoration: none;
+	border-bottom-color: var(--link);
+}
+.wikilink--broken {
+	color: var(--link-broken);
+	font-style: italic;
+}
+.wikilink--broken:hover { border-bottom-color: var(--link-broken); }
+
+.tag {
+	color: var(--accent);
+	background: var(--accent-soft);
+	padding: 1px 7px;
+	border-radius: 99px;
+	font-size: 0.88em;
+	margin: 0 1px;
+}
+.tag:hover { text-decoration: none; filter: brightness(1.1); }
