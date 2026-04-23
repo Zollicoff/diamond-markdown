@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { openTab } from '$lib/workspace/actions';
 
 	interface Props {
 		html: string;
+		vaultId?: string;
 	}
 
-	let { html }: Props = $props();
+	let { html, vaultId }: Props = $props();
 	let host: HTMLElement;
 
 	// Intercept internal link clicks — use SvelteKit nav instead of full reload.
@@ -16,6 +17,16 @@
 		if (!a) return;
 		const href = a.getAttribute('href');
 		if (!href) return;
+		// Tag links → open the tags tab filtered to that tag.
+		if (a.classList.contains('tag') && vaultId) {
+			const m = /\/vault\/[^/]+\/tag\/(.+)$/.exec(href);
+			if (m) {
+				e.preventDefault();
+				const tag = decodeURIComponent(m[1]);
+				openTab(vaultId, { id: `tags:${tag}`, kind: 'tags', title: `#${tag}`, filter: tag }, 'replace');
+				return;
+			}
+		}
 		if (href.startsWith('/vault/') || href.startsWith('#')) {
 			e.preventDefault();
 			if (href.startsWith('#')) {

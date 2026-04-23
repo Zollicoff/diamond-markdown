@@ -78,3 +78,16 @@ export async function fileLog(vault: Vault, relPath: string, limit = 50): Promis
 		return [];
 	}
 }
+
+/**
+ * Read a file's contents at a specific commit. Returns null if the file
+ * did not exist at that sha (e.g. looking before the first commit).
+ */
+export async function fileAtSha(vault: Vault, relPath: string, sha: string): Promise<string | null> {
+	try {
+		const g = await gitFor(vault);
+		return await g.show([`${sha}:${relPath}`]);
+	} catch {
+		return null;
+	}
+}

@@ -6,6 +6,8 @@
 	import CollapseToggle from '$lib/components/CollapseToggle.svelte';
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
+	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import { hydrate as hydrateWorkspace, workspace } from '$lib/workspace/store.svelte';
 	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar } from '$lib/workspace/actions';
 	import { registerBuiltinCommands } from '$lib/commands';
@@ -87,6 +89,8 @@
 </div>
 
 <QuickSwitcher vaultId={data.vault.id} />
+<CommandPalette vaultId={data.vault.id} />
+<HistoryViewer vaultId={data.vault.id} />
 
 <style>
 	.shell {
@@ -131,5 +135,14 @@
 
 	@media (max-width: 900px) {
 		.shell { grid-template-columns: 240px 22px 1fr 22px 280px; }
+	}
+
+	/* Phones: widen rails for touch, tighten expanded sidebars. */
+	@media (max-width: 640px) {
+		.shell { grid-template-columns: 72vw 40px 1fr 40px 80vw; }
+		.shell.left-collapsed  { grid-template-columns: 0 40px 1fr 40px 80vw; }
+		.shell.right-collapsed { grid-template-columns: 72vw 40px 1fr 40px 0; }
+		.shell.left-collapsed.right-collapsed { grid-template-columns: 0 40px 1fr 40px 0; }
+		.collapse-rail { padding-top: 10px; }
 	}
 </style>

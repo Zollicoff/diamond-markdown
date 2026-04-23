@@ -111,5 +111,37 @@ export const api = {
 		const url = `/api/vaults/${vaultId}/search?q=${encodeURIComponent(query)}${opts.full ? '&full=1' : ''}`;
 		const res = await json<{ results: SearchHit[] }>(url);
 		return res.results ?? [];
+	},
+
+	async tags(vaultId: string): Promise<{ tag: string; count: number }[]> {
+		const res = await json<{ tags: { tag: string; count: number }[] }>(`/api/vaults/${vaultId}/tags`);
+		return res.tags ?? [];
+	},
+
+	async notesByTag(vaultId: string, tag: string): Promise<{ path: string; title: string }[]> {
+		const res = await json<{ notes: { path: string; title: string }[] }>(
+			`/api/vaults/${vaultId}/tags?tag=${encodeURIComponent(tag)}`
+		);
+		return res.notes ?? [];
+	},
+
+	async history(vaultId: string, path: string): Promise<{ sha: string; shortSha: string; date: string; author: string; message: string }[]> {
+		const res = await json<{ log: { sha: string; shortSha: string; date: string; author: string; message: string }[] }>(
+			`/api/vaults/${vaultId}/history?path=${encodeURIComponent(path)}`
+		);
+		return res.log ?? [];
+	},
+
+	async historyAt(vaultId: string, path: string, sha: string): Promise<{ content: string }> {
+		return json<{ content: string }>(
+			`/api/vaults/${vaultId}/history?path=${encodeURIComponent(path)}&sha=${encodeURIComponent(sha)}`
+		);
+	},
+
+	async graph(vaultId: string): Promise<{
+		nodes: { path: string; title: string; degree: number }[];
+		edges: { from: string; to: string }[];
+	}> {
+		return json(`/api/vaults/${vaultId}/graph`);
 	}
 };

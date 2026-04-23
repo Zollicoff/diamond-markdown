@@ -21,9 +21,9 @@
 {#if tab.kind === 'note'}
 	<NoteView {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} />
 {:else if tab.kind === 'graph'}
-	<GraphView />
+	<GraphView {vaultId} />
 {:else if tab.kind === 'tags'}
-	<TagsView />
+	<TagsView {vaultId} filter={tab.filter} />
 {:else if tab.kind === 'search'}
 	<SearchView />
 {:else if tab.kind === 'settings'}

@@ -12,7 +12,7 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
-import { replaceWikilinks } from './wikilink';
+import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
@@ -35,10 +35,22 @@ export interface RenderResult {
 export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string): RenderResult {
 	const outgoing: { target: string; resolved: string | null }[] = [];
 
-	// Replace wikilinks + inline tags, but skip code fences and inline code
-	// so examples in the docs render as-written.
+	// Replace embeds, wikilinks, and inline tags — but skip code fences and
+	// inline code so examples in the docs render as-written. Embeds must
+	// run before wikilinks because the embed syntax is `![[...]]` and the
+	// wikilink regex would otherwise also match the `[[...]]` portion.
 	const processed = processOutsideCode(body, (chunk) => {
-		const withLinks = replaceWikilinks(chunk, (link) => {
+		const withEmbeds = replaceEmbeds(chunk, (e) => {
+			if (isImagePath(e.target)) {
+				const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
+				const alt = e.alt ?? e.target.split('/').pop() ?? '';
+				return `<img src="${src}" alt="${escAttr(alt)}" class="embed-image" loading="lazy">`;
+			}
+			// Non-image embeds fall through as a plain link for now.
+			const display = e.alt ?? e.target;
+			return `<a class="embed-link" href="/api/vaults/${vault.id}/raw/${encodeURI(e.target)}" target="_blank" rel="noopener">${escHtml(display)}</a>`;
+		});
+		const withLinks = replaceWikilinks(withEmbeds, (link) => {
 			const resolved = resolveTarget(idx, link.target);
 			outgoing.push({ target: link.target, resolved });
 			const display = link.display ?? link.target;
@@ -58,7 +70,7 @@ export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string): Ren
 
 	const raw = marked.parse(withTags) as string;
 	const clean = purify.sanitize(raw, {
-		ALLOWED_ATTR: ['href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel'],
+		ALLOWED_ATTR: ['href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel', 'loading', 'width', 'height'],
 		ADD_ATTR: ['target']
 	});
 	return { html: clean, outgoingLinks: outgoing };

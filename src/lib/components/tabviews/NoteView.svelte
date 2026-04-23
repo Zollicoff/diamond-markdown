@@ -8,7 +8,7 @@
 	import type { LinkResolver } from '$lib/editor/live-preview';
 	import type { NoteDoc } from '$lib/types';
 	import { api } from '$lib/vault-api';
-	import { on as onBus } from '$lib/events';
+	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
 
 	interface Props {
@@ -157,6 +157,12 @@
 			{:else if err}<span class="status err" title={err}>error</span>
 			{:else if dirty}<span class="status dirty">●</span>
 			{:else if savedAt}<span class="status saved">{fmtSaved(savedAt)}</span>{/if}
+			<button
+				class="btn"
+				onclick={() => emitBus('history:open', { vaultId, path })}
+				title="Show version history"
+				aria-label="Show version history"
+			>⏱</button>
 			<button class="btn" onclick={save} disabled={!dirty || saving}>Save</button>
 		</div>
 	</header>
@@ -169,7 +175,7 @@
 		{#if !doc}
 			<div class="loading">Loading…</div>
 		{:else if mode === 'read'}
-			<Preview html={doc.html} />
+			<Preview html={doc.html} {vaultId} />
 		{:else}
 			<Editor
 				value={content}

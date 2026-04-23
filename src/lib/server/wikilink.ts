@@ -73,3 +73,31 @@ export function parseInlineTags(body: string): string[] {
 	}
 	return [...tags];
 }
+
+/**
+ * Embed syntax: `![[path/to/image.png]]` or `![[image.png|alt text]]`.
+ * No heading anchors for embeds.
+ */
+export interface ParsedEmbed {
+	raw: string;
+	target: string;
+	alt: string | null;
+}
+
+const EMBED_RE = /!\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
+
+export function replaceEmbeds(body: string, render: (e: ParsedEmbed) => string): string {
+	return body.replace(EMBED_RE, (raw, target, alt) => {
+		return render({
+			raw,
+			target: (target as string).trim(),
+			alt: (alt as string | undefined)?.trim() ?? null
+		});
+	});
+}
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
+
+export function isImagePath(p: string): boolean {
+	return IMAGE_EXT_RE.test(p);
+}

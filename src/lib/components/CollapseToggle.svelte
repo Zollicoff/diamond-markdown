@@ -36,4 +36,13 @@
 		border-radius: 4px;
 	}
 	.chev:hover { color: var(--accent); background: var(--bg-hover); }
+
+	/* Phones: bigger target, easier to tap. */
+	@media (max-width: 640px) {
+		.chev {
+			padding: 10px 8px;
+			font-size: 1.1rem;
+			min-width: 32px;
+		}
+	}
 </style>

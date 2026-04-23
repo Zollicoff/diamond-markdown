@@ -17,6 +17,8 @@ export interface VaultEventMap {
 	'folder:renamed': { vaultId: string; from: string; to: string; };
 	'folder:deleted': { vaultId: string; path: string; };
 	'tree:invalidate': { vaultId: string; };
+	'palette:open':  { vaultId: string; };
+	'history:open':  { vaultId: string; path: string; };
 }
 
 type Handler<K extends keyof VaultEventMap> = (payload: VaultEventMap[K]) => void;
