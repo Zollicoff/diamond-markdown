@@ -9,7 +9,7 @@
 		text?: string;
 	}
 
-	let { size = 'md', animated = true, href = null, text = 'Diamond' }: Props = $props();
+	let { size = 'md', animated = true, href = null, text = 'Diamond Markdown' }: Props = $props();
 
 	const dims: Record<Required<Props>['size'], { wm: number; text: string; tracking: string }> = {
 		xs: { wm: 18, text: '1rem',    tracking: '-0.02em' },

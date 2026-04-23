@@ -25,7 +25,7 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	// Ensure a usable identity even if the user hasn't set one globally.
 	const cfg = await g.listConfig();
 	if (!cfg.all['user.email']) await g.addConfig('user.email', 'noreply@diamondmd', false, 'local');
-	if (!cfg.all['user.name']) await g.addConfig('user.name', 'DiamondMD', false, 'local');
+	if (!cfg.all['user.name']) await g.addConfig('user.name', 'Diamond Markdown', false, 'local');
 	return g;
 }
 

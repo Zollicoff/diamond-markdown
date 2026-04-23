@@ -15,7 +15,7 @@
 
 <aside class="sidebar">
 	<header class="head">
-		<Wordmark size="xs" href="/" text="Diamond Markdown" />
+		<Wordmark size="xs" href="/" />
 		<span class="vault-name">{vaultName}</span>
 	</header>
 
