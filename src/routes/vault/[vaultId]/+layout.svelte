@@ -54,11 +54,11 @@
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
 >
-	{#if !workspace.leftSidebarCollapsed}
-		<div class="col left-col">
-			<LeftSidebar vaultId={data.vault.id} vaultName={data.vault.name} {tree} />
-		</div>
-	{/if}
+	<!-- Always 5 grid slots. Collapse happens via CSS width:0 + overflow:hidden
+	     so slot positions stay stable; no #if here or the grid shifts. -->
+	<div class="col left-col">
+		<LeftSidebar vaultId={data.vault.id} vaultName={data.vault.name} {tree} />
+	</div>
 
 	<div class="collapse-rail left-rail">
 		<CollapseToggle
@@ -81,11 +81,9 @@
 		/>
 	</div>
 
-	{#if !workspace.rightSidebarCollapsed}
-		<div class="col right-col">
-			<RightPanel vaultId={data.vault.id} doc={activeDoc} />
-		</div>
-	{/if}
+	<div class="col right-col">
+		<RightPanel vaultId={data.vault.id} doc={activeDoc} />
+	</div>
 </div>
 
 <QuickSwitcher vaultId={data.vault.id} />
@@ -93,15 +91,23 @@
 <style>
 	.shell {
 		display: grid;
-		grid-template-columns: 280px 20px 1fr 20px 300px;
+		grid-template-columns: 280px 22px 1fr 22px 300px;
 		height: 100vh;
 		min-height: 0;
+		transition: grid-template-columns 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
 	}
-	.shell.left-collapsed  { grid-template-columns: 0 20px 1fr 20px 300px; }
-	.shell.right-collapsed { grid-template-columns: 280px 20px 1fr 20px 0; }
-	.shell.left-collapsed.right-collapsed { grid-template-columns: 0 20px 1fr 20px 0; }
+	.shell.left-collapsed  { grid-template-columns: 0 22px 1fr 22px 300px; }
+	.shell.right-collapsed { grid-template-columns: 280px 22px 1fr 22px 0; }
+	.shell.left-collapsed.right-collapsed { grid-template-columns: 0 22px 1fr 22px 0; }
 
-	.col { min-width: 0; overflow: hidden; }
+	.col { min-width: 0; min-height: 0; overflow: hidden; }
+	/* When width reaches 0 via the grid template, the inner sidebar is
+	   clipped. No flash of half-visible content. */
+	.shell.left-collapsed .left-col,
+	.shell.right-collapsed .right-col {
+		visibility: hidden;
+	}
+
 	.collapse-rail {
 		display: flex;
 		align-items: flex-start;
@@ -124,6 +130,6 @@
 	.center > :global(.workspace) { flex: 1; min-height: 0; }
 
 	@media (max-width: 900px) {
-		.shell { grid-template-columns: 240px 20px 1fr 20px 280px; }
+		.shell { grid-template-columns: 240px 22px 1fr 22px 280px; }
 	}
 </style>
