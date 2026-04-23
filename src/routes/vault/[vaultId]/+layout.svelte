@@ -5,6 +5,7 @@
 	import FileTree, { type TreeNode } from '$lib/components/FileTree.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import Wordmark from '$lib/components/Wordmark.svelte';
 	import { tabsStore } from '$lib/tabs.svelte';
 
 	let { data, children }: { data: LayoutData; children: () => unknown } = $props();
@@ -266,7 +267,7 @@
 		}}
 	>
 		<header class="sidebar-head">
-			<a class="brand" href="/">Diamond</a>
+			<Wordmark size="sm" href="/" />
 			<span class="vault-name">{data.vault.name}</span>
 		</header>
 
@@ -322,20 +323,13 @@
 	}
 	.sidebar-head {
 		padding: 14px 16px 10px;
-		display: flex; flex-direction: column; gap: 4px;
-	}
-	.brand {
-		font-size: 1.2rem;
-		font-weight: 700;
-		color: var(--accent);
-		letter-spacing: -0.01em;
-		line-height: 1;
-		text-decoration: none;
+		display: flex; flex-direction: column; gap: 6px;
 	}
 	.vault-name {
 		font-size: 0.78rem;
 		color: var(--fg-muted);
 		font-family: var(--mono);
+		padding-left: 2px;
 	}
 
 	.tree-tools {
