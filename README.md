@@ -92,3 +92,19 @@ MIT. See [LICENSE](./LICENSE).
 ## Contributing
 
 Early days — open an issue if you've got an idea or run into a bug. See [CONTRIBUTING.md](./CONTRIBUTING.md). Style: vanilla CSS (no Tailwind), TypeScript strict, Svelte 5 runes.
+
+## Acknowledgments
+
+DiamondMD is a clean-room implementation, but it stands on a lot of other people's work.
+
+- **[Obsidian](https://obsidian.md)** — the UX model that defined modern personal knowledge bases. The wikilink / backlink / graph / live-preview / vault mental model that DiamondMD adopts is theirs. We use none of their code; we credit the shape of the idea.
+- **[CodeMirror 6](https://codemirror.net)** (MIT) — the editor engine behind source and live-preview modes.
+- **[Svelte](https://svelte.dev) & [SvelteKit](https://kit.svelte.dev)** (MIT) — framework.
+- **[marked](https://marked.js.org)** (MIT) — markdown → HTML.
+- **[DOMPurify](https://github.com/cure53/DOMPurify)** (MPL-2.0 / Apache-2.0) — HTML sanitization.
+- **[jsdom](https://github.com/jsdom/jsdom)** (MIT) — DOM shim for server-side sanitization.
+- **[simple-git](https://github.com/steveukx/git-js)** (MIT) — git wrapper for auto-commits and history.
+- **[Fuse.js](https://fusejs.io)** (Apache-2.0) — fuzzy search.
+- **[Lezer](https://lezer.codemirror.net)** (MIT) — incremental parsing behind CodeMirror's markdown language.
+
+Full library list with license notices in [ACKNOWLEDGMENTS.md](./ACKNOWLEDGMENTS.md).
