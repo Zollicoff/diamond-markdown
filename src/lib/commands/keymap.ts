@@ -19,7 +19,8 @@ const bindings: KeyBinding[] = [
 	{ combo: 'mod+\\', commandId: 'view.toggle-left-sidebar' },
 	{ combo: 'mod+shift+\\', commandId: 'view.toggle-right-sidebar' },
 	{ combo: 'mod+w', commandId: 'tabs.close' },
-	{ combo: 'mod+p', commandId: 'palette.open' }
+	{ combo: 'mod+p', commandId: 'palette.open' },
+	{ combo: 'mod+shift+d', commandId: 'daily.open' }
 ];
 
 export function installGlobalKeymap(getCtx: () => CommandContext): () => void {

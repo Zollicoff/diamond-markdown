@@ -3,8 +3,9 @@
  */
 
 import { register, type CommandContext } from '../registry';
-import { toggleLeftSidebar, toggleRightSidebar, openTab } from '$lib/workspace/actions';
+import { toggleLeftSidebar, toggleRightSidebar, openTab, openNote } from '$lib/workspace/actions';
 import { emit } from '$lib/events';
+import { api } from '$lib/vault-api';
 
 export function registerViewCommands(): void {
 	register({
@@ -50,6 +51,39 @@ export function registerViewCommands(): void {
 		category: 'view',
 		exec(ctx: CommandContext) {
 			openTab(ctx.vaultId!, { id: 'graph', kind: 'graph', title: 'Graph' }, 'replace');
+		}
+	});
+
+	register({
+		id: 'daily.open',
+		title: "Open today's daily note",
+		icon: '📅',
+		shortcut: '⌘⇧D',
+		category: 'file',
+		async exec(ctx: CommandContext) {
+			try {
+				const res = await api.openToday(ctx.vaultId!);
+				const title = res.path.split('/').pop()!.replace(/\.md$/, '');
+				openNote(ctx.vaultId!, res.path, title, 'replace');
+			} catch (e) {
+				alert((e as Error).message);
+			}
+		}
+	});
+
+	register({
+		id: 'publish.export',
+		title: 'Publish vault (static site)',
+		icon: '⇪',
+		category: 'file',
+		async exec(ctx: CommandContext) {
+			try {
+				const res = await api.publish(ctx.vaultId!);
+				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
+				alert(msg);
+			} catch (e) {
+				alert('Publish failed: ' + (e as Error).message);
+			}
 		}
 	});
 

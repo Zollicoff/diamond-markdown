@@ -143,5 +143,27 @@ export const api = {
 		edges: { from: string; to: string }[];
 	}> {
 		return json(`/api/vaults/${vaultId}/graph`);
+	},
+
+	async openToday(vaultId: string): Promise<{ path: string; created: boolean; sha?: string | null }> {
+		const res = await json<{ path: string; created: boolean; sha: string | null }>(
+			`/api/vaults/${vaultId}/daily`,
+			{ method: 'POST' }
+		);
+		if (res.created) {
+			emit('note:created', { vaultId, path: res.path });
+			emit('tree:invalidate', { vaultId });
+		}
+		return res;
+	},
+
+	async publish(vaultId: string): Promise<{
+		outDir: string;
+		totalNotes: number;
+		publicNotes: number;
+		imagesCopied: number;
+		skipped: { path: string; reason: string }[];
+	}> {
+		return json(`/api/vaults/${vaultId}/publish`, { method: 'POST' });
 	}
 };

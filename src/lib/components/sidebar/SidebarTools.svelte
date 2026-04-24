@@ -10,8 +10,10 @@
 	<button class="t-btn" onclick={() => exec('folder.create', { vaultId })} title="New folder">📁 Folder</button>
 </div>
 <div class="nav">
+	<button class="n-btn" onclick={() => exec('daily.open', { vaultId })} title="Open today's daily (⌘⇧D)">📅 Today</button>
 	<button class="n-btn" onclick={() => exec('tags.open', { vaultId })} title="Show tags">#  Tags</button>
 	<button class="n-btn" onclick={() => exec('graph.open', { vaultId })} title="Show graph">◉  Graph</button>
+	<button class="n-btn" onclick={() => exec('publish.export', { vaultId })} title="Publish public notes as static site">⇪  Publish</button>
 </div>
 
 <style>
