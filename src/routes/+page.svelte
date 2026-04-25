@@ -153,7 +153,7 @@
 			<kbd>⌘⇧F</kbd> full-text search ·
 			<kbd>F2</kbd> rename
 		</span>
-		<span class="mono">v0.1 · <a href="https://github.com/Zollicoff/diamondmd" target="_blank" rel="noopener">github</a></span>
+		<span class="mono">v0.1 · <a href="https://github.com/Zollicoff/diamondmarkdown" target="_blank" rel="noopener">github</a></span>
 	</footer>
 </div>
 

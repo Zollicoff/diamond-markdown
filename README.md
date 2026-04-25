@@ -27,7 +27,7 @@ The MVP ships a functional editor, file tree, wikilink resolution, backlinks, fu
 Requires Node 20+ and a folder of markdown files (or use the sample vault that ships with the repo).
 
 ```sh
-git clone https://github.com/Zollicoff/diamondmd.git
+git clone https://github.com/Zollicoff/diamondmarkdown.git
 cd diamondmd
 npm install
 npm run dev           # dev mode, http://localhost:5173

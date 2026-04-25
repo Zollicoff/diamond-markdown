@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Launchd plist for DiamondMD on the Prime Symbiote fleet.
-  Runs the production `node build/index.js` from the diamondmd repo.
+  Launchd plist for Diamond Markdown on the Prime Symbiote fleet.
+  Runs the production `node build/index.js` from the diamondmarkdown repo.
 
   Install:
-    cp com.primesymbiote.diamondmd.plist ~/Library/LaunchAgents/
-    launchctl bootout gui/$(id -u)/com.primesymbiote.diamondmd 2>/dev/null
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.primesymbiote.diamondmd.plist
+    cp com.primesymbiote.diamondmarkdown.plist ~/Library/LaunchAgents/
+    launchctl bootout gui/$(id -u)/com.primesymbiote.diamondmarkdown 2>/dev/null
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.primesymbiote.diamondmarkdown.plist
   Tail:
-    tail -f ~/.prime/logs/diamondmd.log
+    tail -f ~/.prime/logs/diamondmarkdown.log
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.primesymbiote.diamondmd</string>
+	<string>com.primesymbiote.diamondmarkdown</string>
 
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/node</string>
-		<string>/Users/primesymbiote/Github/diamondmd/build/index.js</string>
+		<string>/Users/primesymbiote/Github/diamondmarkdown/build/index.js</string>
 	</array>
 
 	<key>WorkingDirectory</key>
-	<string>/Users/primesymbiote/Github/diamondmd</string>
+	<string>/Users/primesymbiote/Github/diamondmarkdown</string>
 
 	<key>EnvironmentVariables</key>
 	<dict>
@@ -46,9 +46,9 @@
 	<true/>
 
 	<key>StandardOutPath</key>
-	<string>/Users/primesymbiote/.prime/logs/diamondmd.log</string>
+	<string>/Users/primesymbiote/.prime/logs/diamondmarkdown.log</string>
 
 	<key>StandardErrorPath</key>
-	<string>/Users/primesymbiote/.prime/logs/diamondmd.err</string>
+	<string>/Users/primesymbiote/.prime/logs/diamondmarkdown.err</string>
 </dict>
 </plist>
