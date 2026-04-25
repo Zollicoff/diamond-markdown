@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { openTab } from '$lib/workspace/actions';
+	import { openNote, openTab } from '$lib/workspace/actions';
+	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 
 	interface Props {
 		html: string;
@@ -10,13 +11,29 @@
 	let { html, vaultId }: Props = $props();
 	let host: HTMLElement;
 
-	// Intercept internal link clicks — use SvelteKit nav instead of full reload.
+	let menuOpen = $state(false);
+	let menuPos = $state<Position>({ x: 0, y: 0 });
+	let menuItems = $state<MenuItem[]>([]);
+
+	function pathFromHref(href: string): string | null {
+		const m = /^\/vault\/[^/]+\/note\/(.+)$/.exec(href);
+		return m ? decodeURIComponent(m[1]) : null;
+	}
+
+	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
+		if (e.button === 1) return 'new-tab';
+		if (e.metaKey || e.ctrlKey) return 'new-tab';
+		if (e.altKey) return 'new-pane';
+		return 'replace';
+	}
+
 	function onClick(e: MouseEvent): void {
 		const target = e.target as HTMLElement;
 		const a = target.closest('a');
 		if (!a) return;
 		const href = a.getAttribute('href');
 		if (!href) return;
+
 		// Tag links → open the tags tab filtered to that tag.
 		if (a.classList.contains('tag') && vaultId) {
 			const m = /\/vault\/[^/]+\/tag\/(.+)$/.exec(href);
@@ -27,22 +44,80 @@
 				return;
 			}
 		}
-		if (href.startsWith('/vault/') || href.startsWith('#')) {
-			e.preventDefault();
-			if (href.startsWith('#')) {
-				const id = decodeURIComponent(href.slice(1));
-				const el = document.getElementById(id);
-				el?.scrollIntoView({ behavior: 'smooth' });
-			} else {
-				goto(href);
+
+		// Wikilink → modifier-aware open through the workspace store.
+		if (a.classList.contains('wikilink') && vaultId) {
+			const path = pathFromHref(href);
+			if (path) {
+				e.preventDefault();
+				const title = path.split('/').pop()!.replace(/\.md$/, '');
+				openNote(vaultId, path, title, modeFor(e));
+				return;
 			}
 		}
+
+		if (href.startsWith('#')) {
+			e.preventDefault();
+			const id = decodeURIComponent(href.slice(1));
+			const el = document.getElementById(id);
+			el?.scrollIntoView({ behavior: 'smooth' });
+			return;
+		}
+
+		if (href.startsWith('/vault/')) {
+			e.preventDefault();
+			goto(href);
+		}
+	}
+
+	function onAuxClick(e: MouseEvent): void {
+		if (e.button !== 1) return; // middle-click only
+		const a = (e.target as HTMLElement | null)?.closest('a');
+		if (!a || !vaultId) return;
+		const href = a.getAttribute('href');
+		if (!href || !a.classList.contains('wikilink')) return;
+		const path = pathFromHref(href);
+		if (!path) return;
+		e.preventDefault();
+		const title = path.split('/').pop()!.replace(/\.md$/, '');
+		openNote(vaultId, path, title, 'new-tab');
+	}
+
+	function onContext(e: MouseEvent): void {
+		const a = (e.target as HTMLElement | null)?.closest('a');
+		if (!a || !vaultId) return;
+		const href = a.getAttribute('href');
+		if (!href || !a.classList.contains('wikilink')) return;
+		const path = pathFromHref(href);
+		if (!path) return;
+		e.preventDefault();
+		const title = path.split('/').pop()!.replace(/\.md$/, '');
+		menuPos = { x: e.clientX, y: e.clientY };
+		menuItems = [
+			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, path, title, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, path, title, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, path, title, 'new-pane') },
+			{ separator: true, label: '' },
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(path).catch(() => {}); } }
+		];
+		menuOpen = true;
 	}
 </script>
 
-<div bind:this={host} class="preview" onclick={onClick} role="article">
+<div
+	bind:this={host}
+	class="preview"
+	onclick={onClick}
+	onauxclick={onAuxClick}
+	oncontextmenu={onContext}
+	role="article"
+>
 	{@html html}
 </div>
+
+{#if menuOpen}
+	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
+{/if}
 
 <style>
 	.preview {

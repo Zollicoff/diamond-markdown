@@ -10,6 +10,7 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -126,12 +127,18 @@
 		return { resolved: false };
 	};
 
-	function handleWikilinkClick(target: string, href: string | null, resolved: boolean): void {
+	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
+		if (e.button === 1) return 'new-tab';
+		if (e.metaKey || e.ctrlKey) return 'new-tab';
+		if (e.altKey) return 'new-pane';
+		return 'replace';
+	}
+
+	function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
 		if (resolved && href) {
-			// Click a wikilink → replace THIS pane's active tab.
 			const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
 			const notePath = href.replace(`/vault/${vaultId}/note/`, '');
-			openNote(vaultId, decodeURIComponent(notePath), noteTitle, 'replace');
+			openNote(vaultId, decodeURIComponent(notePath), noteTitle, modeFor(e));
 			return;
 		}
 		const createPath = confirm(`Create note "${target}"?`)
@@ -139,6 +146,25 @@
 			: null;
 		if (!createPath) return;
 		goto(`/vault/${vaultId}/note/${encodeURI(createPath)}`);
+	}
+
+	let menuOpen = $state(false);
+	let menuPos = $state<Position>({ x: 0, y: 0 });
+	let menuItems = $state<MenuItem[]>([]);
+
+	function handleWikilinkContext(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
+		if (!resolved || !href) return;
+		const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
+		const notePath = decodeURIComponent(href.replace(`/vault/${vaultId}/note/`, ''));
+		menuPos = { x: e.clientX, y: e.clientY };
+		menuItems = [
+			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, notePath, noteTitle, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, notePath, noteTitle, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, notePath, noteTitle, 'new-pane') },
+			{ separator: true, label: '' },
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(notePath).catch(() => {}); } }
+		];
+		menuOpen = true;
 	}
 
 	function fmtSaved(ms: number | null): string {
@@ -184,11 +210,16 @@
 				onChange={onContentChange}
 				onSave={save}
 				onWikilinkClick={handleWikilinkClick}
+				onWikilinkContext={handleWikilinkContext}
 				onReady={(a) => (editorApi = a)}
 			/>
 		{/if}
 	</div>
 </div>
+
+{#if menuOpen}
+	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
+{/if}
 
 <style>
 	.note-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }

@@ -18,7 +18,9 @@
 		onChange?: (v: string) => void;
 		onSave?: () => void;
 		/** Called when a wikilink pill is clicked. Target is the resolved href. */
-		onWikilinkClick?: (target: string, href: string | null, resolved: boolean) => void;
+		onWikilinkClick?: (target: string, href: string | null, resolved: boolean, e: MouseEvent) => void;
+		/** Called when a wikilink pill is right-clicked. */
+		onWikilinkContext?: (target: string, href: string | null, resolved: boolean, e: MouseEvent) => void;
 		/** Called once after the editor mounts, giving the parent an API handle. */
 		onReady?: (api: EditorApi) => void;
 	}
@@ -30,6 +32,7 @@
 		onChange,
 		onSave,
 		onWikilinkClick,
+		onWikilinkContext,
 		onReady
 	}: Props = $props();
 
@@ -95,7 +98,30 @@
 					event.preventDefault();
 					const href = link.getAttribute('href');
 					const tgt = link.dataset.target ?? '';
-					onWikilinkClick?.(tgt, href, !link.classList.contains('cm-wikilink--broken'));
+					onWikilinkClick?.(tgt, href, !link.classList.contains('cm-wikilink--broken'), event);
+					return true;
+				},
+				auxclick(event) {
+					if (event.button !== 1) return false; // middle-click
+					const target = event.target as HTMLElement | null;
+					if (!target) return false;
+					const link = target.closest<HTMLAnchorElement>('[data-diamond-wikilink]');
+					if (!link) return false;
+					event.preventDefault();
+					const href = link.getAttribute('href');
+					const tgt = link.dataset.target ?? '';
+					onWikilinkClick?.(tgt, href, !link.classList.contains('cm-wikilink--broken'), event);
+					return true;
+				},
+				contextmenu(event) {
+					const target = event.target as HTMLElement | null;
+					if (!target) return false;
+					const link = target.closest<HTMLAnchorElement>('[data-diamond-wikilink]');
+					if (!link) return false;
+					event.preventDefault();
+					const href = link.getAttribute('href');
+					const tgt = link.dataset.target ?? '';
+					onWikilinkContext?.(tgt, href, !link.classList.contains('cm-wikilink--broken'), event);
 					return true;
 				}
 			}),
