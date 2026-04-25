@@ -11,7 +11,7 @@ interface TreeNode {
 	children?: TreeNode[];
 }
 
-function walk(dir: string, base: string): TreeNode[] {
+function walk(dir: string, base: string, excluded: Set<string>): TreeNode[] {
 	let entries: fs.Dirent[];
 	try {
 		entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -24,12 +24,12 @@ function walk(dir: string, base: string): TreeNode[] {
 		const abs = path.join(dir, e.name);
 		const rel = path.relative(base, abs).split(path.sep).join('/');
 		if (e.isDirectory()) {
-			nodes.push({ name: e.name, path: rel, type: 'directory', children: walk(abs, base) });
+			if (excluded.has(rel)) continue;
+			nodes.push({ name: e.name, path: rel, type: 'directory', children: walk(abs, base, excluded) });
 		} else if (e.isFile() && e.name.endsWith('.md')) {
 			nodes.push({ name: e.name, path: rel, type: 'file' });
 		}
 	}
-	// Directories first, then files, alphabetical within each.
 	return nodes.sort((a, b) => {
 		if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
 		return a.name.localeCompare(b.name);
@@ -39,5 +39,6 @@ function walk(dir: string, base: string): TreeNode[] {
 export const GET: RequestHandler = async ({ params }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
-	return json({ tree: walk(vault.path, vault.path) });
+	const excluded = new Set((vault.excludedFolders ?? []).map((f) => f.replace(/^\/+|\/+$/g, '')));
+	return json({ tree: walk(vault.path, vault.path, excluded), excludedFolders: vault.excludedFolders ?? [] });
 };

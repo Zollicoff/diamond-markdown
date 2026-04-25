@@ -3,6 +3,8 @@
 	import Wordmark from '$lib/components/Wordmark.svelte';
 	import SidebarTools from './SidebarTools.svelte';
 	import FileTreePanel from './FileTreePanel.svelte';
+	import BookmarksPanel from './BookmarksPanel.svelte';
+	import RecentNotesPanel from './RecentNotesPanel.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -20,6 +22,9 @@
 	</header>
 
 	<SidebarTools {vaultId} />
+
+	<BookmarksPanel {vaultId} />
+	<RecentNotesPanel {vaultId} />
 
 	<FileTreePanel {vaultId} {tree} />
 

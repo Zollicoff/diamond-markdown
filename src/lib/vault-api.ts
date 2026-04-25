@@ -165,5 +165,15 @@ export const api = {
 		skipped: { path: string; reason: string }[];
 	}> {
 		return json(`/api/vaults/${vaultId}/publish`, { method: 'POST' });
+	},
+
+	async toggleExcluded(vaultId: string, folder: string): Promise<{ excludedFolders: string[] }> {
+		const res = await json<{ excludedFolders: string[] }>(`/api/vaults/${vaultId}/exclude`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ folder })
+		});
+		emit('tree:invalidate', { vaultId });
+		return res;
 	}
 };

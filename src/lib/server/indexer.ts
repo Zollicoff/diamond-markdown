@@ -59,7 +59,7 @@ export function rebuildIndex(vault: Vault): VaultIndex {
 	return idx;
 }
 
-/** Full rebuild — walks every `.md` under the vault. */
+/** Full rebuild — walks every `.md` under the vault, skipping excluded folders. */
 function buildIndex(vault: Vault): VaultIndex {
 	const idx: VaultIndex = {
 		notes: new Map(),
@@ -70,8 +70,11 @@ function buildIndex(vault: Vault): VaultIndex {
 		tagIndex: new Map()
 	};
 
+	const excluded = new Set((vault.excludedFolders ?? []).map((f) => f.replace(/^\/+|\/+$/g, '')));
+
 	for (const abs of walkMarkdown(vault.path)) {
 		const rel = path.relative(vault.path, abs).split(path.sep).join('/');
+		if (isInExcluded(rel, excluded)) continue;
 		try {
 			const body = fs.readFileSync(abs, 'utf-8');
 			ingestNote(idx, rel, body);
@@ -217,4 +220,14 @@ function* walkMarkdown(dir: string): Iterable<string> {
 			yield full;
 		}
 	}
+}
+
+/** Is `rel` (forward-slash, vault-relative) inside any excluded folder? */
+function isInExcluded(rel: string, excluded: Set<string>): boolean {
+	if (excluded.size === 0) return false;
+	for (const folder of excluded) {
+		if (rel === folder) return true;
+		if (rel.startsWith(folder + '/')) return true;
+	}
+	return false;
 }

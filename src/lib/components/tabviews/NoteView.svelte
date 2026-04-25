@@ -70,11 +70,13 @@
 			}),
 			onBus('note:renamed', (e) => {
 				if (e.vaultId === vaultId && e.from === path) {
-					// The parent will swap our `path` prop because of the tab
-					// rewrite in workspace store; we just need to refetch at
-					// the new path.
 					setTimeout(() => void load(), 0);
 				}
+			}),
+			onBus('template:insert', (e) => {
+				// Only the focused note view should consume the template insert.
+				if (e.vaultId !== vaultId || !isFocused) return;
+				editorApi?.insert(e.content);
 			})
 		];
 		return () => offs.forEach((off) => off());
@@ -167,6 +169,17 @@
 		menuOpen = true;
 	}
 
+	const wordCount = $derived.by<number>(() => {
+		// Strip frontmatter, then count word-shaped tokens.
+		const stripped = content.replace(/^---[\s\S]*?\n---\s*\n/, '').replace(/`[^`]*`/g, ' ').replace(/```[\s\S]*?```/g, ' ');
+		const m = stripped.match(/[\p{L}\p{N}'-]+/gu);
+		return m ? m.length : 0;
+	});
+
+	const readingTime = $derived<string>(
+		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / 220))} min`
+	);
+
 	function fmtSaved(ms: number | null): string {
 		if (!ms) return '';
 		const d = Date.now() - ms;
@@ -179,6 +192,9 @@
 	<header class="topbar">
 		<div class="crumbs mono">{path}</div>
 		<div class="save-status">
+			{#if wordCount > 0}
+				<span class="meta mono" title="Word count · estimated reading time">{wordCount} words · {readingTime}</span>
+			{/if}
 			{#if saving}<span class="status saving">saving…</span>
 			{:else if err}<span class="status err" title={err}>error</span>
 			{:else if dirty}<span class="status dirty">●</span>
@@ -234,6 +250,7 @@
 	}
 	.crumbs { color: var(--fg-muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 	.save-status { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--fg-dim); }
+	.meta { font-size: 0.74rem; color: var(--fg-muted); white-space: nowrap; }
 	.status.saving { color: var(--fg-muted); }
 	.status.dirty  { color: var(--accent); font-size: 1.2em; line-height: 1; }
 	.status.saved  { color: var(--success); }

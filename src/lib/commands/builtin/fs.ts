@@ -8,6 +8,7 @@
 
 import { api } from '$lib/vault-api';
 import { register, type CommandContext } from '../registry';
+import * as bookmarks from '$lib/bookmarks.svelte';
 
 async function promptPath(msg: string, placeholder = ''): Promise<string | null> {
 	if (typeof window === 'undefined') return null;
@@ -125,6 +126,35 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			if (!ctx.node) return;
 			await navigator.clipboard?.writeText(ctx.node.path).catch(() => {});
+		}
+	});
+
+	register({
+		id: 'note.toggle-star',
+		title: 'Toggle bookmark',
+		icon: '★',
+		category: 'file',
+		exec(ctx: CommandContext) {
+			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
+			if (!path || !ctx.vaultId) return;
+			const title = (ctx.node?.name ?? path.split('/').pop() ?? path).replace(/\.md$/, '');
+			bookmarks.toggle(ctx.vaultId, path, title);
+		}
+	});
+
+	register({
+		id: 'folder.toggle-exclude',
+		title: 'Toggle excluded folder',
+		icon: '🚫',
+		category: 'file',
+		when: (ctx) => ctx.node?.type === 'directory',
+		async exec(ctx: CommandContext) {
+			if (!ctx.node || ctx.node.type !== 'directory' || !ctx.vaultId) return;
+			try {
+				await api.toggleExcluded(ctx.vaultId, ctx.node.path);
+			} catch (e) {
+				alert((e as Error).message);
+			}
 		}
 	});
 }

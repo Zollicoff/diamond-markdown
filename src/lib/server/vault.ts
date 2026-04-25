@@ -17,6 +17,32 @@ export interface Vault {
 	id: string;
 	name: string;
 	path: string;
+	/** Folder paths (vault-relative, no trailing slash) skipped from index +
+	 *  search + graph + tree. Useful for archive/, attachments/, etc. */
+	excludedFolders?: string[];
+}
+
+export function setExcludedFolders(id: string, folders: string[]): Vault | null {
+	const cfg = load();
+	const v = cfg.vaults.find((x) => x.id === id);
+	if (!v) return null;
+	const cleaned = [...new Set(folders.map((f) => f.replace(/^\/+|\/+$/g, '')).filter(Boolean))];
+	v.excludedFolders = cleaned;
+	save(cfg);
+	return v;
+}
+
+export function toggleExcludedFolder(id: string, folder: string): Vault | null {
+	const cfg = load();
+	const v = cfg.vaults.find((x) => x.id === id);
+	if (!v) return null;
+	const cleaned = folder.replace(/^\/+|\/+$/g, '');
+	const cur = new Set(v.excludedFolders ?? []);
+	if (cur.has(cleaned)) cur.delete(cleaned);
+	else cur.add(cleaned);
+	v.excludedFolders = [...cur];
+	save(cfg);
+	return v;
 }
 
 export interface Config {

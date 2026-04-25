@@ -46,6 +46,15 @@
 	--danger:        #cf222e;
 }
 
+/* highlight.js — github-dark works visually on a light background only with
+   a dark inset for the code block itself. Don't try to recolor every token;
+   keep the dark code surface and let it sit in a card. */
+:root[data-theme='light'] pre code.hljs,
+:root[data-theme='light'] pre .hljs {
+	background: #161b22;
+	color: #e6edf3;
+}
+
 * {
 	box-sizing: border-box;
 }

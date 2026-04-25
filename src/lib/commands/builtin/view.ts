@@ -6,6 +6,7 @@ import { register, type CommandContext } from '../registry';
 import { toggleLeftSidebar, toggleRightSidebar, openTab, openNote } from '$lib/workspace/actions';
 import { emit } from '$lib/events';
 import { api } from '$lib/vault-api';
+import { cycle as cycleTheme, setMode as setThemeMode } from '$lib/theme.svelte';
 
 export function registerViewCommands(): void {
 	register({
@@ -98,5 +99,66 @@ export function registerViewCommands(): void {
 			if (!notePath) return;
 			emit('history:open', { vaultId: ctx.vaultId!, path: notePath });
 		}
+	});
+
+	register({
+		id: 'template.insert',
+		title: 'Insert template…',
+		icon: '📋',
+		shortcut: '⌘⇧T',
+		category: 'file',
+		async exec(ctx: CommandContext) {
+			if (!ctx.vaultId) return;
+			try {
+				const list = await fetch(`/api/vaults/${ctx.vaultId}/templates`).then((r) => r.json()) as { templates: { path: string; name: string }[] };
+				const tpls = list.templates ?? [];
+				if (tpls.length === 0) {
+					alert('No templates yet. Create files in Templates/ to use as templates.');
+					return;
+				}
+				const choice = window.prompt(`Insert template (type the name):\n\n${tpls.map((t, i) => `${i + 1}. ${t.name}`).join('\n')}`, tpls[0].name);
+				if (!choice) return;
+				let chosen: { path: string; name: string } | undefined;
+				const asNum = parseInt(choice, 10);
+				if (!isNaN(asNum) && asNum >= 1 && asNum <= tpls.length) chosen = tpls[asNum - 1];
+				else chosen = tpls.find((t) => t.name.toLowerCase() === choice.trim().toLowerCase());
+				if (!chosen) { alert(`No template named "${choice}".`); return; }
+				const noteTitle = (ctx.notePath as string | undefined)?.split('/').pop()?.replace(/\.md$/, '') ?? '';
+				const res = await fetch(`/api/vaults/${ctx.vaultId}/templates?name=${encodeURIComponent(chosen.name)}&title=${encodeURIComponent(noteTitle)}`).then((r) => r.json()) as { content: string };
+				emit('template:insert', { vaultId: ctx.vaultId, content: res.content });
+			} catch (e) {
+				alert((e as Error).message);
+			}
+		}
+	});
+
+	register({
+		id: 'theme.cycle',
+		title: 'Cycle theme (dark / light / auto)',
+		icon: '◐',
+		shortcut: '⌘⇧L',
+		category: 'view',
+		exec() { cycleTheme(); }
+	});
+	register({
+		id: 'theme.dark',
+		title: 'Theme: Dark',
+		icon: '●',
+		category: 'view',
+		exec() { setThemeMode('dark'); }
+	});
+	register({
+		id: 'theme.light',
+		title: 'Theme: Light',
+		icon: '○',
+		category: 'view',
+		exec() { setThemeMode('light'); }
+	});
+	register({
+		id: 'theme.auto',
+		title: 'Theme: Auto (match system)',
+		icon: '◐',
+		category: 'view',
+		exec() { setThemeMode('auto'); }
 	});
 }

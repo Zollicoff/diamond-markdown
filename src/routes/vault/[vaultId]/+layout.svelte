@@ -9,10 +9,11 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import { hydrate as hydrateWorkspace, workspace } from '$lib/workspace/store.svelte';
-	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar } from '$lib/workspace/actions';
+	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar, activePane, activeTab } from '$lib/workspace/actions';
 	import { registerBuiltinCommands } from '$lib/commands';
 	import { installGlobalKeymap } from '$lib/commands/keymap';
 	import { on as onBus } from '$lib/events';
+	import { hydrate as hydrateBookmarks, rename as renameBookmark, deleted as deleteBookmark } from '$lib/bookmarks.svelte';
 	import type { NoteDoc } from '$lib/types';
 	import type { TreeNode } from '$lib/types';
 
@@ -20,6 +21,7 @@
 
 	// Boot: hydrate workspace, wire event listeners, register commands.
 	hydrateWorkspace(data.vault.id);
+	hydrateBookmarks(data.vault.id);
 	registerBuiltinCommands();
 
 	let tree = $state<TreeNode[]>(data.tree);
@@ -35,13 +37,37 @@
 			bindVaultEvents(data.vault.id),
 			onBus('tree:invalidate', async (e) => {
 				if (e.vaultId !== data.vault.id) return;
-				// Re-fetch tree from API (layout server load won't re-run client-side).
 				try {
 					const res = await fetch(`/api/vaults/${data.vault.id}/tree`);
 					if (res.ok) tree = (await res.json()).tree;
 				} catch { /* ignore */ }
 			}),
-			installGlobalKeymap(() => ({ vaultId: data.vault.id }))
+			onBus('note:renamed', (e) => {
+				if (e.vaultId !== data.vault.id) return;
+				renameBookmark(data.vault.id, e.from, e.to);
+			}),
+			onBus('folder:renamed', (e) => {
+				if (e.vaultId !== data.vault.id) return;
+				renameBookmark(data.vault.id, e.from, e.to);
+			}),
+			onBus('note:deleted', (e) => {
+				if (e.vaultId !== data.vault.id) return;
+				deleteBookmark(data.vault.id, e.path);
+			}),
+			onBus('folder:deleted', (e) => {
+				if (e.vaultId !== data.vault.id) return;
+				deleteBookmark(data.vault.id, e.path);
+			}),
+			installGlobalKeymap(() => {
+				const pane = activePane();
+				const tab = activeTab();
+				return {
+					vaultId: data.vault.id,
+					paneId: pane?.id,
+					tabId: tab?.id,
+					notePath: tab?.kind === 'note' ? tab.path : undefined
+				};
+			})
 		];
 		return () => offs.forEach((off) => off?.());
 	});
@@ -49,6 +75,26 @@
 	function onDocLoaded(doc: NoteDoc): void {
 		activeDoc = doc;
 	}
+
+	// State → URL sync: keep the URL pointed at whatever note is active in
+	// the active pane, without polluting browser history. Clicks that need
+	// real history entries can call goto() — those flow through +page.svelte
+	// which re-runs this effect at a stable URL.
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const pane = workspace.panes[workspace.activePaneId];
+		if (!pane) return;
+		const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
+		if (!tab) return;
+		let desired: string | null = null;
+		if (tab.kind === 'note') desired = `/vault/${data.vault.id}/note/${encodeURI(tab.path)}`;
+		if (!desired) return;
+		const current = window.location.pathname;
+		if (current === desired) return;
+		try {
+			window.history.replaceState(window.history.state, '', desired + window.location.search + window.location.hash);
+		} catch { /* ignore — third-party iframes etc. */ }
+	});
 </script>
 
 <div
