@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { openNote, openTab } from '$lib/workspace/actions';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
@@ -10,6 +11,12 @@
 
 	let { html, vaultId }: Props = $props();
 	let host: HTMLElement;
+
+	// Hover-preview state — popped when the user lingers on a wikilink.
+	let hoverCard = $state<{ x: number; y: number; html: string } | null>(null);
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+	let hoverFetchAbort: AbortController | null = null;
+	const previewCache = new Map<string, string>();
 
 	let menuOpen = $state(false);
 	let menuPos = $state<Position>({ x: 0, y: 0 });
@@ -102,6 +109,102 @@
 		];
 		menuOpen = true;
 	}
+
+	function clearHover(): void {
+		if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+		hoverFetchAbort?.abort();
+		hoverFetchAbort = null;
+		hoverCard = null;
+	}
+
+	function onPointerOver(e: PointerEvent): void {
+		if (!vaultId) return;
+		const a = (e.target as HTMLElement | null)?.closest('a');
+		if (!a || !a.classList.contains('wikilink')) { clearHover(); return; }
+		const href = a.getAttribute('href');
+		if (!href) return;
+		const path = pathFromHref(href);
+		if (!path) return; // broken wikilink — no preview to show
+		// Position card just above the link so it doesn't cover what you're reading.
+		const rect = a.getBoundingClientRect();
+		const x = rect.left;
+		const y = rect.top - 8; // pinned ABOVE; flipped below if it would overflow
+
+		if (hoverTimer) clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(async () => {
+			const cached = previewCache.get(path);
+			if (cached) {
+				hoverCard = { x, y, html: cached };
+				return;
+			}
+			hoverFetchAbort?.abort();
+			hoverFetchAbort = new AbortController();
+			try {
+				const res = await fetch(`/api/vaults/${vaultId}/preview?path=${encodeURIComponent(path)}`, { signal: hoverFetchAbort.signal });
+				if (!res.ok) return;
+				const data = await res.json() as { html: string };
+				previewCache.set(path, data.html);
+				hoverCard = { x, y, html: data.html };
+			} catch { /* ignore aborts */ }
+		}, 280);
+	}
+
+	function onPointerOut(e: PointerEvent): void {
+		const to = e.relatedTarget as HTMLElement | null;
+		// Stay open while moving into the card itself.
+		if (to && to.closest('.hover-card')) return;
+		clearHover();
+	}
+
+	// Mermaid: lazy-load + render every .mermaid-block whenever HTML changes.
+	let mermaidLoaded: Promise<typeof import('mermaid').default> | null = null;
+	function loadMermaid(): Promise<typeof import('mermaid').default> {
+		if (!mermaidLoaded) {
+			mermaidLoaded = import('mermaid').then((m) => {
+				m.default.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+				return m.default;
+			});
+		}
+		return mermaidLoaded;
+	}
+
+	async function renderMermaidIn(root: HTMLElement): Promise<void> {
+		const blocks = root.querySelectorAll<HTMLElement>('.mermaid-block:not([data-rendered])');
+		if (blocks.length === 0) return;
+		const mermaid = await loadMermaid();
+		for (const block of blocks) {
+			const enc = block.getAttribute('data-mermaid-source');
+			if (!enc) continue;
+			let source = '';
+			try { source = atob(enc); } catch { continue; }
+			const id = `mm-${Math.random().toString(36).slice(2, 9)}`;
+			try {
+				const { svg } = await mermaid.render(id, source);
+				block.innerHTML = svg;
+				block.setAttribute('data-rendered', '1');
+			} catch (err) {
+				block.innerHTML = `<pre class="mermaid-fallback">Mermaid error: ${(err as Error).message}\n\n${source.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]!)}</pre>`;
+				block.setAttribute('data-rendered', '1');
+			}
+		}
+	}
+
+	// After HTML changes: scroll to hash if URL has one, render mermaid blocks.
+	$effect(() => {
+		void html; // dep
+		if (!host) return;
+		queueMicrotask(() => {
+			void renderMermaidIn(host);
+			const hash = window.location.hash;
+			if (hash && hash.length > 1) {
+				const id = decodeURIComponent(hash.slice(1));
+				const target = host.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+				target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
+		});
+	});
+
+	onMount(() => () => clearHover());
 </script>
 
 <div
@@ -110,10 +213,23 @@
 	onclick={onClick}
 	onauxclick={onAuxClick}
 	oncontextmenu={onContext}
+	onpointerover={onPointerOver}
+	onpointerout={onPointerOut}
 	role="article"
 >
 	{@html html}
 </div>
+
+{#if hoverCard}
+	<div
+		class="hover-card"
+		style="left:{hoverCard.x}px;top:{hoverCard.y}px"
+		onpointerleave={clearHover}
+		role="tooltip"
+	>
+		<div class="hover-card-body">{@html hoverCard.html}</div>
+	</div>
+{/if}
 
 {#if menuOpen}
 	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
@@ -178,4 +294,104 @@
 		margin: 2em 0;
 	}
 	.preview :global(img) { max-width: 100%; border-radius: 6px; }
+
+	/* ── Note embeds ─────────────────────────────────────── */
+	.preview :global(.embed-note) {
+		border: 1px solid var(--border);
+		border-left: 3px solid var(--accent);
+		border-radius: 6px;
+		margin: 1em 0;
+		background: var(--bg-elev);
+		overflow: hidden;
+	}
+	.preview :global(.embed-note-head) {
+		padding: 6px 14px;
+		font-size: 0.78rem;
+		font-family: var(--mono);
+		color: var(--fg-dim);
+		background: var(--bg-elev-2);
+		border-bottom: 1px solid var(--border);
+	}
+	.preview :global(.embed-note-body) { padding: 12px 16px; }
+	.preview :global(.embed-note-body > :first-child) { margin-top: 0; }
+	.preview :global(.embed-note-body > :last-child) { margin-bottom: 0; }
+	.preview :global(.embed-note.embed-cycle) {
+		padding: 8px 14px;
+		font-size: 0.85rem;
+		color: var(--fg-dim);
+		font-style: italic;
+	}
+	.preview :global(.embed-note.embed-cycle .hint) { font-size: 0.74rem; color: var(--fg-muted); margin-left: 6px; }
+	.preview :global(.embed-broken) {
+		color: var(--link-broken);
+		font-style: italic;
+		border-bottom: 1px dotted var(--link-broken);
+	}
+
+	/* ── Mermaid ─────────────────────────────────────────── */
+	.preview :global(.mermaid-block) {
+		margin: 1em 0;
+		padding: 14px 16px;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		text-align: center;
+		overflow-x: auto;
+	}
+	.preview :global(.mermaid-block svg) { max-width: 100%; height: auto; }
+	.preview :global(.mermaid-fallback) {
+		color: var(--fg-muted);
+		font-size: 0.85em;
+		text-align: left;
+		margin: 0;
+	}
+
+	/* ── Math (KaTeX overrides if any) ──────────────────── */
+	.preview :global(.math-error) {
+		color: var(--link-broken);
+		font-family: var(--mono);
+		font-size: 0.92em;
+	}
+	.preview :global(.katex-display) { margin: 1em 0; }
+
+	/* ── Footnotes (marked-footnote output) ─────────────── */
+	.preview :global(.footnotes) {
+		margin-top: 3em;
+		padding-top: 1.4em;
+		border-top: 1px solid var(--border);
+		font-size: 0.92em;
+		color: var(--fg-muted);
+	}
+	.preview :global(.footnote-ref) {
+		font-size: 0.78em;
+		vertical-align: super;
+		margin-left: 1px;
+	}
+	.preview :global(.footnote-backref) { margin-left: 4px; opacity: 0.6; }
+	.preview :global(.footnote-backref:hover) { opacity: 1; }
+
+	/* ── Hover preview card (wikilinks) ─────────────────── */
+	.hover-card {
+		position: fixed;
+		z-index: 900;
+		max-width: 420px;
+		max-height: 320px;
+		overflow-y: auto;
+		background: var(--bg-elev);
+		border: 1px solid var(--border-strong);
+		border-radius: 8px;
+		box-shadow: 0 10px 40px rgba(0,0,0,0.45);
+		padding: 12px 16px;
+		font-family: var(--sans);
+		font-size: 14px;
+		line-height: 1.55;
+		color: var(--fg);
+		transform: translate(0, -100%);
+		pointer-events: auto;
+	}
+	.hover-card-body :global(h1),
+	.hover-card-body :global(h2),
+	.hover-card-body :global(h3) { font-size: 1em; margin: 0 0 0.4em; }
+	.hover-card-body :global(p) { margin: 0 0 0.5em; }
+	.hover-card-body :global(p:last-child) { margin-bottom: 0; }
 </style>

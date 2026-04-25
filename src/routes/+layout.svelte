@@ -1,5 +1,7 @@
 <script lang="ts">
 	import '../app.css';
+	import 'katex/dist/katex.min.css';
+	import 'highlight.js/styles/github-dark.min.css';
 	let { children } = $props();
 </script>
 
