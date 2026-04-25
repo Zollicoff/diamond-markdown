@@ -28,7 +28,7 @@ Requires Node 20+ and a folder of markdown files (or use the sample vault that s
 
 ```sh
 git clone https://github.com/Zollicoff/diamondmarkdown.git
-cd diamondmd
+cd diamondmarkdown
 npm install
 npm run dev           # dev mode, http://localhost:5173
 ```

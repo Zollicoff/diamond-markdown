@@ -8,8 +8,8 @@ tags: [meta, getting-started]
 ## Run it
 
 ```sh
-git clone https://github.com/Zollicoff/diamondmd.git
-cd diamondmd
+git clone https://github.com/Zollicoff/diamondmarkdown.git
+cd diamondmarkdown
 npm install
 npm run dev
 ```
