@@ -1,8 +1,11 @@
 /**
  * Vault registry. Reads/writes ~/.diamondmd/config.json.
  *
- * First run — if the config doesn't exist — we bootstrap with the in-repo
- * sample-vault so the app has something to render without any setup.
+ * First run: copy the bundled sample-vault into a user-data location
+ * (default: ~/Documents/Diamond Markdown) and register THAT path. The
+ * in-repo sample-vault stays a read-only fixture — user data never
+ * leaks back into the program directory. Override the destination with
+ * the DIAMOND_DEFAULT_VAULT_DIR env var.
  */
 
 import fs from 'node:fs';
@@ -44,11 +47,45 @@ function sampleVaultPath(): string {
 	return path.resolve(process.cwd(), 'sample-vault');
 }
 
+function defaultUserVaultDir(): string {
+	const override = process.env.DIAMOND_DEFAULT_VAULT_DIR;
+	if (override && override.trim()) return path.resolve(override.trim().replace(/^~/, os.homedir()));
+	const home = os.homedir();
+	const docs = path.join(home, 'Documents');
+	const base = fs.existsSync(docs) && fs.statSync(docs).isDirectory() ? docs : home;
+	return path.join(base, 'Diamond Markdown');
+}
+
+/** Recursive copy. Skips .git and .diamond-publish so users get a clean
+ *  starter vault — no inherited commit history, no stale build output. */
+function copyTree(src: string, dest: string): void {
+	fs.mkdirSync(dest, { recursive: true });
+	for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+		if (entry.name === '.git' || entry.name === '.diamond-publish') continue;
+		const s = path.join(src, entry.name);
+		const d = path.join(dest, entry.name);
+		if (entry.isDirectory()) copyTree(s, d);
+		else if (entry.isFile()) fs.copyFileSync(s, d);
+	}
+}
+
 function defaultConfig(): Config {
-	const sample = sampleVaultPath();
+	const dest = defaultUserVaultDir();
+	// If the user already has a directory at the default location, register
+	// it as-is (don't overwrite their files). Otherwise copy the bundled
+	// sample-vault to seed it with starter content.
+	if (!fs.existsSync(dest)) {
+		const seed = sampleVaultPath();
+		try {
+			if (fs.existsSync(seed)) copyTree(seed, dest);
+			else fs.mkdirSync(dest, { recursive: true });
+		} catch {
+			fs.mkdirSync(dest, { recursive: true });
+		}
+	}
 	return {
-		vaults: [{ id: 'sample', name: 'Sample', path: sample }],
-		activeVaultId: 'sample'
+		vaults: [{ id: 'default', name: 'Diamond Markdown', path: dest }],
+		activeVaultId: 'default'
 	};
 }
 
