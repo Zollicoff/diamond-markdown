@@ -51,7 +51,9 @@ export function registerViewCommands(): void {
 		icon: '◉',
 		category: 'view',
 		exec(ctx: CommandContext) {
-			openTab(ctx.vaultId!, { id: 'graph', kind: 'graph', title: 'Graph' }, 'replace');
+			// App-style tab — opens beside the active note, doesn't replace it.
+			// openTab dedupes by id, so a second open just activates the existing tab.
+			openTab(ctx.vaultId!, { id: 'graph', kind: 'graph', title: 'Graph' }, 'new-tab');
 		}
 	});
 
