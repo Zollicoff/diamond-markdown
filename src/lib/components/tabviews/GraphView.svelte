@@ -54,6 +54,58 @@
 	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
 	let hoverPath = $state<string | null>(null);
 
+	// Tunable simulation parameters — persisted per-vault to localStorage.
+	// Sim reads these live each tick; changing a slider re-shapes the graph
+	// even after it's settled, because forces are applied unconditionally.
+	const DEFAULTS = {
+		nodeScale: 1,
+		repulse: 1500,
+		linkForce: 0.05,
+		linkDist: 90,
+		centerForce: 0.01
+	};
+	let nodeScale = $state(DEFAULTS.nodeScale);
+	let repulse = $state(DEFAULTS.repulse);
+	let linkForce = $state(DEFAULTS.linkForce);
+	let linkDist = $state(DEFAULTS.linkDist);
+	let centerForce = $state(DEFAULTS.centerForce);
+	let panelOpen = $state(false);
+	let settingsHydrated = false;
+
+	const settingsKey = (): string => `diamondmd:graph-settings:${vaultId}`;
+
+	function hydrateSettings(): void {
+		if (typeof localStorage === 'undefined') return;
+		try {
+			const raw = localStorage.getItem(settingsKey());
+			if (!raw) return;
+			const v = JSON.parse(raw) as Partial<typeof DEFAULTS>;
+			if (typeof v.nodeScale === 'number') nodeScale = v.nodeScale;
+			if (typeof v.repulse === 'number') repulse = v.repulse;
+			if (typeof v.linkForce === 'number') linkForce = v.linkForce;
+			if (typeof v.linkDist === 'number') linkDist = v.linkDist;
+			if (typeof v.centerForce === 'number') centerForce = v.centerForce;
+		} catch {
+			// Corrupt JSON — ignore and stick with defaults.
+		}
+	}
+
+	function resetSettings(): void {
+		nodeScale = DEFAULTS.nodeScale;
+		repulse = DEFAULTS.repulse;
+		linkForce = DEFAULTS.linkForce;
+		linkDist = DEFAULTS.linkDist;
+		centerForce = DEFAULTS.centerForce;
+	}
+
+	$effect(() => {
+		// Persist whenever any setting changes — but skip the initial run
+		// before hydrate has had a chance to load existing values.
+		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce };
+		if (!settingsHydrated || typeof localStorage === 'undefined') return;
+		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
+	});
+
 	async function loadGraph(): Promise<void> {
 		loading = true;
 		err = null;
@@ -101,7 +153,7 @@
 		const byPath = new Map<string, GNode>(nodes.map((n) => [n.path, n]));
 
 		// Repulsive force between every pair. O(n²) — fine for <500 nodes.
-		const repulseK = 1500;
+		const repulseK = repulse;
 		for (let i = 0; i < nodes.length; i++) {
 			const a = nodes[i];
 			for (let j = i + 1; j < nodes.length; j++) {
@@ -127,8 +179,8 @@
 		}
 
 		// Spring force along edges.
-		const restLen = 90;
-		const springK = 0.05;
+		const restLen = linkDist;
+		const springK = linkForce;
 		for (const e of edges) {
 			const a = byPath.get(e.from)!;
 			const b = byPath.get(e.to)!;
@@ -145,7 +197,7 @@
 		}
 
 		// Gentle gravity toward origin.
-		const gravityK = 0.01;
+		const gravityK = centerForce;
 		for (const n of nodes) {
 			n.vx -= n.x * gravityK * dt;
 			n.vy -= n.y * gravityK * dt;
@@ -171,7 +223,7 @@
 	}
 
 	function nodeRadius(n: GNode): number {
-		return 4 + Math.min(12, Math.sqrt(n.degree) * 3);
+		return (4 + Math.min(12, Math.sqrt(n.degree) * 3)) * nodeScale;
 	}
 
 	function onWheel(e: WheelEvent): void {
@@ -273,6 +325,8 @@
 	}
 
 	onMount(() => {
+		hydrateSettings();
+		settingsHydrated = true;
 		void loadGraph();
 		const offs = [
 			onBus('note:created', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
@@ -295,6 +349,7 @@
 		<h2>Graph</h2>
 		<span class="count mono">{nodes.length} nodes · {edges.length} edges</span>
 		<span class="spacer"></span>
+		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces & display">⚙ Forces</button>
 		<button class="mini" onclick={resetView}>Reset</button>
 		<button class="mini" onclick={center}>Center</button>
 	</header>
@@ -347,6 +402,47 @@
 		</svg>
 	{/if}
 
+	{#if panelOpen}
+		<aside class="forces-panel" role="dialog" aria-label="Graph forces">
+			<div class="fp-head">
+				<span>Forces & display</span>
+				<button class="fp-close" onclick={() => (panelOpen = false)} aria-label="Close">×</button>
+			</div>
+
+			<label class="fp-row">
+				<span class="fp-label">Node size</span>
+				<input type="range" min="0.5" max="3" step="0.1" bind:value={nodeScale} />
+				<span class="fp-val mono">{nodeScale.toFixed(1)}×</span>
+			</label>
+
+			<label class="fp-row">
+				<span class="fp-label">Repel force</span>
+				<input type="range" min="200" max="4000" step="50" bind:value={repulse} />
+				<span class="fp-val mono">{Math.round(repulse)}</span>
+			</label>
+
+			<label class="fp-row">
+				<span class="fp-label">Link force</span>
+				<input type="range" min="0.01" max="0.30" step="0.01" bind:value={linkForce} />
+				<span class="fp-val mono">{linkForce.toFixed(2)}</span>
+			</label>
+
+			<label class="fp-row">
+				<span class="fp-label">Link distance</span>
+				<input type="range" min="30" max="250" step="5" bind:value={linkDist} />
+				<span class="fp-val mono">{Math.round(linkDist)}</span>
+			</label>
+
+			<label class="fp-row">
+				<span class="fp-label">Center force</span>
+				<input type="range" min="0" max="0.05" step="0.001" bind:value={centerForce} />
+				<span class="fp-val mono">{centerForce.toFixed(3)}</span>
+			</label>
+
+			<button class="fp-reset" onclick={resetSettings}>Restore defaults</button>
+		</aside>
+	{/if}
+
 	<footer class="legend">
 		<span>Drag a node to pin · drag background to pan · scroll to zoom · click to open in new tab · alt+click for new pane</span>
 	</footer>
@@ -354,6 +450,7 @@
 
 <style>
 	.graph-view {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		height: 100%;
@@ -386,6 +483,76 @@
 		font-size: 0.76rem;
 	}
 	.mini:hover { color: var(--accent); border-color: var(--accent); }
+	.mini.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+	.forces-panel {
+		position: absolute;
+		top: 50px;
+		right: 12px;
+		z-index: 10;
+		width: 250px;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+		padding: 10px 12px 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.fp-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--fg);
+		padding-bottom: 4px;
+		border-bottom: 1px solid var(--border);
+	}
+	.fp-close {
+		background: transparent;
+		border: 0;
+		color: var(--fg-muted);
+		cursor: pointer;
+		font-size: 1.1rem;
+		line-height: 1;
+		padding: 0 4px;
+	}
+	.fp-close:hover { color: var(--fg); }
+	.fp-row {
+		display: grid;
+		grid-template-columns: auto 1fr 44px;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.74rem;
+		color: var(--fg-dim);
+	}
+	.fp-label {
+		white-space: nowrap;
+		min-width: 84px;
+	}
+	.fp-row input[type='range'] {
+		width: 100%;
+		accent-color: var(--accent);
+	}
+	.fp-val {
+		text-align: right;
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+	}
+	.fp-reset {
+		margin-top: 4px;
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 4px 8px;
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.74rem;
+		cursor: pointer;
+	}
+	.fp-reset:hover { color: var(--accent); border-color: var(--accent); }
 
 	.canvas {
 		flex: 1;
