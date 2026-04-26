@@ -48,6 +48,10 @@
 
 	// Drag state.
 	let draggingNode: GNode | null = null;
+	let dragStartX = 0;
+	let dragStartY = 0;
+	let dragMoved = false;
+	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
 	let hoverPath = $state<string | null>(null);
 
 	async function loadGraph(): Promise<void> {
@@ -197,6 +201,11 @@
 
 	function onPointerMoveBG(e: PointerEvent): void {
 		if (draggingNode) {
+			if (!dragMoved) {
+				const dx = e.clientX - dragStartX;
+				const dy = e.clientY - dragStartY;
+				if (dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) dragMoved = true;
+			}
 			const rect = svgEl?.getBoundingClientRect();
 			if (!rect) return;
 			const wx = (e.clientX - rect.left - viewX) / viewScale;
@@ -223,6 +232,9 @@
 	function onNodePointerDown(e: PointerEvent, n: GNode): void {
 		e.stopPropagation();
 		draggingNode = n;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		dragMoved = false;
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
 		n.fx = n.x;
@@ -232,9 +244,18 @@
 
 	function onNodeClick(e: MouseEvent, n: GNode): void {
 		e.stopPropagation();
+		// Suppress the click the browser fires after a drag-release on the
+		// same node — otherwise dragging triggers a navigation.
+		if (dragMoved) {
+			dragMoved = false;
+			return;
+		}
 		if (e.shiftKey) return; // shift-click reserved for future multiselect
 		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
-		openNote(vaultId, n.path, title, 'replace');
+		// Graph is an app-style tab — keep it open. alt → new pane,
+		// everything else → new tab beside the graph.
+		const mode = e.altKey ? 'new-pane' : 'new-tab';
+		openNote(vaultId, n.path, title, mode);
 	}
 
 	function resetView(): void {
@@ -327,7 +348,7 @@
 	{/if}
 
 	<footer class="legend">
-		<span>Drag a node to pin · drag background to pan · scroll to zoom · click to open</span>
+		<span>Drag a node to pin · drag background to pan · scroll to zoom · click to open in new tab · alt+click for new pane</span>
 	</footer>
 </div>
 
