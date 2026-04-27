@@ -36,7 +36,12 @@ export const load: LayoutServerLoad = async ({ params }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
 	return {
-		vault: { id: vault.id, name: vault.name },
+		vault: {
+			id: vault.id,
+			name: vault.name,
+			path: vault.path,
+			excludedFolders: vault.excludedFolders ?? []
+		},
 		tree: walk(vault.path, vault.path)
 	};
 };

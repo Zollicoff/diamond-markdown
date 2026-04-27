@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
@@ -136,6 +136,7 @@
 	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
 	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
 
+	let initialCenterDone = false;
 	async function loadGraph(): Promise<void> {
 		loading = true;
 		err = null;
@@ -158,9 +159,18 @@
 			nodes = [...byPath.values()];
 			edges = data.edges.filter((e) => byPath.has(e.from) && byPath.has(e.to));
 			startSim();
+			loading = false;
+			// Center *after* the SVG is mounted with the new data — without
+			// this the original setTimeout fired before the {#if} branch
+			// flipped, leaving the graph anchored at (0, 0) until the user
+			// clicked Center manually.
+			if (!initialCenterDone) {
+				await tick();
+				center();
+				initialCenterDone = true;
+			}
 		} catch (e) {
 			err = (e as Error).message;
-		} finally {
 			loading = false;
 		}
 	}
@@ -364,8 +374,6 @@
 			onBus('note:renamed', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
 			onBus('note:saved', (e) => { if (e.vaultId === vaultId) void loadGraph(); })
 		];
-		// Center once the SVG mounts + knows its size.
-		setTimeout(center, 50);
 		return () => offs.forEach((o) => o());
 	});
 

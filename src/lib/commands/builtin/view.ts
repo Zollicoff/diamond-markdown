@@ -59,6 +59,17 @@ export function registerViewCommands(): void {
 	});
 
 	register({
+		id: 'settings.open',
+		title: 'Open settings',
+		icon: '⚙',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			// Singleton tab — same dedupe rule as graph.
+			openTab(ctx.vaultId!, { id: 'settings', kind: 'settings', title: 'Settings' }, 'new-tab');
+		}
+	});
+
+	register({
 		id: 'daily.open',
 		title: "Open today's daily note",
 		icon: '📅',

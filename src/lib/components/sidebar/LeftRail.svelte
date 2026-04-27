@@ -64,6 +64,12 @@
 				<path d="M3 10 V13 a1 1 0 0 0 1 1 H12 a1 1 0 0 0 1 -1 V10" />
 			</svg>
 		</button>
+		<button class="r-btn" onclick={() => exec('settings.open', { vaultId })} title="Settings" aria-label="Settings">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<circle cx="8" cy="8" r="2.2" />
+				<path d="M8 1.5 V3.5 M8 12.5 V14.5 M1.5 8 H3.5 M12.5 8 H14.5 M3.4 3.4 L4.8 4.8 M11.2 11.2 L12.6 12.6 M3.4 12.6 L4.8 11.2 M11.2 4.8 L12.6 3.4" />
+			</svg>
+		</button>
 	</div>
 </nav>
 
