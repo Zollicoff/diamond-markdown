@@ -36,10 +36,13 @@
 			category: c.category ?? 'other'
 		}));
 
+	// Shortcuts handled inline in components rather than via the global
+	// keymap — listed here so users can discover them. F2 used to be
+	// here too but is now properly registered as note.rename in
+	// keymap.ts and gets picked up automatically.
 	const inline: Row[] = [
 		{ title: 'Quick switcher (jump to note)', shortcut: '⌘K', category: 'view' },
 		{ title: 'Full-text search',              shortcut: '⌘⇧F', category: 'view' },
-		{ title: 'Rename file (in file tree)',    shortcut: 'F2',  category: 'file' },
 		{ title: 'Save note',                     shortcut: '⌘S',  category: 'file' },
 		{ title: 'Open wikilink in new tab',      shortcut: '⌘ + click', category: 'navigation' },
 		{ title: 'Open wikilink in new pane',     shortcut: '⌥ + click', category: 'navigation' },

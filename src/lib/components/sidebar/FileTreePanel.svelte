@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { TreeNode } from '$lib/types';
 	import FileTree from '$lib/components/FileTree.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
@@ -6,6 +7,8 @@
 	import { openNote } from '$lib/workspace/actions';
 	import { fileMenu, folderMenu, rootMenu } from './menu-builders';
 	import type { OpenMode } from '$lib/workspace/types';
+	import { on as onBus } from '$lib/events';
+	import { workspace } from '$lib/workspace/store.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -21,6 +24,14 @@
 
 	// Expand all root folders by default (first load feel).
 	let rootExpand = $derived(new Set(tree.filter((n) => n.type === 'directory').map((n) => n.path)));
+
+	// Highlight the currently-active note's file row in the tree.
+	const activePath = $derived.by<string | null>(() => {
+		const pane = workspace.panes[workspace.activePaneId];
+		if (!pane) return null;
+		const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
+		return tab?.kind === 'note' ? tab.path : null;
+	});
 
 	function showMenu(e: MouseEvent, items: MenuItem[]): void {
 		menuPos = { x: e.clientX, y: e.clientY };
@@ -82,6 +93,14 @@
 		e.preventDefault();
 		openNote(vaultId, node.path, node.name.replace(/\.md$/, ''), modeFor(e));
 	}
+
+	// Listen for F2 → note.rename → bus event. Flips the matching tree
+	// node into rename mode (in-place input) without coupling the
+	// command registry to this panel.
+	onMount(() => onBus('note:rename-request', (e) => {
+		if (e.vaultId !== vaultId) return;
+		renamingPath = e.path;
+	}));
 </script>
 
 <div
@@ -95,7 +114,7 @@
 	<FileTree
 		nodes={tree}
 		{vaultId}
-		activePath={null}
+		{activePath}
 		expanded={rootExpand}
 		{renamingPath}
 		onContext={onNodeContext}

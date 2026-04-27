@@ -9,6 +9,7 @@
 import { api } from '$lib/vault-api';
 import { register, type CommandContext } from '../registry';
 import * as bookmarks from '$lib/bookmarks.svelte';
+import { emit } from '$lib/events';
 
 async function promptPath(msg: string, placeholder = ''): Promise<string | null> {
 	if (typeof window === 'undefined') return null;
@@ -126,6 +127,23 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			if (!ctx.node) return;
 			await navigator.clipboard?.writeText(ctx.node.path).catch(() => {});
+		}
+	});
+
+	register({
+		id: 'note.rename',
+		title: 'Rename note',
+		icon: '✎',
+		shortcut: 'F2',
+		category: 'file',
+		when: (ctx) => Boolean(ctx.node?.path || ctx.notePath),
+		exec(ctx: CommandContext) {
+			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
+			if (!path || !ctx.vaultId) return;
+			// FileTreePanel listens for this and flips the matching node
+			// into rename mode (in-place input). Using a bus event keeps
+			// the command registry decoupled from the panel.
+			emit('note:rename-request', { vaultId: ctx.vaultId, path });
 		}
 	});
 

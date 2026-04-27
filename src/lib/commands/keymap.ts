@@ -23,7 +23,8 @@ export const bindings: KeyBinding[] = [
 	{ combo: 'mod+shift+d', commandId: 'daily.open' },
 	{ combo: 'mod+shift+b', commandId: 'note.toggle-star' },
 	{ combo: 'mod+shift+l', commandId: 'theme.cycle' },
-	{ combo: 'mod+shift+t', commandId: 'template.insert' }
+	{ combo: 'mod+shift+t', commandId: 'template.insert' },
+	{ combo: 'f2', commandId: 'note.rename' }
 ];
 
 /** Render a keymap combo string ("mod+shift+t") as a display string ("⌘⇧T"). */

@@ -20,6 +20,7 @@ export interface VaultEventMap {
 	'palette:open':  { vaultId: string; };
 	'history:open':  { vaultId: string; path: string; };
 	'template:insert': { vaultId: string; content: string; };
+	'note:rename-request': { vaultId: string; path: string; };
 }
 
 type Handler<K extends keyof VaultEventMap> = (payload: VaultEventMap[K]) => void;
