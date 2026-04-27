@@ -21,9 +21,13 @@
 		/** Called when this view emits an update the parent cares about
 		 *  (e.g. backlinks refreshed, title from frontmatter). */
 		onDocLoaded?: (doc: NoteDoc) => void;
+		/** Called when the user picks a new view mode in the topbar. The
+		 *  pane owns the mode state so it survives note switches inside
+		 *  the same tab. */
+		onModeChange?: (m: 'live' | 'source' | 'read') => void;
 	}
 
-	let { vaultId, path, mode, isFocused, onDocLoaded }: Props = $props();
+	let { vaultId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
 
 	let doc = $state<NoteDoc | null>(null);
 	let content = $state('');
@@ -196,6 +200,11 @@
 			{#if wordCount > 0}
 				<span class="meta mono" title="Word count · estimated reading time">{wordCount} words · {readingTime}</span>
 			{/if}
+			<div class="mode-group" role="tablist" aria-label="View mode">
+				<button class:active={mode === 'live'}   onclick={() => onModeChange?.('live')}   role="tab" aria-selected={mode === 'live'}>Live</button>
+				<button class:active={mode === 'source'} onclick={() => onModeChange?.('source')} role="tab" aria-selected={mode === 'source'}>Source</button>
+				<button class:active={mode === 'read'}   onclick={() => onModeChange?.('read')}   role="tab" aria-selected={mode === 'read'}>Read</button>
+			</div>
 			{#if saving}<span class="status saving">saving…</span>
 			{:else if err}<span class="status err" title={err}>error</span>
 			{:else if dirty}<span class="status dirty">●</span>
@@ -252,6 +261,20 @@
 	.crumbs { color: var(--fg-muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 	.save-status { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--fg-dim); }
 	.meta { font-size: 0.74rem; color: var(--fg-muted); white-space: nowrap; }
+
+	.mode-group { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); padding: 2px; border-radius: 6px; }
+	.mode-group button {
+		background: transparent;
+		border: 0;
+		color: var(--fg-muted);
+		padding: 2px 9px;
+		border-radius: 4px;
+		font-size: 0.74rem;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.mode-group button:hover { color: var(--fg); }
+	.mode-group button.active { background: var(--bg-elev); color: var(--accent); }
 	.status.saving { color: var(--fg-muted); }
 	.status.dirty  { color: var(--accent); font-size: 1.2em; line-height: 1; }
 	.status.saved  { color: var(--success); }

@@ -13,13 +13,14 @@
 		mode: 'live' | 'source' | 'read';
 		isFocused: boolean;
 		onDocLoaded?: (doc: NoteDoc) => void;
+		onModeChange?: (m: 'live' | 'source' | 'read') => void;
 	}
 
-	let { vaultId, tab, mode, isFocused, onDocLoaded }: Props = $props();
+	let { vaultId, tab, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
 </script>
 
 {#if tab.kind === 'note'}
-	<NoteView {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} />
+	<NoteView {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
 {:else if tab.kind === 'graph'}
 	<GraphView {vaultId} />
 {:else if tab.kind === 'tags'}

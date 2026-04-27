@@ -3,6 +3,7 @@
 	import {
 		activateTab,
 		closeTab,
+		closePane,
 		moveTabBetween,
 		reorderTab,
 		setActivePane
@@ -12,9 +13,10 @@
 		vaultId: string;
 		pane: Pane;
 		isActivePane: boolean;
+		canClose?: boolean;
 	}
 
-	let { vaultId, pane, isActivePane }: Props = $props();
+	let { vaultId, pane, isActivePane, canClose }: Props = $props();
 
 	let dragIdx = $state<number | null>(null);
 	let dragOverIdx = $state<number | null>(null);
@@ -114,6 +116,9 @@
 			<button class="tab-close" onclick={(e) => close(e, t)} aria-label="Close">×</button>
 		</div>
 	{/each}
+	{#if canClose}
+		<button class="pane-close" title="Close pane" onclick={() => closePane(vaultId, pane.id)}>× pane</button>
+	{/if}
 </nav>
 
 <script lang="ts" module>
@@ -197,4 +202,20 @@
 	}
 	.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
 	.tab-close:hover { background: var(--bg-hover); color: var(--fg); }
+
+	.pane-close {
+		margin-left: auto;
+		align-self: center;
+		background: transparent;
+		border: 0;
+		color: var(--fg-dim);
+		font: inherit;
+		font-size: 0.74rem;
+		font-family: var(--mono);
+		padding: 3px 10px;
+		border-radius: 4px;
+		cursor: pointer;
+		flex: none;
+	}
+	.pane-close:hover { color: var(--danger); background: var(--bg-hover); }
 </style>
