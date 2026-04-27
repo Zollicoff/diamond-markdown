@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import type { LayoutData } from './$types';
 	import LeftSidebar from '$lib/components/sidebar/LeftSidebar.svelte';
+	import LeftRail from '$lib/components/sidebar/LeftRail.svelte';
 	import RightPanel from '$lib/components/rightpanel/RightPanel.svelte';
-	import CollapseToggle from '$lib/components/CollapseToggle.svelte';
+	import RightRail from '$lib/components/rightpanel/RightRail.svelte';
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
@@ -102,18 +103,20 @@
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
 >
-	<!-- Always 5 grid slots. Collapse happens via CSS width:0 + overflow:hidden
-	     so slot positions stay stable; no #if here or the grid shifts. -->
-	<div class="col left-col">
-		<LeftSidebar vaultId={data.vault.id} vaultName={data.vault.name} {tree} />
-	</div>
-
-	<div class="collapse-rail left-rail">
-		<CollapseToggle
-			side="left"
+	<!-- Activity rails sit on the outside (Obsidian-style); sidebars are
+	     between them and the editor. Rails always visible — collapsing
+	     just shrinks the sidebar columns to 0. Grid slots stay stable
+	     via width:0 + overflow:hidden, never #if. -->
+	<div class="rail-col">
+		<LeftRail
+			vaultId={data.vault.id}
 			collapsed={workspace.leftSidebarCollapsed}
 			onToggle={() => toggleLeftSidebar(data.vault.id)}
 		/>
+	</div>
+
+	<div class="col left-col">
+		<LeftSidebar vaultId={data.vault.id} vaultName={data.vault.name} {tree} />
 	</div>
 
 	<main class="center">
@@ -121,16 +124,15 @@
 		{@render children()}
 	</main>
 
-	<div class="collapse-rail right-rail">
-		<CollapseToggle
-			side="right"
+	<div class="col right-col">
+		<RightPanel vaultId={data.vault.id} doc={activeDoc} />
+	</div>
+
+	<div class="rail-col">
+		<RightRail
 			collapsed={workspace.rightSidebarCollapsed}
 			onToggle={() => toggleRightSidebar(data.vault.id)}
 		/>
-	</div>
-
-	<div class="col right-col">
-		<RightPanel vaultId={data.vault.id} doc={activeDoc} />
 	</div>
 </div>
 
@@ -141,34 +143,24 @@
 <style>
 	.shell {
 		display: grid;
-		grid-template-columns: 280px 22px 1fr 22px 300px;
+		/* rail | sidebar | editor | sidebar | rail */
+		grid-template-columns: 38px 260px 1fr 280px 38px;
 		height: 100vh;
 		min-height: 0;
 		transition: grid-template-columns 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
 	}
-	.shell.left-collapsed  { grid-template-columns: 0 22px 1fr 22px 300px; }
-	.shell.right-collapsed { grid-template-columns: 280px 22px 1fr 22px 0; }
-	.shell.left-collapsed.right-collapsed { grid-template-columns: 0 22px 1fr 22px 0; }
+	.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 280px 38px; }
+	.shell.right-collapsed { grid-template-columns: 38px 260px 1fr 0 38px; }
+	.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0 38px; }
 
+	.rail-col { min-width: 0; min-height: 0; overflow: hidden; }
 	.col { min-width: 0; min-height: 0; overflow: hidden; }
-	/* When width reaches 0 via the grid template, the inner sidebar is
-	   clipped. No flash of half-visible content. */
+	/* When the sidebar column shrinks to 0, hide its content so we don't
+	   get a clipped half-rendered sidebar during the transition. */
 	.shell.left-collapsed .left-col,
 	.shell.right-collapsed .right-col {
 		visibility: hidden;
 	}
-
-	.collapse-rail {
-		display: flex;
-		align-items: flex-start;
-		justify-content: center;
-		padding-top: 14px;
-		background: var(--bg-elev);
-		border-left: 1px solid var(--border);
-		border-right: 1px solid var(--border);
-	}
-	.left-rail { border-left: 0; }
-	.right-rail { border-right: 0; }
 
 	.center {
 		display: flex;
@@ -180,15 +172,17 @@
 	.center > :global(.workspace) { flex: 1; min-height: 0; }
 
 	@media (max-width: 900px) {
-		.shell { grid-template-columns: 240px 22px 1fr 22px 280px; }
+		.shell { grid-template-columns: 38px 240px 1fr 260px 38px; }
+		.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 260px 38px; }
+		.shell.right-collapsed { grid-template-columns: 38px 240px 1fr 0 38px; }
+		.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0 38px; }
 	}
 
-	/* Phones: widen rails for touch, tighten expanded sidebars. */
+	/* Phones: rails get a touch-friendly 48px; sidebars take most of the screen when open. */
 	@media (max-width: 640px) {
-		.shell { grid-template-columns: 72vw 40px 1fr 40px 80vw; }
-		.shell.left-collapsed  { grid-template-columns: 0 40px 1fr 40px 80vw; }
-		.shell.right-collapsed { grid-template-columns: 72vw 40px 1fr 40px 0; }
-		.shell.left-collapsed.right-collapsed { grid-template-columns: 0 40px 1fr 40px 0; }
-		.collapse-rail { padding-top: 10px; }
+		.shell { grid-template-columns: 48px 70vw 1fr 78vw 48px; }
+		.shell.left-collapsed  { grid-template-columns: 48px 0 1fr 78vw 48px; }
+		.shell.right-collapsed { grid-template-columns: 48px 70vw 1fr 0 48px; }
+		.shell.left-collapsed.right-collapsed { grid-template-columns: 48px 0 1fr 0 48px; }
 	}
 </style>

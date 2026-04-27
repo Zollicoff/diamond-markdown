@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { TreeNode } from '$lib/types';
 	import Wordmark from '$lib/components/Wordmark.svelte';
-	import SidebarTools from './SidebarTools.svelte';
 	import FileTreePanel from './FileTreePanel.svelte';
 	import BookmarksPanel from './BookmarksPanel.svelte';
 	import RecentNotesPanel from './RecentNotesPanel.svelte';
@@ -20,8 +19,6 @@
 		<Wordmark size="xs" href="/" />
 		<span class="vault-name">{vaultName}</span>
 	</header>
-
-	<SidebarTools {vaultId} />
 
 	<BookmarksPanel {vaultId} />
 	<RecentNotesPanel {vaultId} />

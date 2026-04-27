@@ -1,0 +1,138 @@
+<script lang="ts">
+	import { exec } from '$lib/commands';
+	import CollapseToggle from '$lib/components/CollapseToggle.svelte';
+
+	interface Props {
+		vaultId: string;
+		collapsed: boolean;
+		onToggle: () => void;
+	}
+	let { vaultId, collapsed, onToggle }: Props = $props();
+</script>
+
+<nav class="rail" aria-label="Left activity bar">
+	<div class="rail-top">
+		<CollapseToggle side="left" {collapsed} {onToggle} />
+	</div>
+
+	<div class="rail-actions">
+		<button class="r-btn" onclick={() => exec('note.create', { vaultId })} title="New note" aria-label="New note">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H12 a1 1 0 0 0 1 -1 V6" />
+				<path d="M9 2 L13 6" />
+				<path d="M9 2 V6 H13" />
+			</svg>
+		</button>
+		<button class="r-btn" onclick={() => exec('folder.create', { vaultId })} title="New folder" aria-label="New folder">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<path d="M2 5 a1 1 0 0 1 1 -1 H6.5 L8 5.5 H13 a1 1 0 0 1 1 1 V12 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 Z" />
+			</svg>
+		</button>
+	</div>
+
+	<div class="rail-divider" aria-hidden="true"></div>
+
+	<div class="rail-actions">
+		<button class="r-btn" onclick={() => exec('daily.open', { vaultId })} title="Today (⌘⇧D)" aria-label="Today's daily note">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<rect x="2.5" y="3.5" width="11" height="10" rx="1.5" />
+				<line x1="2.5" y1="6.5" x2="13.5" y2="6.5" />
+				<line x1="5" y1="2" x2="5" y2="4.5" />
+				<line x1="11" y1="2" x2="11" y2="4.5" />
+			</svg>
+		</button>
+		<button class="r-btn" onclick={() => exec('tags.open', { vaultId })} title="Tags" aria-label="Tags">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<line x1="3" y1="6" x2="13" y2="6" />
+				<line x1="3" y1="10" x2="13" y2="10" />
+				<line x1="6.5" y1="2.5" x2="5" y2="13.5" />
+				<line x1="11" y1="2.5" x2="9.5" y2="13.5" />
+			</svg>
+		</button>
+		<button class="r-btn" onclick={() => exec('graph.open', { vaultId })} title="Graph" aria-label="Graph">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<line x1="4.5" y1="4.5" x2="11.5" y2="4.5" />
+				<line x1="4.5" y1="4.5" x2="8" y2="11.5" />
+				<line x1="11.5" y1="4.5" x2="8" y2="11.5" />
+				<circle cx="4.5" cy="4.5" r="1.6" class="solid" />
+				<circle cx="11.5" cy="4.5" r="1.6" class="solid" />
+				<circle cx="8" cy="11.5" r="1.6" class="solid" />
+			</svg>
+		</button>
+	</div>
+
+	<div class="rail-spacer"></div>
+
+	<div class="rail-actions rail-bottom">
+		<button class="r-btn" onclick={() => exec('publish.export', { vaultId })} title="Publish (export static site)" aria-label="Publish">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<path d="M8 2.5 V10" />
+				<path d="M5 5.5 L8 2.5 L11 5.5" />
+				<path d="M3 10 V13 a1 1 0 0 0 1 1 H12 a1 1 0 0 0 1 -1 V10" />
+			</svg>
+		</button>
+	</div>
+</nav>
+
+<style>
+	.rail {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		padding: 8px 0;
+		background: var(--bg);
+		border-right: 1px solid var(--border);
+		height: 100%;
+	}
+	.rail-top {
+		padding-bottom: 4px;
+	}
+	.rail-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		width: 100%;
+		align-items: center;
+	}
+	.rail-divider {
+		width: 18px;
+		height: 1px;
+		background: var(--border);
+		margin: 4px 0;
+	}
+	.rail-spacer { flex: 1; }
+	.r-btn {
+		background: transparent;
+		border: 0;
+		color: var(--fg-muted);
+		width: 28px;
+		height: 28px;
+		border-radius: 5px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+	}
+	.r-btn:hover { color: var(--accent); background: var(--bg-hover); }
+	.r-btn svg {
+		width: 16px;
+		height: 16px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.r-btn svg .solid {
+		fill: currentColor;
+		stroke: none;
+	}
+
+	@media (max-width: 640px) {
+		.rail { padding: 10px 0; }
+		.r-btn { width: 36px; height: 36px; }
+		.r-btn svg { width: 18px; height: 18px; }
+	}
+</style>
