@@ -51,7 +51,19 @@ export interface Config {
 	activeVaultId: string | null;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.diamondmd');
+/**
+ * Where the vault registry lives. Defaults to `~/.diamondmd/`. Override
+ * with `DIAMOND_CONFIG_DIR` — useful for isolated test runs that don't
+ * want to touch the user's real config.
+ */
+function configDir(): string {
+	const override = process.env.DIAMOND_CONFIG_DIR;
+	if (override && override.trim()) {
+		return path.resolve(override.trim().replace(/^~/, os.homedir()));
+	}
+	return path.join(os.homedir(), '.diamondmd');
+}
+const CONFIG_DIR = configDir();
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 // Repo-relative sample vault — works in dev (src/) and prod (build/) alike,
