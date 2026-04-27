@@ -18,7 +18,12 @@
 	const activePane = $derived(workspace.panes[workspace.activePaneId] ?? null);
 </script>
 
-<header class="topbar" aria-label="Workspace top bar">
+<header
+	class="topbar"
+	class:left-collapsed={leftCollapsed}
+	class:right-collapsed={rightCollapsed}
+	aria-label="Workspace top bar"
+>
 	<!-- Subgrid mirrors shell columns: rail | left-sidebar | editor | right-sidebar.
 	     The rail-zone always shows the Diamond crystal. When the left sidebar
 	     is expanded, the side-left zone shows the "Diamond Markdown" wordmark
@@ -58,17 +63,37 @@
 </header>
 
 <style>
+	/* Mirrors the shell's grid-template-columns 1:1. We can't use
+	   `grid-template-columns: subgrid` here because Safari's subgrid
+	   implementation flakes out when the parent has animating column
+	   widths (which happens on sidebar collapse). The values below
+	   must stay in lock-step with src/routes/vault/[vaultId]/+layout.svelte
+	   .shell rules. */
 	.topbar {
 		grid-row: 1;
 		grid-column: 1 / -1;
 		display: grid;
-		grid-template-columns: subgrid;
+		grid-template-columns: 38px 260px 1fr 280px;
 		height: 36px;
 		background: var(--bg-elev);
 		border-bottom: 1px solid var(--border);
+		transition: grid-template-columns 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
 	}
-	@supports not (grid-template-columns: subgrid) {
-		.topbar { grid-template-columns: 38px 260px 1fr 280px; }
+	.topbar.left-collapsed  { grid-template-columns: 38px 0 1fr 280px; }
+	.topbar.right-collapsed { grid-template-columns: 38px 260px 1fr 0; }
+	.topbar.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0; }
+
+	@media (max-width: 900px) {
+		.topbar { grid-template-columns: 38px 240px 1fr 260px; }
+		.topbar.left-collapsed  { grid-template-columns: 38px 0 1fr 260px; }
+		.topbar.right-collapsed { grid-template-columns: 38px 240px 1fr 0; }
+		.topbar.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0; }
+	}
+	@media (max-width: 640px) {
+		.topbar { grid-template-columns: 48px 70vw 1fr 78vw; }
+		.topbar.left-collapsed  { grid-template-columns: 48px 0 1fr 78vw; }
+		.topbar.right-collapsed { grid-template-columns: 48px 70vw 1fr 0; }
+		.topbar.left-collapsed.right-collapsed { grid-template-columns: 48px 0 1fr 0; }
 	}
 
 	.tb-zone {
