@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { TreeNode } from '$lib/types';
-	import Wordmark from '$lib/components/Wordmark.svelte';
 	import FileTreePanel from './FileTreePanel.svelte';
 	import BookmarksPanel from './BookmarksPanel.svelte';
 	import RecentNotesPanel from './RecentNotesPanel.svelte';
@@ -16,8 +15,8 @@
 
 <aside class="sidebar">
 	<header class="head">
-		<Wordmark size="xs" href="/" />
-		<span class="vault-name">{vaultName}</span>
+		<span class="vault-label">Vault:</span>
+		<span class="vault-name" title={vaultName}>{vaultName}</span>
 	</header>
 
 	<BookmarksPanel {vaultId} />
@@ -40,14 +39,29 @@
 		height: 100%;
 	}
 	.head {
-		padding: 14px 16px 10px;
-		display: flex; flex-direction: column; gap: 6px;
+		padding: 12px 16px 10px;
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		min-width: 0;
+	}
+	.vault-label {
+		font-size: 0.74rem;
+		color: var(--fg-dim);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		flex: none;
 	}
 	.vault-name {
-		font-size: 0.78rem;
-		color: var(--fg-muted);
+		font-size: 0.84rem;
+		color: var(--fg);
 		font-family: var(--mono);
-		padding-left: 2px;
+		font-weight: 500;
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.foot {
 		padding: 10px 14px;

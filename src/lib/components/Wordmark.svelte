@@ -7,9 +7,13 @@
 		href?: string | null;
 		/** Override the default wordmark text. */
 		text?: string;
+		/** Render only the crystal icon, no text. */
+		iconOnly?: boolean;
+		/** Render only the text, no icon. */
+		textOnly?: boolean;
 	}
 
-	let { size = 'md', animated = true, href = null, text = 'Diamond Markdown' }: Props = $props();
+	let { size = 'md', animated = true, href = null, text = 'Diamond Markdown', iconOnly = false, textOnly = false }: Props = $props();
 
 	const dims: Record<Required<Props>['size'], { wm: number; text: string; tracking: string }> = {
 		xs: { wm: 18, text: '1rem',    tracking: '-0.02em' },
@@ -26,9 +30,12 @@
 	href={href ?? undefined}
 	class="wordmark"
 	class:animated
+	class:icon-only={iconOnly}
+	class:text-only={textOnly}
 	data-size={size}
 	style="--wm-size: {d.wm}px; --text-size: {d.text}; --tracking: {d.tracking};"
 >
+	{#if !textOnly}
 	<svg class="crystal" viewBox="0 0 100 100" aria-hidden="true">
 		<defs>
 			<linearGradient id="diamond-face-a-{size}" x1="0" y1="0" x2="1" y2="1">
@@ -65,7 +72,10 @@
 		<!-- Highlight glint -->
 		<polygon class="glint" points="38,18 32,30 44,30" fill="rgba(255,255,255,0.6)" />
 	</svg>
+	{/if}
+	{#if !iconOnly}
 	<span class="word">{text}</span>
+	{/if}
 </svelte:element>
 
 <style>
