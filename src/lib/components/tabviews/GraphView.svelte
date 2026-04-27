@@ -69,7 +69,13 @@
 	let linkForce = $state(DEFAULTS.linkForce);
 	let linkDist = $state(DEFAULTS.linkDist);
 	let centerForce = $state(DEFAULTS.centerForce);
+
+	// Filter state — purely visual; sim still runs over all nodes so layout
+	// stays stable when toggling. Persisted alongside the force settings.
+	let hideOrphans = $state(false);
+	let searchQuery = $state('');
 	let panelOpen = $state(false);
+	let panelTab = $state<'forces' | 'filters'>('forces');
 	let settingsHydrated = false;
 
 	const settingsKey = (): string => `diamondmd:graph-settings:${vaultId}`;
@@ -79,12 +85,14 @@
 		try {
 			const raw = localStorage.getItem(settingsKey());
 			if (!raw) return;
-			const v = JSON.parse(raw) as Partial<typeof DEFAULTS>;
+			const v = JSON.parse(raw) as Partial<typeof DEFAULTS> & { hideOrphans?: boolean; searchQuery?: string };
 			if (typeof v.nodeScale === 'number') nodeScale = v.nodeScale;
 			if (typeof v.repulse === 'number') repulse = v.repulse;
 			if (typeof v.linkForce === 'number') linkForce = v.linkForce;
 			if (typeof v.linkDist === 'number') linkDist = v.linkDist;
 			if (typeof v.centerForce === 'number') centerForce = v.centerForce;
+			if (typeof v.hideOrphans === 'boolean') hideOrphans = v.hideOrphans;
+			if (typeof v.searchQuery === 'string') searchQuery = v.searchQuery;
 		} catch {
 			// Corrupt JSON — ignore and stick with defaults.
 		}
@@ -98,13 +106,35 @@
 		centerForce = DEFAULTS.centerForce;
 	}
 
+	function resetFilters(): void {
+		hideOrphans = false;
+		searchQuery = '';
+	}
+
 	$effect(() => {
 		// Persist whenever any setting changes — but skip the initial run
 		// before hydrate has had a chance to load existing values.
-		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce };
+		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
 		if (!settingsHydrated || typeof localStorage === 'undefined') return;
 		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
 	});
+
+	// Visible set — sim still runs over `nodes`/`edges`, but rendering
+	// only walks the filtered set, so toggling a filter doesn't disrupt
+	// the live layout.
+	const visiblePaths = $derived.by<Set<string>>(() => {
+		const q = searchQuery.trim().toLowerCase();
+		const set = new Set<string>();
+		for (const n of nodes) {
+			if (hideOrphans && n.degree === 0) continue;
+			if (q && !n.title.toLowerCase().includes(q) && !n.path.toLowerCase().includes(q)) continue;
+			set.add(n.path);
+		}
+		return set;
+	});
+	const visibleNodes = $derived<GNode[]>(nodes.filter((n) => visiblePaths.has(n.path)));
+	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
+	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
 
 	async function loadGraph(): Promise<void> {
 		loading = true;
@@ -347,9 +377,15 @@
 <div class="graph-view">
 	<header class="bar">
 		<h2>Graph</h2>
-		<span class="count mono">{nodes.length} nodes · {edges.length} edges</span>
+		<span class="count mono">
+			{#if filtersActive}
+				{visibleNodes.length} of {nodes.length} nodes · {visibleEdges.length} edges
+			{:else}
+				{nodes.length} nodes · {edges.length} edges
+			{/if}
+		</span>
 		<span class="spacer"></span>
-		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces & display">⚙ Forces</button>
+		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces, filters, display">⚙ Settings</button>
 		<button class="mini" onclick={resetView}>Reset</button>
 		<button class="mini" onclick={center}>Center</button>
 	</header>
@@ -371,7 +407,7 @@
 			onpointercancel={onPointerUpBG}
 		>
 			<g transform={`translate(${viewX}, ${viewY}) scale(${viewScale})`}>
-				{#each edges as e, i (i)}
+				{#each visibleEdges as e, i (i)}
 					{@const a = nodes.find((n) => n.path === e.from)}
 					{@const b = nodes.find((n) => n.path === e.to)}
 					{#if a && b}
@@ -382,7 +418,7 @@
 						/>
 					{/if}
 				{/each}
-				{#each nodes as n (n.path)}
+				{#each visibleNodes as n (n.path)}
 					<g
 						class="node"
 						class:hl={hoverPath === n.path}
@@ -403,43 +439,75 @@
 	{/if}
 
 	{#if panelOpen}
-		<aside class="forces-panel" role="dialog" aria-label="Graph forces">
+		<aside class="forces-panel" role="dialog" aria-label="Graph settings">
 			<div class="fp-head">
-				<span>Forces & display</span>
+				<div class="fp-tabs" role="tablist">
+					<button
+						class="fp-tab"
+						class:active={panelTab === 'forces'}
+						role="tab"
+						aria-selected={panelTab === 'forces'}
+						onclick={() => (panelTab = 'forces')}
+					>Forces</button>
+					<button
+						class="fp-tab"
+						class:active={panelTab === 'filters'}
+						role="tab"
+						aria-selected={panelTab === 'filters'}
+						onclick={() => (panelTab = 'filters')}
+					>
+						Filters
+						{#if filtersActive}<span class="fp-dot" aria-label="Filters active"></span>{/if}
+					</button>
+				</div>
 				<button class="fp-close" onclick={() => (panelOpen = false)} aria-label="Close">×</button>
 			</div>
 
-			<label class="fp-row">
-				<span class="fp-label">Node size</span>
-				<input type="range" min="0.5" max="3" step="0.1" bind:value={nodeScale} />
-				<span class="fp-val mono">{nodeScale.toFixed(1)}×</span>
-			</label>
+			{#if panelTab === 'forces'}
+				<label class="fp-row">
+					<span class="fp-label">Node size</span>
+					<input type="range" min="0.5" max="3" step="0.1" bind:value={nodeScale} />
+					<span class="fp-val mono">{nodeScale.toFixed(1)}×</span>
+				</label>
 
-			<label class="fp-row">
-				<span class="fp-label">Repel force</span>
-				<input type="range" min="200" max="4000" step="50" bind:value={repulse} />
-				<span class="fp-val mono">{Math.round(repulse)}</span>
-			</label>
+				<label class="fp-row">
+					<span class="fp-label">Repel force</span>
+					<input type="range" min="200" max="4000" step="50" bind:value={repulse} />
+					<span class="fp-val mono">{Math.round(repulse)}</span>
+				</label>
 
-			<label class="fp-row">
-				<span class="fp-label">Link force</span>
-				<input type="range" min="0.01" max="0.30" step="0.01" bind:value={linkForce} />
-				<span class="fp-val mono">{linkForce.toFixed(2)}</span>
-			</label>
+				<label class="fp-row">
+					<span class="fp-label">Link force</span>
+					<input type="range" min="0.01" max="0.30" step="0.01" bind:value={linkForce} />
+					<span class="fp-val mono">{linkForce.toFixed(2)}</span>
+				</label>
 
-			<label class="fp-row">
-				<span class="fp-label">Link distance</span>
-				<input type="range" min="30" max="250" step="5" bind:value={linkDist} />
-				<span class="fp-val mono">{Math.round(linkDist)}</span>
-			</label>
+				<label class="fp-row">
+					<span class="fp-label">Link distance</span>
+					<input type="range" min="30" max="250" step="5" bind:value={linkDist} />
+					<span class="fp-val mono">{Math.round(linkDist)}</span>
+				</label>
 
-			<label class="fp-row">
-				<span class="fp-label">Center force</span>
-				<input type="range" min="0" max="0.05" step="0.001" bind:value={centerForce} />
-				<span class="fp-val mono">{centerForce.toFixed(3)}</span>
-			</label>
+				<label class="fp-row">
+					<span class="fp-label">Center force</span>
+					<input type="range" min="0" max="0.05" step="0.001" bind:value={centerForce} />
+					<span class="fp-val mono">{centerForce.toFixed(3)}</span>
+				</label>
 
-			<button class="fp-reset" onclick={resetSettings}>Restore defaults</button>
+				<button class="fp-reset" onclick={resetSettings}>Restore defaults</button>
+			{:else}
+				<label class="fp-search">
+					<span class="fp-label">Search</span>
+					<input type="search" placeholder="Filter by name or path…" bind:value={searchQuery} />
+				</label>
+
+				<label class="fp-toggle">
+					<input type="checkbox" bind:checked={hideOrphans} />
+					<span>Hide orphans <span class="fp-hint">(no links in or out)</span></span>
+				</label>
+
+				<button class="fp-reset" onclick={resetFilters}>Clear filters</button>
+			{/if}
 		</aside>
 	{/if}
 
@@ -504,11 +572,37 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		font-size: 0.78rem;
-		font-weight: 600;
-		color: var(--fg);
+		gap: 8px;
 		padding-bottom: 4px;
 		border-bottom: 1px solid var(--border);
+	}
+	.fp-tabs {
+		display: flex;
+		gap: 4px;
+	}
+	.fp-tab {
+		background: transparent;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		color: var(--fg-muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.78rem;
+		padding: 4px 8px 5px;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.fp-tab:hover { color: var(--fg); }
+	.fp-tab.active {
+		color: var(--fg);
+		border-bottom-color: var(--accent);
+		font-weight: 600;
+	}
+	.fp-dot {
+		display: inline-block;
+		width: 6px; height: 6px; border-radius: 50%;
+		background: var(--accent);
 	}
 	.fp-close {
 		background: transparent;
@@ -553,6 +647,37 @@
 		cursor: pointer;
 	}
 	.fp-reset:hover { color: var(--accent); border-color: var(--accent); }
+
+	.fp-search {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 0.74rem;
+		color: var(--fg-dim);
+	}
+	.fp-search input[type='search'] {
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		color: var(--fg);
+		font: inherit;
+		font-size: 0.78rem;
+		padding: 5px 8px;
+	}
+	.fp-search input[type='search']:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+	.fp-toggle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.78rem;
+		color: var(--fg);
+		cursor: pointer;
+	}
+	.fp-toggle input { accent-color: var(--accent); cursor: pointer; }
+	.fp-hint { color: var(--fg-dim); font-size: 0.72rem; }
 
 	.canvas {
 		flex: 1;

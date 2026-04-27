@@ -1,79 +1,95 @@
-# DiamondMD — Roadmap
+# Diamond Markdown — Roadmap
 
 Version numbers signal feature parity, not stability. We're pre-1.0.
 
-## v0.1 — MVP
+## v0.1 — MVP ✓ (shipped 2026-04-22)
 
 The non-negotiable minimum to replace a basic Obsidian workflow:
 
 - [x] Repo scaffold, license, docs
-- [x] Sample vault (ships in-repo)
-- [ ] Vault registry (`~/.diamondmd/config.json`) — add / switch / remove
-- [ ] File tree with folders, collapsible, click to open
-- [ ] Create / rename / delete note from UI
-- [ ] CodeMirror 6 editor with markdown syntax
-- [ ] Split source + rendered preview
-- [ ] Wikilink parser + resolver (basename, path, alias)
-- [ ] Click a wikilink → navigates to that note
-- [ ] Broken link styling (italic red) + click-to-create
-- [ ] Frontmatter parser (title, tags, aliases, created, updated)
-- [ ] Backlinks panel — every note that links to this one
-- [ ] Outgoing links panel — every wikilink in this note
-- [ ] Tag index page — list every tag + notes using it
-- [ ] Fuzzy quick-switcher (Cmd-K / Ctrl-K) over note titles + aliases
-- [ ] Full-text search (Cmd-Shift-F)
-- [ ] Git auto-commit on save (debounced)
-- [ ] Per-note history viewer (git log of the file)
-- [ ] Daily notes (auto-create today's note from a template)
+- [x] Sample vault (ships in-repo, copied to `~/Documents/Diamond Markdown` on first run)
+- [x] Vault registry (`~/.diamondmd/config.json`) — add / switch / remove
+- [x] File tree with folders, collapsible, click to open, drag-drop, rename / move / delete
+- [x] CodeMirror 6 editor with markdown syntax
+- [x] Source / Live / Read mode toggle
+- [x] **Live preview** (Obsidian-style WYSIWYG-within-editor via CodeMirror decorations) — landed in the v0.1 refactor
+- [x] Wikilink parser + resolver (basename, path, alias)
+- [x] Click a wikilink → navigates to that note (modifier-aware: ⌘ → new tab, alt → new pane)
+- [x] Right-click wikilink → context menu (Open / new tab / new pane / Copy path)
+- [x] Broken link styling + click-to-create
+- [x] Frontmatter parser (title, tags, aliases, created, updated, public)
+- [x] Backlinks panel
+- [x] Outgoing links panel
+- [x] Tag index page
+- [x] Fuzzy quick-switcher
+- [x] Full-text search
+- [x] Git auto-commit on save (debounced)
+- [x] Per-note history viewer (git log + diff)
+- [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)
 
-## v0.2 — Essentials
+## v0.2 — Obsidian-core parity ✓ (shipped 2026-04-25)
 
-- [ ] Graph view (d3-force) — all notes, weighted by link density
-- [ ] Themes (dark/light variants, maybe a "Solarized" and "Paper")
-- [ ] Templates folder (`Templates/` dir with templater-like variables)
-- [ ] Image embeds (`![[image.png]]`)
-- [ ] PDF embeds
-- [ ] Mobile polish — touch-friendly file tree + editor
-- [ ] Settings page (theme, debounce, default template, keybindings)
+- [x] Command palette (⌘P)
+- [x] Tag index page
+- [x] Graph view (custom force-directed sim) — drag, pan, zoom, force tuning, filters
+- [x] History viewer modal
+- [x] Image embeds (`![[image.png]]`)
+- [x] Note embeds (`![[Note]]`, cycle-safe recursion)
+- [x] Hover preview — mouseover wikilinks for a floating preview card
+- [x] Heading anchors + `[[Note#Heading]]` deep links + URL hash scroll
+- [x] Outline panel (right sidebar)
+- [x] Math (KaTeX, server-rendered, price-safe)
+- [x] Mermaid diagrams (lazy-loaded)
+- [x] Code highlighting (highlight.js)
+- [x] Footnotes
+- [x] General templates (`Templates/` folder + ⌘⇧T)
+- [x] Bookmarks (⌘⇧B, sidebar panel)
+- [x] Recent notes panel
+- [x] Light / Dark / Auto theme (⌘⇧L)
+- [x] PWA manifest + theme-color + icons (home-screen install)
+- [x] Excluded folders (per-vault)
+- [x] Word count + reading time
+- [x] State → URL sync (reload preserves position, links shareable)
+- [x] Static-site publishing (`public: true` frontmatter, one-shot export)
+- [x] Acknowledgments + ATTRIBUTION.md
 
-## v0.3 — Live Preview
+## v0.3 — Polish & mobile
 
-The headline UX feature:
+- [ ] Service worker for full offline use
+- [ ] Mobile touch gestures (swipe to switch tabs / panes)
+- [ ] Template picker upgrade (modal palette instead of `prompt()`)
+- [ ] Light-mode highlight.js per-token theming
+- [ ] Outline scroll inside Live mode (currently Read mode only)
+- [ ] Settings page consolidation
+- [ ] Multi-select / drag-select in graph
 
-- [ ] Obsidian-style live preview — markdown syntax hides when cursor leaves the line, renders inline while cursor is on that line
-- [ ] Wikilinks render as pills inline (not raw `[[...]]`)
-- [ ] Headers render inline with their sizing
-- [ ] Inline images
-- [ ] Code blocks with syntax highlighting in preview
+## v0.4 — Performance & scale
 
-This is where we stop looking like "yet another markdown editor" and start looking like a real Obsidian replacement.
+- [ ] Virtualized file tree for very large vaults
+- [ ] Indexer warm-cache on disk for fast startup
+- [ ] Quadtree-backed graph sim (drop O(n²) for very large vaults)
+- [ ] Conflict resolution UI when pulling a remote that diverged
 
-## v0.4 — Publishing
-
-- [ ] Publish a vault (or subset) as a static site
-- [ ] Simple "publish" button that builds + pushes to a public repo / gh-pages / Cloudflare Pages
-- [ ] Per-note `public: true` frontmatter gate
-
-## v0.5 — Plugins
+## v0.5 — Plugins & desktop
 
 - [ ] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
-- [ ] Plugin can register: markdown extension, editor command, right-panel view, settings panel
+- [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
 - [ ] Plugin registry page (load plugins from URL, not just disk)
+- [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.
 
-Deliberately smaller surface than Obsidian's plugin API — too much API = too much rewriting. Three extension points max.
+Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
 
 ## Open ideas (maybe, maybe not)
 
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
-- **Conflict resolution UI** when pulling a remote and two devices edited the same note.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
-- **Export to Obsidian** — ensure our vault is 100% Obsidian-readable at all times (already true — we use the same wikilink syntax).
-- **Tauri binary** — wrap the existing web app in Tauri v2 for an offline-first desktop experience without giving up the web-first architecture. Reuses 100% of the current code; the binary just hosts the SvelteKit build against a local filesystem vault. Small Rust shim for filesystem + git; the rest stays as-is. Lands us on macOS / Windows / Linux App Stores without a rewrite.
+- **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
 
 ## Non-goals
 
-- **Canvas.** Obsidian's visual whiteboarding. Not shipping. Ever. Folks who need it have Obsidian.
-- **Electron wrapper.** We'll never ship a desktop binary. If someone wants to Tauri-wrap the web UI, that's their project.
+- **Canvas.** Obsidian's visual whiteboarding. Not shipping. Folks who need it have Obsidian.
+- **Hosted publish service.** We provide the static-site exporter; you bring the host (gh-pages, Cloudflare Pages, Vercel, Netlify, your own box). No proprietary hosting.
 - **Native mobile apps.** Responsive web is the target. PWA install, yes. App Store listings, no.
+- **Plugin runtime parity with Obsidian.** Their plugin API is huge. We keep ours small on purpose.

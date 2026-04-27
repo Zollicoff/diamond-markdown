@@ -41,7 +41,8 @@ export function registerViewCommands(): void {
 		icon: '#',
 		category: 'view',
 		exec(ctx: CommandContext) {
-			openTab(ctx.vaultId!, { id: 'tags:', kind: 'tags', title: 'Tags' }, 'replace');
+			// App-style tab — opens beside the active note, doesn't replace it.
+			openTab(ctx.vaultId!, { id: 'tags:', kind: 'tags', title: 'Tags' }, 'new-tab');
 		}
 	});
 
