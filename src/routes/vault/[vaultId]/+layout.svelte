@@ -4,6 +4,7 @@
 	import LeftSidebar from '$lib/components/sidebar/LeftSidebar.svelte';
 	import LeftRail from '$lib/components/sidebar/LeftRail.svelte';
 	import RightPanel from '$lib/components/rightpanel/RightPanel.svelte';
+	import TopBar from '$lib/components/TopBar.svelte';
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
@@ -102,10 +103,18 @@
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
 >
-	<!-- Left activity rail (Obsidian-style) is always visible. Right side
-	     has no rail — when collapsed the right sidebar fully disappears.
-	     Collapse chevrons live in the workspace tab bar instead, so the
-	     top edge reads as one continuous bar in single-pane usage. -->
+	<!-- Top bar spans the full width with column zones that mirror the
+	     layout below: rail | left-sidebar | editor | right-sidebar.
+	     Collapsers live in the sidebar zones; when a zone collapses to
+	     0 its chevron jumps to the editor-zone edge so it stays usable. -->
+	<TopBar
+		vaultId={data.vault.id}
+		leftCollapsed={workspace.leftSidebarCollapsed}
+		rightCollapsed={workspace.rightSidebarCollapsed}
+		onToggleLeft={() => toggleLeftSidebar(data.vault.id)}
+		onToggleRight={() => toggleRightSidebar(data.vault.id)}
+	/>
+
 	<div class="rail-col">
 		<LeftRail vaultId={data.vault.id} />
 	</div>
@@ -115,14 +124,7 @@
 	</div>
 
 	<main class="center">
-		<Workspace
-			vaultId={data.vault.id}
-			{onDocLoaded}
-			leftCollapsed={workspace.leftSidebarCollapsed}
-			rightCollapsed={workspace.rightSidebarCollapsed}
-			onToggleLeft={() => toggleLeftSidebar(data.vault.id)}
-			onToggleRight={() => toggleRightSidebar(data.vault.id)}
-		/>
+		<Workspace vaultId={data.vault.id} {onDocLoaded} />
 		{@render children()}
 	</main>
 
@@ -138,7 +140,8 @@
 <style>
 	.shell {
 		display: grid;
-		/* rail | sidebar | editor | sidebar */
+		/* row 1: top bar | row 2: rail | sidebar | editor | sidebar */
+		grid-template-rows: 36px 1fr;
 		grid-template-columns: 38px 260px 1fr 280px;
 		height: 100vh;
 		min-height: 0;
@@ -148,8 +151,9 @@
 	.shell.right-collapsed { grid-template-columns: 38px 260px 1fr 0; }
 	.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0; }
 
-	.rail-col { min-width: 0; min-height: 0; overflow: hidden; }
-	.col { min-width: 0; min-height: 0; overflow: hidden; }
+	.rail-col { grid-row: 2; min-width: 0; min-height: 0; overflow: hidden; }
+	.col { grid-row: 2; min-width: 0; min-height: 0; overflow: hidden; }
+	.center { grid-row: 2; }
 	.shell.left-collapsed .left-col,
 	.shell.right-collapsed .right-col {
 		visibility: hidden;

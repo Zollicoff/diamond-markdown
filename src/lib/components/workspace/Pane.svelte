@@ -12,23 +12,12 @@
 		isActivePane: boolean;
 		canClose: boolean;
 		onDocLoaded?: (doc: NoteDoc) => void;
-		leftCollapsed?: boolean;
-		rightCollapsed?: boolean;
-		onToggleLeft?: () => void;
-		onToggleRight?: () => void;
+		/** Suppress the per-pane TabBar — used when a parent (e.g. TopBar)
+		 *  is rendering this pane's tabs instead. */
+		hideTabBar?: boolean;
 	}
 
-	let {
-		vaultId,
-		pane,
-		isActivePane,
-		canClose,
-		onDocLoaded,
-		leftCollapsed,
-		rightCollapsed,
-		onToggleLeft,
-		onToggleRight
-	}: Props = $props();
+	let { vaultId, pane, isActivePane, canClose, onDocLoaded, hideTabBar }: Props = $props();
 
 	type Mode = 'live' | 'source' | 'read';
 	let mode = $state<Mode>('live');
@@ -50,15 +39,9 @@
 	role="region"
 	aria-label="Editor pane"
 >
-	<TabBar
-		{vaultId}
-		{pane}
-		{isActivePane}
-		{leftCollapsed}
-		{rightCollapsed}
-		{onToggleLeft}
-		{onToggleRight}
-	/>
+	{#if !hideTabBar}
+		<TabBar {vaultId} {pane} {isActivePane} />
+	{/if}
 
 	<div class="pane-chrome">
 		<div class="mode-group" role="tablist" aria-label="View mode">
