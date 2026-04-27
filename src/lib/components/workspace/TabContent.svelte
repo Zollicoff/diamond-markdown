@@ -6,6 +6,7 @@
 	import TagsView from '$lib/components/tabviews/TagsView.svelte';
 	import SearchView from '$lib/components/tabviews/SearchView.svelte';
 	import SettingsView from '$lib/components/tabviews/SettingsView.svelte';
+	import ShortcutsView from '$lib/components/tabviews/ShortcutsView.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -29,4 +30,6 @@
 	<SearchView />
 {:else if tab.kind === 'settings'}
 	<SettingsView />
+{:else if tab.kind === 'shortcuts'}
+	<ShortcutsView />
 {/if}

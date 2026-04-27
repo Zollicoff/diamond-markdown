@@ -70,6 +70,16 @@ export function registerViewCommands(): void {
 	});
 
 	register({
+		id: 'shortcuts.open',
+		title: 'Show keyboard shortcuts',
+		icon: '⌨',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			openTab(ctx.vaultId!, { id: 'shortcuts', kind: 'shortcuts', title: 'Shortcuts' }, 'new-tab');
+		}
+	});
+
+	register({
 		id: 'daily.open',
 		title: "Open today's daily note",
 		icon: '📅',

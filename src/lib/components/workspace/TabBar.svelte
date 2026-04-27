@@ -128,7 +128,8 @@
 			case 'graph':    return '◎';
 			case 'tags':     return '#';
 			case 'search':   return '⌕';
-			case 'settings': return '⚙';
+			case 'settings':  return '⚙';
+			case 'shortcuts': return '⌨';
 			default:         return '◇';
 		}
 	}

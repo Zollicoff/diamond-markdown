@@ -6,7 +6,7 @@
  * to change the renderer, not the store.
  */
 
-export type TabKind = 'note' | 'graph' | 'tags' | 'search' | 'settings';
+export type TabKind = 'note' | 'graph' | 'tags' | 'search' | 'settings' | 'shortcuts';
 
 interface TabBase {
 	id: string;
@@ -37,7 +37,11 @@ export interface SettingsTab extends TabBase {
 	kind: 'settings';
 }
 
-export type Tab = NoteTab | GraphTab | TagsTab | SearchTab | SettingsTab;
+export interface ShortcutsTab extends TabBase {
+	kind: 'shortcuts';
+}
+
+export type Tab = NoteTab | GraphTab | TagsTab | SearchTab | SettingsTab | ShortcutsTab;
 
 export interface Pane {
 	id: string;

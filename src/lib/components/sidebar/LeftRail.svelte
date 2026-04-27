@@ -64,10 +64,21 @@
 				<path d="M3 10 V13 a1 1 0 0 0 1 1 H12 a1 1 0 0 0 1 -1 V10" />
 			</svg>
 		</button>
-		<button class="r-btn" onclick={() => exec('settings.open', { vaultId })} title="Settings" aria-label="Settings">
+		<button class="r-btn" onclick={() => exec('shortcuts.open', { vaultId })} title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
 			<svg viewBox="0 0 16 16" aria-hidden="true">
-				<circle cx="8" cy="8" r="2.2" />
-				<path d="M8 1.5 V3.5 M8 12.5 V14.5 M1.5 8 H3.5 M12.5 8 H14.5 M3.4 3.4 L4.8 4.8 M11.2 11.2 L12.6 12.6 M3.4 12.6 L4.8 11.2 M11.2 4.8 L12.6 3.4" />
+				<rect x="1.5" y="4.5" width="13" height="8" rx="1.5" />
+				<line x1="4" y1="7.5" x2="4.01" y2="7.5" stroke-linecap="round" stroke-width="1.6" />
+				<line x1="6.5" y1="7.5" x2="6.51" y2="7.5" stroke-linecap="round" stroke-width="1.6" />
+				<line x1="9" y1="7.5" x2="9.01" y2="7.5" stroke-linecap="round" stroke-width="1.6" />
+				<line x1="11.5" y1="7.5" x2="11.51" y2="7.5" stroke-linecap="round" stroke-width="1.6" />
+				<line x1="5" y1="10" x2="11" y2="10" stroke-linecap="round" />
+			</svg>
+		</button>
+		<button class="r-btn" onclick={() => exec('settings.open', { vaultId })} title="Settings" aria-label="Settings">
+			<svg viewBox="0 0 24 24" aria-hidden="true">
+				<!-- Lucide-style cog: notched perimeter + center bore -->
+				<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+				<circle cx="12" cy="12" r="3" />
 			</svg>
 		</button>
 	</div>

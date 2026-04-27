@@ -233,17 +233,22 @@
 		openNote(vaultId, n.path, title, mode);
 	}
 
-	function resetView(): void {
-		viewX = 0;
-		viewY = 0;
-		viewScale = 1;
-	}
 	function center(): void {
 		if (!svgEl) return;
 		const rect = svgEl.getBoundingClientRect();
 		viewX = rect.width / 2;
 		viewY = rect.height / 2;
 		viewScale = 1;
+	}
+
+	/** Restore force tunings + filters to factory defaults, then re-center
+	 *  the viewport. (Distinct from Center, which only re-centers the
+	 *  current view — useful when you've manually panned far off-screen
+	 *  but want to keep your slider tweaks.) */
+	function resetAll(): void {
+		resetForces();
+		resetFilters();
+		center();
 	}
 
 	onMount(() => {
@@ -276,8 +281,8 @@
 		</span>
 		<span class="spacer"></span>
 		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces, filters, display">⚙ Settings</button>
-		<button class="mini" onclick={resetView}>Reset</button>
-		<button class="mini" onclick={center}>Center</button>
+		<button class="mini" onclick={resetAll} title="Restore force defaults, clear filters, re-center">Reset</button>
+		<button class="mini" onclick={center} title="Re-center the current view">Center</button>
 	</header>
 
 	{#if loading && nodes.length === 0}

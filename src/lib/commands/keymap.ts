@@ -9,13 +9,13 @@
 
 import { exec, type CommandContext } from './registry';
 
-interface KeyBinding {
+export interface KeyBinding {
 	combo: string; // e.g. "mod+\\"
 	commandId: string;
 	when?: (ctx: CommandContext) => boolean;
 }
 
-const bindings: KeyBinding[] = [
+export const bindings: KeyBinding[] = [
 	{ combo: 'mod+\\', commandId: 'view.toggle-left-sidebar' },
 	{ combo: 'mod+shift+\\', commandId: 'view.toggle-right-sidebar' },
 	{ combo: 'mod+w', commandId: 'tabs.close' },
@@ -25,6 +25,21 @@ const bindings: KeyBinding[] = [
 	{ combo: 'mod+shift+l', commandId: 'theme.cycle' },
 	{ combo: 'mod+shift+t', commandId: 'template.insert' }
 ];
+
+/** Render a keymap combo string ("mod+shift+t") as a display string ("⌘⇧T"). */
+export function comboToDisplay(combo: string): string {
+	return combo
+		.split('+')
+		.map((part) => {
+			if (part === 'mod') return '⌘';
+			if (part === 'shift') return '⇧';
+			if (part === 'alt') return '⌥';
+			if (part === 'ctrl') return '⌃';
+			if (part.length === 1) return part.toUpperCase();
+			return part;
+		})
+		.join('');
+}
 
 export function installGlobalKeymap(getCtx: () => CommandContext): () => void {
 	const handler = (e: KeyboardEvent): void => {

@@ -51,6 +51,7 @@ function tabIdFor(tab: Tab): string {
 	if (tab.kind === 'tags') return `tags:${tab.filter ?? ''}`;
 	if (tab.kind === 'search') return `search:${tab.query}`;
 	if (tab.kind === 'settings') return 'settings';
+	if (tab.kind === 'shortcuts') return 'shortcuts';
 	return randId('tab');
 }
 
