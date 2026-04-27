@@ -21,6 +21,7 @@ import {
 } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { type Range } from '@codemirror/state';
+import { WIKILINK_RE } from '$lib/util/strings';
 
 /** Called for every [[target]] to tell us whether that note exists. */
 export type LinkResolver = (target: string) => { resolved: boolean; href?: string };
@@ -60,8 +61,6 @@ class WikilinkWidget extends WidgetType {
 		return false;
 	}
 }
-
-const WIKILINK_RE = /\[\[([^\[\]|\n]+?)(?:#([^\[\]|\n]+?))?(?:\|([^\[\]\n]+?))?\]\]/g;
 
 function buildDecorations(view: EditorView, resolveLink: LinkResolver): DecorationSet {
 	const ranges: Range<Decoration>[] = [];

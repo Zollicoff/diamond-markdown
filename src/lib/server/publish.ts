@@ -26,6 +26,7 @@ import { splitFrontmatter } from './frontmatter';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { getIndex, resolveTarget } from './indexer';
+import { slugify, escHtml, escAttr } from '$lib/util/strings';
 
 const dompWindow = new JSDOM('').window;
 const purify = DOMPurify(dompWindow as unknown as Window);
@@ -311,25 +312,10 @@ function ensureGitignoreEntry(vault: Vault, entry: string): void {
 	} catch { /* ignore */ }
 }
 
-function slugify(s: string): string {
-	return s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '') || 'note';
-}
-
 function hashString(s: string): string {
 	let h = 0;
 	for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
 	return (h >>> 0).toString(36);
-}
-
-function escHtml(s: string): string {
-	return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-}
-
-function escAttr(s: string): string {
-	return escHtml(s);
 }
 
 const STYLES = `/* DiamondMD static export — minimal readable defaults */

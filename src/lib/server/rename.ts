@@ -12,14 +12,13 @@ import { simpleGit } from 'simple-git';
 import type { Vault } from './vault';
 import { getIndex, upsertNote, removeNote } from './indexer';
 import { resolveInVault } from './paths';
+import { WIKILINK_RE } from '$lib/util/strings';
 
 interface RewriteResult {
 	/** Vault-relative paths modified (excludes the file being renamed). */
 	touched: string[];
 	linksUpdated: number;
 }
-
-const WIKILINK_RE = /\[\[([^\[\]|\n]+?)(?:#([^\[\]|\n]+?))?(?:\|([^\[\]\n]+?))?\]\]/g;
 
 /** Drop a trailing `.md` for path-style compare. */
 const stripMd = (p: string): string => p.replace(/\.md$/i, '');

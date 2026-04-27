@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slugifyHeading } from '$lib/util/strings';
+
 	interface Props {
 		body: string;
 	}
@@ -6,10 +8,6 @@
 	let { body }: Props = $props();
 
 	interface Heading { level: number; text: string; id: string; }
-
-	function slugifyHeading(h: string): string {
-		return h.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
-	}
 
 	const headings = $derived.by<Heading[]>(() => {
 		const out: Heading[] = [];

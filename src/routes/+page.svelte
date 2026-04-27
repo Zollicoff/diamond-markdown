@@ -210,13 +210,13 @@
 	}
 	.vault-card:hover {
 		border-color: var(--border-strong);
-		border-left-color: #7dd3fc;
+		border-left-color: var(--brand-cyan);
 		background: var(--bg-hover);
 		transform: translateX(1px);
 	}
 	.row-1 { display: flex; align-items: center; gap: 10px; }
 	.row-2 { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-	.diamond { color: #7dd3fc; }
+	.diamond { color: var(--brand-cyan); }
 	.name {
 		font-weight: 600;
 		font-size: 0.95rem;
@@ -274,7 +274,7 @@
 		font-family: var(--mono);
 		font-size: 0.85rem;
 	}
-	.add-form input:focus { outline: 2px solid #7dd3fc; outline-offset: 1px; border-color: transparent; }
+	.add-form input:focus { outline: 2px solid var(--brand-cyan); outline-offset: 1px; border-color: transparent; }
 	.actions { display: flex; gap: 8px; }
 
 	.btn {
@@ -289,7 +289,7 @@
 	}
 	.btn:hover { border-color: var(--accent); color: var(--accent); }
 	.btn.primary {
-		background: linear-gradient(135deg, #7dd3fc 0%, #818cf8 100%);
+		background: linear-gradient(135deg, var(--brand-cyan) 0%, var(--brand-indigo) 100%);
 		color: #0a0e1a;
 		font-weight: 600;
 		border-color: transparent;

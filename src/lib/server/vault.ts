@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { slugify } from '$lib/util/strings';
 
 export interface Vault {
 	id: string;
@@ -157,12 +158,9 @@ export function setActiveVault(id: string): void {
 	save(cfg);
 }
 
-function slugify(s: string): string {
-	return s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.slice(0, 48) || 'vault';
+/** Vault id slug — 48-char cap, falls back to 'vault'. */
+function vaultSlug(s: string): string {
+	return slugify(s, { maxLength: 48, fallback: 'vault' });
 }
 
 export function addVault(input: { name: string; path: string }): Vault {
@@ -171,10 +169,10 @@ export function addVault(input: { name: string; path: string }): Vault {
 	if (!fs.existsSync(absPath) || !fs.statSync(absPath).isDirectory()) {
 		throw new Error('path is not a directory');
 	}
-	let id = slugify(input.name);
+	let id = vaultSlug(input.name);
 	let n = 1;
 	while (cfg.vaults.some((v) => v.id === id)) {
-		id = `${slugify(input.name)}-${++n}`;
+		id = `${vaultSlug(input.name)}-${++n}`;
 	}
 	const vault: Vault = { id, name: input.name, path: absPath };
 	cfg.vaults.push(vault);

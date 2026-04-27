@@ -169,7 +169,7 @@
 		font: inherit;
 		font-size: 0.88rem;
 	}
-	.head input[type='search']:focus { outline: 2px solid #7dd3fc; border-color: transparent; }
+	.head input[type='search']:focus { outline: 2px solid var(--brand-cyan); border-color: transparent; }
 
 	.back {
 		background: transparent;

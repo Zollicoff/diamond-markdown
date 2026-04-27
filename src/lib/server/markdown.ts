@@ -27,6 +27,7 @@ import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
+import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 
 // DOMPurify needs a DOM on the server. JSDOM is the standard shim.
 const window = new JSDOM('').window;
@@ -228,16 +229,3 @@ function tagSub(chunk: string, render: (tag: string) => string): string {
 	});
 }
 
-function slugifyHeading(h: string): string {
-	return h.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
-}
-
-function escHtml(s: string): string {
-	return s.replace(/[&<>"']/g, (c) => ({
-		'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-	})[c]!);
-}
-
-function escAttr(s: string): string {
-	return escHtml(s);
-}

@@ -11,6 +11,8 @@
  * Resolution lives in indexer.ts — this file is just the syntax parser.
  */
 
+import { WIKILINK_RE } from '$lib/util/strings';
+
 export interface ParsedWikilink {
 	/** Exact substring from the source, including `[[` and `]]`. */
 	raw: string;
@@ -21,8 +23,6 @@ export interface ParsedWikilink {
 	/** Display text (after `|`), or null to fall back to target. */
 	display: string | null;
 }
-
-const WIKILINK_RE = /\[\[([^\[\]|\n]+?)(?:#([^\[\]|\n]+?))?(?:\|([^\[\]\n]+?))?\]\]/g;
 
 /**
  * Find every wikilink in the given markdown body.

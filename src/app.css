@@ -19,6 +19,12 @@
 	--link:          #79c0ff;
 	--link-broken:   #f85149;
 
+	/* Brand palette — the cyan/indigo crystal gradient. Distinct from
+	   --accent (yellow) which signals interaction. Used by Wordmark,
+	   the graph hover highlight, and primary CTA buttons. */
+	--brand-cyan:    #7dd3fc;
+	--brand-indigo:  #818cf8;
+
 	--success:       #3fb950;
 	--warn:          #d29922;
 	--danger:        #f85149;
@@ -44,6 +50,9 @@
 	--success:       #1a7f37;
 	--warn:          #9a6700;
 	--danger:        #cf222e;
+	/* Brand stays the same in light mode. */
+	--brand-cyan:    #0ea5e9;
+	--brand-indigo:  #6366f1;
 }
 
 /* highlight.js — github-dark works visually on a light background only with

@@ -3,40 +3,28 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import {
+		simulateStep,
+		nodeRadius,
+		SIM_DEFAULTS,
+		type GNode,
+		type GEdge
+	} from '$lib/graph/sim';
+	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 
 	interface Props {
 		vaultId: string;
 	}
-
 	let { vaultId }: Props = $props();
 
-	interface GNode {
-		path: string;
-		title: string;
-		degree: number;
-		x: number;
-		y: number;
-		vx: number;
-		vy: number;
-		fx: number | null;
-		fy: number | null;
-	}
-
-	interface GEdge {
-		from: string;
-		to: string;
-	}
-
+	// --- Data ----------------------------------------------------------
 	let nodes = $state<GNode[]>([]);
 	let edges = $state<GEdge[]>([]);
 	let loading = $state(false);
 	let err = $state<string | null>(null);
 
+	// --- View transform (pan + zoom) -----------------------------------
 	let svgEl: SVGSVGElement | null = $state(null);
-	let rafId = 0;
-	let lastTick = 0;
-
-	// View transform — pan + zoom.
 	let viewX = $state(0);
 	let viewY = $state(0);
 	let viewScale = $state(1);
@@ -46,7 +34,7 @@
 	let panOrigX = 0;
 	let panOrigY = 0;
 
-	// Drag state.
+	// --- Drag state ----------------------------------------------------
 	let draggingNode: GNode | null = null;
 	let dragStartX = 0;
 	let dragStartY = 0;
@@ -54,28 +42,15 @@
 	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
 	let hoverPath = $state<string | null>(null);
 
-	// Tunable simulation parameters — persisted per-vault to localStorage.
-	// Sim reads these live each tick; changing a slider re-shapes the graph
-	// even after it's settled, because forces are applied unconditionally.
-	const DEFAULTS = {
-		nodeScale: 1,
-		repulse: 1500,
-		linkForce: 0.05,
-		linkDist: 90,
-		centerForce: 0.01
-	};
-	let nodeScale = $state(DEFAULTS.nodeScale);
-	let repulse = $state(DEFAULTS.repulse);
-	let linkForce = $state(DEFAULTS.linkForce);
-	let linkDist = $state(DEFAULTS.linkDist);
-	let centerForce = $state(DEFAULTS.centerForce);
-
-	// Filter state — purely visual; sim still runs over all nodes so layout
-	// stays stable when toggling. Persisted alongside the force settings.
+	// --- Tunable params (per-vault, persisted) -------------------------
+	let nodeScale = $state(SIM_DEFAULTS.nodeScale);
+	let repulse = $state(SIM_DEFAULTS.repulse);
+	let linkForce = $state(SIM_DEFAULTS.linkForce);
+	let linkDist = $state(SIM_DEFAULTS.linkDist);
+	let centerForce = $state(SIM_DEFAULTS.centerForce);
 	let hideOrphans = $state(false);
 	let searchQuery = $state('');
 	let panelOpen = $state(false);
-	let panelTab = $state<'forces' | 'filters'>('forces');
 	let settingsHydrated = false;
 
 	const settingsKey = (): string => `diamondmd:graph-settings:${vaultId}`;
@@ -85,7 +60,7 @@
 		try {
 			const raw = localStorage.getItem(settingsKey());
 			if (!raw) return;
-			const v = JSON.parse(raw) as Partial<typeof DEFAULTS> & { hideOrphans?: boolean; searchQuery?: string };
+			const v = JSON.parse(raw) as Partial<typeof SIM_DEFAULTS> & { hideOrphans?: boolean; searchQuery?: string };
 			if (typeof v.nodeScale === 'number') nodeScale = v.nodeScale;
 			if (typeof v.repulse === 'number') repulse = v.repulse;
 			if (typeof v.linkForce === 'number') linkForce = v.linkForce;
@@ -93,35 +68,28 @@
 			if (typeof v.centerForce === 'number') centerForce = v.centerForce;
 			if (typeof v.hideOrphans === 'boolean') hideOrphans = v.hideOrphans;
 			if (typeof v.searchQuery === 'string') searchQuery = v.searchQuery;
-		} catch {
-			// Corrupt JSON — ignore and stick with defaults.
-		}
+		} catch { /* corrupt JSON — stick with defaults */ }
 	}
 
-	function resetSettings(): void {
-		nodeScale = DEFAULTS.nodeScale;
-		repulse = DEFAULTS.repulse;
-		linkForce = DEFAULTS.linkForce;
-		linkDist = DEFAULTS.linkDist;
-		centerForce = DEFAULTS.centerForce;
+	function resetForces(): void {
+		nodeScale = SIM_DEFAULTS.nodeScale;
+		repulse = SIM_DEFAULTS.repulse;
+		linkForce = SIM_DEFAULTS.linkForce;
+		linkDist = SIM_DEFAULTS.linkDist;
+		centerForce = SIM_DEFAULTS.centerForce;
 	}
-
 	function resetFilters(): void {
 		hideOrphans = false;
 		searchQuery = '';
 	}
 
 	$effect(() => {
-		// Persist whenever any setting changes — but skip the initial run
-		// before hydrate has had a chance to load existing values.
 		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
 		if (!settingsHydrated || typeof localStorage === 'undefined') return;
 		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
 	});
 
-	// Visible set — sim still runs over `nodes`/`edges`, but rendering
-	// only walks the filtered set, so toggling a filter doesn't disrupt
-	// the live layout.
+	// --- Filter projection ---------------------------------------------
 	const visiblePaths = $derived.by<Set<string>>(() => {
 		const q = searchQuery.trim().toLowerCase();
 		const set = new Set<string>();
@@ -136,6 +104,7 @@
 	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
 	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
 
+	// --- Load + sim loop -----------------------------------------------
 	let initialCenterDone = false;
 	async function loadGraph(): Promise<void> {
 		loading = true;
@@ -160,10 +129,6 @@
 			edges = data.edges.filter((e) => byPath.has(e.from) && byPath.has(e.to));
 			startSim();
 			loading = false;
-			// Center *after* the SVG is mounted with the new data — without
-			// this the original setTimeout fired before the {#if} branch
-			// flipped, leaving the graph anchored at (0, 0) until the user
-			// clicked Center manually.
 			if (!initialCenterDone) {
 				await tick();
 				center();
@@ -175,101 +140,25 @@
 		}
 	}
 
+	let rafId = 0;
+	let lastTick = 0;
 	function startSim(): void {
 		cancelAnimationFrame(rafId);
 		lastTick = performance.now();
 		const tick = (now: number): void => {
 			const dt = Math.min(32, now - lastTick) / 16; // normalize to ~60fps
 			lastTick = now;
-			simulateStep(dt);
+			simulateStep(nodes, edges, dt, { repulse, linkForce, linkDist, centerForce });
+			nodes = nodes; // nudge reactivity — sim mutates in place
 			rafId = requestAnimationFrame(tick);
 		};
 		rafId = requestAnimationFrame(tick);
 	}
 
-	function simulateStep(dt: number): void {
-		if (nodes.length === 0) return;
-
-		const byPath = new Map<string, GNode>(nodes.map((n) => [n.path, n]));
-
-		// Repulsive force between every pair. O(n²) — fine for <500 nodes.
-		const repulseK = repulse;
-		for (let i = 0; i < nodes.length; i++) {
-			const a = nodes[i];
-			for (let j = i + 1; j < nodes.length; j++) {
-				const b = nodes[j];
-				let dx = a.x - b.x;
-				let dy = a.y - b.y;
-				let d2 = dx * dx + dy * dy;
-				if (d2 < 0.01) {
-					// Jitter to avoid singularity.
-					dx = (Math.random() - 0.5) * 0.5;
-					dy = (Math.random() - 0.5) * 0.5;
-					d2 = dx * dx + dy * dy + 0.01;
-				}
-				const d = Math.sqrt(d2);
-				const f = repulseK / d2;
-				const fx = (dx / d) * f;
-				const fy = (dy / d) * f;
-				a.vx += fx * dt;
-				a.vy += fy * dt;
-				b.vx -= fx * dt;
-				b.vy -= fy * dt;
-			}
-		}
-
-		// Spring force along edges.
-		const restLen = linkDist;
-		const springK = linkForce;
-		for (const e of edges) {
-			const a = byPath.get(e.from)!;
-			const b = byPath.get(e.to)!;
-			const dx = b.x - a.x;
-			const dy = b.y - a.y;
-			const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
-			const f = (d - restLen) * springK;
-			const fx = (dx / d) * f;
-			const fy = (dy / d) * f;
-			a.vx += fx * dt;
-			a.vy += fy * dt;
-			b.vx -= fx * dt;
-			b.vy -= fy * dt;
-		}
-
-		// Gentle gravity toward origin.
-		const gravityK = centerForce;
-		for (const n of nodes) {
-			n.vx -= n.x * gravityK * dt;
-			n.vy -= n.y * gravityK * dt;
-		}
-
-		// Integrate + damping.
-		const damping = 0.8;
-		for (const n of nodes) {
-			if (n.fx != null && n.fy != null) {
-				n.x = n.fx;
-				n.y = n.fy;
-				n.vx = 0;
-				n.vy = 0;
-				continue;
-			}
-			n.vx *= damping;
-			n.vy *= damping;
-			n.x += n.vx * dt;
-			n.y += n.vy * dt;
-		}
-		// Nudge reactivity — replace the array ref.
-		nodes = nodes;
-	}
-
-	function nodeRadius(n: GNode): number {
-		return (4 + Math.min(12, Math.sqrt(n.degree) * 3)) * nodeScale;
-	}
-
+	// --- Pointer + view handlers ---------------------------------------
 	function onWheel(e: WheelEvent): void {
 		e.preventDefault();
 		const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-		// Zoom around cursor.
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
 		const cx = e.clientX - rect.left;
@@ -282,7 +171,6 @@
 	}
 
 	function onPointerDownBG(e: PointerEvent): void {
-		// Don't start pan if user clicked a node (those stop propagation).
 		isPanning = true;
 		panStartX = e.clientX;
 		panStartY = e.clientY;
@@ -300,10 +188,8 @@
 			}
 			const rect = svgEl?.getBoundingClientRect();
 			if (!rect) return;
-			const wx = (e.clientX - rect.left - viewX) / viewScale;
-			const wy = (e.clientY - rect.top - viewY) / viewScale;
-			draggingNode.fx = wx;
-			draggingNode.fy = wy;
+			draggingNode.fx = (e.clientX - rect.left - viewX) / viewScale;
+			draggingNode.fy = (e.clientY - rect.top - viewY) / viewScale;
 			return;
 		}
 		if (!isPanning) return;
@@ -336,16 +222,13 @@
 
 	function onNodeClick(e: MouseEvent, n: GNode): void {
 		e.stopPropagation();
-		// Suppress the click the browser fires after a drag-release on the
-		// same node — otherwise dragging triggers a navigation.
+		// Suppress the click the browser fires after a drag-release.
 		if (dragMoved) {
 			dragMoved = false;
 			return;
 		}
-		if (e.shiftKey) return; // shift-click reserved for future multiselect
+		if (e.shiftKey) return; // reserved for multiselect later
 		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
-		// Graph is an app-style tab — keep it open. alt → new pane,
-		// everything else → new tab beside the graph.
 		const mode = e.altKey ? 'new-pane' : 'new-tab';
 		openNote(vaultId, n.path, title, mode);
 	}
@@ -355,7 +238,6 @@
 		viewY = 0;
 		viewScale = 1;
 	}
-
 	function center(): void {
 		if (!svgEl) return;
 		const rect = svgEl.getBoundingClientRect();
@@ -372,7 +254,7 @@
 			onBus('note:created', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
 			onBus('note:deleted', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
 			onBus('note:renamed', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
-			onBus('note:saved', (e) => { if (e.vaultId === vaultId) void loadGraph(); })
+			onBus('note:saved',   (e) => { if (e.vaultId === vaultId) void loadGraph(); })
 		];
 		return () => offs.forEach((o) => o());
 	});
@@ -438,7 +320,7 @@
 						role="button"
 						tabindex="0"
 					>
-						<circle r={nodeRadius(n)} />
+						<circle r={nodeRadius(n, nodeScale)} />
 						<text dy="-8">{n.title}</text>
 					</g>
 				{/each}
@@ -447,76 +329,26 @@
 	{/if}
 
 	{#if panelOpen}
-		<aside class="forces-panel" role="dialog" aria-label="Graph settings">
-			<div class="fp-head">
-				<div class="fp-tabs" role="tablist">
-					<button
-						class="fp-tab"
-						class:active={panelTab === 'forces'}
-						role="tab"
-						aria-selected={panelTab === 'forces'}
-						onclick={() => (panelTab = 'forces')}
-					>Forces</button>
-					<button
-						class="fp-tab"
-						class:active={panelTab === 'filters'}
-						role="tab"
-						aria-selected={panelTab === 'filters'}
-						onclick={() => (panelTab = 'filters')}
-					>
-						Filters
-						{#if filtersActive}<span class="fp-dot" aria-label="Filters active"></span>{/if}
-					</button>
-				</div>
-				<button class="fp-close" onclick={() => (panelOpen = false)} aria-label="Close">×</button>
-			</div>
-
-			{#if panelTab === 'forces'}
-				<label class="fp-row">
-					<span class="fp-label">Node size</span>
-					<input type="range" min="0.5" max="3" step="0.1" bind:value={nodeScale} />
-					<span class="fp-val mono">{nodeScale.toFixed(1)}×</span>
-				</label>
-
-				<label class="fp-row">
-					<span class="fp-label">Repel force</span>
-					<input type="range" min="200" max="4000" step="50" bind:value={repulse} />
-					<span class="fp-val mono">{Math.round(repulse)}</span>
-				</label>
-
-				<label class="fp-row">
-					<span class="fp-label">Link force</span>
-					<input type="range" min="0.01" max="0.30" step="0.01" bind:value={linkForce} />
-					<span class="fp-val mono">{linkForce.toFixed(2)}</span>
-				</label>
-
-				<label class="fp-row">
-					<span class="fp-label">Link distance</span>
-					<input type="range" min="30" max="250" step="5" bind:value={linkDist} />
-					<span class="fp-val mono">{Math.round(linkDist)}</span>
-				</label>
-
-				<label class="fp-row">
-					<span class="fp-label">Center force</span>
-					<input type="range" min="0" max="0.05" step="0.001" bind:value={centerForce} />
-					<span class="fp-val mono">{centerForce.toFixed(3)}</span>
-				</label>
-
-				<button class="fp-reset" onclick={resetSettings}>Restore defaults</button>
-			{:else}
-				<label class="fp-search">
-					<span class="fp-label">Search</span>
-					<input type="search" placeholder="Filter by name or path…" bind:value={searchQuery} />
-				</label>
-
-				<label class="fp-toggle">
-					<input type="checkbox" bind:checked={hideOrphans} />
-					<span>Hide orphans <span class="fp-hint">(no links in or out)</span></span>
-				</label>
-
-				<button class="fp-reset" onclick={resetFilters}>Clear filters</button>
-			{/if}
-		</aside>
+		<GraphSettingsPanel
+			{nodeScale}
+			{repulse}
+			{linkForce}
+			{linkDist}
+			{centerForce}
+			{hideOrphans}
+			{searchQuery}
+			{filtersActive}
+			onSetNodeScale={(v) => (nodeScale = v)}
+			onSetRepulse={(v) => (repulse = v)}
+			onSetLinkForce={(v) => (linkForce = v)}
+			onSetLinkDist={(v) => (linkDist = v)}
+			onSetCenterForce={(v) => (centerForce = v)}
+			onSetHideOrphans={(v) => (hideOrphans = v)}
+			onSetSearchQuery={(v) => (searchQuery = v)}
+			onResetForces={resetForces}
+			onResetFilters={resetFilters}
+			onClose={() => (panelOpen = false)}
+		/>
 	{/if}
 
 	<footer class="legend">
@@ -561,132 +393,6 @@
 	.mini:hover { color: var(--accent); border-color: var(--accent); }
 	.mini.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
-	.forces-panel {
-		position: absolute;
-		top: 50px;
-		right: 12px;
-		z-index: 10;
-		width: 250px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-		padding: 10px 12px 12px;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.fp-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 8px;
-		padding-bottom: 4px;
-		border-bottom: 1px solid var(--border);
-	}
-	.fp-tabs {
-		display: flex;
-		gap: 4px;
-	}
-	.fp-tab {
-		background: transparent;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		color: var(--fg-muted);
-		cursor: pointer;
-		font: inherit;
-		font-size: 0.78rem;
-		padding: 4px 8px 5px;
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-	}
-	.fp-tab:hover { color: var(--fg); }
-	.fp-tab.active {
-		color: var(--fg);
-		border-bottom-color: var(--accent);
-		font-weight: 600;
-	}
-	.fp-dot {
-		display: inline-block;
-		width: 6px; height: 6px; border-radius: 50%;
-		background: var(--accent);
-	}
-	.fp-close {
-		background: transparent;
-		border: 0;
-		color: var(--fg-muted);
-		cursor: pointer;
-		font-size: 1.1rem;
-		line-height: 1;
-		padding: 0 4px;
-	}
-	.fp-close:hover { color: var(--fg); }
-	.fp-row {
-		display: grid;
-		grid-template-columns: auto 1fr 44px;
-		align-items: center;
-		gap: 8px;
-		font-size: 0.74rem;
-		color: var(--fg-dim);
-	}
-	.fp-label {
-		white-space: nowrap;
-		min-width: 84px;
-	}
-	.fp-row input[type='range'] {
-		width: 100%;
-		accent-color: var(--accent);
-	}
-	.fp-val {
-		text-align: right;
-		font-size: 0.7rem;
-		color: var(--fg-muted);
-	}
-	.fp-reset {
-		margin-top: 4px;
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 4px 8px;
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.74rem;
-		cursor: pointer;
-	}
-	.fp-reset:hover { color: var(--accent); border-color: var(--accent); }
-
-	.fp-search {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		font-size: 0.74rem;
-		color: var(--fg-dim);
-	}
-	.fp-search input[type='search'] {
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--fg);
-		font: inherit;
-		font-size: 0.78rem;
-		padding: 5px 8px;
-	}
-	.fp-search input[type='search']:focus {
-		outline: none;
-		border-color: var(--accent);
-	}
-	.fp-toggle {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 0.78rem;
-		color: var(--fg);
-		cursor: pointer;
-	}
-	.fp-toggle input { accent-color: var(--accent); cursor: pointer; }
-	.fp-hint { color: var(--fg-dim); font-size: 0.72rem; }
-
 	.canvas {
 		flex: 1;
 		min-height: 0;
@@ -704,7 +410,7 @@
 		opacity: 0.55;
 		pointer-events: none;
 	}
-	.edge.hl { stroke: #7dd3fc; opacity: 1; stroke-width: 1.4; }
+	.edge.hl { stroke: var(--brand-cyan); opacity: 1; stroke-width: 1.4; }
 
 	.node circle {
 		fill: var(--fg-muted);
@@ -724,7 +430,7 @@
 		stroke-linejoin: round;
 	}
 	.node:hover circle, .node.hl circle {
-		fill: #7dd3fc;
+		fill: var(--brand-cyan);
 		cursor: pointer;
 	}
 	.node:hover text, .node.hl text { fill: var(--fg); }

@@ -11,6 +11,7 @@
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import { READING_SPEED_WPM } from '$lib/util/constants';
 
 	interface Props {
 		vaultId: string;
@@ -177,7 +178,7 @@
 	});
 
 	const readingTime = $derived<string>(
-		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / 220))} min`
+		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / READING_SPEED_WPM))} min`
 	);
 
 	function fmtSaved(ms: number | null): string {
