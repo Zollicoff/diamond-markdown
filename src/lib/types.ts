@@ -20,6 +20,11 @@ export interface TreeNode {
 	name: string;
 	path: string;
 	type: 'file' | 'directory';
+	/** Modified time (ms since epoch). 0 for directories. */
+	mtime?: number;
+	/** Created/birth time. Falls back to mtime on filesystems without
+	 *  birthtime. 0 for directories. */
+	ctime?: number;
 	children?: TreeNode[];
 }
 

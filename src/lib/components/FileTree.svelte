@@ -3,6 +3,8 @@
 		name: string;
 		path: string;
 		type: 'file' | 'directory';
+		mtime?: number;
+		ctime?: number;
 		children?: TreeNode[];
 	}
 </script>
@@ -12,7 +14,11 @@
 		nodes: TreeNode[];
 		vaultId: string;
 		activePath?: string | null;
+		/** Controlled expand set — the parent owns the source of truth so
+		 *  toolbar actions (expand-all / collapse-all / auto-reveal) can
+		 *  drive it. Pair with onToggleDir to handle user clicks. */
 		expanded?: Set<string>;
+		onToggleDir?: (path: string) => void;
 		/** Path currently being renamed, if any. */
 		renamingPath?: string | null;
 		onContext?: (e: MouseEvent, node: TreeNode) => void;
@@ -20,9 +26,6 @@
 		onDropMove?: (src: string, destFolder: string) => void;
 		onRenameCommit?: (node: TreeNode, newName: string) => void;
 		onRenameCancel?: () => void;
-		/** When provided, file clicks go through this callback instead of
-		 *  the default `<a href>` nav. Lets the parent decide which pane/
-		 *  tab mode to open in based on modifier keys. */
 		onFileClick?: (e: MouseEvent, node: TreeNode) => void;
 	}
 
@@ -31,6 +34,7 @@
 		vaultId,
 		activePath = null,
 		expanded = new Set<string>(),
+		onToggleDir,
 		renamingPath = null,
 		onContext,
 		onRootContext,
@@ -40,14 +44,12 @@
 		onFileClick
 	}: Props = $props();
 
-	let expand = $state(expanded);
+	const expand = $derived(expanded);
 	let dragOverPath = $state<string | null>(null);
 	let rootDragOver = $state(false);
 
 	function toggle(p: string): void {
-		if (expand.has(p)) expand.delete(p);
-		else expand.add(p);
-		expand = new Set(expand);
+		onToggleDir?.(p);
 	}
 
 	function isDescendant(parent: string, maybeChild: string): boolean {

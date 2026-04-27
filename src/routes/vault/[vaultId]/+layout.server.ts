@@ -8,6 +8,11 @@ interface TreeNode {
 	name: string;
 	path: string;
 	type: 'file' | 'directory';
+	/** Modified time (ms since epoch). 0 for directories. */
+	mtime: number;
+	/** Created/birth time (ms since epoch). Falls back to mtime on
+	 *  filesystems that don't track birthtime. 0 for directories. */
+	ctime: number;
 	children?: TreeNode[];
 }
 
@@ -21,11 +26,28 @@ function walk(dir: string, base: string): TreeNode[] {
 		const abs = path.join(dir, e.name);
 		const rel = path.relative(base, abs).split(path.sep).join('/');
 		if (e.isDirectory()) {
-			nodes.push({ name: e.name, path: rel, type: 'directory', children: walk(abs, base) });
+			nodes.push({
+				name: e.name,
+				path: rel,
+				type: 'directory',
+				mtime: 0,
+				ctime: 0,
+				children: walk(abs, base)
+			});
 		} else if (e.isFile() && e.name.endsWith('.md')) {
-			nodes.push({ name: e.name, path: rel, type: 'file' });
+			let mtime = 0;
+			let ctime = 0;
+			try {
+				const st = fs.statSync(abs);
+				mtime = st.mtimeMs;
+				// birthtime can be 0 on Linux ext4; fall back to mtime.
+				ctime = st.birthtimeMs && st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs;
+			} catch { /* permissions / race — leave zeros */ }
+			nodes.push({ name: e.name, path: rel, type: 'file', mtime, ctime });
 		}
 	}
+	// Default sort: directories first, then alphanumeric. Client may
+	// re-sort based on user-selected mode (name/mtime/ctime asc/desc).
 	return nodes.sort((a, b) => {
 		if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
 		return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
