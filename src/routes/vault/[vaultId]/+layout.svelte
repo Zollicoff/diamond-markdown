@@ -4,7 +4,6 @@
 	import LeftSidebar from '$lib/components/sidebar/LeftSidebar.svelte';
 	import LeftRail from '$lib/components/sidebar/LeftRail.svelte';
 	import RightPanel from '$lib/components/rightpanel/RightPanel.svelte';
-	import RightRail from '$lib/components/rightpanel/RightRail.svelte';
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
@@ -103,16 +102,12 @@
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
 >
-	<!-- Activity rails sit on the outside (Obsidian-style); sidebars are
-	     between them and the editor. Rails always visible — collapsing
-	     just shrinks the sidebar columns to 0. Grid slots stay stable
-	     via width:0 + overflow:hidden, never #if. -->
+	<!-- Left activity rail (Obsidian-style) is always visible. Right side
+	     has no rail — when collapsed the right sidebar fully disappears.
+	     Collapse chevrons live in the workspace tab bar instead, so the
+	     top edge reads as one continuous bar in single-pane usage. -->
 	<div class="rail-col">
-		<LeftRail
-			vaultId={data.vault.id}
-			collapsed={workspace.leftSidebarCollapsed}
-			onToggle={() => toggleLeftSidebar(data.vault.id)}
-		/>
+		<LeftRail vaultId={data.vault.id} />
 	</div>
 
 	<div class="col left-col">
@@ -120,19 +115,19 @@
 	</div>
 
 	<main class="center">
-		<Workspace vaultId={data.vault.id} {onDocLoaded} />
+		<Workspace
+			vaultId={data.vault.id}
+			{onDocLoaded}
+			leftCollapsed={workspace.leftSidebarCollapsed}
+			rightCollapsed={workspace.rightSidebarCollapsed}
+			onToggleLeft={() => toggleLeftSidebar(data.vault.id)}
+			onToggleRight={() => toggleRightSidebar(data.vault.id)}
+		/>
 		{@render children()}
 	</main>
 
 	<div class="col right-col">
 		<RightPanel vaultId={data.vault.id} doc={activeDoc} />
-	</div>
-
-	<div class="rail-col">
-		<RightRail
-			collapsed={workspace.rightSidebarCollapsed}
-			onToggle={() => toggleRightSidebar(data.vault.id)}
-		/>
 	</div>
 </div>
 
@@ -143,20 +138,18 @@
 <style>
 	.shell {
 		display: grid;
-		/* rail | sidebar | editor | sidebar | rail */
-		grid-template-columns: 38px 260px 1fr 280px 38px;
+		/* rail | sidebar | editor | sidebar */
+		grid-template-columns: 38px 260px 1fr 280px;
 		height: 100vh;
 		min-height: 0;
 		transition: grid-template-columns 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
 	}
-	.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 280px 38px; }
-	.shell.right-collapsed { grid-template-columns: 38px 260px 1fr 0 38px; }
-	.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0 38px; }
+	.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 280px; }
+	.shell.right-collapsed { grid-template-columns: 38px 260px 1fr 0; }
+	.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0; }
 
 	.rail-col { min-width: 0; min-height: 0; overflow: hidden; }
 	.col { min-width: 0; min-height: 0; overflow: hidden; }
-	/* When the sidebar column shrinks to 0, hide its content so we don't
-	   get a clipped half-rendered sidebar during the transition. */
 	.shell.left-collapsed .left-col,
 	.shell.right-collapsed .right-col {
 		visibility: hidden;
@@ -172,17 +165,16 @@
 	.center > :global(.workspace) { flex: 1; min-height: 0; }
 
 	@media (max-width: 900px) {
-		.shell { grid-template-columns: 38px 240px 1fr 260px 38px; }
-		.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 260px 38px; }
-		.shell.right-collapsed { grid-template-columns: 38px 240px 1fr 0 38px; }
-		.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0 38px; }
+		.shell { grid-template-columns: 38px 240px 1fr 260px; }
+		.shell.left-collapsed  { grid-template-columns: 38px 0 1fr 260px; }
+		.shell.right-collapsed { grid-template-columns: 38px 240px 1fr 0; }
+		.shell.left-collapsed.right-collapsed { grid-template-columns: 38px 0 1fr 0; }
 	}
 
-	/* Phones: rails get a touch-friendly 48px; sidebars take most of the screen when open. */
 	@media (max-width: 640px) {
-		.shell { grid-template-columns: 48px 70vw 1fr 78vw 48px; }
-		.shell.left-collapsed  { grid-template-columns: 48px 0 1fr 78vw 48px; }
-		.shell.right-collapsed { grid-template-columns: 48px 70vw 1fr 0 48px; }
-		.shell.left-collapsed.right-collapsed { grid-template-columns: 48px 0 1fr 0 48px; }
+		.shell { grid-template-columns: 48px 70vw 1fr 78vw; }
+		.shell.left-collapsed  { grid-template-columns: 48px 0 1fr 78vw; }
+		.shell.right-collapsed { grid-template-columns: 48px 70vw 1fr 0; }
+		.shell.left-collapsed.right-collapsed { grid-template-columns: 48px 0 1fr 0; }
 	}
 </style>

@@ -1,20 +1,13 @@
 <script lang="ts">
 	import { exec } from '$lib/commands';
-	import CollapseToggle from '$lib/components/CollapseToggle.svelte';
 
 	interface Props {
 		vaultId: string;
-		collapsed: boolean;
-		onToggle: () => void;
 	}
-	let { vaultId, collapsed, onToggle }: Props = $props();
+	let { vaultId }: Props = $props();
 </script>
 
 <nav class="rail" aria-label="Left activity bar">
-	<div class="rail-top">
-		<CollapseToggle side="left" {collapsed} {onToggle} />
-	</div>
-
 	<div class="rail-actions">
 		<button class="r-btn" onclick={() => exec('note.create', { vaultId })} title="New note" aria-label="New note">
 			<svg viewBox="0 0 16 16" aria-hidden="true">
@@ -84,9 +77,6 @@
 		background: var(--bg);
 		border-right: 1px solid var(--border);
 		height: 100%;
-	}
-	.rail-top {
-		padding-bottom: 4px;
 	}
 	.rail-actions {
 		display: flex;

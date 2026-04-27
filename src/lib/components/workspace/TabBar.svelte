@@ -7,14 +7,27 @@
 		reorderTab,
 		setActivePane
 	} from '$lib/workspace/actions';
+	import CollapseToggle from '$lib/components/CollapseToggle.svelte';
 
 	interface Props {
 		vaultId: string;
 		pane: Pane;
 		isActivePane: boolean;
+		leftCollapsed?: boolean;
+		rightCollapsed?: boolean;
+		onToggleLeft?: () => void;
+		onToggleRight?: () => void;
 	}
 
-	let { vaultId, pane, isActivePane }: Props = $props();
+	let {
+		vaultId,
+		pane,
+		isActivePane,
+		leftCollapsed,
+		rightCollapsed,
+		onToggleLeft,
+		onToggleRight
+	}: Props = $props();
 
 	let dragIdx = $state<number | null>(null);
 	let dragOverIdx = $state<number | null>(null);
@@ -88,6 +101,12 @@
 	onmousedown={focusPane}
 	aria-label="Open notes"
 >
+	{#if onToggleLeft}
+		<div class="rail-slot left">
+			<CollapseToggle side="left" collapsed={!!leftCollapsed} onToggle={onToggleLeft} />
+		</div>
+	{/if}
+	<div class="tab-list">
 	{#if pane.tabs.length === 0}
 		<span class="empty-hint">no tabs · open a note from the sidebar</span>
 	{/if}
@@ -114,6 +133,12 @@
 			<button class="tab-close" onclick={(e) => close(e, t)} aria-label="Close">×</button>
 		</div>
 	{/each}
+	</div>
+	{#if onToggleRight}
+		<div class="rail-slot right">
+			<CollapseToggle side="right" collapsed={!!rightCollapsed} onToggle={onToggleRight} />
+		</div>
+	{/if}
 </nav>
 
 <script lang="ts" module>
@@ -135,12 +160,28 @@
 		min-height: 34px;
 		background: var(--bg);
 		border-bottom: 1px solid var(--border);
-		overflow-x: auto;
-		scrollbar-width: thin;
 		border-top: 2px solid transparent;
 	}
 	.tabs.active-pane { border-top-color: var(--accent); }
 	.tabs.drop-active { background: rgba(125, 211, 252, 0.04); }
+	.tab-list {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: thin;
+	}
+	.rail-slot {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 32px;
+		border-right: 1px solid var(--border);
+	}
+	.rail-slot.right {
+		border-right: 0;
+		border-left: 1px solid var(--border);
+	}
 
 	.empty-hint {
 		padding: 9px 14px;
