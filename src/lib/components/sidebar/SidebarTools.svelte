@@ -10,10 +10,10 @@
 	<button class="t-btn" onclick={() => exec('folder.create', { vaultId })} title="New folder">📁 Folder</button>
 </div>
 <div class="nav">
-	<button class="n-btn" onclick={() => exec('daily.open', { vaultId })} title="Open today's daily (⌘⇧D)">📅 Today</button>
-	<button class="n-btn" onclick={() => exec('tags.open', { vaultId })} title="Show tags">#  Tags</button>
-	<button class="n-btn" onclick={() => exec('graph.open', { vaultId })} title="Show graph">◉  Graph</button>
-	<button class="n-btn" onclick={() => exec('publish.export', { vaultId })} title="Publish public notes as static site">⇪  Publish</button>
+	<button class="n-btn" onclick={() => exec('daily.open', { vaultId })} title="Open today's daily note (⌘⇧D)" aria-label="Today's daily note">📅</button>
+	<button class="n-btn" onclick={() => exec('tags.open', { vaultId })} title="Show tags" aria-label="Tags">#</button>
+	<button class="n-btn" onclick={() => exec('graph.open', { vaultId })} title="Show graph" aria-label="Graph">◉</button>
+	<button class="n-btn" onclick={() => exec('publish.export', { vaultId })} title="Publish public notes as static site" aria-label="Publish">⇪</button>
 </div>
 
 <style>
@@ -47,12 +47,13 @@
 		background: transparent;
 		border: 0;
 		color: var(--fg-muted);
-		padding: 4px 6px;
+		padding: 6px 4px;
 		border-radius: 4px;
 		cursor: pointer;
 		font: inherit;
-		font-size: 0.78rem;
-		text-align: left;
+		font-size: 1rem;
+		line-height: 1;
+		text-align: center;
 	}
 	.n-btn:hover { color: var(--accent); background: var(--bg-hover); }
 </style>
