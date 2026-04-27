@@ -18,23 +18,18 @@
 </script>
 
 <header class="topbar" aria-label="Workspace top bar">
-	<!-- Mirrors the .shell column tracks: rail | left-sidebar | editor | right-sidebar.
-	     When a sidebar zone collapses to 0, its chevron jumps to the editor zone
-	     so it stays reachable. -->
+	<!-- Subgrid mirrors shell columns: rail | left-sidebar | editor | right-sidebar.
+	     Sidebar zones are decorative space (matching widths below). The
+	     collapse chevrons live inside the editor zone, pinned to its left
+	     and right edges, so they never teleport when sidebars toggle —
+	     they just slide along with the editor edge. -->
 	<div class="tb-zone tb-rail" aria-hidden="true"></div>
-
-	<div class="tb-zone tb-left">
-		{#if !leftCollapsed}
-			<CollapseToggle side="left" collapsed={false} onToggle={onToggleLeft} />
-		{/if}
-	</div>
+	<div class="tb-zone tb-side-left" aria-hidden="true"></div>
 
 	<div class="tb-zone tb-editor">
-		{#if leftCollapsed}
-			<div class="edge-chev edge-left">
-				<CollapseToggle side="left" collapsed={true} onToggle={onToggleLeft} />
-			</div>
-		{/if}
+		<div class="tb-chev">
+			<CollapseToggle side="left" collapsed={leftCollapsed} onToggle={onToggleLeft} />
+		</div>
 
 		<div class="tb-tabs">
 			{#if singlePane && activePane}
@@ -44,18 +39,12 @@
 			{/if}
 		</div>
 
-		{#if rightCollapsed}
-			<div class="edge-chev edge-right">
-				<CollapseToggle side="right" collapsed={true} onToggle={onToggleRight} />
-			</div>
-		{/if}
+		<div class="tb-chev">
+			<CollapseToggle side="right" collapsed={rightCollapsed} onToggle={onToggleRight} />
+		</div>
 	</div>
 
-	<div class="tb-zone tb-right">
-		{#if !rightCollapsed}
-			<CollapseToggle side="right" collapsed={false} onToggle={onToggleRight} />
-		{/if}
-	</div>
+	<div class="tb-zone tb-side-right" aria-hidden="true"></div>
 </header>
 
 <style>
@@ -64,11 +53,11 @@
 		grid-column: 1 / -1;
 		display: grid;
 		grid-template-columns: subgrid;
-		min-height: 36px;
+		height: 36px;
 		background: var(--bg-elev);
 		border-bottom: 1px solid var(--border);
 	}
-	/* Fallback if subgrid isn't supported (older Safari etc.) */
+	/* Fallback if subgrid is missing (older Safari etc.) */
 	@supports not (grid-template-columns: subgrid) {
 		.topbar { grid-template-columns: 38px 260px 1fr 280px; }
 	}
@@ -79,35 +68,32 @@
 		min-width: 0;
 		overflow: hidden;
 	}
-	.tb-left {
-		justify-content: flex-end;
-		padding-right: 4px;
+	.tb-side-left {
 		border-right: 1px solid var(--border);
 	}
-	.tb-right {
-		justify-content: flex-start;
-		padding-left: 4px;
+	.tb-side-right {
 		border-left: 1px solid var(--border);
 	}
+
 	.tb-editor {
 		display: flex;
 		align-items: stretch;
 	}
-	.edge-chev {
+	.tb-chev {
+		flex: 0 0 auto;
 		display: flex;
 		align-items: center;
-		padding: 0 6px;
+		padding: 0 4px;
 	}
-	.edge-chev.edge-right { margin-left: auto; }
-
 	.tb-tabs {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		align-items: stretch;
+		overflow: hidden;
 	}
-	/* The TabBar component renders its own bottom-border; suppress that
-	   when it lives inside the topbar so we don't get a double border. */
+	/* TabBar renders its own borders; suppress them inside the topbar so
+	   the topbar's bottom-border is the only seam. */
 	.tb-tabs :global(.tabs) {
 		flex: 1;
 		min-height: 0;
@@ -121,5 +107,6 @@
 		font-size: 0.78rem;
 		padding: 0 12px;
 		font-style: italic;
+		align-self: center;
 	}
 </style>

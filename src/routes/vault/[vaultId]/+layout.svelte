@@ -103,10 +103,11 @@
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
 >
-	<!-- Top bar spans the full width with column zones that mirror the
+	<!-- Top bar spans the full width via subgrid; columns mirror the
 	     layout below: rail | left-sidebar | editor | right-sidebar.
-	     Collapsers live in the sidebar zones; when a zone collapses to
-	     0 its chevron jumps to the editor-zone edge so it stays usable. -->
+	     Collapsers live in the editor zone (pinned to its edges) so they
+	     never teleport — they slide smoothly along with the editor edge
+	     as sidebars expand/collapse. -->
 	<TopBar
 		vaultId={data.vault.id}
 		leftCollapsed={workspace.leftSidebarCollapsed}
