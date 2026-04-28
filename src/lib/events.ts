@@ -18,6 +18,7 @@ export interface VaultEventMap {
 	'folder:deleted': { vaultId: string; path: string; };
 	'tree:invalidate': { vaultId: string; };
 	'palette:open':  { vaultId: string; };
+	'palette:template-pick': { vaultId: string; activeNoteTitle?: string; };
 	'history:open':  { vaultId: string; path: string; };
 	'template:insert': { vaultId: string; content: string; };
 	'note:rename-request': { vaultId: string; path: string; };

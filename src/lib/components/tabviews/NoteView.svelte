@@ -81,7 +81,7 @@
 			onBus('template:insert', (e) => {
 				// Only the focused note view should consume the template insert.
 				if (e.vaultId !== vaultId || !isFocused) return;
-				editorApi?.insert(e.content);
+				editorApi?.insertTemplate(e.content);
 			})
 		];
 		return () => offs.forEach((off) => off());

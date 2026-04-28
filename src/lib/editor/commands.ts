@@ -17,6 +17,10 @@ export interface EditorApi {
 	toggleHeading(level: 1 | 2 | 3 | 4 | 5 | 6): void;
 	/** Insert text at the current cursor; replaces selection if any. */
 	insert(text: string): void;
+	/** Insert a template body. If the body contains the literal string
+	 *  `{{cursor}}` the marker is stripped and the caret lands at that
+	 *  spot; otherwise behaves like `insert`. */
+	insertTemplate(text: string): void;
 	/** Insert a wikilink `[[target]]` (uses selection as target if any). */
 	insertWikilink(): void;
 	/** Insert a fenced code block, preserving the selection as the body. */
@@ -113,6 +117,22 @@ export function makeEditorApi(getView: () => EditorView | null): EditorApi {
 				view.dispatch({
 					changes: { from, to, insert: text },
 					selection: { anchor: from + text.length }
+				});
+			});
+		},
+
+		insertTemplate(text) {
+			withView((view) => {
+				const { from, to } = view.state.selection.main;
+				const marker = '{{cursor}}';
+				const idx = text.indexOf(marker);
+				const stripped = idx >= 0
+					? text.slice(0, idx) + text.slice(idx + marker.length)
+					: text;
+				const cursorAt = idx >= 0 ? from + idx : from + stripped.length;
+				view.dispatch({
+					changes: { from, to, insert: stripped },
+					selection: { anchor: cursorAt }
 				});
 			});
 		},

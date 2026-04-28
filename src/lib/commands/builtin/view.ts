@@ -145,28 +145,10 @@ export function registerViewCommands(): void {
 		icon: '📋',
 		shortcut: '⌘⇧T',
 		category: 'file',
-		async exec(ctx: CommandContext) {
+		exec(ctx: CommandContext) {
 			if (!ctx.vaultId) return;
-			try {
-				const list = await fetch(`/api/vaults/${ctx.vaultId}/templates`).then((r) => r.json()) as { templates: { path: string; name: string }[] };
-				const tpls = list.templates ?? [];
-				if (tpls.length === 0) {
-					alert('No templates yet. Create files in Templates/ to use as templates.');
-					return;
-				}
-				const choice = window.prompt(`Insert template (type the name):\n\n${tpls.map((t, i) => `${i + 1}. ${t.name}`).join('\n')}`, tpls[0].name);
-				if (!choice) return;
-				let chosen: { path: string; name: string } | undefined;
-				const asNum = parseInt(choice, 10);
-				if (!isNaN(asNum) && asNum >= 1 && asNum <= tpls.length) chosen = tpls[asNum - 1];
-				else chosen = tpls.find((t) => t.name.toLowerCase() === choice.trim().toLowerCase());
-				if (!chosen) { alert(`No template named "${choice}".`); return; }
-				const noteTitle = (ctx.notePath as string | undefined)?.split('/').pop()?.replace(/\.md$/, '') ?? '';
-				const res = await fetch(`/api/vaults/${ctx.vaultId}/templates?name=${encodeURIComponent(chosen.name)}&title=${encodeURIComponent(noteTitle)}`).then((r) => r.json()) as { content: string };
-				emit('template:insert', { vaultId: ctx.vaultId, content: res.content });
-			} catch (e) {
-				alert((e as Error).message);
-			}
+			const noteTitle = (ctx.notePath as string | undefined)?.split('/').pop()?.replace(/\.md$/, '') ?? '';
+			emit('palette:template-pick', { vaultId: ctx.vaultId, activeNoteTitle: noteTitle });
 		}
 	});
 

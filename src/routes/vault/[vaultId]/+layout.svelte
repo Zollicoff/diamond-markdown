@@ -8,6 +8,7 @@
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import QuickSwitcher from '$lib/components/QuickSwitcher.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import TemplatePicker from '$lib/components/TemplatePicker.svelte';
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import { hydrate as hydrateWorkspace, workspace } from '$lib/workspace/store.svelte';
 	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar, activePane, activeTab } from '$lib/workspace/actions';
@@ -136,6 +137,7 @@
 
 <QuickSwitcher vaultId={data.vault.id} />
 <CommandPalette vaultId={data.vault.id} />
+<TemplatePicker vaultId={data.vault.id} />
 <HistoryViewer vaultId={data.vault.id} />
 
 <style>

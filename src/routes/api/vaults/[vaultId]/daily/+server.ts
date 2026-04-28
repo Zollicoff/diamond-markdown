@@ -6,6 +6,7 @@ import { getVault } from '$lib/server/vault';
 import { resolveInVault } from '$lib/server/paths';
 import { upsertNote } from '$lib/server/indexer';
 import { commitChange } from '$lib/server/git';
+import { expandTemplate, CURSOR_TOKEN } from '$lib/server/templates';
 
 const DAILY_FOLDER = 'Daily Notes';
 const TEMPLATE_REL = 'Daily Notes/Template.md';
@@ -16,14 +17,6 @@ function todayRel(): string {
 	const m = String(d.getMonth() + 1).padStart(2, '0');
 	const day = String(d.getDate()).padStart(2, '0');
 	return `${DAILY_FOLDER}/${y}-${m}-${day}.md`;
-}
-
-function substituteTemplate(tpl: string, isoDate: string): string {
-	// Minimal substitutions. Keep dependencies zero.
-	return tpl
-		.replace(/\{\{date\}\}/g, isoDate)
-		.replace(/\{\{date:YYYY-MM-DD\}\}/g, isoDate)
-		.replace(/\{\{time\}\}/g, new Date().toISOString().slice(11, 16));
 }
 
 export const POST: RequestHandler = async ({ params }) => {
@@ -41,13 +34,20 @@ export const POST: RequestHandler = async ({ params }) => {
 	// Ensure folder exists.
 	fs.mkdirSync(path.dirname(absTarget), { recursive: true });
 
-	// Build content from template if present, else a simple heading.
+	// Build content from template if present, else a simple heading. We
+	// fix `now` to noon of the dated day so date math like `{{date+1d}}`
+	// in the template lands on the correct calendar day regardless of
+	// the actual time of creation.
+	const [yy, mm, dd] = isoDate.split('-').map(Number);
+	const now = new Date(yy, mm - 1, dd, 12, 0, 0);
 	let content: string;
 	try {
 		const absTpl = resolveInVault(vault, TEMPLATE_REL);
 		if (fs.existsSync(absTpl)) {
 			const tpl = fs.readFileSync(absTpl, 'utf-8');
-			content = substituteTemplate(tpl, isoDate);
+			// File-on-disk content has the cursor token stripped — only the
+			// in-editor `template.insert` flow uses it.
+			content = expandTemplate(tpl, { now, title: isoDate }).split(CURSOR_TOKEN).join('');
 		} else {
 			content = `# ${isoDate}\n\n`;
 		}

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { getVault } from '$lib/server/vault';
 import { resolveInVault } from '$lib/server/paths';
 import { splitFrontmatter } from '$lib/server/frontmatter';
+import { expandTemplate } from '$lib/server/templates';
 
 const TEMPLATES_DIR = 'Templates';
 
@@ -13,8 +14,8 @@ interface TemplateMeta { path: string; name: string; }
 /**
  * List or read templates from the vault's `Templates/` folder.
  * GET /api/vaults/:id/templates             → list
- * GET /api/vaults/:id/templates?name=NAME   → read body (with substitutions
- *   for {{date}} / {{date:YYYY-MM-DD}} / {{time}} / {{title}})
+ * GET /api/vaults/:id/templates?name=NAME   → read body (with full token
+ *   substitution; see src/lib/server/templates.ts)
  */
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
@@ -28,7 +29,10 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		try {
 			for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
 				if (entry.isFile() && entry.name.endsWith('.md')) {
-					list.push({ path: `${TEMPLATES_DIR}/${entry.name}`, name: entry.name.replace(/\.md$/, '') });
+					list.push({
+						path: `${TEMPLATES_DIR}/${entry.name}`,
+						name: entry.name.replace(/\.md$/, '')
+					});
 				}
 			}
 		} catch { /* dir doesn't exist yet — return empty */ }
@@ -44,12 +48,6 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const raw = fs.readFileSync(abs, 'utf-8');
 	const { body } = splitFrontmatter(raw);
 	const title = url.searchParams.get('title') ?? '';
-	const today = new Date();
-	const isoDate = today.toISOString().slice(0, 10);
-	const time = today.toISOString().slice(11, 16);
-	const expanded = body
-		.replace(/\{\{date(?::YYYY-MM-DD)?\}\}/g, isoDate)
-		.replace(/\{\{time\}\}/g, time)
-		.replace(/\{\{title\}\}/g, title);
+	const expanded = expandTemplate(body, { title });
 	return json({ name, content: expanded });
 };
