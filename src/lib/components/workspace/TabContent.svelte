@@ -7,6 +7,7 @@
 	import SearchView from '$lib/components/tabviews/SearchView.svelte';
 	import SettingsView from '$lib/components/tabviews/SettingsView.svelte';
 	import ShortcutsView from '$lib/components/tabviews/ShortcutsView.svelte';
+	import { setSearchQuery } from '$lib/workspace/actions';
 
 	interface Props {
 		vaultId: string;
@@ -27,7 +28,11 @@
 {:else if tab.kind === 'tags'}
 	<TagsView {vaultId} filter={tab.filter} />
 {:else if tab.kind === 'search'}
-	<SearchView />
+	<SearchView
+		{vaultId}
+		query={tab.query}
+		onQueryChange={(q) => setSearchQuery(vaultId, tab.id, q)}
+	/>
 {:else if tab.kind === 'settings'}
 	<SettingsView />
 {:else if tab.kind === 'shortcuts'}

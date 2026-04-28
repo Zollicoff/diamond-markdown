@@ -49,7 +49,7 @@ function tabIdFor(tab: Tab): string {
 	if (tab.kind === 'note') return `note:${(tab as NoteTab).path}`;
 	if (tab.kind === 'graph') return 'graph';
 	if (tab.kind === 'tags') return `tags:${tab.filter ?? ''}`;
-	if (tab.kind === 'search') return `search:${tab.query}`;
+	if (tab.kind === 'search') return 'search';
 	if (tab.kind === 'settings') return 'settings';
 	if (tab.kind === 'shortcuts') return 'shortcuts';
 	return randId('tab');
@@ -127,6 +127,20 @@ export function openTab(vaultId: string, tab: Tab, mode: OpenMode = 'replace'): 
 export function openNote(vaultId: string, path: string, title: string, mode: OpenMode = 'replace'): void {
 	const niceTitle = title || path.split('/').pop()!.replace(/\.md$/, '');
 	openTab(vaultId, { id: `note:${path}`, kind: 'note', path, title: niceTitle }, mode);
+}
+
+/** Update the query stored on a search tab in-place (no id change — the
+ *  tab keeps its slot in the bar). Title reflects the current query. */
+export function setSearchQuery(vaultId: string, tabId: string, query: string): void {
+	for (const pane of Object.values(workspace.panes)) {
+		const tab = pane.tabs.find((t) => t.id === tabId && t.kind === 'search');
+		if (tab && tab.kind === 'search') {
+			tab.query = query;
+			tab.title = query ? `Search: ${query}` : 'Search';
+			persist(vaultId);
+			return;
+		}
+	}
 }
 
 /** Close the tab; returns the path of the note now showing in the active

@@ -80,6 +80,20 @@ export function registerViewCommands(): void {
 	});
 
 	register({
+		id: 'search.open',
+		title: 'Search in vault',
+		icon: '🔍',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			openTab(
+				ctx.vaultId!,
+				{ id: 'search', kind: 'search', title: 'Search', query: '' },
+				'new-tab'
+			);
+		}
+	});
+
+	register({
 		id: 'daily.open',
 		title: "Open today's daily note",
 		icon: '📅',

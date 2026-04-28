@@ -34,6 +34,12 @@
 				<line x1="11" y1="2" x2="11" y2="4.5" />
 			</svg>
 		</button>
+		<button class="r-btn" onclick={() => exec('search.open', { vaultId })} title="Search" aria-label="Search">
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				<circle cx="7" cy="7" r="4" />
+				<line x1="10" y1="10" x2="13.5" y2="13.5" stroke-linecap="round" />
+			</svg>
+		</button>
 		<button class="r-btn" onclick={() => exec('tags.open', { vaultId })} title="Tags" aria-label="Tags">
 			<svg viewBox="0 0 16 16" aria-hidden="true">
 				<line x1="3" y1="6" x2="13" y2="6" />
