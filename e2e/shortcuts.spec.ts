@@ -49,6 +49,17 @@ test('⌘P opens the command palette', async ({ page }) => {
 	await expect(page.locator('input[placeholder*="command" i], [role="dialog"]').first()).toBeVisible({ timeout: 2_000 });
 });
 
+test('⌘P still opens the palette while the editor is focused', async ({ page }) => {
+	// Regression: keymap used to skip ALL bindings when a text input had
+	// focus, so ⌘P fell through to the browser's print dialog. Mod chords
+	// must work even while typing in the CodeMirror editor.
+	await openVault(page);
+	await openFirstNote(page);
+	await page.locator('.cm-content').first().click();
+	await page.keyboard.press(`${MOD}+KeyP`);
+	await expect(page.locator('input[placeholder*="command" i], [role="dialog"]').first()).toBeVisible({ timeout: 2_000 });
+});
+
 test('⌘K opens the quick switcher', async ({ page }) => {
 	await openVault(page);
 	await page.keyboard.press(`${MOD}+KeyK`);
@@ -137,12 +148,17 @@ test('F2 begins rename on the active note in the tree', async ({ page }) => {
 	await page.keyboard.press('Escape');
 });
 
-test('⌘⇧T fires template insert (no templates in fixture → friendly alert)', async ({ page }) => {
+test('⌘⇧T opens the template picker', async ({ page }) => {
 	await openVault(page);
 	await openFirstNote(page);
-	// The fixture vault has no Templates/ folder, so the command alerts.
-	// We just assert the dialog appears — proves the keybinding fires.
-	page.once('dialog', (d) => d.dismiss());
+	// Focus the editor first — exercises the keymap path that previously
+	// dropped mod-chord shortcuts when a contentEditable was focused.
+	await page.locator('.cm-content').first().click();
 	await page.keyboard.press(`${MOD}+Shift+KeyT`);
-	// (No assertion needed beyond the dialog handler being invoked.)
+	const modal = page.getByRole('dialog', { name: 'Insert template' });
+	await expect(modal).toBeVisible();
+	// Fixture vault has no Templates/ — picker shows the empty-state hint.
+	await expect(modal).toContainText('Templates/');
+	await page.keyboard.press('Escape');
+	await expect(modal).toBeHidden();
 });
