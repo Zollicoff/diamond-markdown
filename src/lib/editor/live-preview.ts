@@ -71,6 +71,31 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 	// Does the caret sit somewhere inside [from..to]?
 	const cursorInside = (from: number, to: number): boolean => cursor >= from && cursor <= to;
 
+	// Pre-pass: collect [[wikilink]] spans across the visible viewport.
+	// lezer-markdown parses `[[Note]]` as a literal `[` + standard Link `[Note]`
+	// + literal `]`, so the LinkMark/URL handlers below would hide the inner
+	// brackets — leaving the outer pair visible as `[Note]`. We need to know
+	// the wikilink spans first so those passes can skip anything inside them.
+	const wikilinkSpans: Array<{ from: number; to: number; target: string; display: string }> = [];
+	for (const { from: vFrom, to: vTo } of view.visibleRanges) {
+		const text = doc.sliceString(vFrom, vTo);
+		let m: RegExpExecArray | null;
+		WIKILINK_RE.lastIndex = 0;
+		while ((m = WIKILINK_RE.exec(text))) {
+			const start = vFrom + m.index;
+			const end = start + m[0].length;
+			const target = m[1].trim();
+			const display = (m[3]?.trim() || target);
+			wikilinkSpans.push({ from: start, to: end, target, display });
+		}
+	}
+	const insideWikilink = (from: number, to: number): boolean => {
+		for (const w of wikilinkSpans) {
+			if (from >= w.from && to <= w.to) return true;
+		}
+		return false;
+	};
+
 	// Walk the syntax tree in viewport for perf.
 	for (const { from, to } of view.visibleRanges) {
 		syntaxTree(state).iterate({
@@ -83,6 +108,13 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 				if (name === 'FencedCode' || name === 'CodeBlock') {
 					return false;
 				}
+
+				// Skip anything that lezer parsed inside a [[wikilink]] — the
+				// wikilink widget will own that whole range below. Returning
+				// false prevents descent into children (the inner LinkMarks
+				// that would otherwise hide the inner brackets, leaving the
+				// outer pair visible as `[Note]`).
+				if (insideWikilink(node.from, node.to)) return false;
 
 				if (name === 'HeaderMark') {
 					// `# ` prefix of an ATX heading. Hide when caret is not on the line.
@@ -137,24 +169,16 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 		});
 	}
 
-	// Wikilink pills — scan viewport text (lezer-markdown doesn't know wikilinks).
-	for (const { from: vFrom, to: vTo } of view.visibleRanges) {
-		const text = doc.sliceString(vFrom, vTo);
-		let m: RegExpExecArray | null;
-		WIKILINK_RE.lastIndex = 0;
-		while ((m = WIKILINK_RE.exec(text))) {
-			const start = vFrom + m.index;
-			const end = start + m[0].length;
-			if (cursor >= start && cursor <= end) continue; // actively editing — leave raw
-			const target = m[1].trim();
-			const display = (m[3]?.trim() || target);
-			const { resolved, href } = resolveLink(target);
-			ranges.push(
-				Decoration.replace({
-					widget: new WikilinkWidget(target, display, resolved, href ?? null)
-				}).range(start, end)
-			);
-		}
+	// Wikilink pills — replace each pre-collected span with a widget unless
+	// the caret is inside it (then leave the raw `[[…]]` text for editing).
+	for (const w of wikilinkSpans) {
+		if (cursor >= w.from && cursor <= w.to) continue;
+		const { resolved, href } = resolveLink(w.target);
+		ranges.push(
+			Decoration.replace({
+				widget: new WikilinkWidget(w.target, w.display, resolved, href ?? null)
+			}).range(w.from, w.to)
+		);
 	}
 
 	// Decoration.set sorts for us.

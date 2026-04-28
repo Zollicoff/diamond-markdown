@@ -137,6 +137,20 @@
 		sortMenuOpen = false;
 	}
 
+	let sortBtnEl: HTMLButtonElement | null = $state(null);
+	let sortMenuPos = $state<{ top: number; left: number }>({ top: 0, left: 0 });
+
+	function openSortMenu(): void {
+		if (sortBtnEl) {
+			const r = sortBtnEl.getBoundingClientRect();
+			// Drop down from button, right-align with the button so the menu
+			// (min-width 220px) extends leftward into the sidebar instead of
+			// off-screen / into the editor pane.
+			sortMenuPos = { top: r.bottom + 4, left: r.right - 220 };
+		}
+		sortMenuOpen = !sortMenuOpen;
+	}
+
 	// --- Highlight + auto-reveal -------------------------------------
 	const activePath = $derived.by<string | null>(() => {
 		const pane = workspace.panes[workspace.activePaneId];
@@ -267,8 +281,9 @@
 	<span class="ft-spacer"></span>
 	<div class="sort-wrap">
 		<button
+			bind:this={sortBtnEl}
 			class="toolbar-btn sort"
-			onclick={() => (sortMenuOpen = !sortMenuOpen)}
+			onclick={openSortMenu}
 			title="Sort: {SORT_LABELS[sortMode]}"
 			aria-label="Change sort order"
 			aria-haspopup="menu"
@@ -280,7 +295,7 @@
 			</svg>
 		</button>
 		{#if sortMenuOpen}
-			<menu class="sort-menu" role="menu">
+			<menu class="sort-menu" role="menu" style="top: {sortMenuPos.top}px; left: {sortMenuPos.left}px;">
 				{#each (Object.keys(SORT_LABELS) as SortMode[]) as m (m)}
 					<button
 						class="sort-item"
@@ -396,9 +411,12 @@
 
 	.sort-wrap { position: relative; }
 	.sort-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
+		/* Fixed (not absolute): the sidebar grid column has overflow:hidden,
+		   which would clip an absolute child. Fixed lifts the menu out of
+		   that clip and into the viewport stacking context, so it can land
+		   visually on top of the editor pane. Position is set inline by JS
+		   from the sort button's bounding rect. */
+		position: fixed;
 		min-width: 220px;
 		background: var(--bg-elev);
 		border: 1px solid var(--border);
@@ -406,7 +424,7 @@
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 		padding: 4px;
 		margin: 0;
-		z-index: 20;
+		z-index: 1000;
 		display: flex;
 		flex-direction: column;
 		list-style: none;

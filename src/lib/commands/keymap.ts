@@ -44,20 +44,25 @@ export function comboToDisplay(combo: string): string {
 
 export function installGlobalKeymap(getCtx: () => CommandContext): () => void {
 	const handler = (e: KeyboardEvent): void => {
-		const target = e.target as HTMLElement | null;
-		// Don't hijack typing inside form fields or the editor itself.
-		if (target && isTextInput(target)) return;
 		const combo = comboFrom(e);
 		for (const b of bindings) {
-			if (b.combo === combo) {
-				e.preventDefault();
-				void exec(b.commandId, getCtx());
-				return;
+			if (b.combo !== combo) continue;
+			// Bare-key bindings (e.g. f2) must NOT hijack typing inside an
+			// input/contentEditable. Mod-key chords (⌘P, ⌘W, ⌘\, ⌘⇧T) always
+			// fire — users expect them to work while the editor is focused.
+			const isChord = /\b(mod|ctrl|alt)\+/.test(b.combo);
+			if (!isChord) {
+				const target = e.target as HTMLElement | null;
+				if (target && isTextInput(target)) return;
 			}
+			e.preventDefault();
+			void exec(b.commandId, getCtx());
+			return;
 		}
 	};
-	window.addEventListener('keydown', handler);
-	return () => window.removeEventListener('keydown', handler);
+	// Capture phase so CodeMirror can't swallow ⌘P/⌘W before us.
+	window.addEventListener('keydown', handler, true);
+	return () => window.removeEventListener('keydown', handler, true);
 }
 
 function isTextInput(el: HTMLElement): boolean {
