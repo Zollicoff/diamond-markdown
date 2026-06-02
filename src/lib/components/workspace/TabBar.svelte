@@ -83,11 +83,13 @@
 	}
 </script>
 
-<nav
+<div
 	class="tabs"
 	class:active-pane={isActivePane}
 	class:drop-active={dropActive}
 	onmousedown={focusPane}
+	role="tablist"
+	tabindex="-1"
 	aria-label="Open notes"
 >
 	{#if pane.tabs.length === 0}
@@ -119,7 +121,7 @@
 	{#if canClose}
 		<button class="pane-close" title="Close pane" onclick={() => closePane(vaultId, pane.id)}>× pane</button>
 	{/if}
-</nav>
+</div>
 
 <script lang="ts" module>
 	function kindGlyph(k: Tab['kind']): string {

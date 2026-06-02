@@ -13,9 +13,12 @@ import { renameNoteAtomically, duplicateNoteAtomically } from '$lib/server/renam
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
-	const rel = ensureMdExt(url.searchParams.get('path') || '');
+	let rel: string;
 	let abs: string;
-	try { abs = resolveInVault(vault, rel); }
+	try {
+		rel = ensureMdExt(url.searchParams.get('path') || '');
+		abs = resolveInVault(vault, rel);
+	}
 	catch (e) { throw error(400, (e as Error).message); }
 	if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw error(404, 'note not found');
 	const content = fs.readFileSync(abs, 'utf-8');
@@ -44,9 +47,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	if (!vault) throw error(404, 'vault not found');
 	const body = (await request.json()) as { path: string; content: string; commitNow?: boolean };
 	if (!body?.path || typeof body?.content !== 'string') throw error(400, 'path and content required');
-	const rel = ensureMdExt(body.path);
+	let rel: string;
 	let abs: string;
-	try { abs = resolveInVault(vault, rel); }
+	try {
+		rel = ensureMdExt(body.path);
+		abs = resolveInVault(vault, rel);
+	}
 	catch (e) { throw error(400, (e as Error).message); }
 	const existed = fs.existsSync(abs);
 	fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -73,9 +79,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	if (!body.from) throw error(400, 'from required');
 
 	if (body.duplicate) {
-		const src = ensureMdExt(body.from);
-		const dst = body.to ? ensureMdExt(body.to) : undefined;
 		try {
+			const src = ensureMdExt(body.from);
+			const dst = body.to ? ensureMdExt(body.to) : undefined;
 			const res = await duplicateNoteAtomically(vault, src, dst);
 			return json({ ok: true, ...res });
 		} catch (e) {
@@ -84,9 +90,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	}
 
 	if (!body.to) throw error(400, 'to required for rename');
-	const from = ensureMdExt(body.from);
-	const to = ensureMdExt(body.to);
 	try {
+		const from = ensureMdExt(body.from);
+		const to = ensureMdExt(body.to);
 		const res = await renameNoteAtomically(vault, from, to);
 		return json({ ok: true, from, to, ...res });
 	} catch (e) {
@@ -97,9 +103,12 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 export const DELETE: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
-	const rel = ensureMdExt(url.searchParams.get('path') || '');
+	let rel: string;
 	let abs: string;
-	try { abs = resolveInVault(vault, rel); }
+	try {
+		rel = ensureMdExt(url.searchParams.get('path') || '');
+		abs = resolveInVault(vault, rel);
+	}
 	catch (e) { throw error(400, (e as Error).message); }
 	if (fs.existsSync(abs)) fs.unlinkSync(abs);
 	removeNote(vault, rel);

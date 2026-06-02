@@ -89,7 +89,14 @@
 </script>
 
 {#if open}
-	<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) open = false; }}>
+	<div
+		class="backdrop"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => { if (e.target === e.currentTarget) open = false; }}
+		onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
+	>
 		<div class="modal">
 			<div class="head">
 				<span class="mode">{fullText ? 'Search' : 'Go to'}</span>

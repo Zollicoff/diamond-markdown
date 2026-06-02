@@ -95,7 +95,9 @@
 		role="dialog"
 		aria-modal="true"
 		aria-label="Insert template"
+		tabindex="-1"
 		onclick={(e) => { if (e.target === e.currentTarget) open = false; }}
+		onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
 	>
 		<div class="modal">
 			<div class="head">

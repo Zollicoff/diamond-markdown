@@ -53,7 +53,9 @@ export const GET: RequestHandler = async ({ params }) => {
 		headers: {
 			'content-type': mime,
 			'content-length': String(stat.size),
-			'cache-control': 'private, max-age=60'
+			'cache-control': 'private, max-age=60',
+			'x-content-type-options': 'nosniff',
+			'content-security-policy': "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox"
 		}
 	});
 };

@@ -134,6 +134,9 @@ See [ROADMAP.md](./ROADMAP.md) — summary:
 - **v0.4** — Refinements + perf (large vaults)
 - **v0.5** — Plugin API, Tauri desktop wrapper
 
+The open-source replacement track is broken out in
+[OPEN_SOURCE_OBSIDIAN_PLAN.md](./OPEN_SOURCE_OBSIDIAN_PLAN.md).
+
 ## Architecture
 
 Single SvelteKit app:
@@ -152,6 +155,8 @@ MIT. See [LICENSE](./LICENSE).
 ## Contributing
 
 Open an issue if you've got an idea or run into a bug. See [CONTRIBUTING.md](./CONTRIBUTING.md). Style: vanilla CSS (no Tailwind), TypeScript strict, Svelte 5 runes.
+
+Security model and reporting guidance live in [SECURITY.md](./SECURITY.md).
 
 ## Acknowledgments
 

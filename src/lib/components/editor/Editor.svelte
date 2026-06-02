@@ -38,7 +38,7 @@
 
 	let host: HTMLElement;
 	let view: EditorView | null = null;
-	let lastExternal = value;
+	let lastExternal = $state('');
 	const previewCompartment = new Compartment();
 
 	const highlightStyle = HighlightStyle.define([

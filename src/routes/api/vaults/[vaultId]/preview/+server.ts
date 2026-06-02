@@ -17,11 +17,12 @@ const PREVIEW_CHARS = 800;
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
-	const rel = ensureMdExt(url.searchParams.get('path') || '');
-	if (!rel) throw error(400, 'path required');
-
+	let rel: string;
 	let abs: string;
-	try { abs = resolveInVault(vault, rel); } catch (e) { throw error(400, (e as Error).message); }
+	try {
+		rel = ensureMdExt(url.searchParams.get('path') || '');
+		abs = resolveInVault(vault, rel);
+	} catch (e) { throw error(400, (e as Error).message); }
 	if (!fs.existsSync(abs)) throw error(404, 'note not found');
 
 	const raw = fs.readFileSync(abs, 'utf-8');

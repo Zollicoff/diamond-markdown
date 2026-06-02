@@ -55,6 +55,8 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.3 — Polish & mobile
 
+- [ ] Security/self-hosting docs and release checklist
+- [ ] Route-level tests for path traversal, symlink escapes, raw asset headers, and note/folder mutations
 - [ ] Service worker for full offline use
 - [ ] Mobile touch gestures (swipe to switch tabs / panes)
 - [ ] Template picker upgrade (modal palette instead of `prompt()`)
@@ -65,6 +67,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.4 — Performance & scale
 
+- [ ] Git sync status / pull / push UI with divergence warnings
 - [ ] Virtualized file tree for very large vaults
 - [ ] Indexer warm-cache on disk for fast startup
 - [ ] Quadtree-backed graph sim (drop O(n²) for very large vaults)

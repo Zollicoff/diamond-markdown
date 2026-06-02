@@ -45,8 +45,8 @@
 	let expand = $state<Set<string>>(new Set());
 	let toolbarHydrated = false;
 
-	const prefsKey = `diamond.tree-prefs.${vaultId}`;
-	const expandKey = `diamond.tree-expand.${vaultId}`;
+	const prefsKey = $derived(`diamond.tree-prefs.${vaultId}`);
+	const expandKey = $derived(`diamond.tree-expand.${vaultId}`);
 
 	function hydratePrefs(): void {
 		if (typeof localStorage === 'undefined') return;
@@ -344,6 +344,7 @@
 
 <div
 	class="wrap"
+	role="presentation"
 	oncontextmenu={(e) => {
 		if ((e.target as HTMLElement).closest('.node')) return;
 		e.preventDefault();

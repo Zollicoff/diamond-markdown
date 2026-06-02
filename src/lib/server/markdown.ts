@@ -17,8 +17,6 @@
 import fs from 'node:fs';
 import { marked } from 'marked';
 import markedFootnote from 'marked-footnote';
-import DOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
 import katex from 'katex';
 import hljs from 'highlight.js';
 import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
@@ -27,11 +25,8 @@ import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
+import { purify } from './sanitize';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
-
-// DOMPurify needs a DOM on the server. JSDOM is the standard shim.
-const window = new JSDOM('').window;
-const purify = DOMPurify(window as unknown as Window);
 
 marked.setOptions({ gfm: true, breaks: false });
 marked.use(markedFootnote());
@@ -228,4 +223,3 @@ function tagSub(chunk: string, render: (tag: string) => string): string {
 		return `${pre}${render(tag)}`;
 	});
 }
-

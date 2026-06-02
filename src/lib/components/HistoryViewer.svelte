@@ -113,7 +113,14 @@
 </script>
 
 {#if open}
-	<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
+	<div
+		class="backdrop"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => { if (e.target === e.currentTarget) close(); }}
+		onkeydown={(e) => { if (e.key === 'Escape') close(); }}
+	>
 		<div class="modal">
 			<header class="head">
 				<div class="title">

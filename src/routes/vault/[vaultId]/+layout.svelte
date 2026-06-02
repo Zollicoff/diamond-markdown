@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 	import LeftSidebar from '$lib/components/sidebar/LeftSidebar.svelte';
 	import LeftRail from '$lib/components/sidebar/LeftRail.svelte';
@@ -19,14 +20,11 @@
 	import type { NoteDoc } from '$lib/types';
 	import type { TreeNode } from '$lib/types';
 
-	let { data, children }: { data: LayoutData; children: () => unknown } = $props();
+	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
-	// Boot: hydrate workspace, wire event listeners, register commands.
-	hydrateWorkspace(data.vault.id);
-	hydrateBookmarks(data.vault.id);
-	registerBuiltinCommands();
+	const vaultId = $derived(data.vault.id);
 
-	let tree = $state<TreeNode[]>(data.tree);
+	let tree = $state<TreeNode[]>([]);
 	let activeDoc = $state<NoteDoc | null>(null);
 
 	$effect(() => {
@@ -35,36 +33,41 @@
 	});
 
 	onMount(() => {
+		// Boot: hydrate workspace, wire event listeners, register commands.
+		hydrateWorkspace(vaultId);
+		hydrateBookmarks(vaultId);
+		registerBuiltinCommands();
+
 		const offs = [
-			bindVaultEvents(data.vault.id),
+			bindVaultEvents(vaultId),
 			onBus('tree:invalidate', async (e) => {
-				if (e.vaultId !== data.vault.id) return;
+				if (e.vaultId !== vaultId) return;
 				try {
-					const res = await fetch(`/api/vaults/${data.vault.id}/tree`);
+					const res = await fetch(`/api/vaults/${vaultId}/tree`);
 					if (res.ok) tree = (await res.json()).tree;
 				} catch { /* ignore */ }
 			}),
 			onBus('note:renamed', (e) => {
-				if (e.vaultId !== data.vault.id) return;
-				renameBookmark(data.vault.id, e.from, e.to);
+				if (e.vaultId !== vaultId) return;
+				renameBookmark(vaultId, e.from, e.to);
 			}),
 			onBus('folder:renamed', (e) => {
-				if (e.vaultId !== data.vault.id) return;
-				renameBookmark(data.vault.id, e.from, e.to);
+				if (e.vaultId !== vaultId) return;
+				renameBookmark(vaultId, e.from, e.to);
 			}),
 			onBus('note:deleted', (e) => {
-				if (e.vaultId !== data.vault.id) return;
-				deleteBookmark(data.vault.id, e.path);
+				if (e.vaultId !== vaultId) return;
+				deleteBookmark(vaultId, e.path);
 			}),
 			onBus('folder:deleted', (e) => {
-				if (e.vaultId !== data.vault.id) return;
-				deleteBookmark(data.vault.id, e.path);
+				if (e.vaultId !== vaultId) return;
+				deleteBookmark(vaultId, e.path);
 			}),
 			installGlobalKeymap(() => {
 				const pane = activePane();
 				const tab = activeTab();
 				return {
-					vaultId: data.vault.id,
+					vaultId,
 					paneId: pane?.id,
 					tabId: tab?.id,
 					notePath: tab?.kind === 'note' ? tab.path : undefined
@@ -89,7 +92,7 @@
 		const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
 		if (!tab) return;
 		let desired: string | null = null;
-		if (tab.kind === 'note') desired = `/vault/${data.vault.id}/note/${encodeURI(tab.path)}`;
+		if (tab.kind === 'note') desired = `/vault/${vaultId}/note/${encodeURI(tab.path)}`;
 		if (!desired) return;
 		const current = window.location.pathname;
 		if (current === desired) return;
@@ -126,7 +129,7 @@
 	</div>
 
 	<main class="center">
-		<Workspace vaultId={data.vault.id} {onDocLoaded} />
+		<Workspace {vaultId} {onDocLoaded} />
 		{@render children()}
 	</main>
 
@@ -135,10 +138,10 @@
 	</div>
 </div>
 
-<QuickSwitcher vaultId={data.vault.id} />
-<CommandPalette vaultId={data.vault.id} />
-<TemplatePicker vaultId={data.vault.id} />
-<HistoryViewer vaultId={data.vault.id} />
+<QuickSwitcher {vaultId} />
+<CommandPalette {vaultId} />
+<TemplatePicker {vaultId} />
+<HistoryViewer {vaultId} />
 
 <style>
 	.shell {

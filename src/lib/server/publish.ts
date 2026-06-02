@@ -19,17 +19,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
 import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags } from './wikilink';
 import { splitFrontmatter } from './frontmatter';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { getIndex, resolveTarget } from './indexer';
+import { purify } from './sanitize';
 import { slugify, escHtml, escAttr } from '$lib/util/strings';
-
-const dompWindow = new JSDOM('').window;
-const purify = DOMPurify(dompWindow as unknown as Window);
 
 marked.setOptions({ gfm: true, breaks: false });
 

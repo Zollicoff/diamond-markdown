@@ -24,7 +24,7 @@
 	let { items, pos, onClose }: Props = $props();
 
 	let menuEl: HTMLDivElement | null = $state(null);
-	let placed = $state<{ left: number; top: number }>({ left: pos.x, top: pos.y });
+	let placed = $state<{ left: number; top: number }>({ left: 0, top: 0 });
 
 	onMount(() => {
 		// Clamp to viewport after mount so we know the rendered size.

@@ -1,7 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import fs from 'node:fs';
-import path from 'node:path';
 import { getVault } from '$lib/server/vault';
 import { resolveInVault } from '$lib/server/paths';
 import { splitFrontmatter } from '$lib/server/frontmatter';
@@ -21,7 +20,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
 
-	const root = path.join(vault.path, TEMPLATES_DIR);
+	const root = resolveInVault(vault, TEMPLATES_DIR);
 	const name = url.searchParams.get('name');
 
 	if (!name) {

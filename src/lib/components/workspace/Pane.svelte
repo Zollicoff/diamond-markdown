@@ -31,12 +31,14 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions - pane focus follows pointer/focus events across nested editor controls. -->
 <section
 	class="pane"
 	class:active={isActivePane}
 	onmousedown={focus}
 	onfocusin={focus}
-	role="region"
+	role="group"
+	tabindex="-1"
 	aria-label="Editor pane"
 >
 	{#if !hideTabBar}

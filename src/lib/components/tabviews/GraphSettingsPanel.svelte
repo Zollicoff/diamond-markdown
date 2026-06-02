@@ -38,7 +38,7 @@
 	const r = SIM_RANGES;
 </script>
 
-<aside class="forces-panel" role="dialog" aria-label="Graph settings">
+<aside class="forces-panel" aria-label="Graph settings">
 	<div class="fp-head">
 		<div class="fp-tabs" role="tablist">
 			<button

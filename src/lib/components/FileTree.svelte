@@ -10,6 +10,8 @@
 </script>
 
 <script lang="ts">
+	import FileTree from './FileTree.svelte';
+
 	interface Props {
 		nodes: TreeNode[];
 		vaultId: string;
@@ -47,6 +49,13 @@
 	const expand = $derived(expanded);
 	let dragOverPath = $state<string | null>(null);
 	let rootDragOver = $state(false);
+
+	function focusOnMount(node: HTMLInputElement): void {
+		requestAnimationFrame(() => {
+			node.focus();
+			node.select();
+		});
+	}
 
 	function toggle(p: string): void {
 		onToggleDir?.(p);
@@ -146,6 +155,10 @@
 					class:open={expand.has(n.path)}
 					class:drop-target={dragOverPath === n.path}
 					draggable={renamingPath !== n.path}
+					role="treeitem"
+					aria-expanded={expand.has(n.path)}
+					aria-selected={activePath === n.path}
+					tabindex="-1"
 					ondragstart={(e) => handleDragStart(e, n)}
 					ondragover={(e) => handleDragOver(e, n)}
 					ondragleave={() => handleDragLeave(n)}
@@ -158,7 +171,7 @@
 							<input
 								class="rename-input"
 								value={initialRenameValue(n)}
-								autofocus
+								use:focusOnMount
 								onkeydown={(e) => renameKey(e, n)}
 								onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
 								onclick={(e) => e.stopPropagation()}
@@ -170,7 +183,7 @@
 				</div>
 				{#if expand.has(n.path) && n.children && n.children.length > 0}
 					<div class="nested">
-						<svelte:self
+						<FileTree
 							nodes={n.children}
 							{vaultId}
 							{activePath}
@@ -192,6 +205,9 @@
 					class="node file"
 					class:active={activePath === n.path}
 					draggable={renamingPath !== n.path}
+					role="treeitem"
+					aria-selected={activePath === n.path}
+					tabindex="-1"
 					ondragstart={(e) => handleDragStart(e, n)}
 					oncontextmenu={(e) => handleContext(e, n)}
 				>
@@ -200,7 +216,7 @@
 							<input
 								class="rename-input"
 								value={initialRenameValue(n)}
-								autofocus
+								use:focusOnMount
 								onkeydown={(e) => renameKey(e, n)}
 								onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
 								onclick={(e) => e.stopPropagation()}

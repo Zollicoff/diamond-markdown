@@ -233,6 +233,14 @@
 		openNote(vaultId, n.path, title, mode);
 	}
 
+	function onNodeKeydown(e: KeyboardEvent, n: GNode): void {
+		if (e.key !== 'Enter' && e.key !== ' ') return;
+		e.preventDefault();
+		e.stopPropagation();
+		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
+		openNote(vaultId, n.path, title, 'new-tab');
+	}
+
 	function center(): void {
 		if (!svgEl) return;
 		const rect = svgEl.getBoundingClientRect();
@@ -295,6 +303,8 @@
 		<svg
 			bind:this={svgEl}
 			class="canvas"
+			role="img"
+			aria-label="Vault graph"
 			onwheel={onWheel}
 			onpointerdown={onPointerDownBG}
 			onpointermove={onPointerMoveBG}
@@ -320,6 +330,7 @@
 						transform={`translate(${n.x}, ${n.y})`}
 						onpointerdown={(e) => onNodePointerDown(e, n)}
 						onclick={(e) => onNodeClick(e, n)}
+						onkeydown={(e) => onNodeKeydown(e, n)}
 						onmouseenter={() => (hoverPath = n.path)}
 						onmouseleave={() => (hoverPath = null)}
 						role="button"

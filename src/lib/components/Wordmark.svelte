@@ -22,7 +22,7 @@
 		lg: { wm: 72, text: '3.6rem',  tracking: '-0.035em' },
 		xl: { wm: 120, text: '6rem',   tracking: '-0.04em' }
 	};
-	const d = dims[size];
+	const d = $derived(dims[size]);
 </script>
 
 <svelte:element

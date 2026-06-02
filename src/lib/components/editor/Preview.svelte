@@ -207,15 +207,18 @@
 	onMount(() => () => clearHover());
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions - preview delegates clicks/context/hover to rendered markdown links. -->
 <div
 	bind:this={host}
 	class="preview"
 	onclick={onClick}
 	onauxclick={onAuxClick}
 	oncontextmenu={onContext}
+	onkeydown={() => {}}
 	onpointerover={onPointerOver}
 	onpointerout={onPointerOut}
-	role="article"
+	role="document"
+	tabindex="-1"
 >
 	{@html html}
 </div>
