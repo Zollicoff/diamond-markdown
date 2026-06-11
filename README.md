@@ -42,6 +42,9 @@ node build            # production server via adapter-node
 
 On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Documents/Diamond Markdown` and registers it as your default vault. Override with the `DIAMOND_DEFAULT_VAULT_DIR` environment variable, or add more vaults from the in-app vault manager. Your data lives in your home directory; the repo is the program.
 
+Production deployment guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
+Release verification lives in [docs/release-checklist.md](./docs/release-checklist.md).
+
 ## Concepts
 
 - **Vault** — a folder of markdown files. Every vault is its own git repository (auto-initialized on first save).
@@ -159,6 +162,7 @@ MIT. See [LICENSE](./LICENSE).
 Open an issue if you've got an idea or run into a bug. See [CONTRIBUTING.md](./CONTRIBUTING.md). Style: vanilla CSS (no Tailwind), TypeScript strict, Svelte 5 runes.
 
 Security model and reporting guidance live in [SECURITY.md](./SECURITY.md).
+Self-hosting hardening guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
 
 ## Acknowledgments
 

@@ -18,6 +18,9 @@ until versioned releases begin.
 - Keep dependencies current and run `npm audit --audit-level=moderate` before
   releases.
 
+Detailed self-hosting guidance lives in `docs/self-hosting.md`. Release
+verification lives in `docs/release-checklist.md`.
+
 ## Reporting A Vulnerability
 
 Please do not open a public issue for a private-note exposure, path traversal,

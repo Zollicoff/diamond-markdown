@@ -55,7 +55,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.3 — Polish & mobile
 
-- [ ] Security/self-hosting docs and release checklist
+- [x] Security/self-hosting docs and release checklist
 - [x] Route-level tests for path traversal, symlink escapes, raw asset headers, and note/folder mutations
 - [ ] Service worker for full offline use
 - [ ] Mobile touch gestures (swipe to switch tabs / panes)
