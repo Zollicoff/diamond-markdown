@@ -3,6 +3,16 @@
 Use this checklist before tagging, publishing, or deploying Diamond Markdown.
 Do not call a release ready from partial checks.
 
+The repeatable verification command is:
+
+```sh
+npm run verify:release
+```
+
+It runs the dependency audit, Svelte diagnostics, production build, and full
+Playwright e2e suite. On macOS, it uses an installed Google Chrome executable as
+a fallback when Playwright's managed Chromium cache is unavailable.
+
 ## 1. Repository State
 
 ```sh
