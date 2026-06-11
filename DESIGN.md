@@ -237,9 +237,9 @@ Manifests choose an execution mode. `trusted` is the backwards-compatible
 default and runs plugin ESM in the app context. `worker` loads the entry module
 through `src/lib/plugins/worker-runtime.ts`, where plugin logic runs inside a
 module Worker. Worker plugins can register command-palette actions, notify the
-host, and register iframe-hosted settings/right panels. They cannot register
-editor commands or markdown postprocessors because those require live app/DOM
-objects.
+host, register editor commands through a capability proxy, and register
+iframe-hosted settings/right panels. They cannot register markdown
+postprocessors because those require live app/DOM objects.
 
 Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
 Settings and right-sidebar panels use the same pattern: plugins register small
@@ -266,6 +266,10 @@ Editor commands reuse the normal command registry but resolve their mutable
 surface through `src/lib/plugins/editor-commands.svelte.ts`. `NoteView.svelte`
 registers the active editor API by vault/pane/tab while a note is in Live or
 Source mode, and plugin editor commands only appear when that context exists.
+Trusted plugins receive the live `EditorApi`. Worker plugins receive a
+serializable context plus a promise-returning editor proxy; each proxy method
+sends a bounded editor capability request, and the host re-resolves the target
+tab/pane/note before applying the mutation.
 
 Markdown postprocessors are intentionally client-side. The server still returns
 sanitized HTML; `Preview.svelte` inserts that HTML, renders Mermaid blocks, then
@@ -273,10 +277,10 @@ runs registered plugin postprocessors against the preview root with the active
 `NoteDoc` context.
 
 Worker execution plus iframe panels isolate command logic and plugin UI from
-the main DOM, and note file access now goes through a host capability proxy.
-This is still not a complete untrusted-plugin permission system: active-editor
-mutation proxying remains required before arbitrary third-party plugins are
-safe.
+the main DOM, while note file and active-editor mutations go through host
+capability proxies. This is still not a complete arbitrary-plugin security
+model: review/install policy, API stability, and broader permission prompts are
+still future work.
 
 ## Offline / PWA
 

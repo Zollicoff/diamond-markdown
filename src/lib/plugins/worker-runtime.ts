@@ -2,9 +2,15 @@ import { register, unregister, type CommandContext, type CommandDef } from '$lib
 import type { PluginCommandManifest, PluginDescriptor } from './types';
 import { registerRightPanel, registerSettingsPanel } from './extensions.svelte';
 import { createPluginFilesApi, type PluginFilesApi } from './capabilities';
+import { getActivePluginEditor, type ActivePluginEditor } from './editor-commands.svelte';
 
 interface WorkerCommandMessage {
 	type: 'registerCommand';
+	command: PluginCommandManifest & { shortcut?: string };
+}
+
+interface WorkerEditorCommandMessage {
+	type: 'registerEditorCommand';
 	command: PluginCommandManifest & { shortcut?: string };
 }
 
@@ -26,7 +32,17 @@ interface WorkerNotifyMessage {
 	message: string;
 }
 
-type WorkerCapabilityName = 'files.readNote' | 'files.writeNote';
+type WorkerCapabilityName =
+	| 'files.readNote'
+	| 'files.writeNote'
+	| 'editor.insert'
+	| 'editor.insertTemplate'
+	| 'editor.wrap'
+	| 'editor.prependLines'
+	| 'editor.toggleHeading'
+	| 'editor.insertWikilink'
+	| 'editor.insertCodeBlock'
+	| 'editor.focus';
 
 interface WorkerCapabilityRequestMessage {
 	type: 'capabilityRequest';
@@ -52,6 +68,7 @@ interface WorkerCompleteMessage {
 
 type WorkerMessage =
 	| WorkerCommandMessage
+	| WorkerEditorCommandMessage
 	| WorkerPanelMessage
 	| WorkerNotifyMessage
 	| WorkerCapabilityRequestMessage
@@ -62,6 +79,13 @@ type WorkerMessage =
 interface PendingCommand {
 	resolve: () => void;
 	reject: (error: Error) => void;
+}
+
+interface WorkerEditorTarget {
+	vaultId: string;
+	paneId: string;
+	tabId: string;
+	notePath: string;
 }
 
 export interface WorkerPluginRuntime {
@@ -129,6 +153,35 @@ function rejectCapabilities(error) {
   capabilityPending.clear();
 }
 
+function makeEditorProxy(target) {
+  return Object.freeze({
+    insert(text) {
+      return requestCapability('editor.insert', { target, text });
+    },
+    insertTemplate(text) {
+      return requestCapability('editor.insertTemplate', { target, text });
+    },
+    wrap(prefix, suffix) {
+      return requestCapability('editor.wrap', { target, prefix, suffix });
+    },
+    prependLines(text) {
+      return requestCapability('editor.prependLines', { target, text });
+    },
+    toggleHeading(level) {
+      return requestCapability('editor.toggleHeading', { target, level });
+    },
+    insertWikilink() {
+      return requestCapability('editor.insertWikilink', { target });
+    },
+    insertCodeBlock(lang) {
+      return requestCapability('editor.insertCodeBlock', { target, lang });
+    },
+    focus() {
+      return requestCapability('editor.focus', { target });
+    }
+  });
+}
+
 function makeApi(vaultId, pluginId) {
   return {
     vaultId,
@@ -150,8 +203,10 @@ function makeApi(vaultId, pluginId) {
       commands.set(manifest.id, command.exec);
       self.postMessage({ type: 'registerCommand', command: manifest });
     },
-    registerEditorCommand() {
-      throw new Error('worker plugins cannot register editor commands yet');
+    registerEditorCommand(command) {
+      const manifest = cleanCommand(command);
+      commands.set(manifest.id, command.exec);
+      self.postMessage({ type: 'registerEditorCommand', command: manifest });
     },
     registerMarkdownPostprocessor() {
       throw new Error('worker plugins cannot register markdown postprocessors');
@@ -199,7 +254,9 @@ self.onmessage = async (event) => {
     if (data.type === 'execCommand') {
       const exec = commands.get(data.commandId);
       if (!exec) throw new Error('unknown command: ' + data.commandId);
-      const result = await exec({ ...(data.context ?? {}), vaultId: data.vaultId, pluginId: data.pluginId });
+      const context = { ...(data.context ?? {}), vaultId: data.vaultId, pluginId: data.pluginId };
+      if (data.editorTarget) context.editor = makeEditorProxy(data.editorTarget);
+      const result = await exec(context);
       if (result && typeof result.notify === 'string') api?.notify(result.notify);
       self.postMessage({ type: 'commandComplete', requestId: data.requestId });
       return;
@@ -224,6 +281,10 @@ function scopedWorkerCommandId(pluginId: string, commandId: string): string {
 	return `plugin:${pluginId}:worker:${commandId}`;
 }
 
+function scopedWorkerEditorCommandId(pluginId: string, commandId: string): string {
+	return `plugin:${pluginId}:worker-editor:${commandId}`;
+}
+
 function serializableContext(ctx: CommandContext): CommandContext {
 	const out: CommandContext = {};
 	if (typeof ctx.vaultId === 'string') out.vaultId = ctx.vaultId;
@@ -235,6 +296,38 @@ function serializableContext(ctx: CommandContext): CommandContext {
 		out.node = { path: ctx.node.path, type: ctx.node.type, name: ctx.node.name };
 	}
 	return out;
+}
+
+function serializableDoc(editor: ActivePluginEditor): Record<string, unknown> {
+	return {
+		path: editor.doc.path,
+		content: editor.doc.content,
+		revision: editor.doc.revision,
+		mtime: editor.doc.mtime,
+		frontmatter: JSON.parse(JSON.stringify(editor.doc.frontmatter ?? {})) as Record<string, unknown>,
+		body: editor.doc.body,
+		tags: [...editor.doc.tags]
+	};
+}
+
+function editorTarget(editor: ActivePluginEditor): WorkerEditorTarget {
+	return {
+		vaultId: editor.vaultId,
+		paneId: editor.paneId,
+		tabId: editor.tabId,
+		notePath: editor.notePath
+	};
+}
+
+function serializableEditorContext(ctx: CommandContext, editor: ActivePluginEditor): CommandContext {
+	return {
+		...serializableContext(ctx),
+		vaultId: editor.vaultId,
+		paneId: editor.paneId,
+		tabId: editor.tabId,
+		notePath: editor.notePath,
+		doc: serializableDoc(editor)
+	};
 }
 
 function cleanWorkerIframePanel(panel: WorkerIframePanelDef, label: string): WorkerIframePanelDef {
@@ -266,6 +359,61 @@ function readCapabilityInput(input: unknown): Record<string, unknown> {
 	return input as Record<string, unknown>;
 }
 
+function readString(input: Record<string, unknown>, key: string, maxBytes = 128 * 1024): string {
+	const value = input[key];
+	if (typeof value !== 'string') throw new Error(`${key} must be a string`);
+	if (new TextEncoder().encode(value).byteLength > maxBytes) throw new Error(`${key} is too large`);
+	return value;
+}
+
+function readOptionalString(input: Record<string, unknown>, key: string, maxBytes = 128 * 1024): string | undefined {
+	const value = input[key];
+	if (value === undefined || value === null || value === '') return undefined;
+	if (typeof value !== 'string') throw new Error(`${key} must be a string`);
+	if (new TextEncoder().encode(value).byteLength > maxBytes) throw new Error(`${key} is too large`);
+	return value;
+}
+
+function readEditorTarget(input: Record<string, unknown>): WorkerEditorTarget {
+	const target = input.target;
+	if (!target || typeof target !== 'object' || Array.isArray(target)) throw new Error('editor target required');
+	const obj = target as Record<string, unknown>;
+	const out = {
+		vaultId: obj.vaultId,
+		paneId: obj.paneId,
+		tabId: obj.tabId,
+		notePath: obj.notePath
+	};
+	if (
+		typeof out.vaultId !== 'string' ||
+		typeof out.paneId !== 'string' ||
+		typeof out.tabId !== 'string' ||
+		typeof out.notePath !== 'string'
+	) {
+		throw new Error('editor target is invalid');
+	}
+	return out as WorkerEditorTarget;
+}
+
+function activeEditorForTarget(target: WorkerEditorTarget): ActivePluginEditor {
+	const editor = getActivePluginEditor({
+		vaultId: target.vaultId,
+		paneId: target.paneId,
+		tabId: target.tabId,
+		notePath: target.notePath
+	});
+	if (
+		!editor ||
+		editor.vaultId !== target.vaultId ||
+		editor.paneId !== target.paneId ||
+		editor.tabId !== target.tabId ||
+		editor.notePath !== target.notePath
+	) {
+		throw new Error('active editor is no longer available');
+	}
+	return editor;
+}
+
 async function runWorkerCapability(files: PluginFilesApi, message: WorkerCapabilityRequestMessage): Promise<unknown> {
 	const input = readCapabilityInput(message.input);
 	switch (message.capability) {
@@ -275,6 +423,36 @@ async function runWorkerCapability(files: PluginFilesApi, message: WorkerCapabil
 			return files.writeNote(input.path as string, input.content as string, {
 				expectedRevision: typeof input.expectedRevision === 'string' ? input.expectedRevision : undefined
 			});
+		case 'editor.insert':
+			activeEditorForTarget(readEditorTarget(input)).editor.insert(readString(input, 'text'));
+			return { ok: true };
+		case 'editor.insertTemplate':
+			activeEditorForTarget(readEditorTarget(input)).editor.insertTemplate(readString(input, 'text'));
+			return { ok: true };
+		case 'editor.wrap':
+			activeEditorForTarget(readEditorTarget(input)).editor.wrap(
+				readString(input, 'prefix', 256),
+				readOptionalString(input, 'suffix', 256)
+			);
+			return { ok: true };
+		case 'editor.prependLines':
+			activeEditorForTarget(readEditorTarget(input)).editor.prependLines(readString(input, 'text', 256));
+			return { ok: true };
+		case 'editor.toggleHeading': {
+			const level = Number(input.level);
+			if (![1, 2, 3, 4, 5, 6].includes(level)) throw new Error('heading level must be 1-6');
+			activeEditorForTarget(readEditorTarget(input)).editor.toggleHeading(level as 1 | 2 | 3 | 4 | 5 | 6);
+			return { ok: true };
+		}
+		case 'editor.insertWikilink':
+			activeEditorForTarget(readEditorTarget(input)).editor.insertWikilink();
+			return { ok: true };
+		case 'editor.insertCodeBlock':
+			activeEditorForTarget(readEditorTarget(input)).editor.insertCodeBlock(readOptionalString(input, 'lang', 32));
+			return { ok: true };
+		case 'editor.focus':
+			activeEditorForTarget(readEditorTarget(input)).editor.focus();
+			return { ok: true };
 		default:
 			throw new Error(`unknown capability: ${message.capability}`);
 	}
@@ -325,6 +503,47 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 				}).catch((error) => {
 					console.error(`[plugin:${plugin.id}] worker command failed:`, error);
 					alert(`Plugin worker command failed: ${(error as Error).message}`);
+				});
+			}
+		};
+		register(wrapped);
+		registered.add(id);
+	}
+
+	function registerWorkerEditorCommand(command: PluginCommandManifest & { shortcut?: string }): void {
+		if (!ID_RE.test(command.id)) throw new Error(`invalid worker editor command id: ${command.id}`);
+		if (!command.title?.trim()) throw new Error('worker editor command title required');
+		const id = scopedWorkerEditorCommandId(plugin.id, command.id);
+		const activeEditor = (ctx: CommandContext): ActivePluginEditor | null => (
+			getActivePluginEditor({ ...ctx, vaultId })
+		);
+		const wrapped: CommandDef = {
+			id,
+			title: command.title,
+			icon: command.icon,
+			shortcut: command.shortcut,
+			category: command.category ?? `plugin:${plugin.id}`,
+			when(ctx) {
+				return activeEditor(ctx) !== null;
+			},
+			async exec(ctx) {
+				const editor = activeEditor(ctx);
+				if (!editor) return;
+				const currentRequestId = ++requestId;
+				await new Promise<void>((resolve, reject) => {
+					pending.set(currentRequestId, { resolve, reject });
+					worker.postMessage({
+						type: 'execCommand',
+						requestId: currentRequestId,
+						commandId: command.id,
+						vaultId,
+						pluginId: plugin.id,
+						context: serializableEditorContext(ctx, editor),
+						editorTarget: editorTarget(editor)
+					});
+				}).catch((error) => {
+					console.error(`[plugin:${plugin.id}] worker editor command failed:`, error);
+					alert(`Plugin worker editor command failed: ${(error as Error).message}`);
 				});
 			}
 		};
@@ -391,6 +610,10 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 		try {
 			if (message.type === 'registerCommand') {
 				registerWorkerCommand(message.command);
+				return;
+			}
+			if (message.type === 'registerEditorCommand') {
+				registerWorkerEditorCommand(message.command);
 				return;
 			}
 			if (message.type === 'registerSettingsPanel') {

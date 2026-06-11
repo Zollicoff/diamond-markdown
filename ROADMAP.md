@@ -81,11 +81,11 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
   - [x] Markdown postprocessor hook
   - [x] Editor-specific command hook
   - [x] Right-panel view hook
-- [ ] Sandboxed execution (iframes for UI; Worker for logic)
+- [x] Sandboxed execution (iframes for UI; Worker for logic)
   - [x] Worker execution for command-only plugin logic
   - [x] Iframe-hosted settings/right-panel renderers
   - [x] Capability proxy for note file read/write APIs
-  - [ ] Capability proxy for active-editor mutation APIs
+  - [x] Capability proxy for active-editor mutation APIs
 - [x] Plugin install UI (load plugins from manifest URL, not just disk)
 - [x] Curated plugin registry/catalog
 - [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.

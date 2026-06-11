@@ -484,6 +484,60 @@ export function activate(api) {
 	expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'pwned.md'))).toBe(false);
 });
 
+test('worker plugins mutate the active editor through a capability proxy', async ({ page, request }) => {
+	const logs: string[] = [];
+	page.on('console', (msg) => logs.push(msg.text()));
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-editor-plugin-vault');
+	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-editor');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(pluginDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({
+		id: 'worker-editor',
+		name: 'Worker Editor Plugin',
+		version: '0.1.0',
+		description: 'Uses host-mediated editor mutations.',
+		entry: 'main.js',
+		execution: 'worker',
+		commands: []
+	}, null, 2));
+	fs.writeFileSync(path.join(pluginDir, 'main.js'), `
+export function activate(api) {
+  api.notify('worker editor ready');
+  api.registerEditorCommand({
+    id: 'worker-editor-insert',
+    title: 'Worker Editor Insert',
+    category: 'plugin',
+    async exec(context) {
+      await context.editor.insert('Worker editor command: ' + context.doc.path + '\\n');
+      await context.editor.insertTemplate('Template cursor {{cursor}}done\\n');
+      api.notify('worker editor mutated ' + context.notePath);
+    }
+  });
+}
+`);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Worker Editor Plugin Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-editor] worker editor ready'))).toBe(true);
+	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
+	const editor = page.locator('.cm-content').first();
+	await expect(editor).toBeVisible();
+
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Worker Editor Insert');
+	await page.getByRole('button', { name: /Worker Editor Insert/ }).click();
+	await expect(editor).toContainText('Worker editor command: Home.md');
+	await expect(editor).toContainText('Template cursor done');
+	await expect.poll(() => logs.join('\n')).toContain('[plugin:worker-editor] worker editor mutated Home.md');
+});
+
 test('worker plugins register sandboxed iframe panels', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-frame-plugin-vault');
 	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-frames');

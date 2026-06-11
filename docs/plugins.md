@@ -107,15 +107,17 @@ their entry module inside a module Worker and currently exposes:
 - `api.files.readNote(path)`
 - `api.files.writeNote(path, content, options?)`
 - `api.registerCommand(command)`
+- `api.registerEditorCommand(command)`
 - `api.registerRightPanel(panel)` for iframe panels only
 - `api.registerSettingsPanel(panel)` for iframe panels only
 - `api.notify(message)`
 
 Worker command handlers receive a serializable command context, not live DOM or
-editor objects. Network APIs such as `fetch`, `XMLHttpRequest`, `WebSocket`, and
-`EventSource` are disabled in the worker bootstrap. This isolates command logic
-from the main app DOM, but it is not yet a complete untrusted-plugin permission
-system.
+raw app objects. Worker editor command handlers receive a promise-returning
+editor proxy instead of the live CodeMirror object. Network APIs such as
+`fetch`, `XMLHttpRequest`, `WebSocket`, and `EventSource` are disabled in the
+worker bootstrap. This isolates command logic from the main app DOM, but it is
+not yet a complete untrusted-plugin permission system.
 
 ## File Capabilities
 
@@ -165,6 +167,24 @@ export function activate(api) {
 Editor command contexts include `editor`, `doc`, `notePath`, `paneId`, `tabId`,
 `vaultId`, and `pluginId`. They reuse the main command palette and may define a
 `when(context)` predicate for note-specific visibility.
+
+Worker editor commands support the same registration shape, but `when` is not
+available because functions cannot be moved across the Worker boundary. The
+worker editor proxy currently supports `insert`, `insertTemplate`, `wrap`,
+`prependLines`, `toggleHeading`, `insertWikilink`, `insertCodeBlock`, and
+`focus`; each method returns a promise because the host applies the mutation.
+
+```js
+export function activate(api) {
+  api.registerEditorCommand({
+    id: 'insert-source',
+    title: 'Insert Source',
+    async exec(context) {
+      await context.editor.insertTemplate('Source: {{cursor}}');
+    }
+  });
+}
+```
 
 ## Settings Panels
 
@@ -261,5 +281,5 @@ rerenders or unloads.
 
 Trusted plugins run in the main app context. Worker plugins isolate command
 logic from the DOM, and iframe panels isolate plugin UI from the parent document.
-Note file access goes through a host capability proxy. Active-editor mutation
-proxying is still planned, so only install plugins you trust.
+Note file access and active-editor mutations go through host capability proxies.
+Only install plugins you trust while the permission model remains young.
