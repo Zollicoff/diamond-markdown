@@ -161,8 +161,6 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	for (const folder of hiddenFolders) scanHiddenMarkdown(path.join(root, ...folder.split('/')));
 
 	const warnings: string[] = [];
-	if (markdownFiles === 0) warnings.push('No markdown files were found outside hidden/config folders.');
-	if (!gitRepository) warnings.push('No Git repository was found. Initialize Git before first GitHub sync.');
 	if (hiddenMarkdownRisk) warnings.push('Hidden folders contain markdown files; Diamond skips hidden folders by default.');
 	if (unreadableEntries > 0) warnings.push(`${unreadableEntries} folder${unreadableEntries === 1 ? '' : 's'} could not be read.`);
 	if (skippedSymlinks > 0) warnings.push(`${skippedSymlinks} symlink${skippedSymlinks === 1 ? '' : 's'} skipped during inspection.`);
