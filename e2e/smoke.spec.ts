@@ -53,6 +53,44 @@ async function swipe(locator: Locator, direction: 'left' | 'right'): Promise<voi
 	}, { startX, endX, y });
 }
 
+async function shiftDragSelect(locator: Locator): Promise<void> {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error('Cannot drag-select an invisible target');
+	const startX = box.x + 8;
+	const startY = box.y + 8;
+	const endX = box.x + box.width - 8;
+	const endY = box.y + box.height - 8;
+	await locator.evaluate((el, gesture) => {
+		const common: PointerEventInit = {
+			pointerId: 101,
+			pointerType: 'mouse',
+			isPrimary: true,
+			shiftKey: true,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		};
+		el.dispatchEvent(new PointerEvent('pointerdown', {
+			...common,
+			clientX: gesture.startX,
+			clientY: gesture.startY,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointermove', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.endY,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointerup', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.endY,
+			buttons: 0
+		}));
+	}, { startX, startY, endX, endY });
+}
+
 test('app boots and lists vaults on the picker', async ({ page }) => {
 	await page.goto('/');
 	await expect(page).toHaveTitle(/Diamond Markdown|DiamondMD/i);
@@ -81,6 +119,20 @@ test('graph tab opens beside the active note (does not replace)', async ({ page 
 	await expect(page.locator('text=/\\d+ nodes? · \\d+ edges?/').first()).toBeVisible({ timeout: 5_000 });
 	const tabsAfter = await workspaceTabs.count();
 	expect(tabsAfter).toBeGreaterThan(tabsBefore);
+});
+
+test('graph supports shift-drag selection', async ({ page }) => {
+	await openFirstVault(page);
+	await openFirstNote(page);
+	await page.getByLabel('Graph').click();
+	await expect(page.locator('text=/\\d+ nodes? · \\d+ edges?/').first()).toBeVisible({ timeout: 5_000 });
+
+	await shiftDragSelect(page.locator('.canvas'));
+	await expect.poll(() => page.locator('.node.selected').count()).toBeGreaterThan(1);
+	await expect(page.locator('.selected-count')).toContainText(/selected/);
+
+	await page.getByRole('button', { name: 'Clear' }).click();
+	await expect(page.locator('.selected-count')).toBeHidden();
 });
 
 test('touch swipes switch workspace tabs and panes', async ({ page }) => {

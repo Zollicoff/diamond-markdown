@@ -63,7 +63,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Light-mode highlight.js per-token theming
 - [x] Outline scroll inside Live mode
 - [ ] Settings page consolidation
-- [ ] Multi-select / drag-select in graph
+- [x] Multi-select / drag-select in graph
 
 ## v0.4 — Performance & scale
 

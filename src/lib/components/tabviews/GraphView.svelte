@@ -33,14 +33,19 @@
 	let panStartY = 0;
 	let panOrigX = 0;
 	let panOrigY = 0;
+	let selecting = $state(false);
+	let selectStart = $state<{ x: number; y: number } | null>(null);
+	let selectEnd = $state<{ x: number; y: number } | null>(null);
 
 	// --- Drag state ----------------------------------------------------
 	let draggingNode: GNode | null = null;
 	let dragStartX = 0;
 	let dragStartY = 0;
 	let dragMoved = false;
+	let suppressNextNodeClick = false;
 	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
 	let hoverPath = $state<string | null>(null);
+	let selectedPaths = $state<string[]>([]);
 
 	// --- Tunable params (per-vault, persisted) -------------------------
 	let nodeScale = $state(SIM_DEFAULTS.nodeScale);
@@ -103,6 +108,18 @@
 	const visibleNodes = $derived<GNode[]>(nodes.filter((n) => visiblePaths.has(n.path)));
 	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
 	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
+	const selectedCount = $derived(selectedPaths.filter((path) => visiblePaths.has(path)).length);
+	const selectionBox = $derived.by(() => {
+		if (!selecting || !selectStart || !selectEnd) return null;
+		const x = Math.min(selectStart.x, selectEnd.x);
+		const y = Math.min(selectStart.y, selectEnd.y);
+		return {
+			x,
+			y,
+			width: Math.abs(selectEnd.x - selectStart.x),
+			height: Math.abs(selectEnd.y - selectStart.y)
+		};
+	});
 
 	// --- Load + sim loop -----------------------------------------------
 	let initialCenterDone = false;
@@ -170,16 +187,82 @@
 		viewY = cy - wy * viewScale;
 	}
 
+	function capturePointer(el: Element, pointerId: number): void {
+		try { el.setPointerCapture?.(pointerId); } catch { /* synthetic or already-captured pointer */ }
+	}
+
+	function releasePointer(el: Element, pointerId: number): void {
+		try { el.releasePointerCapture?.(pointerId); } catch { /* synthetic or already-released pointer */ }
+	}
+
+	function screenPoint(e: PointerEvent): { x: number; y: number } | null {
+		const rect = svgEl?.getBoundingClientRect();
+		if (!rect) return null;
+		return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+	}
+
+	function clearSelection(): void {
+		selectedPaths = [];
+	}
+
+	function toggleSelection(path: string): void {
+		selectedPaths = selectedPaths.includes(path)
+			? selectedPaths.filter((p) => p !== path)
+			: [...selectedPaths, path];
+	}
+
+	function finishSelection(additive: boolean): void {
+		if (!selectionBox || selectionBox.width < 8 || selectionBox.height < 8) {
+			selecting = false;
+			selectStart = null;
+			selectEnd = null;
+			return;
+		}
+		const x1 = (selectionBox.x - viewX) / viewScale;
+		const y1 = (selectionBox.y - viewY) / viewScale;
+		const x2 = (selectionBox.x + selectionBox.width - viewX) / viewScale;
+		const y2 = (selectionBox.y + selectionBox.height - viewY) / viewScale;
+		const minX = Math.min(x1, x2);
+		const maxX = Math.max(x1, x2);
+		const minY = Math.min(y1, y2);
+		const maxY = Math.max(y1, y2);
+		const next = additive ? [...selectedPaths] : [];
+		for (const n of visibleNodes) {
+			if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY && !next.includes(n.path)) {
+				next.push(n.path);
+			}
+		}
+		selectedPaths = next;
+		selecting = false;
+		selectStart = null;
+		selectEnd = null;
+	}
+
 	function onPointerDownBG(e: PointerEvent): void {
+		if (e.shiftKey) {
+			const point = screenPoint(e);
+			if (!point) return;
+			selecting = true;
+			selectStart = point;
+			selectEnd = point;
+			isPanning = false;
+			capturePointer(e.currentTarget as Element, e.pointerId);
+			return;
+		}
 		isPanning = true;
 		panStartX = e.clientX;
 		panStartY = e.clientY;
 		panOrigX = viewX;
 		panOrigY = viewY;
-		(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		capturePointer(e.currentTarget as Element, e.pointerId);
 	}
 
 	function onPointerMoveBG(e: PointerEvent): void {
+		if (selecting) {
+			const point = screenPoint(e);
+			if (point) selectEnd = point;
+			return;
+		}
 		if (draggingNode) {
 			if (!dragMoved) {
 				const dx = e.clientX - dragStartX;
@@ -198,13 +281,24 @@
 	}
 
 	function onPointerUpBG(e: PointerEvent): void {
+		if (selecting) {
+			if (e.type === 'pointercancel') {
+				selecting = false;
+				selectStart = null;
+				selectEnd = null;
+			} else {
+				finishSelection(e.metaKey || e.ctrlKey);
+			}
+			releasePointer(e.currentTarget as Element, e.pointerId);
+			return;
+		}
 		if (draggingNode) {
 			draggingNode.fx = null;
 			draggingNode.fy = null;
 			draggingNode = null;
 		}
 		isPanning = false;
-		(e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
+		releasePointer(e.currentTarget as Element, e.pointerId);
 	}
 
 	function onNodePointerDown(e: PointerEvent, n: GNode): void {
@@ -217,17 +311,39 @@
 		if (!rect) return;
 		n.fx = n.x;
 		n.fy = n.y;
-		(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		capturePointer(e.currentTarget as Element, e.pointerId);
+	}
+
+	function onNodePointerMove(e: PointerEvent): void {
+		e.stopPropagation();
+		onPointerMoveBG(e);
+	}
+
+	function onNodePointerUp(e: PointerEvent, n: GNode): void {
+		e.stopPropagation();
+		const shouldToggleSelection = e.type !== 'pointercancel' && e.shiftKey && !dragMoved;
+		onPointerUpBG(e);
+		if (shouldToggleSelection) {
+			toggleSelection(n.path);
+			suppressNextNodeClick = true;
+		}
 	}
 
 	function onNodeClick(e: MouseEvent, n: GNode): void {
 		e.stopPropagation();
+		if (suppressNextNodeClick) {
+			suppressNextNodeClick = false;
+			return;
+		}
 		// Suppress the click the browser fires after a drag-release.
 		if (dragMoved) {
 			dragMoved = false;
 			return;
 		}
-		if (e.shiftKey) return; // reserved for multiselect later
+		if (e.shiftKey) {
+			toggleSelection(n.path);
+			return;
+		}
 		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
 		const mode = e.altKey ? 'new-pane' : 'new-tab';
 		openNote(vaultId, n.path, title, mode);
@@ -237,6 +353,10 @@
 		if (e.key !== 'Enter' && e.key !== ' ') return;
 		e.preventDefault();
 		e.stopPropagation();
+		if (e.shiftKey) {
+			toggleSelection(n.path);
+			return;
+		}
 		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
 		openNote(vaultId, n.path, title, 'new-tab');
 	}
@@ -287,6 +407,10 @@
 				{nodes.length} nodes · {edges.length} edges
 			{/if}
 		</span>
+		{#if selectedCount > 0}
+			<span class="selected-count mono">{selectedCount} selected</span>
+			<button class="mini" onclick={clearSelection} title="Clear graph selection">Clear</button>
+		{/if}
 		<span class="spacer"></span>
 		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces, filters, display">⚙ Settings</button>
 		<button class="mini" onclick={resetAll} title="Restore force defaults, clear filters, re-center">Reset</button>
@@ -320,6 +444,7 @@
 							x1={a.x} y1={a.y} x2={b.x} y2={b.y}
 							class="edge"
 							class:hl={hoverPath === e.from || hoverPath === e.to}
+							class:selected={selectedPaths.includes(e.from) && selectedPaths.includes(e.to)}
 						/>
 					{/if}
 				{/each}
@@ -327,20 +452,34 @@
 					<g
 						class="node"
 						class:hl={hoverPath === n.path}
+						class:selected={selectedPaths.includes(n.path)}
 						transform={`translate(${n.x}, ${n.y})`}
 						onpointerdown={(e) => onNodePointerDown(e, n)}
+						onpointermove={onNodePointerMove}
+						onpointerup={(e) => onNodePointerUp(e, n)}
+						onpointercancel={(e) => onNodePointerUp(e, n)}
 						onclick={(e) => onNodeClick(e, n)}
 						onkeydown={(e) => onNodeKeydown(e, n)}
 						onmouseenter={() => (hoverPath = n.path)}
 						onmouseleave={() => (hoverPath = null)}
 						role="button"
 						tabindex="0"
+						aria-pressed={selectedPaths.includes(n.path)}
 					>
 						<circle r={nodeRadius(n, nodeScale)} />
 						<text dy="-8">{n.title}</text>
 					</g>
 				{/each}
 			</g>
+			{#if selectionBox}
+				<rect
+					class="selection-box"
+					x={selectionBox.x}
+					y={selectionBox.y}
+					width={selectionBox.width}
+					height={selectionBox.height}
+				/>
+			{/if}
 		</svg>
 	{/if}
 
@@ -368,7 +507,7 @@
 	{/if}
 
 	<footer class="legend">
-		<span>Drag a node to pin · drag background to pan · scroll to zoom · click to open in new tab · alt+click for new pane</span>
+		<span>Drag a node to pin · drag background to pan · shift-click or shift-drag to select · scroll to zoom · click to open in new tab · alt+click for new pane</span>
 	</footer>
 </div>
 
@@ -395,6 +534,14 @@
 		font-weight: 600;
 	}
 	.count { font-size: 0.72rem; color: var(--fg-dim); }
+	.selected-count {
+		font-size: 0.72rem;
+		color: var(--accent);
+		background: var(--accent-soft);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+		border-radius: 999px;
+		padding: 2px 8px;
+	}
 	.spacer { flex: 1; }
 	.mini {
 		background: transparent;
@@ -427,6 +574,7 @@
 		pointer-events: none;
 	}
 	.edge.hl { stroke: var(--brand-cyan); opacity: 1; stroke-width: 1.4; }
+	.edge.selected { stroke: var(--accent); opacity: 0.9; stroke-width: 1.5; }
 
 	.node circle {
 		fill: var(--fg-muted);
@@ -449,7 +597,21 @@
 		fill: var(--brand-cyan);
 		cursor: pointer;
 	}
+	.node.selected circle {
+		fill: var(--accent);
+		stroke: var(--fg);
+		stroke-width: 2;
+	}
 	.node:hover text, .node.hl text { fill: var(--fg); }
+	.node.selected text { fill: var(--fg); }
+
+	.selection-box {
+		fill: var(--accent-soft);
+		stroke: var(--accent);
+		stroke-width: 1;
+		stroke-dasharray: 4 3;
+		pointer-events: none;
+	}
 
 	.status, .err {
 		padding: 2rem;

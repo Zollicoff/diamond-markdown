@@ -100,6 +100,7 @@ Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
 - Force-directed graph of notes + links
 - App-style tab — opens beside notes, doesn't replace them
 - Drag nodes to pin, click to open in new tab, alt-click for new pane
+- Shift-click or shift-drag to select multiple graph nodes
 - Tunable forces panel: node size, repel, link force, link distance, center force (per-vault persisted)
 - Filters: hide orphans, search by name/path
 
