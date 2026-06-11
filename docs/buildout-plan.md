@@ -55,22 +55,25 @@ Use small, pushable slices:
 - Prefer conservative git sync semantics: fetch, inspect, fast-forward pull,
   clean push, manual diverged recovery.
 
-## Next Implementation Slices
+## Recently Landed Slices
 
-1. **App dialog/toast infrastructure.** Replace native browser dialogs in core
+- **App dialog/toast infrastructure.** Replace native browser dialogs in core
    commands, note interactions, templates, file-tree mutations, and plugin
    failures.
-2. **Git sync UX extraction.** Keep command builders and state labels outside
+- **Git sync UX extraction.** Keep command builders and state labels outside
    `GitSyncPanel`; move remaining branch/status rendering helpers into modules.
-3. **Note view split.** Extract metadata, wikilink navigation, save/reload, and
+- **Note view split.** Extract metadata, wikilink navigation, save/reload, and
    link-create behavior from `NoteView` so the component focuses on layout and
    editor/preview switching.
-4. **Plugin panel split.** Separate plugin install state, manifest validation
+- **Plugin panel split.** Separate plugin install state, manifest validation
    feedback, catalog rendering, and installed-plugin rendering.
-5. **Import and migration helpers.** Add an Obsidian-vault import checklist:
+
+## Next Implementation Slices
+
+1. **Import and migration helpers.** Add an Obsidian-vault import checklist:
    ignore `.obsidian`, detect attachment folders, preserve markdown unchanged,
    and recommend git initialization before first sync.
-6. **Verification hardening.** Add tests for dialog-driven destructive actions,
+2. **Verification hardening.** Add tests for dialog-driven destructive actions,
    sync recovery copy, plugin install replacement behavior, and import helpers.
 
 ## Verification Gates
