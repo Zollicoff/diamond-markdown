@@ -209,6 +209,12 @@ Do not raise Vite's chunk-size warning to hide these. Prefer additional dynamic
 imports or dependency replacement if these lazy chunks become user-visible
 latency.
 
+The adapter-node build intentionally disables adapter-side precompression.
+Deployments can still use CDN or reverse-proxy compression, but the checked-in
+release verifier runs repeated `node build` smoke servers against the same build
+tree. Avoiding `.br`/`.gz` sidecars keeps those smoke runs from crashing on
+stale compressed-asset lookups.
+
 ## File tree rendering
 
 `FileTree.svelte` flattens the expanded tree into visible rows and renders only
