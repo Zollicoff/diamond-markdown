@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import '../app.css';
 	import 'katex/dist/katex.min.css';
 	import 'highlight.js/styles/github-dark.min.css';
+	import '../app.css';
 	import { hydrate as hydrateTheme } from '$lib/theme.svelte';
 
 	let { children } = $props();

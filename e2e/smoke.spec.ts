@@ -181,6 +181,26 @@ test('outline jumps scroll the live editor to headings', async ({ page }) => {
 	await expect.poll(() => page.locator('.cm-scroller').first().evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 });
 
+test('light theme applies readable highlight.js token colors', async ({ page }) => {
+	await page.goto('/');
+	await page.evaluate(() => localStorage.setItem('diamond.theme', 'light'));
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await page.getByRole('tab', { name: 'Read' }).click();
+
+	const codeBlock = page.locator('.preview pre').first();
+	const builtin = page.locator('.preview code.hljs .hljs-built_in').first();
+	await expect(codeBlock).toBeVisible();
+	await expect(builtin).toHaveText('clone');
+
+	const colors = await builtin.evaluate((el) => {
+		const token = getComputedStyle(el);
+		const pre = getComputedStyle(el.closest('pre')!);
+		return { token: token.color, background: pre.backgroundColor };
+	});
+	expect(colors.background).toBe('rgb(246, 248, 250)');
+	expect(colors.token).toBe('rgb(5, 80, 174)');
+});
+
 test('wikilink toolbar button inserts double-bracket [[]] syntax', async ({ page }) => {
 	await openFirstVault(page);
 	await openFirstNote(page);

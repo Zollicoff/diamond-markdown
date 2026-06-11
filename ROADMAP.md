@@ -60,7 +60,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Template picker upgrade (modal palette instead of `prompt()`)
 - [x] Service worker for offline app shell/static assets
 - [x] Mobile touch gestures (swipe to switch tabs / panes)
-- [ ] Light-mode highlight.js per-token theming
+- [x] Light-mode highlight.js per-token theming
 - [x] Outline scroll inside Live mode
 - [ ] Settings page consolidation
 - [ ] Multi-select / drag-select in graph
