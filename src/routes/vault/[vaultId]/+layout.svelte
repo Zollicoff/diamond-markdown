@@ -153,6 +153,9 @@
 	</div>
 
 	<main class="center">
+		{#if data.readOnly}
+			<div class="read-only-banner">Read-only mode: browsing is enabled; changes are disabled.</div>
+		{/if}
 		<Workspace {vaultId} {onDocLoaded} />
 		{@render children()}
 	</main>
@@ -196,6 +199,14 @@
 		min-width: 0;
 		min-height: 0;
 		overflow: hidden;
+	}
+	.read-only-banner {
+		flex: 0 0 auto;
+		padding: 8px 12px;
+		border-bottom: 1px solid color-mix(in srgb, var(--brand-cyan), var(--border) 65%);
+		background: color-mix(in srgb, var(--brand-cyan), var(--bg-elev) 90%);
+		color: var(--fg);
+		font-size: 0.82rem;
 	}
 	.center > :global(.workspace) { flex: 1; min-height: 0; }
 

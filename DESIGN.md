@@ -157,6 +157,17 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
 This keeps the browser UI safe for normal Obsidian-style sync without hiding
 Git's real conflict model.
 
+## Read-only mode
+
+`DIAMOND_READ_ONLY=true` makes Diamond Markdown browse-only at the server
+boundary. `src/hooks.server.ts` rejects every non-GET/HEAD/OPTIONS request under
+`/api/` with `403` before the request reaches route handlers. Read routes still
+serve vault metadata, markdown, search, graph, tags, raw assets, and health.
+
+The mode is meant for public demos and sample vaults. It is not authentication:
+private vault deployments still need localhost/private-network binding or a
+trusted authenticated reverse proxy.
+
 ## Bundle boundaries
 
 The vault workspace shell lazy-loads tab views from `TabContent.svelte`.

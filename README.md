@@ -141,6 +141,12 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Service worker caches the app shell and immutable static assets. Vault APIs
   stay network/server-backed so note and git state do not go stale silently.
 
+### Self-hosting
+- Optional `DIAMOND_READ_ONLY=true` mode for browse-only demos: read APIs stay
+  available while write APIs return `403`
+- Designed for localhost, Tailscale/private networks, or authenticated reverse
+  proxy deployment; no built-in multi-user auth yet
+
 ### Desktop
 - Tauri v2 shell in `src-tauri/`
 - Starts the existing built SvelteKit/Node backend on loopback, waits for it,

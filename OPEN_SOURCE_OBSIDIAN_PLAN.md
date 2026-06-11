@@ -43,7 +43,9 @@ Risks:
 - Document the security model in README: localhost/Tailscale/reverse proxy by
   default, no built-in multi-user auth yet.
 - Add optional basic auth or trusted-header auth for simple self-hosted installs.
-- Add read-only mode for public demos and sample vaults.
+- Add read-only mode for public demos and sample vaults. ✓ Basic server-enforced
+  `DIAMOND_READ_ONLY` mode is available; future work can hide more write
+  controls in the UI.
 - Keep raw asset serving sandboxed and non-executable.
 
 ### 3. Make Sync Real

@@ -93,7 +93,22 @@ Check:
 - Push refuses when the vault is dirty or behind.
 - Diverged histories are reported as manual-merge state.
 
-## 7. Documentation
+## 7. Read-Only Smoke
+
+Run the production server with a disposable config/vault:
+
+```sh
+DIAMOND_READ_ONLY=true HOST=127.0.0.1 PORT=4174 node build
+```
+
+Required:
+
+- `/api/health` reports `"readOnly": true`.
+- `GET /api/vaults` works.
+- A write request such as `POST /api/vaults/default/note` returns `403`.
+- The home and vault screens show the read-only banner.
+
+## 8. Documentation
 
 Check:
 
@@ -102,7 +117,7 @@ Check:
 - `SECURITY.md` and `docs/self-hosting.md` describe the current security model.
 - New user-visible behavior is documented in `DESIGN.md` when architectural.
 
-## 8. Tag Or Deploy
+## 9. Tag Or Deploy
 
 Only after all required checks pass:
 

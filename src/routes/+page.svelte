@@ -35,7 +35,16 @@
 		recent = out;
 	});
 
+	function toggleAddVault(): void {
+		if (data.readOnly) {
+			addOpen = false;
+			return;
+		}
+		addOpen = !addOpen;
+	}
+
 	async function addVault(): Promise<void> {
+		if (data.readOnly) return;
 		if (!newName.trim() || !newPath.trim()) return;
 		adding = true; err = null;
 		try {
@@ -81,10 +90,14 @@
 		<Wordmark size="md" />
 	</header>
 
+	{#if data.readOnly}
+		<div class="read-only-banner">Read-only mode: browsing is enabled; changes are disabled.</div>
+	{/if}
+
 	<section class="col">
 		<div class="col-head">
 			<h2>Vaults</h2>
-			<button class="mini-btn" onclick={() => (addOpen = !addOpen)}>
+			<button class="mini-btn" disabled={data.readOnly} onclick={toggleAddVault}>
 				{addOpen ? '× Cancel' : '＋ Add vault'}
 			</button>
 		</div>
@@ -178,6 +191,14 @@
 		align-items: baseline;
 		justify-content: space-between;
 		margin-bottom: 0.6rem;
+	}
+	.read-only-banner {
+		padding: 10px 14px;
+		border: 1px solid color-mix(in srgb, var(--brand-cyan), var(--border) 65%);
+		background: color-mix(in srgb, var(--brand-cyan), var(--bg-elev) 88%);
+		border-radius: 8px;
+		color: var(--fg);
+		font-size: 0.9rem;
 	}
 	h2 {
 		font-family: 'Bricolage Grotesque', var(--sans);
@@ -308,6 +329,14 @@
 		font-family: inherit;
 	}
 	.mini-btn:hover { color: var(--accent); background: var(--bg-hover); }
+	.mini-btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+	.mini-btn:disabled:hover {
+		color: var(--fg-muted);
+		background: transparent;
+	}
 
 	/* Footer */
 	.foot {

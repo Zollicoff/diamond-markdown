@@ -1,4 +1,5 @@
-import type { Handle } from '@sveltejs/kit';
+import { json, type Handle } from '@sveltejs/kit';
+import { isReadOnlyMode, readOnlyMessage } from '$lib/server/read-only';
 
 /**
  * Strip the `rel="modulepreload"` Link response header that SvelteKit
@@ -22,6 +23,14 @@ import type { Handle } from '@sveltejs/kit';
  * the only place to drop it is here.
  */
 export const handle: Handle = async ({ event, resolve }) => {
+	if (
+		isReadOnlyMode() &&
+		event.url.pathname.startsWith('/api/') &&
+		!['GET', 'HEAD', 'OPTIONS'].includes(event.request.method.toUpperCase())
+	) {
+		return json({ message: readOnlyMessage() }, { status: 403 });
+	}
+
 	const response = await resolve(event);
 	response.headers.delete('link');
 	return response;

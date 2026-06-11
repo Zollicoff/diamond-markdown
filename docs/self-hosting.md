@@ -41,6 +41,8 @@ Useful environment variables:
 - `PORT`: HTTP port.
 - `DIAMOND_CONFIG_DIR`: where `config.json` is stored.
 - `DIAMOND_DEFAULT_VAULT_DIR`: first-run vault destination.
+- `DIAMOND_READ_ONLY`: set to `true`, `1`, `yes`, or `on` to block write
+  APIs for public demos or browse-only vaults.
 
 Example isolated production-ish run:
 
@@ -51,6 +53,26 @@ HOST=127.0.0.1 \
 PORT=4173 \
 node build
 ```
+
+## Read-Only Mode
+
+Read-only mode is for demos and public browsing. It keeps the normal vault UI
+available, but all non-GET API requests return `403`, so note edits, vault
+changes, folder operations, publishing, plugin installs, and GitHub sync actions
+are disabled server-side.
+
+```sh
+DIAMOND_READ_ONLY=true HOST=127.0.0.1 PORT=4173 node build
+```
+
+`/api/health` reports the active mode:
+
+```json
+{ "ok": true, "service": "diamondmarkdown", "readOnly": true }
+```
+
+Read-only mode is not authentication. Keep the server on localhost, Tailscale,
+or behind a trusted authenticated proxy if the vault is private.
 
 ## Process Manager
 
@@ -113,5 +135,7 @@ Git history is useful, but it is not a full backup plan.
 - Server is localhost/private-network only, or protected by proxy auth.
 - Vault paths are trusted local directories.
 - Git credentials are managed by SSH agent or credential helper.
+- `DIAMOND_READ_ONLY=true` is enabled for public demo vaults that should not be
+  editable.
 - Dependencies pass `npm audit --audit-level=moderate`.
 - Release verification passes the commands in `docs/release-checklist.md`.

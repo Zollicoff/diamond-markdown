@@ -3,6 +3,7 @@ import type { LayoutServerLoad } from './$types';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getVault } from '$lib/server/vault';
+import { isReadOnlyMode } from '$lib/server/read-only';
 
 interface TreeNode {
 	name: string;
@@ -64,6 +65,7 @@ export const load: LayoutServerLoad = async ({ params }) => {
 			path: vault.path,
 			excludedFolders: vault.excludedFolders ?? []
 		},
-		tree: walk(vault.path, vault.path)
+		tree: walk(vault.path, vault.path),
+		readOnly: isReadOnlyMode()
 	};
 };

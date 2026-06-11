@@ -15,6 +15,8 @@ until versioned releases begin.
 - Do not expose the server directly to the public internet without an
   authentication layer in front of it.
 - Register only vault directories you trust.
+- Use `DIAMOND_READ_ONLY=true` for browse-only demos, but do not treat it as
+  an authentication layer.
 - Keep dependencies current and run `npm audit --audit-level=moderate` before
   releases.
 
@@ -39,3 +41,7 @@ multi-user authentication or authorization. The server rejects vault path
 escapes and symlink escapes through `src/lib/server/paths.ts`; new filesystem
 routes must use that resolver rather than reading client-supplied paths
 directly.
+
+When `DIAMOND_READ_ONLY=true`, the server hook rejects non-GET API requests
+before they reach route handlers. This is intended for public browsing and demo
+deployments where vault content should be visible but not editable.
