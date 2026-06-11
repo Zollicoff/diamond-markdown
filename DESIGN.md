@@ -31,6 +31,7 @@ diamondmd/
 │   │   │   ├── vault.ts
 │   │   │   ├── paths.ts
 │   │   │   ├── note-service.ts
+│   │   │   ├── folder-service.ts
 │   │   │   ├── wikilink.ts
 │   │   │   ├── markdown.ts
 │   │   │   ├── indexer.ts

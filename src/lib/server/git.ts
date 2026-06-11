@@ -60,7 +60,7 @@ export async function commitChange(
 ): Promise<{ sha: string } | null> {
 	if (files.length === 0) return null;
 	const g = await gitFor(vault);
-	await g.add(files);
+	await g.raw(['add', '-A', '--', ...files]);
 	// If nothing's actually staged (e.g. content unchanged), skip.
 	const status = await g.status();
 	if (status.staged.length === 0 && status.not_added.length === 0 && status.modified.length === 0) {

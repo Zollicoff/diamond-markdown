@@ -118,6 +118,93 @@ test('note API rejects path traversal reads and writes', async ({ request }) => 
 	expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, '..', 'escape.md'))).toBe(false);
 });
 
+test('folder API rejects path traversal creates and deletes', async ({ request }) => {
+	const create = await request.post('/api/vaults/default/folder', {
+		data: { path: '../outside-folder' }
+	});
+	expect(create.status()).toBe(400);
+	expect(await create.text()).toContain('path escapes vault');
+
+	const del = await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent('../outside-folder')}&force=1`);
+	expect(del.status()).toBe(400);
+	expect(await del.text()).toContain('path escapes vault');
+	expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, '..', 'outside-folder'))).toBe(false);
+});
+
+test('folder API force-deletes tracked notes and leaves git clean', async ({ request }) => {
+	const folder = 'Folder Delete Test';
+	const notePath = `${folder}/Inside.md`;
+	const absFolder = path.join(FIXTURE_PATHS.VAULT_DIR, folder);
+
+	try {
+		const saved = await request.post('/api/vaults/default/note', {
+			data: { path: notePath, content: '# Inside\n\nDelete me.\n' }
+		});
+		expect(saved.ok()).toBe(true);
+		expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, notePath))).toBe(true);
+
+		const blocked = await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent(folder)}`);
+		expect(blocked.status()).toBe(409);
+		expect(await blocked.text()).toContain('folder not empty');
+
+		const removed = await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent(folder)}&force=1`);
+		expect(removed.ok()).toBe(true);
+		const body = await removed.json() as { removedNotes: number; sha: string | null };
+		expect(body.removedNotes).toBe(1);
+		expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(absFolder)).toBe(false);
+
+		const missing = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+		expect(missing.status()).toBe(404);
+
+		const sync = await request.get('/api/vaults/default/sync');
+		const status = await sync.json() as { clean: boolean; files: unknown[] };
+		expect(status.clean).toBe(true);
+		expect(status.files).toHaveLength(0);
+	} finally {
+		if (fs.existsSync(absFolder)) fs.rmSync(absFolder, { recursive: true, force: true });
+	}
+});
+
+test('folder API rename moves notes and rewrites path-style wikilinks', async ({ request }) => {
+	const from = 'Folder Rename A';
+	const to = 'Folder Rename B';
+	const notePath = `${from}/Target.md`;
+	const movedPath = `${to}/Target.md`;
+	const linkPath = 'Folder Rename Links.md';
+
+	try {
+		const target = await request.post('/api/vaults/default/note', {
+			data: { path: notePath, content: '# Target\n\nRename me.\n' }
+		});
+		expect(target.ok()).toBe(true);
+		const linker = await request.post('/api/vaults/default/note', {
+			data: { path: linkPath, content: '# Links\n\nSee [[Folder Rename A/Target]].\n' }
+		});
+		expect(linker.ok()).toBe(true);
+
+		const renamed = await request.patch('/api/vaults/default/folder', {
+			data: { from, to }
+		});
+		expect(renamed.ok()).toBe(true);
+		const body = await renamed.json() as { movedNotes: number; linksUpdated: number; sha: string | null };
+		expect(body.movedNotes).toBe(1);
+		expect(body.linksUpdated).toBe(1);
+		expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+
+		expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, notePath))).toBe(false);
+		expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, movedPath))).toBe(true);
+		expect(fs.readFileSync(path.join(FIXTURE_PATHS.VAULT_DIR, linkPath), 'utf-8')).toContain('[[Folder Rename B/Target]]');
+
+		const moved = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(movedPath)}`);
+		expect(moved.ok()).toBe(true);
+	} finally {
+		await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent(to)}&force=1`).catch(() => undefined);
+		await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent(from)}&force=1`).catch(() => undefined);
+		await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(linkPath)}`).catch(() => undefined);
+	}
+});
+
 test('raw asset API serves safe headers and blocks symlink escapes', async ({ request }) => {
 	const assetDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'assets');
 	const assetPath = path.join(assetDir, 'tiny.svg');
