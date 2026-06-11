@@ -454,5 +454,5 @@
 		font-size: 0.78rem;
 	}
 
-	.wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; }
+	.wrap { flex: 1; min-height: 0; overflow: hidden; padding: 10px; }
 </style>

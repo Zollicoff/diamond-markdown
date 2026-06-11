@@ -10,13 +10,13 @@
 </script>
 
 <script lang="ts">
-	import FileTree from './FileTree.svelte';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		nodes: TreeNode[];
 		vaultId: string;
 		activePath?: string | null;
-		/** Controlled expand set — the parent owns the source of truth so
+		/** Controlled expand set - the parent owns the source of truth so
 		 *  toolbar actions (expand-all / collapse-all / auto-reveal) can
 		 *  drive it. Pair with onToggleDir to handle user clicks. */
 		expanded?: Set<string>;
@@ -29,6 +29,15 @@
 		onRenameCommit?: (node: TreeNode, newName: string) => void;
 		onRenameCancel?: () => void;
 		onFileClick?: (e: MouseEvent, node: TreeNode) => void;
+	}
+
+	interface FlatRow {
+		node: TreeNode;
+		depth: number;
+	}
+
+	interface VisibleRow extends FlatRow {
+		index: number;
 	}
 
 	let {
@@ -46,9 +55,39 @@
 		onFileClick
 	}: Props = $props();
 
-	const expand = $derived(expanded);
+	const ROW_HEIGHT = 26;
+	const OVERSCAN = 12;
+	const DEFAULT_VIEWPORT_HEIGHT = 520;
+
 	let dragOverPath = $state<string | null>(null);
 	let rootDragOver = $state(false);
+	let scrollTop = $state(0);
+	let viewportHeight = $state(0);
+	let viewportEl = $state<HTMLDivElement | null>(null);
+
+	const expand = $derived(expanded);
+	const flatRows = $derived(flattenVisible(nodes, expand));
+	const totalHeight = $derived(flatRows.length * ROW_HEIGHT);
+	const measuredHeight = $derived(viewportHeight || DEFAULT_VIEWPORT_HEIGHT);
+	const startIndex = $derived(Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN));
+	const visibleCount = $derived(Math.ceil(measuredHeight / ROW_HEIGHT) + OVERSCAN * 2);
+	const endIndex = $derived(Math.min(flatRows.length, startIndex + visibleCount));
+	const visibleRows = $derived(
+		flatRows.slice(startIndex, endIndex).map((row, offset): VisibleRow => ({
+			...row,
+			index: startIndex + offset
+		}))
+	);
+
+	function flattenVisible(items: TreeNode[], opened: Set<string>, depth = 0, out: FlatRow[] = []): FlatRow[] {
+		for (const node of items) {
+			out.push({ node, depth });
+			if (node.type === 'directory' && opened.has(node.path) && node.children?.length) {
+				flattenVisible(node.children, opened, depth + 1, out);
+			}
+		}
+		return out;
+	}
 
 	function focusOnMount(node: HTMLInputElement): void {
 		requestAnimationFrame(() => {
@@ -75,7 +114,7 @@
 	function handleDragOver(e: DragEvent, destNode: TreeNode): void {
 		if (destNode.type !== 'directory') return;
 		const src = e.dataTransfer?.getData('application/x-diamond-path');
-		if (src && isDescendant(src, destNode.path)) return; // can't drop into self/descendant
+		if (src && isDescendant(src, destNode.path)) return;
 		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 		dragOverPath = destNode.path;
@@ -92,16 +131,36 @@
 		const src = e.dataTransfer?.getData('application/x-diamond-path');
 		if (!src) return;
 		if (isDescendant(src, destNode.path)) return;
-		// Already in this folder? no-op.
 		const srcParent = src.split('/').slice(0, -1).join('/');
 		if (srcParent === destNode.path) return;
 		onDropMove?.(src, destNode.path);
+	}
+
+	function handleRootDragOver(e: DragEvent): void {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		rootDragOver = true;
+	}
+
+	function handleRootDrop(e: DragEvent): void {
+		rootDragOver = false;
+		const src = e.dataTransfer?.getData('application/x-diamond-path');
+		if (!src) return;
+		const srcParent = src.split('/').slice(0, -1).join('/');
+		if (srcParent === '') return;
+		onDropMove?.(src, '');
 	}
 
 	function handleContext(e: MouseEvent, node: TreeNode): void {
 		e.preventDefault();
 		e.stopPropagation();
 		onContext?.(e, node);
+	}
+
+	function handleRootContext(e: MouseEvent): void {
+		if ((e.target as HTMLElement).closest('.node')) return;
+		e.preventDefault();
+		onRootContext?.(e);
 	}
 
 	function renameKey(e: KeyboardEvent, node: TreeNode): void {
@@ -118,135 +177,143 @@
 	function initialRenameValue(node: TreeNode): string {
 		return node.type === 'file' ? node.name.replace(/\.md$/, '') : node.name;
 	}
+
+	function fileHref(node: TreeNode): string {
+		return `/vault/${vaultId}/note/${encodeURI(node.path)}`;
+	}
+
+	function rowStyle(row: VisibleRow): string {
+		return `--tree-depth: ${row.depth}; transform: translateY(${row.index * ROW_HEIGHT}px);`;
+	}
+
+	function updateViewportHeight(): void {
+		viewportHeight = viewportEl?.clientHeight ?? 0;
+	}
+
+	onMount(() => {
+		updateViewportHeight();
+		const ro = typeof ResizeObserver !== 'undefined' && viewportEl
+			? new ResizeObserver(updateViewportHeight)
+			: null;
+		if (ro && viewportEl) ro.observe(viewportEl);
+		return () => ro?.disconnect();
+	});
 </script>
 
-<ul
-	class="tree"
+<div
+	bind:this={viewportEl}
+	class="tree-viewport"
 	class:root-drag={rootDragOver}
-	ondragover={(e) => {
-		const src = e.dataTransfer?.getData('application/x-diamond-path');
-		if (!src || src.includes('/')) { /* only top-level drops accepted at root for now */ }
-		e.preventDefault();
-		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-		rootDragOver = true;
-	}}
+	role="presentation"
+	onscroll={(e) => (scrollTop = (e.currentTarget as HTMLDivElement).scrollTop)}
+	ondragover={handleRootDragOver}
 	ondragleave={() => (rootDragOver = false)}
-	ondrop={(e) => {
-		rootDragOver = false;
-		const src = e.dataTransfer?.getData('application/x-diamond-path');
-		if (!src) return;
-		// Drop at root = move to vault root
-		const srcParent = src.split('/').slice(0, -1).join('/');
-		if (srcParent === '') return; // already at root
-		onDropMove?.(src, '');
-	}}
-	oncontextmenu={(e) => {
-		// Ignore context fired from deeper nodes; those handle their own.
-		if ((e.target as HTMLElement).closest('.node')) return;
-		e.preventDefault();
-		onRootContext?.(e);
-	}}
+	ondrop={handleRootDrop}
+	oncontextmenu={handleRootContext}
 >
-	{#each nodes as n}
-		{#if n.type === 'directory'}
-			<li>
-				<div
-					class="node dir"
-					class:open={expand.has(n.path)}
-					class:drop-target={dragOverPath === n.path}
-					draggable={renamingPath !== n.path}
-					role="treeitem"
-					aria-expanded={expand.has(n.path)}
-					aria-selected={activePath === n.path}
-					tabindex="-1"
-					ondragstart={(e) => handleDragStart(e, n)}
-					ondragover={(e) => handleDragOver(e, n)}
-					ondragleave={() => handleDragLeave(n)}
-					ondrop={(e) => handleDrop(e, n)}
-					oncontextmenu={(e) => handleContext(e, n)}
-				>
-					<button class="dir-head" onclick={() => toggle(n.path)}>
-						<span class="chev">{expand.has(n.path) ? '▾' : '▸'}</span>
+	<ul class="tree" role="tree" style={`height: ${totalHeight}px;`}>
+		{#each visibleRows as row (row.node.path)}
+			{@const n = row.node}
+			<li class="tree-row" style={rowStyle(row)}>
+				{#if n.type === 'directory'}
+					<div
+						class="node dir"
+						class:open={expand.has(n.path)}
+						class:drop-target={dragOverPath === n.path}
+						draggable={renamingPath !== n.path}
+						role="treeitem"
+						aria-level={row.depth + 1}
+						aria-expanded={expand.has(n.path)}
+						aria-selected={activePath === n.path}
+						tabindex="-1"
+						ondragstart={(e) => handleDragStart(e, n)}
+						ondragover={(e) => handleDragOver(e, n)}
+						ondragleave={() => handleDragLeave(n)}
+						ondrop={(e) => handleDrop(e, n)}
+						oncontextmenu={(e) => handleContext(e, n)}
+					>
+						<button class="dir-head" onclick={() => toggle(n.path)}>
+							<span class="chev">{expand.has(n.path) ? '▾' : '▸'}</span>
+							{#if renamingPath === n.path}
+								<input
+									class="rename-input"
+									value={initialRenameValue(n)}
+									use:focusOnMount
+									onkeydown={(e) => renameKey(e, n)}
+									onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span class="name">{n.name}</span>
+							{/if}
+						</button>
+					</div>
+				{:else}
+					<div
+						class="node file"
+						class:active={activePath === n.path}
+						draggable={renamingPath !== n.path}
+						role="treeitem"
+						aria-level={row.depth + 1}
+						aria-selected={activePath === n.path}
+						tabindex="-1"
+						ondragstart={(e) => handleDragStart(e, n)}
+						oncontextmenu={(e) => handleContext(e, n)}
+					>
 						{#if renamingPath === n.path}
-							<input
-								class="rename-input"
-								value={initialRenameValue(n)}
-								use:focusOnMount
-								onkeydown={(e) => renameKey(e, n)}
-								onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
-								onclick={(e) => e.stopPropagation()}
-							/>
+							<div class="file-row">
+								<input
+									class="rename-input"
+									value={initialRenameValue(n)}
+									use:focusOnMount
+									onkeydown={(e) => renameKey(e, n)}
+									onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							</div>
 						{:else}
-							<span class="name">{n.name}</span>
+							<a
+								href={fileHref(n)}
+								class="file-link"
+								onclick={(e) => {
+									if (onFileClick) { e.preventDefault(); onFileClick(e, n); }
+								}}
+								onauxclick={(e) => {
+									if (e.button === 1 && onFileClick) { e.preventDefault(); onFileClick(e, n); }
+								}}
+							>
+								<span class="file-name">{n.name.replace(/\.md$/, '')}</span>
+							</a>
 						{/if}
-					</button>
-				</div>
-				{#if expand.has(n.path) && n.children && n.children.length > 0}
-					<div class="nested">
-						<FileTree
-							nodes={n.children}
-							{vaultId}
-							{activePath}
-							{expanded}
-							{renamingPath}
-							{onContext}
-							{onRootContext}
-							{onDropMove}
-							{onRenameCommit}
-							{onRenameCancel}
-							{onFileClick}
-						/>
 					</div>
 				{/if}
 			</li>
-		{:else}
-			<li>
-				<div
-					class="node file"
-					class:active={activePath === n.path}
-					draggable={renamingPath !== n.path}
-					role="treeitem"
-					aria-selected={activePath === n.path}
-					tabindex="-1"
-					ondragstart={(e) => handleDragStart(e, n)}
-					oncontextmenu={(e) => handleContext(e, n)}
-				>
-					{#if renamingPath === n.path}
-						<div class="file-row">
-							<input
-								class="rename-input"
-								value={initialRenameValue(n)}
-								use:focusOnMount
-								onkeydown={(e) => renameKey(e, n)}
-								onblur={(e) => onRenameCommit?.(n, (e.currentTarget as HTMLInputElement).value.trim())}
-								onclick={(e) => e.stopPropagation()}
-							/>
-						</div>
-					{:else}
-						<a
-							href={`/vault/${vaultId}/note/${encodeURI(n.path)}`}
-							class="file-link"
-							onclick={(e) => {
-								if (onFileClick) { e.preventDefault(); onFileClick(e, n); }
-							}}
-							onauxclick={(e) => {
-								if (e.button === 1 && onFileClick) { e.preventDefault(); onFileClick(e, n); }
-							}}
-						>
-							<span class="file-name">{n.name.replace(/\.md$/, '')}</span>
-						</a>
-					{/if}
-				</div>
-			</li>
-		{/if}
-	{/each}
-</ul>
+		{/each}
+	</ul>
+</div>
 
 <style>
-	.tree { list-style: none; padding: 0; margin: 0; min-height: 40px; border-radius: 6px; }
-	.tree.root-drag { outline: 2px dashed var(--accent); outline-offset: 2px; }
-	.tree li { margin: 0; }
-	.nested { padding-left: 14px; border-left: 1px solid var(--border); margin-left: 8px; }
+	.tree-viewport {
+		height: 100%;
+		min-height: 0;
+		overflow-y: auto;
+		border-radius: 6px;
+	}
+	.tree-viewport.root-drag { outline: 2px dashed var(--accent); outline-offset: -2px; }
+	.tree {
+		position: relative;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		min-height: 40px;
+		border-radius: 6px;
+	}
+	.tree-row {
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 26px;
+		margin: 0;
+	}
 
 	.node {
 		border-radius: 4px;
@@ -258,7 +325,8 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 3px 6px;
+		min-height: 26px;
+		padding: 3px 6px 3px calc(6px + var(--tree-depth) * 14px);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 4px;
@@ -272,14 +340,22 @@
 	.dir-head:hover, .file-link:hover { background: var(--bg-hover); }
 	.file.active .file-link { background: var(--bg-elev-2); color: var(--accent); border-color: var(--border); }
 
-	.chev { width: 10px; color: var(--fg-dim); font-size: 0.75rem; }
+	.chev {
+		width: 10px;
+		flex: none;
+		color: var(--fg-dim);
+		font-size: 0.75rem;
+	}
 	.dir .name { color: var(--fg-muted); }
 	.dir.open .name { color: var(--fg); }
 	.file-name { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-	.file-row { padding: 3px 6px 3px 22px; }
+	.file-row {
+		min-height: 26px;
+		padding: 3px 6px 3px calc(22px + var(--tree-depth) * 14px);
+	}
 	.rename-input {
-		flex: 1;
+		width: 100%;
 		background: var(--bg);
 		border: 1px solid var(--accent);
 		border-radius: 3px;
@@ -290,7 +366,6 @@
 	}
 	.rename-input:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
 
-	/* Drag image polish */
 	.node[draggable='true'] { cursor: grab; }
 	.node[draggable='true']:active { cursor: grabbing; }
 </style>

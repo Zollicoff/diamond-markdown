@@ -115,6 +115,35 @@ test('sort menu in file-tree toolbar layers above the editor', async ({ page }) 
 	await expect(menu).toBeHidden();
 });
 
+test('file tree virtualizes large vaults while preserving scroll access', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'large-tree-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	for (let i = 0; i < 600; i += 1) {
+		fs.writeFileSync(path.join(vaultDir, `Note ${String(i).padStart(4, '0')}.md`), `# Note ${i}\n`);
+	}
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Large Tree Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	const renderedAtTop = await page.locator('.tree .file-link').count();
+	expect(renderedAtTop).toBeGreaterThan(0);
+	expect(renderedAtTop).toBeLessThan(80);
+
+	await page.locator('.tree-viewport').evaluate((el) => {
+		el.scrollTop = el.scrollHeight;
+		el.dispatchEvent(new Event('scroll'));
+	});
+	await expect(page.locator('.tree .file-link').filter({ hasText: 'Note 0599' })).toBeVisible();
+	await page.locator('.tree .file-link').filter({ hasText: 'Note 0599' }).click();
+	await expect(page.getByLabel('Editor pane').getByText('Note 599')).toBeVisible();
+});
+
 test('wikilinks render as just the link text, not [Note]', async ({ page }) => {
 	await openVault(page);
 	// Features Overview has real wikilinks at line 8 — comfortably inside

@@ -178,6 +178,18 @@ Do not raise Vite's chunk-size warning to hide these. Prefer additional dynamic
 imports or dependency replacement if these lazy chunks become user-visible
 latency.
 
+## File tree rendering
+
+`FileTree.svelte` flattens the expanded tree into visible rows and renders only
+the viewport window plus overscan. The parent sidebar still owns sorting,
+expanded folders, auto-reveal, context menus, drag/drop, rename state, and note
+open behavior; the tree renderer is responsible only for windowing and row UI.
+
+This keeps large vaults from mounting every expanded node at once while
+preserving normal Obsidian-style sidebar behavior. The e2e suite includes a
+600-note vault check that verifies the mounted `.file-link` count stays bounded
+and the last note remains reachable by scrolling.
+
 ## Offline / PWA
 
 `src/service-worker.ts` is deliberately conservative. It precaches the app
