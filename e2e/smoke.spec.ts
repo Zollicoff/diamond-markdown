@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 
 // Fixture is built once by playwright.config.ts before the webServer starts.
 
@@ -15,6 +15,42 @@ async function openFirstNote(page: Page): Promise<void> {
 	await fileLink.click();
 	// Editor mounts when a note tab activates.
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+}
+
+async function swipe(locator: Locator, direction: 'left' | 'right'): Promise<void> {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error('Cannot swipe an invisible target');
+	const y = box.y + box.height / 2;
+	const startX = direction === 'left' ? box.x + box.width * 0.78 : box.x + box.width * 0.22;
+	const endX = direction === 'left' ? box.x + box.width * 0.22 : box.x + box.width * 0.78;
+	await locator.evaluate((el, gesture) => {
+		const common: PointerEventInit = {
+			pointerId: 99,
+			pointerType: 'touch',
+			isPrimary: true,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		};
+		el.dispatchEvent(new PointerEvent('pointerdown', {
+			...common,
+			clientX: gesture.startX,
+			clientY: gesture.y,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointermove', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.y,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointerup', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.y,
+			buttons: 0
+		}));
+	}, { startX, endX, y });
 }
 
 test('app boots and lists vaults on the picker', async ({ page }) => {
@@ -45,6 +81,58 @@ test('graph tab opens beside the active note (does not replace)', async ({ page 
 	await expect(page.locator('text=/\\d+ nodes? · \\d+ edges?/').first()).toBeVisible({ timeout: 5_000 });
 	const tabsAfter = await workspaceTabs.count();
 	expect(tabsAfter).toBeGreaterThan(tabsBefore);
+});
+
+test('touch swipes switch workspace tabs and panes', async ({ page }) => {
+	await page.goto('/');
+	await page.evaluate(() => {
+		localStorage.setItem('diamond.workspace.default', JSON.stringify({
+			panes: {
+				p1: {
+					id: 'p1',
+					tabs: [
+						{ id: 'note:Getting Started.md', kind: 'note', path: 'Getting Started.md', title: 'Getting Started' },
+						{ id: 'graph', kind: 'graph', title: 'Graph' }
+					],
+					activeTabId: 'note:Getting Started.md'
+				},
+				p2: {
+					id: 'p2',
+					tabs: [
+						{ id: 'note:Wikilinks.md', kind: 'note', path: 'Wikilinks.md', title: 'Wikilinks' }
+					],
+					activeTabId: 'note:Wikilinks.md'
+				}
+			},
+			layout: {
+				kind: 'split',
+				direction: 'row',
+				children: [{ kind: 'pane', paneId: 'p1' }, { kind: 'pane', paneId: 'p2' }],
+				sizes: [1, 1]
+			},
+			activePaneId: 'p1',
+			leftSidebarCollapsed: true,
+			rightSidebarCollapsed: true,
+			leftPanelId: 'files',
+			rightPanelId: 'backlinks'
+		}));
+	});
+	await page.goto('/vault/default');
+
+	const activeTabTitle = page.locator('.pane.active .tab.active .tab-title');
+	await expect(activeTabTitle).toHaveText('Getting Started');
+
+	await swipe(page.locator('.pane.active'), 'left');
+	await expect(activeTabTitle).toHaveText('Graph');
+
+	await swipe(page.locator('.pane.active'), 'left');
+	await expect(activeTabTitle).toHaveText('Wikilinks');
+
+	await swipe(page.locator('.pane.active'), 'right');
+	await expect(activeTabTitle).toHaveText('Graph');
+
+	await swipe(page.locator('.pane.active'), 'right');
+	await expect(activeTabTitle).toHaveText('Getting Started');
 });
 
 test('settings tab opens with theme + vault info', async ({ page }) => {

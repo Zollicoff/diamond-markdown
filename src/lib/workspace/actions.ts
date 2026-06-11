@@ -7,7 +7,7 @@
  */
 
 import type { Tab, Pane, LayoutNode, NoteTab, OpenMode } from './types';
-import { workspace, persist } from './store.svelte';
+import { workspace, persist, panesInLayoutOrder } from './store.svelte';
 import { on } from '$lib/events';
 
 function randId(prefix = 'p'): string {
@@ -41,6 +41,39 @@ export function activateTab(vaultId: string, paneId: string, tabId: string): voi
 	pane.activeTabId = tabId;
 	workspace.activePaneId = paneId;
 	persist(vaultId);
+}
+
+export function activateAdjacentTabOrPane(
+	vaultId: string,
+	paneId: string,
+	direction: 'previous' | 'next'
+): 'tab' | 'pane' | 'none' {
+	const pane = paneById(paneId);
+	if (!pane) return 'none';
+
+	const activeIdx = pane.tabs.findIndex((t) => t.id === pane.activeTabId);
+	const currentIdx = activeIdx >= 0 ? activeIdx : direction === 'next' ? -1 : pane.tabs.length;
+	const tabIdx = direction === 'next' ? currentIdx + 1 : currentIdx - 1;
+	const tab = pane.tabs[tabIdx];
+	if (tab) {
+		pane.activeTabId = tab.id;
+		workspace.activePaneId = pane.id;
+		persist(vaultId);
+		return 'tab';
+	}
+
+	const panes = panesInLayoutOrder();
+	const paneIdx = panes.findIndex((p) => p.id === pane.id);
+	if (paneIdx < 0) return 'none';
+	const targetPane = panes[direction === 'next' ? paneIdx + 1 : paneIdx - 1];
+	if (!targetPane) return 'none';
+
+	workspace.activePaneId = targetPane.id;
+	if (!targetPane.activeTabId && targetPane.tabs.length > 0) {
+		targetPane.activeTabId = targetPane.tabs[0].id;
+	}
+	persist(vaultId);
+	return 'pane';
 }
 
 /** Produce a stable id for a tab. For notes, we use the path — so the

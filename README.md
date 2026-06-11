@@ -84,6 +84,7 @@ Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
 
 ### Workspace
 - Tabs + split panes (recursive layout tree)
+- Touch swipes switch adjacent tabs first, then adjacent panes at tab boundaries
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, rename / move / delete, drag-drop
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
