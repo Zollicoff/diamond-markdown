@@ -20,6 +20,7 @@
 	const canFetch = $derived(!!status?.remoteUrl && !isBusy);
 	const canPull = $derived(!!status?.canPull && !isBusy);
 	const canPush = $derived(!!status?.canPush && !isBusy);
+	const hasDiverged = $derived(!!status?.diverged);
 
 	function applyStatus(next: GitSyncStatus): void {
 		status = next;
@@ -130,6 +131,38 @@
 		</ul>
 	{/if}
 
+	{#if hasDiverged && status}
+		<div class="diverged-panel">
+			<div class="diverged-head">
+				<div>
+					<div class="panel-title">Diverged history</div>
+					<div class="panel-subtitle">
+						Manual merge required between {status.sha ?? 'local'} and {status.remoteSha ?? status.remoteBranch ?? 'remote'}.
+					</div>
+				</div>
+				<span class="badge">Blocked</span>
+			</div>
+			<p>
+				Diamond will not auto-merge vault files. Resolve the git history outside the app, then refresh sync status.
+			</p>
+
+			<div class="change-grid">
+				<div class="change-box local">
+					<h3>Local only</h3>
+					{@render fileList(status.localChanges, 'No local file changes reported.')}
+				</div>
+				<div class="change-box remote">
+					<h3>Remote only</h3>
+					{@render fileList(status.remoteChanges, 'No remote file changes reported.')}
+				</div>
+				<div class="change-box overlap" class:hot={status.conflictCandidates.length > 0}>
+					<h3>Overlapping files</h3>
+					{@render fileList(status.conflictCandidates, 'No same-path overlap detected.')}
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if message}
 		<div class="ok-msg">{message}</div>
 	{/if}
@@ -137,6 +170,18 @@
 		<div class="err">{error}</div>
 	{/if}
 </section>
+
+{#snippet fileList(files: string[], empty: string)}
+	{#if files.length > 0}
+		<ul class="change-list">
+			{#each files as file (file)}
+				<li class="mono" title={file}>{file}</li>
+			{/each}
+		</ul>
+	{:else}
+		<div class="empty">{empty}</div>
+	{/if}
+{/snippet}
 
 <style>
 	.group {
@@ -293,6 +338,85 @@
 	.ok-msg { color: var(--success); }
 	.err { color: var(--danger); }
 	.mono { font-family: var(--mono); }
+	.diverged-panel {
+		margin-top: 12px;
+		padding: 12px;
+		border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+		border-radius: 7px;
+		background: var(--bg);
+	}
+	.diverged-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.panel-title {
+		font-size: 0.9rem;
+		font-weight: 700;
+		color: var(--fg);
+	}
+	.panel-subtitle {
+		font-size: 0.72rem;
+		color: var(--fg-dim);
+		margin-top: 2px;
+	}
+	.badge {
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		color: var(--accent);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		padding: 3px 7px;
+	}
+	.diverged-panel p {
+		color: var(--fg-muted);
+		font-size: 0.8rem;
+		line-height: 1.45;
+		margin: 10px 0;
+	}
+	.change-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 8px;
+	}
+	.change-box {
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 8px;
+		background: var(--bg-elev);
+	}
+	.change-box.hot {
+		border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+	}
+	.change-box h3 {
+		margin: 0 0 6px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--fg-muted);
+	}
+	.change-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		gap: 3px;
+	}
+	.change-list li {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.72rem;
+		color: var(--fg);
+	}
+	.empty {
+		color: var(--fg-dim);
+		font-size: 0.72rem;
+	}
 
 	@media (max-width: 760px) {
 		.row,
@@ -309,6 +433,9 @@
 		.actions,
 		.status-counts {
 			justify-content: flex-start;
+		}
+		.change-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>

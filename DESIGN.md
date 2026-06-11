@@ -150,7 +150,9 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
 - Fetch updates remote refs without changing local files.
 - Pull is fast-forward only and requires a clean worktree.
 - Push requires a clean worktree and refuses when the remote is ahead.
-- Diverged histories are reported as a manual-merge state; the app does not create merge commits automatically.
+- Diverged histories are reported as a manual-merge state with local-only,
+  remote-only, and overlapping changed-file lists computed from the merge base.
+  The app does not create merge commits automatically.
 
 This keeps the browser UI safe for normal Obsidian-style sync without hiding
 Git's real conflict model.

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
@@ -12,6 +13,10 @@ import { FIXTURE_PATHS } from './setup-fixture';
 async function openVault(page: Page): Promise<void> {
 	await page.goto('/vault/default');
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+}
+
+function git(cwd: string, args: string[]): string {
+	return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
 }
 
 test('indexer writes a config-scoped warm cache and refreshes it on note save', async ({ request }) => {
@@ -175,6 +180,78 @@ test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	});
 	expect(res.status()).toBe(409);
 	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
+});
+
+test('sync status surfaces diverged histories with overlapping file candidates', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'diverged-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'diverged-origin.git');
+	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'diverged-remote-worktree');
+	for (const dir of [vaultDir, bareDir, cloneDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Shared.md'), '# Shared\n\nBase.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Sync Divergence Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	const branch = git(vaultDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+	git(vaultDir, ['push', '-u', 'origin', branch]);
+	execFileSync('git', ['--git-dir', bareDir, 'symbolic-ref', 'HEAD', `refs/heads/${branch}`]);
+
+	fs.writeFileSync(path.join(vaultDir, 'Shared.md'), '# Shared\n\nLocal edit.\n');
+	fs.writeFileSync(path.join(vaultDir, 'LocalOnly.md'), '# Local only\n');
+	git(vaultDir, ['add', 'Shared.md', 'LocalOnly.md']);
+	git(vaultDir, ['commit', '-m', 'local: edit shared']);
+
+	execFileSync('git', ['clone', '--branch', branch, bareDir, cloneDir], { stdio: 'ignore' });
+	git(cloneDir, ['config', 'user.email', 'remote@example.test']);
+	git(cloneDir, ['config', 'user.name', 'Remote Test']);
+	fs.writeFileSync(path.join(cloneDir, 'Shared.md'), '# Shared\n\nRemote edit.\n');
+	fs.writeFileSync(path.join(cloneDir, 'RemoteOnly.md'), '# Remote only\n');
+	git(cloneDir, ['add', 'Shared.md', 'RemoteOnly.md']);
+	git(cloneDir, ['commit', '-m', 'remote: edit shared']);
+	git(cloneDir, ['push', 'origin', branch]);
+
+	const fetched = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'fetch' } });
+	expect(fetched.ok()).toBe(true);
+	const statusRes = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(statusRes.ok()).toBe(true);
+	const status = await statusRes.json() as {
+		diverged: boolean;
+		ahead: number;
+		behind: number;
+		canPull: boolean;
+		canPush: boolean;
+		localChanges: string[];
+		remoteChanges: string[];
+		conflictCandidates: string[];
+		message: string;
+	};
+	expect(status.diverged).toBe(true);
+	expect(status.ahead).toBe(1);
+	expect(status.behind).toBe(1);
+	expect(status.canPull).toBe(false);
+	expect(status.canPush).toBe(false);
+	expect(status.localChanges).toEqual(['LocalOnly.md']);
+	expect(status.remoteChanges).toEqual(['RemoteOnly.md']);
+	expect(status.conflictCandidates).toEqual(['Shared.md']);
+	expect(status.message).toContain('overlapping file');
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Settings').click();
+	await expect(page.getByText('Diverged history')).toBeVisible();
+	await expect(page.getByText('Overlapping files')).toBeVisible();
+	await expect(page.locator('.change-box.local').getByText('LocalOnly.md')).toBeVisible();
+	await expect(page.locator('.change-box.remote').getByText('RemoteOnly.md')).toBeVisible();
+	await expect(page.locator('.change-box.overlap').getByText('Shared.md')).toBeVisible();
 });
 
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {

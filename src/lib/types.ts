@@ -84,11 +84,17 @@ export interface GitSyncStatus {
 	remoteDisplayUrl: string | null;
 	upstream: string | null;
 	remoteBranch: string | null;
+	remoteSha: string | null;
 	clean: boolean;
 	conflicted: string[];
 	files: GitFileStatus[];
 	ahead: number;
 	behind: number;
+	diverged: boolean;
+	mergeBase: string | null;
+	localChanges: string[];
+	remoteChanges: string[];
+	conflictCandidates: string[];
 	canPull: boolean;
 	canPush: boolean;
 	needsRemote: boolean;

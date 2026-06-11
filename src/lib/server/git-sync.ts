@@ -43,6 +43,26 @@ function parseAheadBehind(raw: string | null): { ahead: number; behind: number }
 	};
 }
 
+function parsePathList(raw: string | null): string[] {
+	if (!raw) return [];
+	return raw.split('\n').map((line) => line.trim()).filter(Boolean).sort();
+}
+
+async function changedSince(g: SimpleGit, from: string | null, to: string): Promise<string[]> {
+	if (!from) return [];
+	return parsePathList(await rawOrNull(g, ['diff', '--name-only', `${from}..${to}`]));
+}
+
+function intersection(a: string[], b: string[]): string[] {
+	const set = new Set(a);
+	return b.filter((item) => set.has(item)).sort();
+}
+
+function difference(a: string[], b: string[]): string[] {
+	const set = new Set(b);
+	return a.filter((item) => !set.has(item)).sort();
+}
+
 export function validateGitHubRemoteUrl(remoteUrl: string): string {
 	const cleaned = remoteUrl.trim();
 	if (!cleaned) throw new Error('remote URL required');
@@ -90,7 +110,10 @@ function statusMessage(status: GitSyncStatus): string {
 	if (status.needsRemote) return 'Add a GitHub remote to enable sync.';
 	if (status.conflicted.length > 0) return 'Resolve merge conflicts before syncing.';
 	if (!status.clean) return 'Commit or discard local vault changes before syncing.';
-	if (status.ahead > 0 && status.behind > 0) return 'Local and remote histories diverged; manual merge required.';
+	if (status.diverged && status.conflictCandidates.length > 0) {
+		return `Local and remote histories diverged; ${status.conflictCandidates.length} overlapping file${status.conflictCandidates.length === 1 ? '' : 's'} need manual resolution.`;
+	}
+	if (status.diverged) return 'Local and remote histories diverged; manual merge required.';
 	if (status.behind > 0) return `${status.behind} remote commit${status.behind === 1 ? '' : 's'} ready to pull.`;
 	if (status.ahead > 0) return `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ready to push.`;
 	return 'Vault is clean and up to date with the last fetched remote state.';
@@ -104,21 +127,35 @@ export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
 	const remoteUrl = await originRemote(g);
 	const upstream = await rawOrNull(g, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
 	let remoteBranch: string | null = null;
+	let remoteSha: string | null = null;
 	let ahead = status.ahead ?? 0;
 	let behind = status.behind ?? 0;
+	let mergeBase: string | null = null;
+	let localChangedPaths: string[] = [];
+	let remoteChangedPaths: string[] = [];
 
 	if (remoteUrl && branch) {
 		const candidate = `origin/${branch}`;
 		if (await hasRef(g, `refs/remotes/${candidate}`)) {
 			remoteBranch = candidate;
+			remoteSha = await rawOrNull(g, ['rev-parse', '--short', candidate]);
 			({ ahead, behind } = parseAheadBehind(await rawOrNull(g, ['rev-list', '--left-right', '--count', `HEAD...${candidate}`])));
+			if (ahead > 0 && behind > 0) {
+				mergeBase = await rawOrNull(g, ['merge-base', 'HEAD', candidate]);
+				localChangedPaths = await changedSince(g, mergeBase, 'HEAD');
+				remoteChangedPaths = await changedSince(g, mergeBase, candidate);
+			}
 		}
 	}
 
 	const clean = status.isClean();
 	const conflicted = status.conflicted ?? [];
 	const needsRemote = !remoteUrl;
-	const blocked = conflicted.length > 0 || !clean || (ahead > 0 && behind > 0);
+	const diverged = ahead > 0 && behind > 0;
+	const conflictCandidates = intersection(localChangedPaths, remoteChangedPaths);
+	const localChanges = difference(localChangedPaths, conflictCandidates);
+	const remoteChanges = difference(remoteChangedPaths, conflictCandidates);
+	const blocked = conflicted.length > 0 || !clean || diverged;
 	const syncStatus: GitSyncStatus = {
 		initialized: true,
 		branch,
@@ -127,6 +164,7 @@ export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
 		remoteDisplayUrl: redactRemoteUrl(remoteUrl),
 		upstream,
 		remoteBranch,
+		remoteSha,
 		clean,
 		conflicted,
 		files: status.files.map((file) => ({
@@ -136,6 +174,11 @@ export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
 		})),
 		ahead,
 		behind,
+		diverged,
+		mergeBase,
+		localChanges,
+		remoteChanges,
+		conflictCandidates,
 		canPull: !!remoteUrl && !!branch && !blocked && behind > 0,
 		canPush: !!remoteUrl && !!branch && !blocked && behind === 0,
 		needsRemote
