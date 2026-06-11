@@ -75,7 +75,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.5 — Plugins & desktop
 
-- [ ] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
+- [x] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
 - [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
 - [ ] Plugin registry page (load plugins from URL, not just disk)

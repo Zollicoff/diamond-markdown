@@ -202,6 +202,23 @@ The Svelte graph view does not own the approximation choice. It passes the same
 force settings to `simulateStep`, so settings, dragging, filters, pan/zoom, and
 note-opening behavior stay independent of the physics backend.
 
+## Plugin runtime
+
+Vault-local plugins live under `.diamondmd/plugins/<plugin-id>/`. Server-side
+discovery in `src/lib/server/plugins.ts` reads `plugin.json` manifests and only
+serves the declared ESM entry module for each valid plugin. The file tree and
+indexer already skip hidden dot folders, so plugin implementation files do not
+appear as notes.
+
+Client boot calls `loadVaultPlugins(vaultId)` after built-in commands are
+registered. Plugin modules export `activate(api)` and can register command
+palette actions through a small API. Runtime command ids are scoped as
+`plugin:<plugin-id>:<command-id>` so plugins cannot overwrite built-in command
+ids accidentally.
+
+Current plugins execute as trusted browser ESM. Sandboxed iframe/Worker execution
+remains a v0.5 requirement before untrusted third-party plugins are safe.
+
 ## Offline / PWA
 
 `src/service-worker.ts` is deliberately conservative. It precaches the app

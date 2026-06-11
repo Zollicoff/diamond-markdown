@@ -102,6 +102,65 @@ test('new note command uses an in-app name dialog', async ({ page, request }) =>
 	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`).catch(() => undefined);
 });
 
+test('vault plugins are discovered and register boot commands', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-vault');
+	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'boot-test');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(pluginDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({
+		id: 'boot-test',
+		name: 'Boot Test Plugin',
+		version: '0.1.0',
+		description: 'Registers a command during vault boot.',
+		entry: 'main.js',
+		commands: [{ id: 'mark-booted', title: 'Plugin Boot Test', category: 'plugin' }]
+	}, null, 2));
+	fs.writeFileSync(path.join(pluginDir, 'main.js'), `
+export function activate(api) {
+  window.__diamondPluginActivated = api.pluginId;
+  api.registerCommand({
+    id: 'mark-booted',
+    title: 'Plugin Boot Test',
+    icon: '◆',
+    category: 'plugin',
+    exec() {
+      window.__diamondPluginRan = api.vaultId;
+    }
+  });
+}
+`);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Plugin Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const listed = await request.get(`/api/vaults/${vault.id}/plugins`);
+	expect(listed.ok()).toBe(true);
+	const listBody = await listed.json() as { plugins: { id: string; name: string; commands: { title: string }[] }[] };
+	expect(listBody.plugins[0]?.id).toBe('boot-test');
+	expect(listBody.plugins[0]?.commands[0]?.title).toBe('Plugin Boot Test');
+
+	const moduleRes = await request.get(`/api/vaults/${vault.id}/plugins/boot-test/module`);
+	expect(moduleRes.ok()).toBe(true);
+	expect(moduleRes.headers()['content-type']).toContain('application/javascript');
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginActivated)).toBe('boot-test');
+
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Plugin Boot Test');
+	await page.getByRole('button', { name: /Plugin Boot Test/ }).click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginRan)).toBe(vault.id);
+
+	await page.getByLabel('Settings').click();
+	await expect(page.getByText('Boot Test Plugin')).toBeVisible();
+	await expect(page.getByText('Plugin Boot Test')).toBeVisible();
+});
+
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.toolbar-btn.sort').click();

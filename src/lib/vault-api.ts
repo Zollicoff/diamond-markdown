@@ -8,6 +8,7 @@
  */
 
 import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode } from './types';
+import type { PluginListResponse } from './plugins/types';
 import { emit } from './events';
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -211,5 +212,9 @@ export const api = {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ action: 'push' })
 		});
+	},
+
+	async plugins(vaultId: string): Promise<PluginListResponse> {
+		return json(`/api/vaults/${vaultId}/plugins`);
 	}
 };

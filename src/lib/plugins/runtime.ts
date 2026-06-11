@@ -1,0 +1,117 @@
+import { register, unregister, type CommandContext, type CommandDef } from '$lib/commands';
+import { api as vaultApi } from '$lib/vault-api';
+import type { PluginDescriptor } from './types';
+
+export interface PluginCommandDef {
+	id: string;
+	title: string;
+	icon?: string;
+	shortcut?: string;
+	category?: string;
+	when?: (ctx: CommandContext) => boolean;
+	exec: (ctx: CommandContext) => void | Promise<void>;
+}
+
+export interface PluginApi {
+	vaultId: string;
+	pluginId: string;
+	registerCommand: (command: PluginCommandDef) => void;
+	notify: (message: string) => void;
+}
+
+export interface PluginModule {
+	activate?: (api: PluginApi) => void | (() => void) | Promise<void | (() => void)>;
+	default?: (api: PluginApi) => void | (() => void) | Promise<void | (() => void)>;
+}
+
+export interface PluginLoadResult {
+	plugin: PluginDescriptor;
+	loaded: boolean;
+	error?: string;
+}
+
+export interface PluginRuntime {
+	results: PluginLoadResult[];
+	dispose: () => void;
+}
+
+const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+
+function scopedCommandId(pluginId: string, commandId: string): string {
+	return `plugin:${pluginId}:${commandId}`;
+}
+
+function isCommandId(value: string): boolean {
+	return ID_RE.test(value);
+}
+
+export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> {
+	const registered = new Set<string>();
+	const disposers: (() => void)[] = [];
+	const results: PluginLoadResult[] = [];
+	const { plugins } = await vaultApi.plugins(vaultId);
+
+	for (const plugin of plugins) {
+		if (!plugin.enabled) {
+			results.push({ plugin, loaded: false, error: plugin.error ?? 'plugin disabled' });
+			continue;
+		}
+
+		try {
+			const module = await import(/* @vite-ignore */ `${plugin.moduleUrl}?v=${encodeURIComponent(plugin.version)}`) as PluginModule;
+			const activate = module.activate ?? module.default;
+			if (typeof activate !== 'function') {
+				results.push({ plugin, loaded: false, error: 'plugin module must export activate(api)' });
+				continue;
+			}
+
+			const pluginApi: PluginApi = {
+				vaultId,
+				pluginId: plugin.id,
+				registerCommand(command) {
+					if (!isCommandId(command.id)) throw new Error(`invalid command id: ${command.id}`);
+					const id = scopedCommandId(plugin.id, command.id);
+					const wrapped: CommandDef = {
+						id,
+						title: command.title,
+						icon: command.icon,
+						shortcut: command.shortcut,
+						category: command.category ?? `plugin:${plugin.id}`,
+						when: command.when,
+						async exec(ctx) {
+							try {
+								await command.exec({ ...ctx, vaultId, pluginId: plugin.id });
+							} catch (e) {
+								console.error(`[plugin:${plugin.id}] command failed:`, e);
+								alert(`Plugin command failed: ${(e as Error).message}`);
+							}
+						}
+					};
+					register(wrapped);
+					registered.add(id);
+				},
+				notify(message) {
+					console.info(`[plugin:${plugin.id}] ${message}`);
+				}
+			};
+
+			const dispose = await activate(pluginApi);
+			if (typeof dispose === 'function') disposers.push(dispose);
+			results.push({ plugin, loaded: true });
+		} catch (e) {
+			console.error(`[plugin:${plugin.id}] failed to load:`, e);
+			results.push({ plugin, loaded: false, error: (e as Error).message });
+		}
+	}
+
+	return {
+		results,
+		dispose() {
+			for (const dispose of disposers.splice(0)) {
+				try { dispose(); } catch (e) { console.error('[plugins] disposer failed:', e); }
+			}
+			for (const id of registered) unregister(id);
+			registered.clear();
+		}
+	};
+}

@@ -44,6 +44,7 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 
 Production deployment guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
 Release verification lives in [docs/release-checklist.md](./docs/release-checklist.md).
+Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
 
 ## Concepts
 
@@ -130,6 +131,11 @@ Release verification lives in [docs/release-checklist.md](./docs/release-checkli
 - Service worker caches the app shell and immutable static assets. Vault APIs
   stay network/server-backed so note and git state do not go stale silently.
 
+### Plugins
+- Vault-local ESM plugins from `.diamondmd/plugins/<plugin-id>/`
+- Manifest discovery in Settings
+- Boot-time command registration for command-palette actions
+
 ## Roadmap
 
 See [ROADMAP.md](./ROADMAP.md) — summary:
@@ -151,6 +157,7 @@ Single SvelteKit app:
 - Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with clean-worktree, fast-forward, and divergence guards
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`
+- Plugin runtime (`src/lib/plugins/`) — vault-local manifests and ESM modules register scoped commands at vault boot
 - Typed event bus (`src/lib/events.ts`) — `note:saved`, `note:renamed`, etc. Decouples panes / panels / index.
 - No database — all state derives from the filesystem; the backlink/tag index is rebuilt on file-watcher events
 - [DESIGN.md](./DESIGN.md) has the details

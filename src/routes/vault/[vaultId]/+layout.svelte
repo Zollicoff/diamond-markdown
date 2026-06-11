@@ -18,6 +18,7 @@
 	import { installGlobalKeymap } from '$lib/commands/keymap';
 	import { on as onBus } from '$lib/events';
 	import { hydrate as hydrateBookmarks, rename as renameBookmark, deleted as deleteBookmark } from '$lib/bookmarks.svelte';
+	import { loadVaultPlugins } from '$lib/plugins/runtime';
 	import type { NoteDoc } from '$lib/types';
 	import type { TreeNode } from '$lib/types';
 
@@ -38,6 +39,10 @@
 		hydrateWorkspace(vaultId);
 		hydrateBookmarks(vaultId);
 		registerBuiltinCommands();
+		let disposePlugins: (() => void) | null = null;
+		void loadVaultPlugins(vaultId).then((runtime) => {
+			disposePlugins = runtime.dispose;
+		}).catch((e) => console.error('[plugins] boot failed:', e));
 
 		const offs = [
 			bindVaultEvents(vaultId),
@@ -75,7 +80,10 @@
 				};
 			})
 		];
-		return () => offs.forEach((off) => off?.());
+		return () => {
+			disposePlugins?.();
+			offs.forEach((off) => off?.());
+		};
 	});
 
 	function onDocLoaded(doc: NoteDoc): void {
