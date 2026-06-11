@@ -86,7 +86,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
   - [ ] Iframe-hosted settings/right-panel renderers
   - [ ] Capability proxy for file/editor APIs
 - [x] Plugin install UI (load plugins from manifest URL, not just disk)
-- [ ] Curated plugin registry/catalog
+- [x] Curated plugin registry/catalog
 - [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.

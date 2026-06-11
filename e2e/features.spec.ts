@@ -336,6 +336,42 @@ export function activate(api) {
 	}
 });
 
+test('plugin catalog installs curated worker plugins', async ({ page, request }) => {
+	const logs: string[] = [];
+	page.on('console', (msg) => logs.push(msg.text()));
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-catalog-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Plugin Catalog Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Settings').click();
+	await expect(page.getByRole('heading', { name: 'Plugin catalog' })).toBeVisible();
+	const card = page.locator('.catalog-card').filter({ hasText: 'scratchpad-helper' });
+	await expect(card.getByText(/Scratchpad Helper/)).toBeVisible();
+	await expect(card.locator('.plugin-state').getByText('Worker', { exact: true })).toBeVisible();
+	await card.getByRole('button', { name: 'Install Scratchpad Helper' }).click();
+
+	await expect(page.getByText('Installed Scratchpad Helper. Plugin runtime reload requested.')).toBeVisible();
+	await expect(card.getByRole('button', { name: 'Installed Scratchpad Helper' })).toBeDisabled();
+	await expect(page.locator('.plugin-card').filter({ hasText: 'scratchpad-helper' }).getByText(/Scratchpad Helper/)).toBeVisible();
+	expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'scratchpad-helper', 'plugin.json'))).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'scratchpad-helper', 'main.js'))).toBe(true);
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:scratchpad-helper] Scratchpad helper ready'))).toBe(true);
+
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Catalog Scratchpad Status');
+	await page.getByRole('button', { name: /Catalog Scratchpad Status/ }).click();
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:scratchpad-helper] Scratchpad helper sees no active note'))).toBe(true);
+});
+
 test('worker plugins register command logic without main-window access', async ({ page, request }) => {
 	const logs: string[] = [];
 	page.on('console', (msg) => logs.push(msg.text()));

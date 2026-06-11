@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/vault-api';
-	import type { PluginDescriptor } from '$lib/plugins/types';
+	import type { PluginCatalogItem, PluginDescriptor } from '$lib/plugins/types';
 
 	interface Props {
 		vaultId: string;
@@ -9,23 +9,33 @@
 
 	let { vaultId }: Props = $props();
 	let plugins = $state<PluginDescriptor[]>([]);
+	let catalog = $state<PluginCatalogItem[]>([]);
 	let loading = $state(true);
+	let catalogLoading = $state(true);
 	let error = $state<string | null>(null);
 	let installUrl = $state('');
 	let replaceExisting = $state(false);
 	let installing = $state(false);
+	let installingCatalogId = $state<string | null>(null);
 	let installMessage = $state<string | null>(null);
+	let installedIds = $derived(new Set(plugins.map((plugin) => plugin.id)));
 
 	async function load(): Promise<void> {
 		loading = true;
+		catalogLoading = true;
 		error = null;
 		try {
-			const res = await api.plugins(vaultId);
+			const [res, catalogRes] = await Promise.all([
+				api.plugins(vaultId),
+				api.pluginCatalog()
+			]);
 			plugins = res.plugins;
+			catalog = catalogRes.plugins;
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
 			loading = false;
+			catalogLoading = false;
 		}
 	}
 
@@ -49,6 +59,25 @@
 			error = (e as Error).message;
 		} finally {
 			installing = false;
+		}
+	}
+
+	async function installCatalogPlugin(plugin: PluginCatalogItem): Promise<void> {
+		if (installing) return;
+		installing = true;
+		installingCatalogId = plugin.id;
+		error = null;
+		installMessage = null;
+		try {
+			const res = await api.installCatalogPlugin(vaultId, plugin.id, replaceExisting);
+			plugins = res.plugins;
+			installMessage = `${res.message} Plugin runtime reload requested.`;
+			replaceExisting = false;
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			installing = false;
+			installingCatalogId = null;
 		}
 	}
 </script>
@@ -83,6 +112,66 @@
 			<div class="ok">{installMessage}</div>
 		{/if}
 	</form>
+
+	<div class="catalog">
+		<div class="section-head">
+			<h3>Plugin catalog</h3>
+			<span class="catalog-count">{catalog.length} curated</span>
+		</div>
+		{#if catalogLoading}
+			<div class="empty">Loading catalog…</div>
+		{:else if catalog.length === 0}
+			<div class="empty">No curated plugins are available.</div>
+		{:else}
+			<ul class="catalog-list">
+				{#each catalog as item (item.id)}
+					{@const installed = installedIds.has(item.id)}
+					{@const actionLabel = installed ? (replaceExisting ? 'Replace' : 'Installed') : 'Install'}
+					<li class="catalog-card">
+						<div class="plugin-head">
+							<div>
+								<div class="plugin-title">
+									{item.name}
+									<span class="plugin-version mono">{item.version}</span>
+								</div>
+								<div class="plugin-id mono">{item.id}</div>
+							</div>
+							<div class="plugin-badges">
+								<span class="plugin-state">{item.execution === 'worker' ? 'Worker' : 'Trusted'}</span>
+								{#if installed}
+									<span class="plugin-state">Installed</span>
+								{/if}
+							</div>
+						</div>
+						<p>{item.description}</p>
+						<div class="catalog-meta">
+							<div class="tag-row">
+								{#each item.tags as tag}
+									<span class="command-chip mono">{tag}</span>
+								{/each}
+							</div>
+							<button
+								type="button"
+								aria-label={`${actionLabel} ${item.name}`}
+								disabled={installing || (installed && !replaceExisting)}
+								onclick={() => void installCatalogPlugin(item)}
+							>
+								{#if installingCatalogId === item.id}
+									Installing...
+								{:else if installed && replaceExisting}
+									Replace
+								{:else if installed}
+									Installed
+								{:else}
+									Install
+								{/if}
+							</button>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</div>
 
 	{#if loading}
 		<div class="empty">Loading plugins…</div>
@@ -159,6 +248,22 @@
 		padding: 12px;
 		margin-bottom: 12px;
 	}
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 0 0 8px;
+	}
+	.section-head h3 {
+		margin: 0;
+		color: var(--fg);
+		font-size: 0.88rem;
+	}
+	.catalog-count {
+		color: var(--fg-dim);
+		font-size: 0.76rem;
+	}
 	.installer > label:first-child {
 		color: var(--fg);
 		font-size: 0.84rem;
@@ -193,6 +298,57 @@
 	}
 	.install-row button:disabled {
 		opacity: 0.45;
+		cursor: default;
+	}
+	.catalog {
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		background: color-mix(in srgb, var(--bg-elev) 58%, transparent);
+		padding: 12px;
+		margin-bottom: 12px;
+	}
+	.catalog-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.catalog-card {
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		background: var(--bg);
+		padding: 12px;
+	}
+	.catalog-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-top: 10px;
+	}
+	.tag-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+	}
+	.catalog-meta button {
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: var(--accent);
+		color: var(--bg);
+		font: inherit;
+		font-size: 0.78rem;
+		font-weight: 700;
+		padding: 6px 10px;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.catalog-meta button:disabled {
+		background: var(--bg-elev);
+		color: var(--fg-dim);
+		opacity: 0.7;
 		cursor: default;
 	}
 	.check {

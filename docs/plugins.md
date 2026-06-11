@@ -45,6 +45,15 @@ for development. Diamond rejects URL credentials, plugin id/folder mismatches,
 absolute entry paths, `..` escapes, query/hash entry paths, and overwrite
 attempts unless "replace existing" is checked.
 
+## Catalog
+
+Settings -> Plugins also includes a small curated catalog. Catalog entries are
+served from `/api/plugins/catalog` and installed by catalog id. Catalog installs
+reuse the same manifest parsing, replacement checks, and vault-local write path
+as manual URL installs. That means catalog plugins are copied into the vault
+under `.diamondmd/plugins/<plugin-id>/` and follow the same validation,
+replacement, and runtime reload behavior.
+
 ## Entry Module
 
 ```js

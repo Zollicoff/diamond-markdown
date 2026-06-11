@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pluginCatalogDefinition } from '$lib/plugins/catalog';
 import type { VaultRef } from '$lib/types';
 import type { PluginCommandManifest, PluginDescriptor, PluginExecutionMode, PluginManifest } from '$lib/plugins/types';
 
@@ -10,6 +11,11 @@ const MAX_ENTRY_BYTES = 1024 * 1024;
 
 export interface PluginInstallInput {
 	manifestUrl: string;
+	replace?: boolean;
+}
+
+export interface PluginCatalogInstallInput {
+	catalogId: string;
 	replace?: boolean;
 }
 
@@ -202,12 +208,15 @@ export async function installPluginFromUrl(vault: VaultRef, input: PluginInstall
 	const manifest = parseManifest(rawManifest, '');
 	const entryUrl = entryUrlFor(manifestUrl, manifest.entry);
 	const entryCode = await fetchText(entryUrl, MAX_ENTRY_BYTES, 'plugin entry');
+	return installPluginSource(vault, manifest, entryCode, input.replace === true);
+}
 
+function installPluginSource(vault: VaultRef, manifest: PluginManifest, entryCode: string, replace: boolean): PluginDescriptor {
 	const root = path.resolve(pluginRoot(vault));
 	const targetDir = path.resolve(root, manifest.id);
 	assertInsideRoot(root, targetDir);
 	if (fs.existsSync(targetDir)) {
-		if (!input.replace) throw new Error('plugin already installed; enable replace to overwrite');
+		if (!replace) throw new Error('plugin already installed; enable replace to overwrite');
 		fs.rmSync(targetDir, { recursive: true, force: true });
 	}
 
@@ -217,4 +226,14 @@ export async function installPluginFromUrl(vault: VaultRef, input: PluginInstall
 	fs.writeFileSync(path.join(targetDir, 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
 	fs.writeFileSync(entryPath, entryCode, 'utf-8');
 	return descriptorFromManifest(vault.id, manifest);
+}
+
+export function installPluginFromCatalog(vault: VaultRef, input: PluginCatalogInstallInput): PluginDescriptor {
+	const id = typeof input.catalogId === 'string' ? input.catalogId.trim() : '';
+	if (!ID_RE.test(id)) throw new Error('invalid catalog plugin id');
+	const plugin = pluginCatalogDefinition(id);
+	if (!plugin) throw new Error('catalog plugin not found');
+	const manifest = parseManifest(plugin.manifest, id);
+	if (manifest.id !== id) throw new Error('catalog plugin id mismatch');
+	return installPluginSource(vault, manifest, plugin.source, input.replace === true);
 }

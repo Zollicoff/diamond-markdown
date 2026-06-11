@@ -36,6 +36,22 @@ export interface PluginListResponse {
 	plugins: PluginDescriptor[];
 }
 
+export interface PluginCatalogItem {
+	id: string;
+	name: string;
+	version: string;
+	description: string;
+	author?: string;
+	execution: PluginExecutionMode;
+	tags: string[];
+	commands: PluginCommandManifest[];
+	manifestUrl: string;
+}
+
+export interface PluginCatalogResponse {
+	plugins: PluginCatalogItem[];
+}
+
 export interface PluginInstallResponse extends PluginListResponse {
 	plugin: PluginDescriptor;
 	message: string;

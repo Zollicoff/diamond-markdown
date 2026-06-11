@@ -217,6 +217,13 @@ the same origin and manifest directory, then writes the canonical manifest and
 entry into the vault-local plugin folder. Existing plugin ids are not overwritten
 unless the caller explicitly asks to replace them.
 
+The curated catalog is intentionally just another manifest source. Static
+catalog definitions live in `src/lib/plugins/catalog.ts`, `/api/plugins/catalog`
+lists them, and the Settings catalog buttons post a catalog id through
+`/api/vaults/[vaultId]/plugins`. Catalog installs reuse the same manifest
+parsing, replacement checks, and vault-local write path as manual URL installs,
+without fetching the app's own routes through loopback HTTP.
+
 Client boot calls `loadVaultPlugins(vaultId)` after built-in commands are
 registered. Plugin modules export `activate(api)` and can register command
 palette actions through a small API. Runtime command ids are scoped as
