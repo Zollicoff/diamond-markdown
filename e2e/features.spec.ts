@@ -107,6 +107,74 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	expect(updated.notes.map((n) => n.notePath)).toContain('Cache Added.md');
 });
 
+test('Obsidian import check reports vault readiness without changing files', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-import-vault');
+	const notePath = path.join(vaultDir, 'Notes', 'Home.md');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ legacyEditor: false }));
+	fs.writeFileSync(notePath, '# Home\n\nObsidian note with ![[roof.png]].\n');
+	fs.writeFileSync(path.join(vaultDir, 'Daily.md'), '# Daily\n\nLog.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Attachments', 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+	git(vaultDir, ['init']);
+	const before = fs.readFileSync(notePath, 'utf-8');
+
+	const checked = await request.post('/api/vaults/import-check', {
+		data: { path: vaultDir }
+	});
+	expect(checked.ok()).toBe(true);
+	const body = await checked.json() as {
+		path: string;
+		markdownFiles: number;
+		assetFiles: number;
+		obsidianConfig: boolean;
+		gitRepository: boolean;
+		likelyAttachmentFolders: string[];
+		recommendedExcludedFolders: string[];
+		checklist: { id: string; detail: string; level: string }[];
+		markdownExamples: string[];
+	};
+	expect(body.path).toBe(path.resolve(vaultDir));
+	expect(body.markdownFiles).toBe(2);
+	expect(body.assetFiles).toBe(1);
+	expect(body.obsidianConfig).toBe(true);
+	expect(body.gitRepository).toBe(true);
+	expect(body.likelyAttachmentFolders).toContain('Attachments');
+	expect(body.recommendedExcludedFolders).toContain('.obsidian');
+	expect(body.markdownExamples).toContain('Daily.md');
+	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
+	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
+	expect(fs.readFileSync(notePath, 'utf-8')).toBe(before);
+});
+
+test('home add vault form previews Obsidian import checklist', async ({ page }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-ui-import-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), '{}\n');
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n![[Attachments/roof.png]]\n');
+	fs.writeFileSync(path.join(vaultDir, 'Attachments', 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /Add vault/ }).click();
+	await page.getByLabel('Display name').fill('Obsidian UI Import');
+	await page.getByLabel('Absolute path').fill(vaultDir);
+	await page.getByRole('button', { name: 'Inspect import' }).click();
+	await expect(page.locator('.import-card')).toContainText('Import readiness');
+	await expect(page.locator('.import-card')).toContainText('1 note');
+	await expect(page.locator('.import-card')).toContainText('1 asset');
+	await expect(page.locator('.import-card')).toContainText('Likely attachment folders: Attachments.');
+	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
+	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
+	await expect(page.locator('.import-card')).toContainText('.obsidian');
+
+	await page.getByRole('button', { name: 'Add vault', exact: true }).click();
+	await expect(page).toHaveURL(/\/vault\/obsidian-ui-import$/);
+});
+
 test('search rail icon opens a search tab; results fire on input', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();

@@ -16,6 +16,31 @@ export interface VaultStats {
 	lastModified: number | null;
 }
 
+export type VaultImportCheckLevel = 'ok' | 'info' | 'warn';
+
+export interface VaultImportCheckItem {
+	id: string;
+	label: string;
+	detail: string;
+	level: VaultImportCheckLevel;
+}
+
+export interface VaultImportAnalysis {
+	path: string;
+	markdownFiles: number;
+	assetFiles: number;
+	totalFiles: number;
+	obsidianConfig: boolean;
+	diamondConfig: boolean;
+	gitRepository: boolean;
+	likelyAttachmentFolders: string[];
+	recommendedExcludedFolders: string[];
+	ignoredFolders: string[];
+	warnings: string[];
+	checklist: VaultImportCheckItem[];
+	markdownExamples: string[];
+}
+
 export interface TreeNode {
 	name: string;
 	path: string;

@@ -16,6 +16,8 @@ Diamond Markdown already has the right foundation:
 - Basic Auth and read-only modes for safer single-user self-hosting.
 - A small plugin runtime with manifest discovery, catalog installs, workers,
   iframe UI panels, markdown postprocessors, commands, and editor commands.
+- Obsidian-vault import preflight that preserves markdown unchanged, detects
+  `.obsidian`, attachment folders, and Git readiness before registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
 
@@ -67,12 +69,14 @@ Use small, pushable slices:
    editor/preview switching.
 - **Plugin panel split.** Separate plugin install state, manifest validation
    feedback, catalog rendering, and installed-plugin rendering.
+- **Import and migration helpers.** Add an Obsidian-vault import checklist:
+   ignore `.obsidian`, detect attachment folders, preserve markdown unchanged,
+   and recommend git initialization before first sync.
 
 ## Next Implementation Slices
 
-1. **Import and migration helpers.** Add an Obsidian-vault import checklist:
-   ignore `.obsidian`, detect attachment folders, preserve markdown unchanged,
-   and recommend git initialization before first sync.
+1. **Import and migration helpers.** Expand migration guidance for unsupported
+   Obsidian plugin settings, canvas files, and unusual attachment layouts.
 2. **Verification hardening.** Add tests for dialog-driven destructive actions,
    sync recovery copy, plugin install replacement behavior, and import helpers.
 

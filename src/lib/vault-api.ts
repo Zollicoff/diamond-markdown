@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode } from './types';
+import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { emit } from './events';
 
@@ -21,6 +21,22 @@ async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+	async addVault(name: string, path: string): Promise<{ vault: VaultRef }> {
+		return json('/api/vaults', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ name, path })
+		});
+	},
+
+	async inspectVaultImport(path: string): Promise<VaultImportAnalysis> {
+		return json('/api/vaults/import-check', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path })
+		});
+	},
+
 	async tree(vaultId: string): Promise<{ tree: TreeNode[] }> {
 		return json(`/api/vaults/${vaultId}/tree`);
 	},
