@@ -1,8 +1,9 @@
 /**
  * Git integration. Every vault is a git repo; every save is a commit.
  *
- * Lazy init: if the vault dir is not already a git repo, the first save
- * runs `git init` + sets a default identity (if none is globally set).
+ * Lazy init: if the vault dir is not already a git repo, the first git
+ * operation runs `git init`, sets a default identity, and creates an
+ * `init: vault` baseline commit for existing files.
  */
 
 import fs from 'node:fs';
@@ -21,7 +22,8 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	// long-lived simple-git instance so vaults nested inside another repo do
 	// not accidentally operate on the parent repository.
 	const gitDir = path.join(vault.path, '.git');
-	if (!fs.existsSync(gitDir)) {
+	const initialized = !fs.existsSync(gitDir);
+	if (initialized) {
 		execFileSync('git', ['-C', vault.path, 'init'], { stdio: 'ignore' });
 	}
 	g = simpleGit(vault.path);
@@ -31,6 +33,16 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	const cfg = await g.listConfig();
 	if (!cfg.all['user.email']) await g.addConfig('user.email', 'noreply@diamondmd', false, 'local');
 	if (!cfg.all['user.name']) await g.addConfig('user.name', 'Diamond Markdown', false, 'local');
+
+	if (initialized) {
+		await g.add('.');
+		try {
+			await g.commit('init: vault');
+		} catch (err) {
+			if (!String(err).includes('nothing to commit')) throw err;
+		}
+	}
+
 	return g;
 }
 

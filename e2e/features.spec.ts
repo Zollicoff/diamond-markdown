@@ -79,6 +79,24 @@ test('settings exposes GitHub sync status and controls', async ({ page }) => {
 	await expect(page.getByText(/Add a GitHub remote|Vault is clean|Commit or discard/)).toBeVisible({ timeout: 5_000 });
 });
 
+test('sync status initializes a clean vault git repo with an initial commit', async ({ request }) => {
+	const res = await request.get('/api/vaults/default/sync');
+	expect(res.ok()).toBe(true);
+	const status = await res.json() as {
+		clean: boolean;
+		files: unknown[];
+		sha: string | null;
+		needsRemote: boolean;
+		message: string;
+	};
+	expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, '.git'))).toBe(true);
+	expect(status.clean).toBe(true);
+	expect(status.files).toHaveLength(0);
+	expect(status.sha).toMatch(/^[a-f0-9]{7,}$/);
+	expect(status.needsRemote).toBe(true);
+	expect(status.message).toContain('Add a GitHub remote');
+});
+
 test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	const res = await request.post('/api/vaults/default/sync', {
 		data: { action: 'set-remote', remoteUrl: 'https://example.com/owner/repo.git' }
