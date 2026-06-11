@@ -5,6 +5,8 @@ export interface PluginCommandManifest {
 	category?: string;
 }
 
+export type PluginExecutionMode = 'trusted' | 'worker';
+
 export interface PluginManifest {
 	id: string;
 	name: string;
@@ -12,6 +14,7 @@ export interface PluginManifest {
 	description?: string;
 	author?: string;
 	entry: string;
+	execution: PluginExecutionMode;
 	commands?: PluginCommandManifest[];
 }
 
@@ -22,6 +25,7 @@ export interface PluginDescriptor {
 	description?: string;
 	author?: string;
 	entry: string;
+	execution: PluginExecutionMode;
 	commands: PluginCommandManifest[];
 	moduleUrl: string;
 	enabled: boolean;

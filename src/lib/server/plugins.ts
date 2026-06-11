@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { VaultRef } from '$lib/types';
-import type { PluginCommandManifest, PluginDescriptor, PluginManifest } from '$lib/plugins/types';
+import type { PluginCommandManifest, PluginDescriptor, PluginExecutionMode, PluginManifest } from '$lib/plugins/types';
 
 const PLUGIN_ROOT = '.diamondmd/plugins';
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
@@ -38,6 +38,12 @@ function cleanCommand(raw: unknown): PluginCommandManifest | null {
 	return command;
 }
 
+function cleanExecution(raw: unknown): PluginExecutionMode {
+	if (raw === undefined || raw === null || raw === '') return 'trusted';
+	if (raw === 'trusted' || raw === 'worker') return raw;
+	throw new Error('execution must be trusted or worker');
+}
+
 function parseManifest(raw: unknown, fallbackId: string): PluginManifest {
 	if (!raw || typeof raw !== 'object') throw new Error('plugin manifest must be an object');
 	const obj = raw as Record<string, unknown>;
@@ -52,6 +58,7 @@ function parseManifest(raw: unknown, fallbackId: string): PluginManifest {
 		name,
 		version,
 		entry: cleanEntry(obj.entry),
+		execution: cleanExecution(obj.execution),
 		commands: Array.isArray(obj.commands)
 			? obj.commands.map(cleanCommand).filter((cmd): cmd is PluginCommandManifest => !!cmd)
 			: []
@@ -122,6 +129,7 @@ function descriptorFromManifest(vaultId: string, manifest: PluginManifest): Plug
 		description: manifest.description,
 		author: manifest.author,
 		entry: manifest.entry,
+		execution: manifest.execution,
 		commands: manifest.commands ?? [],
 		moduleUrl: `/api/vaults/${encodeURIComponent(vaultId)}/plugins/${encodeURIComponent(manifest.id)}/module`,
 		enabled: true
@@ -134,6 +142,7 @@ function errorDescriptor(vaultId: string, id: string, message: string): PluginDe
 		name: id,
 		version: 'invalid',
 		entry: 'main.js',
+		execution: 'trusted',
 		commands: [],
 		moduleUrl: `/api/vaults/${encodeURIComponent(vaultId)}/plugins/${encodeURIComponent(id)}/module`,
 		enabled: false,

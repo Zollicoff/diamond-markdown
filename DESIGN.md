@@ -226,6 +226,13 @@ ids accidentally.
 Successful installs emit `plugins:reload`; the vault shell disposes the current
 runtime and boots the new plugin set without a full page reload.
 
+Manifests choose an execution mode. `trusted` is the backwards-compatible
+default and runs plugin ESM in the app context. `worker` loads the entry module
+through `src/lib/plugins/worker-runtime.ts`, where command-only plugin logic
+runs inside a module Worker. Worker plugins can register command-palette actions
+and notify the host, but they cannot register editor commands, panels, or
+markdown postprocessors because those still require live app/DOM objects.
+
 Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
 Settings and right-sidebar panels use the same pattern: plugins register small
 DOM renderers, Diamond renders them inside bounded hosts, and runtime cleanup
@@ -243,8 +250,10 @@ sanitized HTML; `Preview.svelte` inserts that HTML, renders Mermaid blocks, then
 runs registered plugin postprocessors against the preview root with the active
 `NoteDoc` context.
 
-Current plugins execute as trusted browser ESM. Sandboxed iframe/Worker execution
-remains a v0.5 requirement before untrusted third-party plugins are safe.
+Worker execution isolates command logic from the DOM and app objects, but it is
+not a complete untrusted-plugin permission system. Iframe-hosted UI renderers
+and a stricter capability proxy remain required before arbitrary third-party
+plugins are safe.
 
 ## Offline / PWA
 

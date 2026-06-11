@@ -11,6 +11,7 @@ import {
 } from './extensions.svelte';
 import { getActivePluginEditor, type PluginEditorCommandContext } from './editor-commands.svelte';
 import type { PluginDescriptor } from './types';
+import { loadWorkerPlugin } from './worker-runtime';
 
 export interface PluginCommandDef {
 	id: string;
@@ -99,6 +100,13 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 		}
 
 		try {
+			if (plugin.execution === 'worker') {
+				const workerRuntime = await loadWorkerPlugin(vaultId, plugin);
+				disposers.push(workerRuntime.dispose);
+				results.push({ plugin, loaded: true });
+				continue;
+			}
+
 			const module = await import(/* @vite-ignore */ `${plugin.moduleUrl}?v=${encodeURIComponent(plugin.version)}`) as PluginModule;
 			const activate = module.activate ?? module.default;
 			if (typeof activate !== 'function') {

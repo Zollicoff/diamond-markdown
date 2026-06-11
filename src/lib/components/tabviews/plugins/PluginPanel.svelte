@@ -102,7 +102,10 @@
 							</div>
 							<div class="plugin-id mono">{plugin.id}</div>
 						</div>
-						<span class="plugin-state">{plugin.enabled ? 'Valid' : 'Invalid'}</span>
+						<div class="plugin-badges">
+							<span class="plugin-state">{plugin.execution === 'worker' ? 'Worker' : 'Trusted'}</span>
+							<span class="plugin-state">{plugin.enabled ? 'Valid' : 'Invalid'}</span>
+						</div>
 					</div>
 					{#if plugin.description}
 						<p>{plugin.description}</p>
@@ -248,6 +251,12 @@
 		letter-spacing: 0.08em;
 		padding: 3px 7px;
 		white-space: nowrap;
+	}
+	.plugin-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		justify-content: flex-end;
 	}
 	p {
 		color: var(--fg-muted);

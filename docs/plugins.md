@@ -19,6 +19,7 @@ underscores, and hyphens.
   "version": "0.1.0",
   "description": "Registers one command.",
   "entry": "main.js",
+  "execution": "trusted",
   "commands": [
     { "id": "say-hello", "title": "Say Hello", "category": "plugin" }
   ]
@@ -26,7 +27,8 @@ underscores, and hyphens.
 ```
 
 `entry` defaults to `main.js` and must point to a `.js` or `.mjs` file inside
-the plugin directory.
+the plugin directory. `execution` defaults to `trusted`; set it to `worker` for
+DOM-isolated command-only plugin logic.
 
 ## Install From URL
 
@@ -79,6 +81,26 @@ The public API is intentionally small while the plugin system is young:
 - `api.registerRightPanel(panel)`
 - `api.registerSettingsPanel(panel)`
 - `api.notify(message)`
+
+## Execution Modes
+
+Trusted plugins run as browser ESM in the Diamond Markdown app context. They can
+use the full API, including UI renderers and markdown postprocessors, and should
+only come from sources you trust.
+
+Worker plugins declare `"execution": "worker"` in `plugin.json`. Diamond loads
+their entry module inside a module Worker and currently exposes only:
+
+- `api.vaultId`
+- `api.pluginId`
+- `api.registerCommand(command)`
+- `api.notify(message)`
+
+Worker command handlers receive a serializable command context, not live DOM or
+editor objects. Network APIs such as `fetch`, `XMLHttpRequest`, `WebSocket`, and
+`EventSource` are disabled in the worker bootstrap. This isolates command logic
+from the main app DOM, but it is not yet a complete untrusted-plugin permission
+system.
 
 ## Editor Commands
 
@@ -166,6 +188,6 @@ rerenders or unloads.
 
 ## Security Notes
 
-Current plugins run as browser ESM in the Diamond Markdown app context. Only
-install plugins you trust. Sandboxed UI/worker execution is a planned v0.5
-follow-up before treating untrusted third-party plugins as safe.
+Trusted plugins run in the main app context. Worker plugins isolate command
+logic from the DOM, but UI extensions still require trusted execution until
+iframe-hosted plugin panels land. Only install plugins you trust.

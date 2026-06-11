@@ -336,6 +336,59 @@ export function activate(api) {
 	}
 });
 
+test('worker plugins register command logic without main-window access', async ({ page, request }) => {
+	const logs: string[] = [];
+	page.on('console', (msg) => logs.push(msg.text()));
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-plugin-vault');
+	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-test');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(pluginDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({
+		id: 'worker-test',
+		name: 'Worker Test Plugin',
+		version: '0.1.0',
+		description: 'Runs command logic in a Worker.',
+		entry: 'main.js',
+		execution: 'worker',
+		commands: [{ id: 'worker-ping', title: 'Worker Plugin Ping', category: 'plugin' }]
+	}, null, 2));
+	fs.writeFileSync(path.join(pluginDir, 'main.js'), `
+export function activate(api) {
+  api.notify('worker activated ' + api.pluginId);
+  api.registerCommand({
+    id: 'worker-ping',
+    title: 'Worker Plugin Ping',
+    category: 'plugin',
+    exec(context) {
+      api.notify('worker ran ' + context.vaultId + ' window=' + String(typeof window));
+      return { notify: 'worker returned ' + (context.notePath ?? 'no-note') };
+    }
+  });
+}
+`);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Worker Plugin Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker activated worker-test'))).toBe(true);
+	await page.getByLabel('Settings').click();
+	const card = page.locator('.plugin-card').filter({ hasText: 'worker-test' });
+	await expect(card.getByText(/Worker Test Plugin/)).toBeVisible();
+	await expect(card.locator('.plugin-state').getByText('Worker', { exact: true })).toBeVisible();
+
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Worker Plugin Ping');
+	await page.getByRole('button', { name: /Worker Plugin Ping/ }).click();
+	await expect.poll(() => logs.some((line) => line.includes(`[plugin:worker-test] worker ran ${vault.id} window=undefined`))).toBe(true);
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker returned no-note'))).toBe(true);
+});
+
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.toolbar-btn.sort').click();
