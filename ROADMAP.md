@@ -71,7 +71,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Indexer warm-cache on disk for fast startup
 - [x] Diverged-history resolution UI with local/remote/overlap file lists
 - [x] Virtualized file tree for very large vaults
-- [ ] Quadtree-backed graph sim (drop O(n²) for very large vaults)
+- [x] Quadtree-backed graph sim (drop O(n²) for very large vaults)
 
 ## v0.5 — Plugins & desktop
 

@@ -190,6 +190,18 @@ preserving normal Obsidian-style sidebar behavior. The e2e suite includes a
 600-note vault check that verifies the mounted `.file-link` count stays bounded
 and the last note remains reachable by scrolling.
 
+## Graph simulation
+
+`src/lib/graph/sim.ts` keeps graph physics as pure logic. Small graphs use exact
+pairwise repulsion because the overhead is tiny and the motion is precise.
+Graphs at or above 180 nodes switch to Barnes-Hut style quadtree repulsion:
+near cells are traversed exactly, distant cells are approximated by center of
+mass.
+
+The Svelte graph view does not own the approximation choice. It passes the same
+force settings to `simulateStep`, so settings, dragging, filters, pan/zoom, and
+note-opening behavior stay independent of the physics backend.
+
 ## Offline / PWA
 
 `src/service-worker.ts` is deliberately conservative. It precaches the app

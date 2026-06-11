@@ -144,6 +144,29 @@ test('file tree virtualizes large vaults while preserving scroll access', async 
 	await expect(page.getByLabel('Editor pane').getByText('Note 599')).toBeVisible();
 });
 
+test('large graph opens with the scale simulation path', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'large-graph-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	for (let i = 0; i < 220; i += 1) {
+		const title = `Graph Note ${String(i).padStart(4, '0')}`;
+		const next = i < 219 ? `\n\nNext: [[Graph Note ${String(i + 1).padStart(4, '0')}]]\n` : '\n';
+		fs.writeFileSync(path.join(vaultDir, `${title}.md`), `# ${title}${next}`);
+	}
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Large Graph Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Graph').click();
+	await expect(page.locator('text=/220 nodes · 219 edges/').first()).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator('.canvas')).toBeVisible();
+});
+
 test('wikilinks render as just the link text, not [Note]', async ({ page }) => {
 	await openVault(page);
 	// Features Overview has real wikilinks at line 8 — comfortably inside
