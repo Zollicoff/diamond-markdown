@@ -40,11 +40,19 @@ npm run build
 node build            # production server via adapter-node
 ```
 
+Desktop shell:
+
+```sh
+npm run build
+npm run desktop:dev   # Tauri v2 shell, local loopback backend
+```
+
 On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Documents/Diamond Markdown` and registers it as your default vault. Override with the `DIAMOND_DEFAULT_VAULT_DIR` environment variable, or add more vaults from the in-app vault manager. Your data lives in your home directory; the repo is the program.
 
 Production deployment guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
 Release verification lives in [docs/release-checklist.md](./docs/release-checklist.md).
 Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
+Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ## Concepts
 
@@ -133,6 +141,14 @@ Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
 - Service worker caches the app shell and immutable static assets. Vault APIs
   stay network/server-backed so note and git state do not go stale silently.
 
+### Desktop
+- Tauri v2 shell in `src-tauri/`
+- Starts the existing built SvelteKit/Node backend on loopback, waits for it,
+  then opens a native desktop webview to the local app
+- Supports attaching to an already-running backend with `DIAMOND_SERVER_URL`
+- Current packaged builds still require a Node runtime until the backend is
+  replaced with native Rust commands or bundled as a sidecar
+
 ### Plugins
 - Vault-local ESM plugins from `.diamondmd/plugins/<plugin-id>/`
 - Manifest discovery in Settings
@@ -156,6 +172,8 @@ The open-source replacement track is broken out in
 Single SvelteKit app:
 
 - Server (`src/lib/server/`) handles filesystem, git, indexing — never exposes raw paths, only vault-relative paths
+- Desktop (`src-tauri/`) wraps the same server app in Tauri and launches it on
+  loopback for local desktop use
 - Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with clean-worktree, fast-forward, and divergence guards
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`

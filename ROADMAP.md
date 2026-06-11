@@ -88,7 +88,8 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
   - [x] Capability proxy for active-editor mutation APIs
 - [x] Plugin install UI (load plugins from manifest URL, not just disk)
 - [x] Curated plugin registry/catalog
-- [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.
+- [x] **Tauri v2 desktop wrapper** — native desktop shell that launches the existing built SvelteKit/Node backend on loopback and opens a Tauri webview, reusing 100% of current app behavior.
+- [ ] **Self-contained desktop runtime** — remove the system Node requirement by replacing the Node backend with native Rust filesystem/git commands or bundling a per-platform backend sidecar.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
 
