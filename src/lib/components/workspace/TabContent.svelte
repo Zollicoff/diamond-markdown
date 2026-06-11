@@ -27,6 +27,7 @@
 
 	interface Props {
 		vaultId: string;
+		paneId: string;
 		tab: Tab;
 		mode: 'live' | 'source' | 'read';
 		isFocused: boolean;
@@ -34,7 +35,7 @@
 		onModeChange?: (m: 'live' | 'source' | 'read') => void;
 	}
 
-	let { vaultId, tab, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
+	let { vaultId, paneId, tab, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
 
 	let View = $state<ViewComponent | null>(null);
 	let loadingKind = $state<Tab['kind'] | null>(null);
@@ -68,7 +69,7 @@
 {:else if !View}
 	<div class="lazy-state">Loading {loadingKind ?? tab.kind}…</div>
 {:else if tab.kind === 'note'}
-	<View {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
+	<View {vaultId} {paneId} tabId={tab.id} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
 {:else if tab.kind === 'graph'}
 	<View {vaultId} />
 {:else if tab.kind === 'tags'}

@@ -7,6 +7,7 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { READING_SPEED_WPM } from '$lib/util/constants';
 
@@ -33,6 +34,8 @@
 
 	interface Props {
 		vaultId: string;
+		paneId: string;
+		tabId: string;
 		path: string;
 		mode: 'live' | 'source' | 'read';
 		isFocused: boolean;
@@ -45,7 +48,7 @@
 		onModeChange?: (m: 'live' | 'source' | 'read') => void;
 	}
 
-	let { vaultId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
+	let { vaultId, paneId, tabId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
 
 	let doc = $state<NoteDoc | null>(null);
 	let content = $state('');
@@ -233,6 +236,18 @@
 				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
 		}
 		return () => { alive = false; };
+	});
+
+	$effect(() => {
+		if (!doc || !editorApi || mode === 'read') return;
+		return registerActivePluginEditor({
+			vaultId,
+			paneId,
+			tabId,
+			notePath: path,
+			doc,
+			editor: editorApi
+		});
 	});
 
 	function fmtSaved(ms: number | null): string {

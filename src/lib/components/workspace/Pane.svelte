@@ -49,6 +49,7 @@
 		{#if activeTab}
 			<TabContent
 				{vaultId}
+				paneId={pane.id}
 				tab={activeTab}
 				{mode}
 				isFocused={isActivePane}

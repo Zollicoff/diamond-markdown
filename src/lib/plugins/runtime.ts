@@ -9,6 +9,7 @@ import {
 	type PluginRightPanelDef,
 	type PluginSettingsPanelDef
 } from './extensions.svelte';
+import { getActivePluginEditor, type PluginEditorCommandContext } from './editor-commands.svelte';
 import type { PluginDescriptor } from './types';
 
 export interface PluginCommandDef {
@@ -21,10 +22,21 @@ export interface PluginCommandDef {
 	exec: (ctx: CommandContext) => void | Promise<void>;
 }
 
+export interface PluginEditorCommandDef {
+	id: string;
+	title: string;
+	icon?: string;
+	shortcut?: string;
+	category?: string;
+	when?: (ctx: PluginEditorCommandContext) => boolean;
+	exec: (ctx: PluginEditorCommandContext) => void | Promise<void>;
+}
+
 export interface PluginApi {
 	vaultId: string;
 	pluginId: string;
 	registerCommand: (command: PluginCommandDef) => void;
+	registerEditorCommand: (command: PluginEditorCommandDef) => void;
 	registerMarkdownPostprocessor: (processor: PluginMarkdownPostprocessorDef) => void;
 	registerRightPanel: (panel: PluginRightPanelDef) => void;
 	registerSettingsPanel: (panel: PluginSettingsPanelDef) => void;
@@ -51,6 +63,10 @@ const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 function scopedCommandId(pluginId: string, commandId: string): string {
 	return `plugin:${pluginId}:${commandId}`;
+}
+
+function scopedEditorCommandId(pluginId: string, commandId: string): string {
+	return `plugin:${pluginId}:editor:${commandId}`;
 }
 
 function scopedSettingsPanelId(pluginId: string, panelId: string): string {
@@ -109,6 +125,40 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 							} catch (e) {
 								console.error(`[plugin:${plugin.id}] command failed:`, e);
 								alert(`Plugin command failed: ${(e as Error).message}`);
+							}
+						}
+					};
+					register(wrapped);
+					registered.add(id);
+				},
+				registerEditorCommand(command) {
+					if (!isCommandId(command.id)) throw new Error(`invalid editor command id: ${command.id}`);
+					if (typeof command.exec !== 'function') throw new Error('editor command exec function required');
+					const id = scopedEditorCommandId(plugin.id, command.id);
+					const makeContext = (ctx: CommandContext): PluginEditorCommandContext | null => {
+						const editor = getActivePluginEditor({ ...ctx, vaultId });
+						if (!editor) return null;
+						return { ...ctx, ...editor, vaultId, pluginId: plugin.id };
+					};
+					const wrapped: CommandDef = {
+						id,
+						title: command.title,
+						icon: command.icon,
+						shortcut: command.shortcut,
+						category: command.category ?? `plugin:${plugin.id}`,
+						when(ctx) {
+							const pluginCtx = makeContext(ctx);
+							if (!pluginCtx) return false;
+							return command.when ? command.when(pluginCtx) : true;
+						},
+						async exec(ctx) {
+							const pluginCtx = makeContext(ctx);
+							if (!pluginCtx) return;
+							try {
+								await command.exec(pluginCtx);
+							} catch (e) {
+								console.error(`[plugin:${plugin.id}] editor command failed:`, e);
+								alert(`Plugin editor command failed: ${(e as Error).message}`);
 							}
 						}
 					};

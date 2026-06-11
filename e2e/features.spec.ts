@@ -128,6 +128,16 @@ export function activate(api) {
       window.__diamondPluginRan = api.vaultId;
     }
   });
+  api.registerEditorCommand({
+    id: 'insert-marker',
+    title: 'Plugin Editor Insert',
+    icon: '✎',
+    category: 'plugin',
+    exec(context) {
+      context.editor.insert('Plugin editor command: ' + context.doc.path);
+      window.__diamondPluginEditorRan = context.notePath;
+    }
+  });
   api.registerSettingsPanel({
     id: 'general',
     title: 'Boot Test Settings',
@@ -211,6 +221,14 @@ export function activate(api) {
 	await page.getByRole('tab', { name: 'Read' }).click();
 	await expect(page.getByTestId('plugin-markdown-marker')).toHaveText('Home.md');
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginMarkdownRan)).toBe('Home');
+	await page.getByRole('tab', { name: 'Live' }).click();
+	const editor = page.locator('.cm-content').first();
+	await expect(editor).toBeVisible();
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Plugin Editor Insert');
+	await page.getByRole('button', { name: /Plugin Editor Insert/ }).click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginEditorRan)).toBe('Home.md');
+	await expect(editor).toContainText('Plugin editor command: Home.md');
 
 	await page.keyboard.press('Meta+P');
 	await page.locator('input[placeholder="Run a command…"]').fill('Plugin Boot Test');

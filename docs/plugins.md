@@ -59,10 +59,33 @@ The public API is intentionally small while the plugin system is young:
 - `api.vaultId`
 - `api.pluginId`
 - `api.registerCommand(command)`
+- `api.registerEditorCommand(command)`
 - `api.registerMarkdownPostprocessor(processor)`
 - `api.registerRightPanel(panel)`
 - `api.registerSettingsPanel(panel)`
 - `api.notify(message)`
+
+## Editor Commands
+
+Plugins can register commands that only appear when the active tab has a live
+editor:
+
+```js
+export function activate(api) {
+  api.registerEditorCommand({
+    id: 'insert-callout',
+    title: 'Insert Callout',
+    exec(context) {
+      context.editor.insertTemplate('> [!note] {{cursor}}');
+      console.info(`Inserted into ${context.doc.path}`);
+    }
+  });
+}
+```
+
+Editor command contexts include `editor`, `doc`, `notePath`, `paneId`, `tabId`,
+`vaultId`, and `pluginId`. They reuse the main command palette and may define a
+`when(context)` predicate for note-specific visibility.
 
 ## Settings Panels
 

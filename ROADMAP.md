@@ -79,7 +79,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
   - [x] Settings panel renderer
   - [x] Markdown postprocessor hook
-  - [ ] Editor-specific command hook
+  - [x] Editor-specific command hook
   - [x] Right-panel view hook
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
 - [ ] Plugin registry page (load plugins from URL, not just disk)

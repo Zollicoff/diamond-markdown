@@ -223,6 +223,11 @@ unregisters them when the vault shell unloads. Right-sidebar panels receive the
 active note document so plugins can build note-aware sidebars without owning the
 workspace shell.
 
+Editor commands reuse the normal command registry but resolve their mutable
+surface through `src/lib/plugins/editor-commands.svelte.ts`. `NoteView.svelte`
+registers the active editor API by vault/pane/tab while a note is in Live or
+Source mode, and plugin editor commands only appear when that context exists.
+
 Markdown postprocessors are intentionally client-side. The server still returns
 sanitized HTML; `Preview.svelte` inserts that HTML, renders Mermaid blocks, then
 runs registered plugin postprocessors against the preview root with the active
