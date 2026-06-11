@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
-	import Editor from '$lib/components/editor/Editor.svelte';
-	import Preview from '$lib/components/editor/Preview.svelte';
-	import EditorToolbar from '$lib/components/editor/EditorToolbar.svelte';
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
 	import type { NoteDoc } from '$lib/types';
@@ -12,6 +9,27 @@
 	import { openNote } from '$lib/workspace/actions';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { READING_SPEED_WPM } from '$lib/util/constants';
+
+	type ViewComponent = any;
+
+	let editorPromise: Promise<ViewComponent> | null = null;
+	let previewPromise: Promise<ViewComponent> | null = null;
+	let toolbarPromise: Promise<ViewComponent> | null = null;
+
+	function loadEditor(): Promise<ViewComponent> {
+		editorPromise ??= import('$lib/components/editor/Editor.svelte').then((m) => m.default);
+		return editorPromise;
+	}
+
+	function loadPreview(): Promise<ViewComponent> {
+		previewPromise ??= import('$lib/components/editor/Preview.svelte').then((m) => m.default);
+		return previewPromise;
+	}
+
+	function loadToolbar(): Promise<ViewComponent> {
+		toolbarPromise ??= import('$lib/components/editor/EditorToolbar.svelte').then((m) => m.default);
+		return toolbarPromise;
+	}
 
 	interface Props {
 		vaultId: string;
@@ -36,6 +54,10 @@
 	let savedAt = $state<number | null>(null);
 	let err = $state<string | null>(null);
 	let editorApi = $state<EditorApi | null>(null);
+	let EditorView = $state<ViewComponent | null>(null);
+	let PreviewView = $state<ViewComponent | null>(null);
+	let ToolbarView = $state<ViewComponent | null>(null);
+	let viewLoadError = $state<string | null>(null);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -190,6 +212,28 @@
 		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / READING_SPEED_WPM))} min`
 	);
 	const isConflict = $derived(err?.includes('note changed on disk') ?? false);
+	const waitingForEditor = $derived(mode !== 'read' && (!EditorView || !ToolbarView));
+	const waitingForPreview = $derived(mode === 'read' && !PreviewView);
+
+	$effect(() => {
+		let alive = true;
+		viewLoadError = null;
+		if (mode === 'read') {
+			editorApi = null;
+			loadPreview()
+				.then((component) => { if (alive) PreviewView = component; })
+				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
+		} else {
+			Promise.all([loadEditor(), loadToolbar()])
+				.then(([editor, toolbar]) => {
+					if (!alive) return;
+					EditorView = editor;
+					ToolbarView = toolbar;
+				})
+				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
+		}
+		return () => { alive = false; };
+	});
 
 	function fmtSaved(ms: number | null): string {
 		if (!ms) return '';
@@ -228,17 +272,21 @@
 		</div>
 	</header>
 
-	{#if mode !== 'read'}
-		<EditorToolbar api={editorApi} />
+	{#if mode !== 'read' && ToolbarView}
+		<ToolbarView api={editorApi} />
 	{/if}
 
 	<div class="body">
 		{#if !doc}
 			<div class="loading">Loading…</div>
-		{:else if mode === 'read'}
-			<Preview html={doc.html} {vaultId} />
-		{:else}
-			<Editor
+		{:else if viewLoadError}
+			<div class="loading err">Could not load view: {viewLoadError}</div>
+		{:else if mode === 'read' && PreviewView}
+			<PreviewView html={doc.html} {vaultId} />
+		{:else if mode === 'read' && waitingForPreview}
+			<div class="loading">Loading preview…</div>
+		{:else if mode !== 'read' && EditorView}
+			<EditorView
 				value={content}
 				mode={mode as 'live' | 'source'}
 				{resolveLink}
@@ -246,8 +294,12 @@
 				onSave={save}
 				onWikilinkClick={handleWikilinkClick}
 				onWikilinkContext={handleWikilinkContext}
-				onReady={(a) => (editorApi = a)}
+				onReady={(a: EditorApi) => (editorApi = a)}
 			/>
+		{:else if waitingForEditor}
+			<div class="loading">Loading editor…</div>
+		{:else}
+			<div class="loading">Loading…</div>
 		{/if}
 	</div>
 </div>
@@ -304,5 +356,6 @@
 
 	.body { flex: 1; min-height: 0; overflow: hidden; }
 	.loading { padding: 2rem; color: var(--fg-dim); }
+	.loading.err { color: var(--danger); }
 	.mono { font-family: var(--mono); }
 </style>

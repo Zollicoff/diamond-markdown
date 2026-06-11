@@ -1,13 +1,29 @@
 <script lang="ts">
 	import type { Tab } from '$lib/workspace/types';
 	import type { NoteDoc } from '$lib/types';
-	import NoteView from '$lib/components/tabviews/NoteView.svelte';
-	import GraphView from '$lib/components/tabviews/GraphView.svelte';
-	import TagsView from '$lib/components/tabviews/TagsView.svelte';
-	import SearchView from '$lib/components/tabviews/SearchView.svelte';
-	import SettingsView from '$lib/components/tabviews/SettingsView.svelte';
-	import ShortcutsView from '$lib/components/tabviews/ShortcutsView.svelte';
 	import { setSearchQuery } from '$lib/workspace/actions';
+
+	type ViewComponent = any;
+
+	const loaders = {
+		note: () => import('$lib/components/tabviews/NoteView.svelte').then((m) => m.default),
+		graph: () => import('$lib/components/tabviews/GraphView.svelte').then((m) => m.default),
+		tags: () => import('$lib/components/tabviews/TagsView.svelte').then((m) => m.default),
+		search: () => import('$lib/components/tabviews/SearchView.svelte').then((m) => m.default),
+		settings: () => import('$lib/components/tabviews/SettingsView.svelte').then((m) => m.default),
+		shortcuts: () => import('$lib/components/tabviews/ShortcutsView.svelte').then((m) => m.default)
+	} satisfies Record<Tab['kind'], () => Promise<ViewComponent>>;
+
+	const cache = new Map<Tab['kind'], Promise<ViewComponent>>();
+
+	function loadView(kind: Tab['kind']): Promise<ViewComponent> {
+		let pending = cache.get(kind);
+		if (!pending) {
+			pending = loaders[kind]();
+			cache.set(kind, pending);
+		}
+		return pending;
+	}
 
 	interface Props {
 		vaultId: string;
@@ -19,22 +35,68 @@
 	}
 
 	let { vaultId, tab, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
+
+	let View = $state<ViewComponent | null>(null);
+	let loadingKind = $state<Tab['kind'] | null>(null);
+	let loadError = $state<string | null>(null);
+
+	$effect(() => {
+		const kind = tab.kind;
+		let alive = true;
+		loadingKind = kind;
+		loadError = null;
+		View = null;
+		loadView(kind)
+			.then((component) => {
+				if (!alive || tab.kind !== kind) return;
+				View = component;
+			})
+			.catch((e) => {
+				if (!alive || tab.kind !== kind) return;
+				loadError = e instanceof Error ? e.message : String(e);
+			})
+			.finally(() => {
+				if (!alive || tab.kind !== kind) return;
+				loadingKind = null;
+			});
+		return () => { alive = false; };
+	});
 </script>
 
-{#if tab.kind === 'note'}
-	<NoteView {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
+{#if loadError}
+	<div class="lazy-state error">Could not load {tab.title}: {loadError}</div>
+{:else if !View}
+	<div class="lazy-state">Loading {loadingKind ?? tab.kind}…</div>
+{:else if tab.kind === 'note'}
+	<View {vaultId} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
 {:else if tab.kind === 'graph'}
-	<GraphView {vaultId} />
+	<View {vaultId} />
 {:else if tab.kind === 'tags'}
-	<TagsView {vaultId} filter={tab.filter} />
+	<View {vaultId} filter={tab.filter} />
 {:else if tab.kind === 'search'}
-	<SearchView
+	<View
 		{vaultId}
 		query={tab.query}
-		onQueryChange={(q) => setSearchQuery(vaultId, tab.id, q)}
+		onQueryChange={(q: string) => setSearchQuery(vaultId, tab.id, q)}
 	/>
 {:else if tab.kind === 'settings'}
-	<SettingsView />
+	<View />
 {:else if tab.kind === 'shortcuts'}
-	<ShortcutsView />
+	<View />
 {/if}
+
+<style>
+	.lazy-state {
+		display: grid;
+		place-items: center;
+		height: 100%;
+		min-height: 0;
+		color: var(--fg-dim);
+		font-size: 0.86rem;
+	}
+	.lazy-state.error {
+		color: var(--danger, #f87171);
+		padding: 20px;
+		text-align: center;
+	}
+</style>

@@ -144,6 +144,27 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
 This keeps the browser UI safe for normal Obsidian-style sync without hiding
 Git's real conflict model.
 
+## Bundle boundaries
+
+The vault workspace shell lazy-loads tab views from `TabContent.svelte`.
+Opening the vault should load the sidebar, rails, command surfaces, and a small
+tab loader, not every editor/graph/settings surface at once.
+
+Within `NoteView.svelte`, edit modes lazy-load CodeMirror (`Editor.svelte`) and
+the formatting toolbar, while read mode lazy-loads the markdown preview
+surface. This keeps CodeMirror out of read-only sessions and keeps preview
+rendering dependencies out of pure editing sessions.
+
+Known heavy lazy chunks:
+
+- CodeMirror editor bundle: loaded only when a note is opened in live/source mode.
+- Mermaid/diagram vendor bundle: loaded only by `Preview.svelte` when rendered
+  markdown contains Mermaid blocks.
+
+Do not raise Vite's chunk-size warning to hide these. Prefer additional dynamic
+imports or dependency replacement if these lazy chunks become user-visible
+latency.
+
 ## Security model
 
 Single-user by default. Authentication is not built in — deploy behind Tailscale, a reverse proxy, or on localhost.
