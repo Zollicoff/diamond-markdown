@@ -58,7 +58,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Security/self-hosting docs and release checklist
 - [x] Route-level tests for path traversal, symlink escapes, raw asset headers, and note/folder mutations
 - [x] Template picker upgrade (modal palette instead of `prompt()`)
-- [ ] Service worker for full offline use
+- [x] Service worker for offline app shell/static assets
 - [ ] Mobile touch gestures (swipe to switch tabs / panes)
 - [ ] Light-mode highlight.js per-token theming
 - [ ] Outline scroll inside Live mode (currently Read mode only)

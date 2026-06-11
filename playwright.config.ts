@@ -6,8 +6,10 @@ const PORT = 4173;
 const FIXTURE_ROOT = FIXTURE_PATHS.FIXTURE_ROOT;
 const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
-// Build a clean test vault before the webServer boots.
-buildFixture();
+// Build a clean test vault before the webServer boots. Playwright may import
+// this config inside restarted test workers after a failure; those workers must
+// not delete the fixture while the already-running webServer still points at it.
+if (!process.env.TEST_WORKER_INDEX) buildFixture();
 
 /**
  * Isolated test runtime. The `webServer` boots `npm run preview` (the

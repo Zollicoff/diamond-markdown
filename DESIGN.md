@@ -176,6 +176,14 @@ Do not raise Vite's chunk-size warning to hide these. Prefer additional dynamic
 imports or dependency replacement if these lazy chunks become user-visible
 latency.
 
+## Offline / PWA
+
+`src/service-worker.ts` is deliberately conservative. It precaches the app
+shell, SvelteKit build output, and static assets, then serves same-origin
+navigation requests network-first with a cached fallback. It does not intercept
+`/api/` or non-GET requests; vault contents, git status, note saves, and sync
+operations remain server-authoritative.
+
 ## Security model
 
 Single-user by default. Authentication is not built in — deploy behind Tailscale, a reverse proxy, or on localhost.

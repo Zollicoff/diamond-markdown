@@ -177,6 +177,18 @@ test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
 });
 
+test('service worker is built with app-shell caching and API bypass', async ({ request }) => {
+	const res = await request.get('/service-worker.js');
+	expect(res.ok()).toBe(true);
+	const source = await res.text();
+	expect(source).toContain('diamondmd');
+	expect(source).toContain('-static-');
+	expect(source).toContain('-runtime-');
+	expect(source).toContain('/api/');
+	expect(source).toContain('respondWith');
+	expect(source).toContain('caches.open');
+});
+
 test('note API rejects path traversal reads and writes', async ({ request }) => {
 	const read = await request.get(`/api/vaults/default/note?path=${encodeURIComponent('../package.json')}`);
 	expect(read.status()).toBe(400);

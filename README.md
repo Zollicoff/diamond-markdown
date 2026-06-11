@@ -127,6 +127,8 @@ Release verification lives in [docs/release-checklist.md](./docs/release-checkli
 
 ### PWA
 - Installable on mobile / desktop, offline manifest, theme-color, custom icons
+- Service worker caches the app shell and immutable static assets. Vault APIs
+  stay network/server-backed so note and git state do not go stale silently.
 
 ## Roadmap
 
