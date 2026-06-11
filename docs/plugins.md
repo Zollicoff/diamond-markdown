@@ -84,6 +84,8 @@ The public API is intentionally small while the plugin system is young:
 
 - `api.vaultId`
 - `api.pluginId`
+- `api.files.readNote(path)`
+- `api.files.writeNote(path, content, options?)`
 - `api.registerCommand(command)`
 - `api.registerEditorCommand(command)`
 - `api.registerMarkdownPostprocessor(processor)`
@@ -102,6 +104,8 @@ their entry module inside a module Worker and currently exposes:
 
 - `api.vaultId`
 - `api.pluginId`
+- `api.files.readNote(path)`
+- `api.files.writeNote(path, content, options?)`
 - `api.registerCommand(command)`
 - `api.registerRightPanel(panel)` for iframe panels only
 - `api.registerSettingsPanel(panel)` for iframe panels only
@@ -112,6 +116,33 @@ editor objects. Network APIs such as `fetch`, `XMLHttpRequest`, `WebSocket`, and
 `EventSource` are disabled in the worker bootstrap. This isolates command logic
 from the main app DOM, but it is not yet a complete untrusted-plugin permission
 system.
+
+## File Capabilities
+
+Trusted and worker plugins can read and write markdown notes through the
+host-mediated file capability:
+
+```js
+export function activate(api) {
+  api.registerCommand({
+    id: 'append-source',
+    title: 'Append Source',
+    async exec(context) {
+      if (!context.notePath) return;
+      const note = await api.files.readNote(context.notePath);
+      await api.files.writeNote(note.path, `${note.content}\n\nSource: Diamond`, {
+        expectedRevision: note.revision
+      });
+    }
+  });
+}
+```
+
+The capability only accepts relative markdown note paths. Absolute paths,
+relative path traversal, hidden segments such as `.diamondmd`, and non-markdown
+extensions are rejected by the host before a request reaches the server.
+Returned note data is serializable: `path`, `content`, `revision`, `mtime`,
+`frontmatter`, `body`, and `tags`.
 
 ## Editor Commands
 
@@ -230,5 +261,5 @@ rerenders or unloads.
 
 Trusted plugins run in the main app context. Worker plugins isolate command
 logic from the DOM, and iframe panels isolate plugin UI from the parent document.
-File/editor capability proxying is still planned, so only install plugins you
-trust.
+Note file access goes through a host capability proxy. Active-editor mutation
+proxying is still planned, so only install plugins you trust.

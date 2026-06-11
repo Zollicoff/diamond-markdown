@@ -425,6 +425,65 @@ export function activate(api) {
 	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker returned no-note'))).toBe(true);
 });
 
+test('worker plugins use file capability proxy for note reads and writes', async ({ page, request }) => {
+	const logs: string[] = [];
+	page.on('console', (msg) => logs.push(msg.text()));
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-file-plugin-vault');
+	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-files');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(pluginDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({
+		id: 'worker-files',
+		name: 'Worker Files Plugin',
+		version: '0.1.0',
+		description: 'Uses host-mediated note file capabilities.',
+		entry: 'main.js',
+		execution: 'worker',
+		commands: [{ id: 'worker-file-write', title: 'Worker File Write', category: 'plugin' }]
+	}, null, 2));
+	fs.writeFileSync(path.join(pluginDir, 'main.js'), `
+export function activate(api) {
+  api.notify('worker files ready');
+  api.registerCommand({
+    id: 'worker-file-write',
+    title: 'Worker File Write',
+    category: 'plugin',
+    async exec() {
+      const home = await api.files.readNote('Home');
+      const write = await api.files.writeNote('Generated/Worker Note', home.content + '\\nwritten by worker\\n');
+      const generated = await api.files.readNote(write.path);
+      let blocked = false;
+      try {
+        await api.files.writeNote('.diamondmd/plugins/pwned', 'bad');
+      } catch {
+        blocked = true;
+      }
+      api.notify('file capability ' + home.path + ' -> ' + generated.path + ' blocked=' + blocked + ' revision=' + Boolean(generated.revision));
+    }
+  });
+}
+`);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Worker File Plugin Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-files] worker files ready'))).toBe(true);
+	await page.keyboard.press('Meta+P');
+	await page.locator('input[placeholder="Run a command…"]').fill('Worker File Write');
+	await page.getByRole('button', { name: /Worker File Write/ }).click();
+	await expect.poll(() => logs.join('\n')).toContain(
+		'[plugin:worker-files] file capability Home.md -> Generated/Worker Note.md blocked=true revision=true'
+	);
+	expect(fs.readFileSync(path.join(vaultDir, 'Generated', 'Worker Note.md'), 'utf-8')).toContain('written by worker');
+	expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'pwned.md'))).toBe(false);
+});
+
 test('worker plugins register sandboxed iframe panels', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-frame-plugin-vault');
 	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-frames');

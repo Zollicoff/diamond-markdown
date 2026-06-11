@@ -1,6 +1,7 @@
 import { register, unregister, type CommandContext, type CommandDef } from '$lib/commands';
 import type { PluginCommandManifest, PluginDescriptor } from './types';
 import { registerRightPanel, registerSettingsPanel } from './extensions.svelte';
+import { createPluginFilesApi, type PluginFilesApi } from './capabilities';
 
 interface WorkerCommandMessage {
 	type: 'registerCommand';
@@ -25,6 +26,15 @@ interface WorkerNotifyMessage {
 	message: string;
 }
 
+type WorkerCapabilityName = 'files.readNote' | 'files.writeNote';
+
+interface WorkerCapabilityRequestMessage {
+	type: 'capabilityRequest';
+	requestId: number;
+	capability: WorkerCapabilityName;
+	input: unknown;
+}
+
 interface WorkerReadyMessage {
 	type: 'ready';
 }
@@ -44,6 +54,7 @@ type WorkerMessage =
 	| WorkerCommandMessage
 	| WorkerPanelMessage
 	| WorkerNotifyMessage
+	| WorkerCapabilityRequestMessage
 	| WorkerReadyMessage
 	| WorkerErrorMessage
 	| WorkerCompleteMessage;
@@ -64,8 +75,10 @@ const WORKER_SOURCE = `
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 const MAX_IFRAME_HTML_BYTES = 128 * 1024;
 const commands = new Map();
+const capabilityPending = new Map();
 let api = null;
 let dispose = null;
+let capabilityRequestId = 0;
 
 function pluginError(message) {
   return message instanceof Error ? message.message : String(message);
@@ -103,10 +116,35 @@ function cleanPanel(panel, label) {
   return out;
 }
 
+function requestCapability(capability, input) {
+  const requestId = ++capabilityRequestId;
+  return new Promise((resolve, reject) => {
+    capabilityPending.set(requestId, { resolve, reject });
+    self.postMessage({ type: 'capabilityRequest', requestId, capability, input });
+  });
+}
+
+function rejectCapabilities(error) {
+  for (const item of capabilityPending.values()) item.reject(error);
+  capabilityPending.clear();
+}
+
 function makeApi(vaultId, pluginId) {
   return {
     vaultId,
     pluginId,
+    files: Object.freeze({
+      readNote(path) {
+        return requestCapability('files.readNote', { path });
+      },
+      writeNote(path, content, options = {}) {
+        return requestCapability('files.writeNote', {
+          path,
+          content,
+          expectedRevision: options && typeof options.expectedRevision === 'string' ? options.expectedRevision : undefined
+        });
+      }
+    }),
     registerCommand(command) {
       const manifest = cleanCommand(command);
       commands.set(manifest.id, command.exec);
@@ -140,6 +178,14 @@ try {
 self.onmessage = async (event) => {
   const data = event.data ?? {};
   try {
+    if (data.type === 'capabilityResponse') {
+      const item = capabilityPending.get(data.requestId);
+      if (!item) return;
+      capabilityPending.delete(data.requestId);
+      if (data.ok) item.resolve(data.result);
+      else item.reject(new Error(data.error || 'capability request failed'));
+      return;
+    }
     if (data.type === 'activate') {
       api = makeApi(data.vaultId, data.pluginId);
       const mod = await import(data.moduleUrl);
@@ -159,10 +205,12 @@ self.onmessage = async (event) => {
       return;
     }
     if (data.type === 'dispose') {
+      rejectCapabilities(new Error('worker plugin disposed'));
       if (dispose) await dispose();
       self.close();
     }
   } catch (error) {
+    rejectCapabilities(error instanceof Error ? error : new Error(String(error)));
     self.postMessage({
       type: data.type === 'execCommand' ? 'commandError' : 'error',
       requestId: data.requestId,
@@ -209,9 +257,33 @@ function cleanWorkerIframePanel(panel: WorkerIframePanelDef, label: string): Wor
 	};
 }
 
+function messageError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function readCapabilityInput(input: unknown): Record<string, unknown> {
+	if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('capability input must be an object');
+	return input as Record<string, unknown>;
+}
+
+async function runWorkerCapability(files: PluginFilesApi, message: WorkerCapabilityRequestMessage): Promise<unknown> {
+	const input = readCapabilityInput(message.input);
+	switch (message.capability) {
+		case 'files.readNote':
+			return files.readNote(input.path as string);
+		case 'files.writeNote':
+			return files.writeNote(input.path as string, input.content as string, {
+				expectedRevision: typeof input.expectedRevision === 'string' ? input.expectedRevision : undefined
+			});
+		default:
+			throw new Error(`unknown capability: ${message.capability}`);
+	}
+}
+
 export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor): Promise<WorkerPluginRuntime> {
 	const workerUrl = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
 	const worker = new Worker(workerUrl, { type: 'module', name: `diamond-plugin-${plugin.id}` });
+	const files = createPluginFilesApi(vaultId);
 	const registered = new Set<string>();
 	const panelDisposers: (() => void)[] = [];
 	const pending = new Map<number, PendingCommand>();
@@ -292,6 +364,28 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 		panelDisposers.push(dispose);
 	}
 
+	async function handleCapabilityRequest(message: WorkerCapabilityRequestMessage): Promise<void> {
+		if (!Number.isSafeInteger(message.requestId) || message.requestId < 1) {
+			console.error(`[plugin:${plugin.id}] worker capability request rejected: invalid request id`);
+			return;
+		}
+		try {
+			worker.postMessage({
+				type: 'capabilityResponse',
+				requestId: message.requestId,
+				ok: true,
+				result: await runWorkerCapability(files, message)
+			});
+		} catch (error) {
+			worker.postMessage({
+				type: 'capabilityResponse',
+				requestId: message.requestId,
+				ok: false,
+				error: messageError(error)
+			});
+		}
+	}
+
 	worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
 		const message = event.data;
 		try {
@@ -309,6 +403,10 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 			}
 			if (message.type === 'notify') {
 				console.info(`[plugin:${plugin.id}] ${message.message}`);
+				return;
+			}
+			if (message.type === 'capabilityRequest') {
+				void handleCapabilityRequest(message);
 				return;
 			}
 			if (message.type === 'ready') {

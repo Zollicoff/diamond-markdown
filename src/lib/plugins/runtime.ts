@@ -11,6 +11,7 @@ import {
 } from './extensions.svelte';
 import { getActivePluginEditor, type PluginEditorCommandContext } from './editor-commands.svelte';
 import type { PluginDescriptor } from './types';
+import { createPluginFilesApi, type PluginFilesApi } from './capabilities';
 import { loadWorkerPlugin } from './worker-runtime';
 
 export interface PluginCommandDef {
@@ -36,6 +37,7 @@ export interface PluginEditorCommandDef {
 export interface PluginApi {
 	vaultId: string;
 	pluginId: string;
+	files: PluginFilesApi;
 	registerCommand: (command: PluginCommandDef) => void;
 	registerEditorCommand: (command: PluginEditorCommandDef) => void;
 	registerMarkdownPostprocessor: (processor: PluginMarkdownPostprocessorDef) => void;
@@ -132,6 +134,7 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 			const pluginApi: PluginApi = {
 				vaultId,
 				pluginId: plugin.id,
+				files: createPluginFilesApi(vaultId),
 				registerCommand(command) {
 					if (!isCommandId(command.id)) throw new Error(`invalid command id: ${command.id}`);
 					const id = scopedCommandId(plugin.id, command.id);

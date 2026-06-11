@@ -254,6 +254,14 @@ Panel renderers can also be iframe-backed. When a plugin registers a panel with
 enabled but parent-origin access blocked. The host sends serializable panel
 context to the iframe with `postMessage`.
 
+File capabilities live in `src/lib/plugins/capabilities.ts`. Plugins receive
+`api.files.readNote` and `api.files.writeNote`, which clean paths, reject
+hidden/relative segments, and route note access through the same typed
+`vault-api` wrapper as the first-party UI. Worker plugins request those
+capabilities with `capabilityRequest` messages; the host executes them and
+returns serializable `capabilityResponse` payloads without enabling worker
+network access.
+
 Editor commands reuse the normal command registry but resolve their mutable
 surface through `src/lib/plugins/editor-commands.svelte.ts`. `NoteView.svelte`
 registers the active editor API by vault/pane/tab while a note is in Live or
@@ -265,9 +273,10 @@ runs registered plugin postprocessors against the preview root with the active
 `NoteDoc` context.
 
 Worker execution plus iframe panels isolate command logic and plugin UI from
-the main DOM, but this is not a complete untrusted-plugin permission system. A
-stricter capability proxy for file/editor APIs remains required before
-arbitrary third-party plugins are safe.
+the main DOM, and note file access now goes through a host capability proxy.
+This is still not a complete untrusted-plugin permission system: active-editor
+mutation proxying remains required before arbitrary third-party plugins are
+safe.
 
 ## Offline / PWA
 
