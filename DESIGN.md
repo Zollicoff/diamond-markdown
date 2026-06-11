@@ -215,6 +215,11 @@ release verifier runs repeated `node build` smoke servers against the same build
 tree. Avoiding `.br`/`.gz` sidecars keeps those smoke runs from crashing on
 stale compressed-asset lookups.
 
+The release verifier also removes `build/` and `.svelte-kit/output/` before the
+production build. Repeated local verification should prove the freshly built
+server and client manifest agree, not accidentally reuse stale immutable chunks
+from an earlier build.
+
 ## App dialogs and notifications
 
 Browser-native `alert()` / `confirm()` calls are intentionally avoided in app

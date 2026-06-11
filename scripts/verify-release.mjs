@@ -23,8 +23,17 @@ function playwrightEnv() {
 	return {};
 }
 
+function cleanProductionBuildOutput() {
+	console.log('\n==> Clean production build output');
+	for (const target of ['build', '.svelte-kit/output']) {
+		fs.rmSync(target, { recursive: true, force: true });
+		console.log(`removed ${target}`);
+	}
+}
+
 run('Dependency audit', 'npm', ['audit', '--audit-level=moderate']);
 run('Type and Svelte diagnostics', 'npm', ['run', 'check']);
+cleanProductionBuildOutput();
 run('Production build', 'npm', ['run', 'build', '--', '--logLevel', 'warn'], { CI: '1' });
 run('Basic Auth production smoke', 'npm', ['run', 'verify:auth']);
 run('Read-only production smoke', 'npm', ['run', 'verify:readonly']);
