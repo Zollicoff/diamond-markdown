@@ -71,10 +71,10 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	const searchBody = await search.json() as { results: { path: string }[] };
 	expect(searchBody.results.some((r) => r.path === 'Cache Seed.md')).toBe(true);
 
-	const cacheFiles = fs.readdirSync(cacheDir).filter((name) => name.endsWith('.json'));
-	expect(cacheFiles).toHaveLength(1);
-	const cachePath = path.join(cacheDir, cacheFiles[0]);
-	const cache = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as {
+	const cacheFiles = fs.readdirSync(cacheDir)
+		.filter((name) => name.endsWith('.json'))
+		.map((name) => path.join(cacheDir, name));
+	type CacheEntry = {
 		version: number;
 		vaultId: string;
 		vaultPath: string;
@@ -82,6 +82,15 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 		notes: { notePath: string }[];
 		linksOutRaw: { notePath: string; targets: string[] }[];
 	};
+
+	const cacheEntries = cacheFiles.map((cachePath) => ({
+		cachePath,
+		body: JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as CacheEntry
+	}));
+	const matchingCaches = cacheEntries.filter((entry) => entry.body.vaultId === vault.id);
+	expect(matchingCaches).toHaveLength(1);
+	const { cachePath, body: cache } = matchingCaches[0];
+	const updatedCache = (): CacheEntry => JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as CacheEntry;
 	expect(cache.version).toBe(1);
 	expect(cache.vaultId).toBe(vault.id);
 	expect(cache.vaultPath).toBe(path.resolve(vaultDir));
@@ -93,10 +102,7 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 		data: { path: 'Cache Added.md', content: '# Cache Added\n\nMore cache text.\n', commitNow: false }
 	});
 	expect(saved.ok()).toBe(true);
-	const updated = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as {
-		files: { rel: string }[];
-		notes: { notePath: string }[];
-	};
+	const updated = updatedCache();
 	expect(updated.files.map((f) => f.rel)).toContain('Cache Added.md');
 	expect(updated.notes.map((n) => n.notePath)).toContain('Cache Added.md');
 });
@@ -805,7 +811,7 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 	await expect(page.locator('.change-box.overlap').getByText('Shared.md')).toBeVisible();
 });
 
-test('vault writes are blocked when fetched remote commits need pulling', async ({ request }) => {
+test('vault writes are blocked until fetched remote commits are pulled', async ({ request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-vault');
 	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-origin.git');
 	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-remote-worktree');
@@ -859,6 +865,16 @@ test('vault writes are blocked when fetched remote commits need pulling', async 
 	expect(blockedSave.status()).toBe(409);
 	expect(await blockedSave.text()).toContain('pull remote changes before editing vault files');
 	expect(fs.existsSync(path.join(vaultDir, 'Local While Behind.md'))).toBe(false);
+
+	const pulled = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'pull' } });
+	expect(pulled.ok()).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(true);
+
+	const unblockedSave = await request.post(`/api/vaults/${vault.id}/note`, {
+		data: { path: 'Local After Pull.md', content: '# Local after pull\n' }
+	});
+	expect(unblockedSave.ok()).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, 'Local After Pull.md'))).toBe(true);
 });
 
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {

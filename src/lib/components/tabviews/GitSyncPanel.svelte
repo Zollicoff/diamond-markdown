@@ -5,9 +5,10 @@
 
 	interface Props {
 		vaultId: string;
+		vaultPath?: string;
 	}
 
-	let { vaultId }: Props = $props();
+	let { vaultId, vaultPath = '' }: Props = $props();
 
 	let status = $state<GitSyncStatus | null>(null);
 	let remoteUrl = $state('');
@@ -21,6 +22,31 @@
 	const canPull = $derived(!!status?.canPull && !isBusy);
 	const canPush = $derived(!!status?.canPush && !isBusy);
 	const hasDiverged = $derived(!!status?.diverged);
+	const hasRemoteChanges = $derived(!!status && !status.diverged && status.behind > 0);
+	const hasConflicts = $derived((status?.conflicted.length ?? 0) > 0);
+	const resolutionCommands = $derived.by(() => buildResolutionCommands(status, vaultPath));
+
+	function shellQuote(value: string): string {
+		return `'${value.replaceAll("'", "'\\''")}'`;
+	}
+
+	function buildResolutionCommands(next: GitSyncStatus | null, pathHint: string): string {
+		if (!next) return '';
+		const cd = pathHint ? `cd ${shellQuote(pathHint)}` : '# cd /path/to/vault';
+		const branch = next.branch ? shellQuote(next.branch) : '<branch>';
+		const remoteRef = next.branch ? shellQuote(`origin/${next.branch}`) : 'origin/<branch>';
+
+		if (next.conflicted.length > 0) {
+			return [cd, 'git status', '# resolve conflicted files', 'git add -A', 'git commit', 'git push'].join('\n');
+		}
+		if (next.diverged) {
+			return [cd, 'git fetch origin', `git merge ${remoteRef}`, '# resolve any conflicts', 'git add -A', 'git commit', 'git push'].join('\n');
+		}
+		if (next.behind > 0) {
+			return [cd, `git pull --ff-only origin ${branch}`].join('\n');
+		}
+		return '';
+	}
 
 	function applyStatus(next: GitSyncStatus): void {
 		status = next;
@@ -123,16 +149,48 @@
 		<button class="action-btn primary" onclick={() => run('push', () => api.pushSync(vaultId))} disabled={!canPush}>Push</button>
 	</div>
 
-	{#if status?.conflicted.length}
-		<ul class="file-list">
-			{#each status.conflicted as file (file)}
-				<li class="mono">{file}</li>
-			{/each}
-		</ul>
+	{#if hasRemoteChanges && status}
+		<div class="sync-block">
+			<div class="diverged-head">
+				<div>
+					<div class="panel-title">Remote changes waiting</div>
+					<div class="panel-subtitle">
+						{status.behind} commit{status.behind === 1 ? '' : 's'} must be pulled before vault writes continue.
+					</div>
+				</div>
+				<span class="badge">Writes paused</span>
+			</div>
+			<p>
+				Pull the fast-forward changes, then continue editing. Diamond blocks new vault mutations while the last fetched remote is ahead.
+			</p>
+			<div class="panel-actions">
+				<button class="action-btn primary" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!canPull}>Pull now</button>
+				<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh</button>
+			</div>
+			{@render commandBlock(resolutionCommands)}
+		</div>
+	{/if}
+
+	{#if hasConflicts && status}
+		<div class="sync-block danger-block">
+			<div class="diverged-head">
+				<div>
+					<div class="panel-title">Merge conflicts</div>
+					<div class="panel-subtitle">Resolve conflicted files before editing vault files.</div>
+				</div>
+				<span class="badge">Blocked</span>
+			</div>
+			<ul class="file-list">
+				{#each status.conflicted as file (file)}
+					<li class="mono">{file}</li>
+				{/each}
+			</ul>
+			{@render commandBlock(resolutionCommands)}
+		</div>
 	{/if}
 
 	{#if hasDiverged && status}
-		<div class="diverged-panel">
+		<div class="sync-block diverged-panel">
 			<div class="diverged-head">
 				<div>
 					<div class="panel-title">Diverged history</div>
@@ -145,6 +203,10 @@
 			<p>
 				Diamond will not auto-merge vault files. Resolve the git history outside the app, then refresh sync status.
 			</p>
+			<div class="panel-actions">
+				<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh after resolve</button>
+			</div>
+			{@render commandBlock(resolutionCommands)}
 
 			<div class="change-grid">
 				<div class="change-box local">
@@ -180,6 +242,12 @@
 		</ul>
 	{:else}
 		<div class="empty">{empty}</div>
+	{/if}
+{/snippet}
+
+{#snippet commandBlock(commands: string)}
+	{#if commands}
+		<pre class="command-block mono"><code>{commands}</code></pre>
 	{/if}
 {/snippet}
 
@@ -322,7 +390,7 @@
 	}
 
 	.file-list {
-		margin: 10px 0 0;
+		margin: 10px 0;
 		padding: 8px 12px 8px 26px;
 		border: 1px solid var(--border);
 		border-radius: 6px;
@@ -338,12 +406,15 @@
 	.ok-msg { color: var(--success); }
 	.err { color: var(--danger); }
 	.mono { font-family: var(--mono); }
-	.diverged-panel {
+	.sync-block {
 		margin-top: 12px;
 		padding: 12px;
 		border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
 		border-radius: 7px;
 		background: var(--bg);
+	}
+	.danger-block {
+		border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
 	}
 	.diverged-head {
 		display: flex;
@@ -375,6 +446,30 @@
 		font-size: 0.8rem;
 		line-height: 1.45;
 		margin: 10px 0;
+	}
+	.sync-block p {
+		color: var(--fg-muted);
+		font-size: 0.8rem;
+		line-height: 1.45;
+		margin: 10px 0;
+	}
+	.panel-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin: 8px 0 10px;
+	}
+	.command-block {
+		margin: 10px 0;
+		padding: 9px 10px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg-elev);
+		color: var(--fg);
+		font-size: 0.72rem;
+		line-height: 1.45;
+		overflow-x: auto;
+		white-space: pre;
 	}
 	.change-grid {
 		display: grid;

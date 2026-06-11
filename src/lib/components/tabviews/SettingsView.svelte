@@ -115,7 +115,7 @@
 			</section>
 
 			<div id="sync" class="anchor">
-				<GitSyncPanel vaultId={vault.id} />
+				<GitSyncPanel vaultId={vault.id} vaultPath={vault.path} />
 			</div>
 
 			<div id="plugins" class="anchor">
