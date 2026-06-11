@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getVault } from '$lib/server/vault';
 import {
+	checkGitHubRemote,
 	fetchGitHubRemote,
 	getGitSyncStatus,
 	pullGitHubRemote,
@@ -9,7 +10,7 @@ import {
 	setGitHubRemote
 } from '$lib/server/git-sync';
 
-type SyncAction = 'set-remote' | 'fetch' | 'pull' | 'push';
+type SyncAction = 'set-remote' | 'check' | 'fetch' | 'pull' | 'push';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const vault = getVault(params.vaultId);
@@ -29,6 +30,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	try {
 		if (body.action === 'set-remote') {
 			return json(await setGitHubRemote(vault, body.remoteUrl ?? ''));
+		}
+		if (body.action === 'check') {
+			return json(await checkGitHubRemote(vault));
 		}
 		if (body.action === 'fetch') {
 			return json(await fetchGitHubRemote(vault));

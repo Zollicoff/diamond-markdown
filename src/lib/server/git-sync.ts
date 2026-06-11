@@ -6,6 +6,8 @@
  * are surfaced instead of merged behind the user's back.
  */
 
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { SimpleGit } from 'simple-git';
 import type { GitSyncResult, GitSyncStatus } from '$lib/types';
 import type { Vault } from './vault';
@@ -14,6 +16,8 @@ import { getVaultGit, hasRef, parseAheadBehind, rawOrNull } from './git';
 const GITHUB_HTTPS_REMOTE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
 const GITHUB_SSH_REMOTE = /^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
 const GITHUB_SSH_URL_REMOTE = /^ssh:\/\/git@github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
+const REMOTE_HEALTH_TIMEOUT_MS = 15_000;
+const execFileAsync = promisify(execFile);
 
 function parsePathList(raw: string | null): string[] {
 	if (!raw) return [];
@@ -89,6 +93,26 @@ function statusMessage(status: GitSyncStatus): string {
 	if (status.behind > 0) return `${status.behind} remote commit${status.behind === 1 ? '' : 's'} ready to pull.`;
 	if (status.ahead > 0) return `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ready to push.`;
 	return 'Vault is clean and up to date with the last fetched remote state.';
+}
+
+function refsFromLsRemote(raw: string | Buffer): string[] {
+	return raw.toString().split('\n')
+		.map((line) => line.trim().split(/\s+/)[1])
+		.filter((ref): ref is string => !!ref)
+		.sort();
+}
+
+function cleanGitFailure(e: unknown, remoteUrl: string): string {
+	const err = e as { killed?: boolean; signal?: string; stderr?: string | Buffer; stdout?: string | Buffer; message?: string };
+	if (err.killed || err.signal === 'SIGTERM') return `git timed out after ${REMOTE_HEALTH_TIMEOUT_MS / 1000}s`;
+	const raw = (err.stderr ?? err.stdout ?? err.message ?? '').toString();
+	const redacted = redactRemoteUrl(remoteUrl) ?? 'origin';
+	const firstLine = raw
+		.replaceAll(remoteUrl, redacted)
+		.split('\n')
+		.map((line) => line.trim())
+		.find(Boolean);
+	return firstLine ? firstLine.slice(0, 240) : 'git ls-remote failed';
 }
 
 export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
@@ -173,6 +197,42 @@ export async function setGitHubRemote(vault: Vault, remoteUrl: string): Promise<
 		status: await getGitSyncStatus(vault),
 		message: 'GitHub remote saved.'
 	};
+}
+
+export async function checkGitHubRemote(vault: Vault): Promise<GitSyncResult> {
+	const g = await getVaultGit(vault);
+	const remoteUrl = await originRemote(g);
+	if (!remoteUrl) throw new Error('GitHub remote is not configured');
+	const branch = await currentBranch(g);
+	try {
+		const { stdout } = await execFileAsync('git', ['-C', vault.path, 'ls-remote', '--heads', 'origin'], {
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				GIT_TERMINAL_PROMPT: '0',
+				GCM_INTERACTIVE: 'never'
+			},
+			timeout: REMOTE_HEALTH_TIMEOUT_MS,
+			maxBuffer: 1024 * 1024
+		});
+		const refs = refsFromLsRemote(stdout);
+		const branchRef = branch ? `refs/heads/${branch}` : null;
+		let detail = 'remote heads are visible.';
+		if (branchRef && refs.includes(branchRef)) {
+			detail = `branch ${branch} is available.`;
+		} else if (branch && refs.length === 0) {
+			detail = `no remote branches found yet; first push will create ${branch}.`;
+		} else if (branch) {
+			detail = `current branch ${branch} is not on the remote yet.`;
+		}
+		return {
+			ok: true,
+			status: await getGitSyncStatus(vault),
+			message: `GitHub remote is reachable; ${detail}`
+		};
+	} catch (e) {
+		throw new Error(`GitHub remote check failed: ${cleanGitFailure(e, remoteUrl)}`);
+	}
 }
 
 export async function fetchGitHubRemote(vault: Vault): Promise<GitSyncResult> {

@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getVault } from '$lib/server/vault';
-import { assertVaultCanWrite, isVaultWriteBlockedError } from '$lib/server/git';
+import { assertVaultCanWrite, commitChange, isVaultWriteBlockedError } from '$lib/server/git';
 import { installPluginFromCatalog, installPluginFromUrl, listPlugins } from '$lib/server/plugins';
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -26,7 +26,13 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				manifestUrl: body.manifestUrl!,
 				replace: body.replace === true
 			});
-		return json({ plugin, plugins: listPlugins(vault), message: `Installed ${plugin.name}.` });
+		const commit = await commitChange(
+			vault,
+			[`.diamondmd/plugins/${plugin.id}`],
+			body.replace === true ? 'edit' : 'create',
+			`plugin ${plugin.id}`
+		);
+		return json({ plugin, plugins: listPlugins(vault), message: `Installed ${plugin.name}.`, sha: commit?.sha ?? null });
 	} catch (e) {
 		throw error(isVaultWriteBlockedError(e) ? 409 : 400, (e as Error).message);
 	}

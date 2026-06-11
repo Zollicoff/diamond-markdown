@@ -18,16 +18,30 @@
 
 	const isBusy = $derived(busy !== null);
 	const canSaveRemote = $derived(remoteUrl.trim().length > 0 && !isBusy);
+	const canCheck = $derived(!!status?.remoteUrl && !isBusy);
 	const canFetch = $derived(!!status?.remoteUrl && !isBusy);
 	const canPull = $derived(!!status?.canPull && !isBusy);
 	const canPush = $derived(!!status?.canPush && !isBusy);
 	const hasDiverged = $derived(!!status?.diverged);
 	const hasRemoteChanges = $derived(!!status && !status.diverged && status.behind > 0);
 	const hasConflicts = $derived((status?.conflicted.length ?? 0) > 0);
+	const setupCommands = $derived.by(() => buildSetupCommands(status, vaultPath, remoteUrl));
 	const resolutionCommands = $derived.by(() => buildResolutionCommands(status, vaultPath));
 
 	function shellQuote(value: string): string {
 		return `'${value.replaceAll("'", "'\\''")}'`;
+	}
+
+	function buildSetupCommands(next: GitSyncStatus | null, pathHint: string, remoteHint: string): string {
+		if (!next?.needsRemote) return '';
+		const cd = pathHint ? `cd ${shellQuote(pathHint)}` : '# cd /path/to/vault';
+		const remote = remoteHint.trim() || 'https://github.com/owner/repo.git';
+		const branch = next.branch ?? 'main';
+		return [
+			cd,
+			`git remote add origin ${shellQuote(remote)}`,
+			`git push -u origin ${shellQuote(branch)}`
+		].join('\n');
 	}
 
 	function buildResolutionCommands(next: GitSyncStatus | null, pathHint: string): string {
@@ -144,10 +158,24 @@
 
 	<div class="actions">
 		<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh</button>
+		<button class="action-btn" onclick={() => run('check', () => api.checkSync(vaultId))} disabled={!canCheck}>Check remote</button>
 		<button class="action-btn" onclick={() => run('fetch', () => api.fetchSync(vaultId))} disabled={!canFetch}>Fetch</button>
 		<button class="action-btn" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!canPull}>Pull</button>
 		<button class="action-btn primary" onclick={() => run('push', () => api.pushSync(vaultId))} disabled={!canPush}>Push</button>
 	</div>
+
+	{#if status?.needsRemote}
+		<div class="sync-block">
+			<div class="diverged-head">
+				<div>
+					<div class="panel-title">Connect a GitHub repository</div>
+					<div class="panel-subtitle">Save a remote above, or run the equivalent git commands in this vault.</div>
+				</div>
+				<span class="badge">Setup</span>
+			</div>
+			{@render commandBlock(setupCommands)}
+		</div>
+	{/if}
 
 	{#if hasRemoteChanges && status}
 		<div class="sync-block">

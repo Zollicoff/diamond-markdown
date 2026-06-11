@@ -327,6 +327,12 @@ export function activate(api) {
 		expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'remote-test', 'main.js'))).toBe(true);
 		await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondRemotePluginActivated)).toBe('remote-test');
 
+		const sync = await request.get(`/api/vaults/${vault.id}/sync`);
+		expect(sync.ok()).toBe(true);
+		const syncBody = await sync.json() as { clean: boolean; files: unknown[] };
+		expect(syncBody.clean).toBe(true);
+		expect(syncBody.files).toHaveLength(0);
+
 		await page.keyboard.press('Meta+P');
 		await page.locator('input[placeholder="Run a command…"]').fill('Remote Plugin Ping');
 		await page.getByRole('button', { name: /Remote Plugin Ping/ }).click();
@@ -337,6 +343,51 @@ export function activate(api) {
 		});
 		expect(duplicate.status()).toBe(400);
 		expect(await duplicate.text()).toContain('plugin already installed');
+	} finally {
+		await remote.close();
+	}
+});
+
+test('concurrent sync status and plugin install share fresh git initialization', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'concurrent-git-init-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	const remote = await servePluginFiles({
+		'/plugin.json': JSON.stringify({
+			id: 'concurrent-test',
+			name: 'Concurrent Test Plugin',
+			version: '0.1.0',
+			description: 'Installed while sync initializes git.',
+			entry: 'main.js'
+		}),
+		'/main.js': 'export function activate() {}\n'
+	});
+	try {
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Concurrent Git Init Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const [sync, installed] = await Promise.all([
+			request.get(`/api/vaults/${vault.id}/sync`),
+			request.post(`/api/vaults/${vault.id}/plugins`, {
+				data: { manifestUrl: remote.url('/plugin.json') }
+			})
+		]);
+		expect(sync.ok()).toBe(true);
+		expect(installed.ok()).toBe(true);
+		const installBody = await installed.json() as { sha: string | null };
+		expect(installBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, '.git', 'index.lock'))).toBe(false);
+
+		const finalSync = await request.get(`/api/vaults/${vault.id}/sync`);
+		expect(finalSync.ok()).toBe(true);
+		const finalStatus = await finalSync.json() as { clean: boolean; files: unknown[] };
+		expect(finalStatus.clean).toBe(true);
+		expect(finalStatus.files).toHaveLength(0);
+		expect(git(vaultDir, ['log', '--oneline', '--', '.diamondmd/plugins/concurrent-test'])).toContain('create: plugin concurrent-test');
 	} finally {
 		await remote.close();
 	}
@@ -703,6 +754,7 @@ test('settings exposes GitHub sync status and controls', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 	await expect(page.getByPlaceholder('https://github.com/owner/repo.git')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Check remote' })).toBeVisible();
 	await expect(page.getByText(/Add a GitHub remote|Vault is clean|Commit or discard/)).toBeVisible({ timeout: 5_000 });
 });
 
@@ -730,6 +782,37 @@ test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	});
 	expect(res.status()).toBe(409);
 	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
+});
+
+test('sync API checks configured remote reachability without mutating the vault', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'remote-health-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'remote-health-origin.git');
+	for (const dir of [vaultDir, bareDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nHealth check.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Remote Health Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+
+	const checked = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'check' } });
+	expect(checked.ok()).toBe(true);
+	const body = await checked.json() as {
+		message: string;
+		status: { clean: boolean; files: unknown[]; needsRemote: boolean; remoteUrl: string | null };
+	};
+	expect(body.message).toContain('GitHub remote is reachable');
+	expect(body.status.remoteUrl).toBe(bareDir);
+	expect(body.status.needsRemote).toBe(false);
+	expect(body.status.clean).toBe(true);
+	expect(body.status.files).toHaveLength(0);
 });
 
 test('sync status surfaces diverged histories with overlapping file candidates', async ({ page, request }) => {

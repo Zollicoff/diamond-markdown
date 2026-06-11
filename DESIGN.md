@@ -147,6 +147,9 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
 
 - Only GitHub HTTPS and SSH remotes are accepted for `origin`.
 - Status reports branch, sha, clean/dirty state, conflicted files, ahead/behind counts, and the redacted remote URL.
+- The health check action runs non-interactive `git ls-remote --heads origin`
+  with credential prompts disabled, then reports whether the current branch is
+  visible or would be created by the first push.
 - Fetch updates remote refs without changing local files.
 - Pull is fast-forward only and requires a clean worktree.
 - Push requires a clean worktree and refuses when the remote is ahead.
@@ -157,6 +160,8 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
   if the last fetched `origin/<branch>` is behind the local checkout, diverged,
   or has merge conflicts, the API returns `409` instead of creating another
   vault mutation.
+- Plugin installs commit their plugin folder after writing, so installing a
+  plugin does not leave the vault dirty or block the next sync action.
 
 This keeps the browser UI safe for normal Obsidian-style sync without hiding
 Git's real conflict model.

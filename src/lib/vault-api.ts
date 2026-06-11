@@ -202,6 +202,14 @@ export const api = {
 		});
 	},
 
+	async checkSync(vaultId: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'check' })
+		});
+	},
+
 	async fetchSync(vaultId: string): Promise<GitSyncResult> {
 		return json(`/api/vaults/${vaultId}/sync`, {
 			method: 'POST',

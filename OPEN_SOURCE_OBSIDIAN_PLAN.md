@@ -57,7 +57,9 @@ Risks:
   APIs now block after fetch when the remote is behind, diverged, or
   merge-conflicted.
 - Add a conflict-resolution workflow for remote pulls and local edits.
-- Support per-vault remote setup instructions and health checks.
+- Support per-vault remote setup instructions and health checks. ✓ Settings now
+  shows setup commands for unconfigured vaults and can run a non-interactive
+  remote reachability check.
 
 ### 4. Improve Daily-Driver UX
 

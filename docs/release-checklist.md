@@ -99,11 +99,13 @@ Check:
 
 - Fresh vault gets an `init: vault` commit and clean sync status.
 - Non-GitHub remotes are rejected.
+- Configured remotes can be checked with the Settings health-check action.
 - Fetch does not mutate files.
 - Pull is fast-forward only.
 - Push refuses when the vault is dirty or behind.
 - Diverged histories are reported as manual-merge state.
 - After fetch, behind/diverged/merge-conflicted vaults block write APIs with `409`.
+- Plugin installs create a commit and leave the vault clean.
 
 ## 7. Basic Auth Smoke
 

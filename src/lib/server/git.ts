@@ -13,16 +13,14 @@ import { simpleGit, type SimpleGit } from 'simple-git';
 import type { Vault } from './vault';
 
 const gitCache = new Map<string, SimpleGit>();
+const gitInitCache = new Map<string, Promise<SimpleGit>>();
 const VAULT_WRITE_BLOCKED_MESSAGES = new Set([
 	'resolve merge conflicts before editing vault files',
 	'local and remote histories diverged; resolve sync before editing vault files',
 	'pull remote changes before editing vault files'
 ]);
 
-async function gitFor(vault: Vault): Promise<SimpleGit> {
-	let g = gitCache.get(vault.id);
-	if (g) return g;
-
+async function initializeGit(vault: Vault): Promise<SimpleGit> {
 	// Lazy init. Use explicit `git -C <vault> init` before constructing the
 	// long-lived simple-git instance so vaults nested inside another repo do
 	// not accidentally operate on the parent repository.
@@ -31,8 +29,7 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	if (initialized) {
 		execFileSync('git', ['-C', vault.path, 'init'], { stdio: 'ignore' });
 	}
-	g = simpleGit(vault.path);
-	gitCache.set(vault.id, g);
+	const g = simpleGit(vault.path);
 
 	// Ensure a usable identity even if the user hasn't set one globally.
 	const cfg = await g.listConfig();
@@ -48,7 +45,22 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 		}
 	}
 
+	gitCache.set(vault.id, g);
 	return g;
+}
+
+async function gitFor(vault: Vault): Promise<SimpleGit> {
+	const cached = gitCache.get(vault.id);
+	if (cached) return cached;
+
+	const pending = gitInitCache.get(vault.id);
+	if (pending) return pending;
+
+	const initializing = initializeGit(vault).finally(() => {
+		gitInitCache.delete(vault.id);
+	});
+	gitInitCache.set(vault.id, initializing);
+	return initializing;
 }
 
 export async function rawOrNull(g: SimpleGit, args: string[]): Promise<string | null> {
