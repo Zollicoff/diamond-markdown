@@ -77,8 +77,8 @@ Use small, pushable slices:
 
 1. **Import and migration helpers.** Expand migration guidance for unsupported
    Obsidian plugin settings, canvas files, and unusual attachment layouts.
-2. **Verification hardening.** Add tests for dialog-driven destructive actions,
-   sync recovery copy, plugin install replacement behavior, and import helpers.
+2. **Verification hardening.** Add tests for remaining dialog-driven
+   destructive actions, sync recovery copy, and deeper import edge cases.
 
 ## Verification Gates
 

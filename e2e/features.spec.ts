@@ -474,6 +474,76 @@ export function activate(api) {
 	}
 });
 
+test('plugin install replacement overwrites files and commits a clean edit', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-replace-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	const pluginFiles = {
+		'/plugin.json': JSON.stringify({
+			id: 'replace-test',
+			name: 'Replace Test Plugin',
+			version: '0.1.0',
+			description: 'First installed version.',
+			entry: 'main.js',
+			commands: [{ id: 'replace-ping', title: 'Replace Test Ping', category: 'plugin' }]
+		}),
+		'/main.js': 'export function activate(api) { window.__diamondReplaceVersion = "0.1.0"; }\n'
+	};
+	const remote = await servePluginFiles(pluginFiles);
+	try {
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Plugin Replace Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		await page.goto(`/vault/${vault.id}`);
+		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByLabel('Settings').click();
+		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
+		await page.getByRole('button', { name: 'Install', exact: true }).click();
+		await expect(page.getByText('Installed Replace Test Plugin. Plugin runtime reload requested.')).toBeVisible();
+		const card = page.locator('.plugin-card').filter({ hasText: 'replace-test' });
+		await expect(card).toContainText('0.1.0');
+		await expect(card).toContainText('First installed version.');
+
+		pluginFiles['/plugin.json'] = JSON.stringify({
+			id: 'replace-test',
+			name: 'Replace Test Plugin',
+			version: '0.2.0',
+			description: 'Replacement version from the same manifest URL.',
+			entry: 'main.js',
+			commands: [{ id: 'replace-ping', title: 'Replace Test Ping', category: 'plugin' }]
+		});
+		pluginFiles['/main.js'] = 'export function activate(api) { window.__diamondReplaceVersion = "0.2.0"; }\n';
+
+		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
+		await page.getByLabel('Replace existing plugin with the same id').check();
+		await page.getByRole('button', { name: 'Install', exact: true }).click();
+		await expect(page.getByText('Installed Replace Test Plugin. Plugin runtime reload requested.')).toBeVisible();
+		await expect(card).toContainText('0.2.0');
+		await expect(card).toContainText('Replacement version from the same manifest URL.');
+		await expect(page.getByLabel('Replace existing plugin with the same id')).not.toBeChecked();
+
+		const manifestPath = path.join(vaultDir, '.diamondmd', 'plugins', 'replace-test', 'plugin.json');
+		const entryPath = path.join(vaultDir, '.diamondmd', 'plugins', 'replace-test', 'main.js');
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { version: string; description: string };
+		expect(manifest.version).toBe('0.2.0');
+		expect(manifest.description).toBe('Replacement version from the same manifest URL.');
+		expect(fs.readFileSync(entryPath, 'utf-8')).toContain('0.2.0');
+		expect(git(vaultDir, ['log', '--oneline', '--', '.diamondmd/plugins/replace-test'])).toContain('edit: plugin replace-test');
+
+		const sync = await request.get(`/api/vaults/${vault.id}/sync`);
+		expect(sync.ok()).toBe(true);
+		const syncBody = await sync.json() as { clean: boolean; files: unknown[] };
+		expect(syncBody.clean).toBe(true);
+		expect(syncBody.files).toHaveLength(0);
+	} finally {
+		await remote.close();
+	}
+});
+
 test('concurrent sync status and plugin install share fresh git initialization', async ({ request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'concurrent-git-init-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });

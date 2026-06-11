@@ -5,6 +5,8 @@ import {
 	classifyGitSyncRecovery,
 	gitSyncIndicator
 } from '../src/lib/sync/status';
+import { buildGitSyncRecoveryCopy } from '../src/lib/sync/recovery';
+import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '../src/lib/sync/commands';
 
 function status(overrides: Partial<GitSyncStatus> = {}): GitSyncStatus {
 	return {
@@ -77,5 +79,44 @@ test.describe('git sync UI state', () => {
 			indicator: 'warn',
 			recovery: 'remote-changes'
 		});
+	});
+
+	test('builds setup and recovery copy with matching operator commands', () => {
+		const setup = status({ needsRemote: true, remoteUrl: null, remoteDisplayUrl: null });
+		expect(buildGitSyncRecoveryCopy(setup)).toMatchObject({
+			kind: 'setup',
+			title: 'Connect a GitHub repository',
+			badge: 'Setup'
+		});
+		expect(buildGitSyncSetupCommands(setup, "/Users/me/My Vault", "https://github.com/owner/vault.git")).toBe(
+			"cd '/Users/me/My Vault'\n" +
+			"git remote add origin 'https://github.com/owner/vault.git'\n" +
+			"git push -u origin 'main'"
+		);
+
+		const behind = status({ behind: 2, canPull: true, canPush: false });
+		expect(buildGitSyncRecoveryCopy(behind)).toMatchObject({
+			kind: 'remote-changes',
+			subtitle: '2 commits must be pulled before vault writes continue.',
+			badge: 'Writes paused'
+		});
+		expect(buildGitSyncResolutionCommands(behind, '/vault')).toBe("cd '/vault'\ngit pull --ff-only origin 'main'");
+
+		const conflicted = status({ conflicted: ['Shared.md'], clean: false });
+		expect(buildGitSyncRecoveryCopy(conflicted)).toMatchObject({
+			kind: 'conflicts',
+			title: 'Merge conflicts',
+			badge: 'Blocked'
+		});
+		expect(buildGitSyncResolutionCommands(conflicted, '/vault')).toContain('# resolve conflicted files');
+
+		const diverged = status({ diverged: true, ahead: 1, behind: 1, canPull: false, canPush: false });
+		expect(buildGitSyncRecoveryCopy(diverged)).toMatchObject({
+			kind: 'diverged',
+			title: 'Diverged history',
+			subtitle: 'Manual merge required between abc1234 and def5678.',
+			badge: 'Blocked'
+		});
+		expect(buildGitSyncResolutionCommands(diverged, '/vault')).toContain("git merge 'origin/main'");
 	});
 });

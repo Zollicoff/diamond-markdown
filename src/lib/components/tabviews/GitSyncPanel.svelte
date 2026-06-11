@@ -3,6 +3,7 @@
 	import { api } from '$lib/vault-api';
 	import type { GitSyncStatus } from '$lib/types';
 	import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '$lib/sync/commands';
+	import { buildGitSyncRecoveryCopy } from '$lib/sync/recovery';
 	import { buildGitSyncUiState } from '$lib/sync/status';
 
 	interface Props {
@@ -19,6 +20,7 @@
 	let error = $state<string | null>(null);
 
 	const ui = $derived(buildGitSyncUiState(status, remoteUrl, busy));
+	const recoveryCopy = $derived(buildGitSyncRecoveryCopy(status));
 	const setupCommands = $derived.by(() => buildGitSyncSetupCommands(status, vaultPath, remoteUrl));
 	const resolutionCommands = $derived.by(() => buildGitSyncResolutionCommands(status, vaultPath));
 
@@ -128,10 +130,10 @@
 		<div class="sync-block">
 			<div class="diverged-head">
 				<div>
-					<div class="panel-title">Connect a GitHub repository</div>
-					<div class="panel-subtitle">Save a remote above, or run the equivalent git commands in this vault.</div>
+					<div class="panel-title">{recoveryCopy?.title}</div>
+					<div class="panel-subtitle">{recoveryCopy?.subtitle}</div>
 				</div>
-				<span class="badge">Setup</span>
+				<span class="badge">{recoveryCopy?.badge}</span>
 			</div>
 			{@render commandBlock(setupCommands)}
 		</div>
@@ -141,15 +143,13 @@
 		<div class="sync-block">
 			<div class="diverged-head">
 				<div>
-					<div class="panel-title">Remote changes waiting</div>
-					<div class="panel-subtitle">
-						{status.behind} commit{status.behind === 1 ? '' : 's'} must be pulled before vault writes continue.
-					</div>
+					<div class="panel-title">{recoveryCopy?.title}</div>
+					<div class="panel-subtitle">{recoveryCopy?.subtitle}</div>
 				</div>
-				<span class="badge">Writes paused</span>
+				<span class="badge">{recoveryCopy?.badge}</span>
 			</div>
 			<p>
-				Pull the fast-forward changes, then continue editing. Diamond blocks new vault mutations while the last fetched remote is ahead.
+				{recoveryCopy?.body}
 			</p>
 			<div class="panel-actions">
 				<button class="action-btn primary" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!ui.canPull}>Pull now</button>
@@ -163,10 +163,10 @@
 		<div class="sync-block danger-block">
 			<div class="diverged-head">
 				<div>
-					<div class="panel-title">Merge conflicts</div>
-					<div class="panel-subtitle">Resolve conflicted files before editing vault files.</div>
+					<div class="panel-title">{recoveryCopy?.title}</div>
+					<div class="panel-subtitle">{recoveryCopy?.subtitle}</div>
 				</div>
-				<span class="badge">Blocked</span>
+				<span class="badge">{recoveryCopy?.badge}</span>
 			</div>
 			<ul class="file-list">
 				{#each status.conflicted as file (file)}
@@ -181,15 +181,13 @@
 		<div class="sync-block diverged-panel">
 			<div class="diverged-head">
 				<div>
-					<div class="panel-title">Diverged history</div>
-					<div class="panel-subtitle">
-						Manual merge required between {status.sha ?? 'local'} and {status.remoteSha ?? status.remoteBranch ?? 'remote'}.
-					</div>
+					<div class="panel-title">{recoveryCopy?.title}</div>
+					<div class="panel-subtitle">{recoveryCopy?.subtitle}</div>
 				</div>
-				<span class="badge">Blocked</span>
+				<span class="badge">{recoveryCopy?.badge}</span>
 			</div>
 			<p>
-				Diamond will not auto-merge vault files. Resolve the git history outside the app, then refresh sync status.
+				{recoveryCopy?.body}
 			</p>
 			<div class="panel-actions">
 				<button class="action-btn" onclick={loadStatus} disabled={ui.isBusy}>Refresh after resolve</button>
