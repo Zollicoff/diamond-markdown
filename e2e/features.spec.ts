@@ -128,6 +128,26 @@ export function activate(api) {
       window.__diamondPluginRan = api.vaultId;
     }
   });
+  api.registerSettingsPanel({
+    id: 'general',
+    title: 'Boot Test Settings',
+    description: 'Settings registered by a vault plugin.',
+    render(container, context) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Run plugin settings';
+      button.dataset.testid = 'plugin-settings-button';
+      const marker = document.createElement('span');
+      marker.dataset.testid = 'plugin-settings-marker';
+      marker.textContent = context.vaultId;
+      const run = () => {
+        window.__diamondPluginSettingsRan = context.pluginId;
+      };
+      button.addEventListener('click', run);
+      container.append(button, marker);
+      return () => button.removeEventListener('click', run);
+    }
+  });
 }
 `);
 
@@ -159,6 +179,11 @@ export function activate(api) {
 	await page.getByLabel('Settings').click();
 	await expect(page.getByText('Boot Test Plugin')).toBeVisible();
 	await expect(page.getByText('Plugin Boot Test')).toBeVisible();
+	await expect(page.getByText('Boot Test Settings')).toBeVisible();
+	await expect(page.getByText('Settings registered by a vault plugin.')).toBeVisible();
+	await expect(page.getByTestId('plugin-settings-marker')).toHaveText(vault.id);
+	await page.getByTestId('plugin-settings-button').click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginSettingsRan)).toBe('boot-test');
 });
 
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {

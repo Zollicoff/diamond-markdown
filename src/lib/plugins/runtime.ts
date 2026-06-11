@@ -1,5 +1,10 @@
 import { register, unregister, type CommandContext, type CommandDef } from '$lib/commands';
 import { api as vaultApi } from '$lib/vault-api';
+import {
+	clearVaultExtensions,
+	registerSettingsPanel,
+	type PluginSettingsPanelDef
+} from './extensions.svelte';
 import type { PluginDescriptor } from './types';
 
 export interface PluginCommandDef {
@@ -16,6 +21,7 @@ export interface PluginApi {
 	vaultId: string;
 	pluginId: string;
 	registerCommand: (command: PluginCommandDef) => void;
+	registerSettingsPanel: (panel: PluginSettingsPanelDef) => void;
 	notify: (message: string) => void;
 }
 
@@ -41,6 +47,10 @@ function scopedCommandId(pluginId: string, commandId: string): string {
 	return `plugin:${pluginId}:${commandId}`;
 }
 
+function scopedSettingsPanelId(pluginId: string, panelId: string): string {
+	return `plugin:${pluginId}:settings:${panelId}`;
+}
+
 function isCommandId(value: string): boolean {
 	return ID_RE.test(value);
 }
@@ -49,6 +59,7 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 	const registered = new Set<string>();
 	const disposers: (() => void)[] = [];
 	const results: PluginLoadResult[] = [];
+	clearVaultExtensions(vaultId);
 	const { plugins } = await vaultApi.plugins(vaultId);
 
 	for (const plugin of plugins) {
@@ -89,6 +100,21 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 					};
 					register(wrapped);
 					registered.add(id);
+				},
+				registerSettingsPanel(panel) {
+					if (!isCommandId(panel.id)) throw new Error(`invalid settings panel id: ${panel.id}`);
+					if (!panel.title?.trim()) throw new Error('settings panel title required');
+					if (typeof panel.render !== 'function') throw new Error('settings panel render function required');
+					const id = scopedSettingsPanelId(plugin.id, panel.id);
+					const unregisterPanel = registerSettingsPanel(vaultId, {
+						id,
+						localId: panel.id,
+						pluginId: plugin.id,
+						title: panel.title.trim(),
+						description: panel.description?.trim(),
+						render: panel.render
+					});
+					disposers.push(unregisterPanel);
 				},
 				notify(message) {
 					console.info(`[plugin:${plugin.id}] ${message}`);

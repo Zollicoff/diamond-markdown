@@ -216,6 +216,11 @@ palette actions through a small API. Runtime command ids are scoped as
 `plugin:<plugin-id>:<command-id>` so plugins cannot overwrite built-in command
 ids accidentally.
 
+Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
+The first extension point is a Settings panel renderer: plugins register a
+small DOM renderer, Settings renders it inside a bounded host, and runtime
+cleanup unregisters it when the vault shell unloads.
+
 Current plugins execute as trusted browser ESM. Sandboxed iframe/Worker execution
 remains a v0.5 requirement before untrusted third-party plugins are safe.
 

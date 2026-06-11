@@ -59,7 +59,28 @@ The public API is intentionally small while the plugin system is young:
 - `api.vaultId`
 - `api.pluginId`
 - `api.registerCommand(command)`
+- `api.registerSettingsPanel(panel)`
 - `api.notify(message)`
+
+## Settings Panels
+
+Plugins can add a small settings panel to the Settings tab:
+
+```js
+export function activate(api) {
+  api.registerSettingsPanel({
+    id: 'general',
+    title: 'Hello Diamond',
+    description: 'Settings owned by this plugin.',
+    render(container, context) {
+      container.innerHTML = `<button type="button">Ping ${context.pluginId}</button>`;
+    }
+  });
+}
+```
+
+`render(container, context)` may return a cleanup function. Diamond calls that
+cleanup when the vault UI unloads or the plugin runtime is disposed.
 
 ## Security Notes
 

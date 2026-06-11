@@ -2,10 +2,13 @@
 	import { page } from '$app/state';
 	import { theme, setMode, type ThemeMode } from '$lib/theme.svelte';
 	import { api } from '$lib/vault-api';
+	import { listSettingsPanels } from '$lib/plugins/extensions.svelte';
 	import GitSyncPanel from './GitSyncPanel.svelte';
 	import PluginPanel from './plugins/PluginPanel.svelte';
+	import PluginSettingsSlot from './plugins/PluginSettingsSlot.svelte';
 
 	const vault = $derived(page.data.vault as { id: string; name: string; path: string; excludedFolders: string[] });
+	const pluginSettingsPanels = $derived(listSettingsPanels(vault.id));
 	let excluded = $state<string[]>([]);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
@@ -92,6 +95,10 @@
 	<GitSyncPanel vaultId={vault.id} />
 
 	<PluginPanel vaultId={vault.id} />
+
+	{#each pluginSettingsPanels as panel (panel.id)}
+		<PluginSettingsSlot vaultId={vault.id} {panel} />
+	{/each}
 
 	<section class="group">
 		<h2>Excluded folders</h2>
