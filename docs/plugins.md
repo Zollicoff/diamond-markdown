@@ -28,6 +28,21 @@ underscores, and hyphens.
 `entry` defaults to `main.js` and must point to a `.js` or `.mjs` file inside
 the plugin directory.
 
+## Install From URL
+
+Settings -> Plugins can install a plugin from a remote manifest URL. Diamond
+fetches the `plugin.json`, validates the manifest, fetches the declared entry
+module beside that manifest, then writes both files into:
+
+```text
+<vault>/.diamondmd/plugins/<plugin-id>/
+```
+
+Manifest and entry URLs must use HTTPS, except localhost HTTP URLs are accepted
+for development. Diamond rejects URL credentials, plugin id/folder mismatches,
+absolute entry paths, `..` escapes, query/hash entry paths, and overwrite
+attempts unless "replace existing" is checked.
+
 ## Entry Module
 
 ```js

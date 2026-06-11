@@ -11,6 +11,10 @@
 	let plugins = $state<PluginDescriptor[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let installUrl = $state('');
+	let replaceExisting = $state(false);
+	let installing = $state(false);
+	let installMessage = $state<string | null>(null);
 
 	async function load(): Promise<void> {
 		loading = true;
@@ -28,6 +32,25 @@
 	onMount(() => {
 		void load();
 	});
+
+	async function install(): Promise<void> {
+		const manifestUrl = installUrl.trim();
+		if (!manifestUrl || installing) return;
+		installing = true;
+		error = null;
+		installMessage = null;
+		try {
+			const res = await api.installPlugin(vaultId, manifestUrl, replaceExisting);
+			plugins = res.plugins;
+			installMessage = `${res.message} Plugin runtime reload requested.`;
+			installUrl = '';
+			replaceExisting = false;
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			installing = false;
+		}
+	}
 </script>
 
 <section class="group">
@@ -36,6 +59,30 @@
 		Vault plugins live in <span class="mono">.diamondmd/plugins/&lt;plugin-id&gt;/</span>
 		with a <span class="mono">plugin.json</span> manifest and ESM entry module.
 	</p>
+
+	<form class="installer" onsubmit={(e) => { e.preventDefault(); void install(); }}>
+		<label for="plugin-manifest-url">Install from manifest URL</label>
+		<div class="install-row">
+			<input
+				id="plugin-manifest-url"
+				type="url"
+				bind:value={installUrl}
+				placeholder="https://example.com/plugin.json"
+				spellcheck="false"
+				autocomplete="off"
+			/>
+			<button type="submit" disabled={installing || !installUrl.trim()}>
+				{installing ? 'Installing...' : 'Install'}
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" bind:checked={replaceExisting} />
+			<span>Replace existing plugin with the same id</span>
+		</label>
+		{#if installMessage}
+			<div class="ok">{installMessage}</div>
+		{/if}
+	</form>
 
 	{#if loading}
 		<div class="empty">Loading plugins…</div>
@@ -100,6 +147,59 @@
 		font-size: 0.85rem;
 		margin: -8px 0 14px;
 	}
+	.installer {
+		display: grid;
+		gap: 8px;
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		background: color-mix(in srgb, var(--bg-elev) 76%, transparent);
+		padding: 12px;
+		margin-bottom: 12px;
+	}
+	.installer > label:first-child {
+		color: var(--fg);
+		font-size: 0.84rem;
+		font-weight: 700;
+	}
+	.install-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 8px;
+	}
+	input[type='url'] {
+		width: 100%;
+		box-sizing: border-box;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: var(--bg);
+		color: var(--fg);
+		font: inherit;
+		font-size: 0.84rem;
+		padding: 7px 9px;
+	}
+	.install-row button {
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: var(--accent);
+		color: var(--bg);
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 700;
+		padding: 7px 12px;
+		cursor: pointer;
+	}
+	.install-row button:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.check {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--fg-dim);
+		font-size: 0.78rem;
+	}
+	.check input { accent-color: var(--accent); }
 	.plugin-list {
 		list-style: none;
 		padding: 0;
@@ -186,6 +286,10 @@
 		color: var(--danger);
 		font-size: 0.82rem;
 		margin-top: 8px;
+	}
+	.ok {
+		color: var(--success);
+		font-size: 0.82rem;
 	}
 	.mono { font-family: var(--mono); }
 </style>

@@ -31,3 +31,8 @@ export interface PluginDescriptor {
 export interface PluginListResponse {
 	plugins: PluginDescriptor[];
 }
+
+export interface PluginInstallResponse extends PluginListResponse {
+	plugin: PluginDescriptor;
+	message: string;
+}

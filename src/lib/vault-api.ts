@@ -8,7 +8,7 @@
  */
 
 import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode } from './types';
-import type { PluginListResponse } from './plugins/types';
+import type { PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { emit } from './events';
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -216,5 +216,15 @@ export const api = {
 
 	async plugins(vaultId: string): Promise<PluginListResponse> {
 		return json(`/api/vaults/${vaultId}/plugins`);
+	},
+
+	async installPlugin(vaultId: string, manifestUrl: string, replace = false): Promise<PluginInstallResponse> {
+		const res = await json<PluginInstallResponse>(`/api/vaults/${vaultId}/plugins`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ manifestUrl, replace })
+		});
+		emit('plugins:reload', { vaultId });
+		return res;
 	}
 };

@@ -40,9 +40,20 @@
 		hydrateBookmarks(vaultId);
 		registerBuiltinCommands();
 		let disposePlugins: (() => void) | null = null;
-		void loadVaultPlugins(vaultId).then((runtime) => {
-			disposePlugins = runtime.dispose;
-		}).catch((e) => console.error('[plugins] boot failed:', e));
+		let pluginReloadSeq = 0;
+		async function reloadPlugins(): Promise<void> {
+			const seq = ++pluginReloadSeq;
+			disposePlugins?.();
+			disposePlugins = null;
+			try {
+				const runtime = await loadVaultPlugins(vaultId);
+				if (seq === pluginReloadSeq) disposePlugins = runtime.dispose;
+				else runtime.dispose();
+			} catch (e) {
+				console.error('[plugins] boot failed:', e);
+			}
+		}
+		void reloadPlugins();
 
 		const offs = [
 			bindVaultEvents(vaultId),
@@ -68,6 +79,10 @@
 			onBus('folder:deleted', (e) => {
 				if (e.vaultId !== vaultId) return;
 				deleteBookmark(vaultId, e.path);
+			}),
+			onBus('plugins:reload', (e) => {
+				if (e.vaultId !== vaultId) return;
+				void reloadPlugins();
 			}),
 			installGlobalKeymap(() => {
 				const pane = activePane();

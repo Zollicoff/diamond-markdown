@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 
@@ -17,6 +19,33 @@ async function openVault(page: Page): Promise<void> {
 
 function git(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
+}
+
+async function servePluginFiles(files: Record<string, string>): Promise<{ url: (path: string) => string; close: () => Promise<void> }> {
+	const server = http.createServer((req, res) => {
+		const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname;
+		const body = files[pathname];
+		if (!body) {
+			res.writeHead(404, { 'content-type': 'text/plain' });
+			res.end('not found');
+			return;
+		}
+		res.writeHead(200, {
+			'content-type': pathname.endsWith('.json') ? 'application/json' : 'application/javascript'
+		});
+		res.end(body);
+	});
+	await new Promise<void>((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, '127.0.0.1', resolve);
+	});
+	const address = server.address() as AddressInfo;
+	return {
+		url: (pathname: string) => `http://127.0.0.1:${address.port}${pathname}`,
+		close: () => new Promise<void>((resolve, reject) => {
+			server.close((err) => err ? reject(err) : resolve());
+		})
+	};
 }
 
 test('indexer writes a config-scoped warm cache and refreshes it on note save', async ({ request }) => {
@@ -212,7 +241,7 @@ export function activate(api) {
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginActivated)).toBe('boot-test');
 	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
-	await expect(page.getByLabel('Editor pane').getByText('Home')).toBeVisible();
+	await expect(page.getByLabel('Editor pane').getByText('Home', { exact: true })).toBeVisible();
 	await expect(page.getByText('Boot Test Right Panel')).toBeVisible();
 	await expect(page.getByText('Right panel registered by a vault plugin.')).toBeVisible();
 	await expect(page.getByTestId('plugin-right-panel-marker')).toHaveText('Home.md');
@@ -243,6 +272,68 @@ export function activate(api) {
 	await expect(page.getByTestId('plugin-settings-marker')).toHaveText(vault.id);
 	await page.getByTestId('plugin-settings-button').click();
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginSettingsRan)).toBe('boot-test');
+});
+
+test('plugin install UI fetches manifest URLs and reloads runtime', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-install-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	const remote = await servePluginFiles({
+		'/plugin.json': JSON.stringify({
+			id: 'remote-test',
+			name: 'Remote Test Plugin',
+			version: '0.1.0',
+			description: 'Installed from a remote manifest.',
+			entry: 'main.js',
+			commands: [{ id: 'ping', title: 'Remote Plugin Ping', category: 'plugin' }]
+		}),
+		'/main.js': `
+export function activate(api) {
+  window.__diamondRemotePluginActivated = api.pluginId;
+  api.registerCommand({
+    id: 'ping',
+    title: 'Remote Plugin Ping',
+    category: 'plugin',
+    exec() {
+      window.__diamondRemotePluginRan = api.vaultId;
+    }
+  });
+}
+`
+	});
+	try {
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Plugin Install Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		await page.goto(`/vault/${vault.id}`);
+		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByLabel('Settings').click();
+		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
+		await page.getByRole('button', { name: 'Install' }).click();
+		await expect(page.getByText('Installed Remote Test Plugin. Plugin runtime reload requested.')).toBeVisible();
+		await expect(page.locator('.plugin-card').filter({ hasText: 'remote-test' }).getByText(/Remote Test Plugin/)).toBeVisible();
+		await expect(page.getByText('Installed from a remote manifest.')).toBeVisible();
+		expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'remote-test', 'plugin.json'))).toBe(true);
+		expect(fs.existsSync(path.join(vaultDir, '.diamondmd', 'plugins', 'remote-test', 'main.js'))).toBe(true);
+		await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondRemotePluginActivated)).toBe('remote-test');
+
+		await page.keyboard.press('Meta+P');
+		await page.locator('input[placeholder="Run a command…"]').fill('Remote Plugin Ping');
+		await page.getByRole('button', { name: /Remote Plugin Ping/ }).click();
+		await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondRemotePluginRan)).toBe(vault.id);
+
+		const duplicate = await request.post(`/api/vaults/${vault.id}/plugins`, {
+			data: { manifestUrl: remote.url('/plugin.json') }
+		});
+		expect(duplicate.status()).toBe(400);
+		expect(await duplicate.text()).toContain('plugin already installed');
+	} finally {
+		await remote.close();
+	}
 });
 
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {

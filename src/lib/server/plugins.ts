@@ -5,9 +5,18 @@ import type { PluginCommandManifest, PluginDescriptor, PluginManifest } from '$l
 
 const PLUGIN_ROOT = '.diamondmd/plugins';
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+const MAX_MANIFEST_BYTES = 128 * 1024;
+const MAX_ENTRY_BYTES = 1024 * 1024;
+
+export interface PluginInstallInput {
+	manifestUrl: string;
+	replace?: boolean;
+}
 
 function cleanEntry(entry: unknown): string {
 	const value = typeof entry === 'string' && entry.trim() ? entry.trim() : 'main.js';
+	if (/^[a-z][a-z0-9+.-]*:/i.test(value)) throw new Error('entry must be a relative module path');
+	if (value.includes('?') || value.includes('#')) throw new Error('entry cannot include query or hash');
 	if (path.isAbsolute(value)) throw new Error('entry must be vault-plugin relative');
 	const normalized = value.split(/[\\/]+/).filter(Boolean).join('/');
 	if (!normalized || normalized.startsWith('../') || normalized.includes('/../')) {
@@ -54,6 +63,55 @@ function parseManifest(raw: unknown, fallbackId: string): PluginManifest {
 
 function pluginRoot(vault: VaultRef): string {
 	return path.join(vault.path, PLUGIN_ROOT);
+}
+
+function assertInsideRoot(root: string, candidate: string): void {
+	const rel = path.relative(root, candidate);
+	if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('plugin path escapes plugin root');
+}
+
+function isLoopbackHost(hostname: string): boolean {
+	return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+}
+
+function parseInstallUrl(rawUrl: string, label: string): URL {
+	const raw = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+	if (!raw) throw new Error(`${label} URL required`);
+	let url: URL;
+	try {
+		url = new URL(raw);
+	} catch {
+		throw new Error(`${label} URL is invalid`);
+	}
+	if (url.username || url.password) throw new Error(`${label} URL cannot include credentials`);
+	if (url.protocol === 'http:' && !isLoopbackHost(url.hostname)) {
+		throw new Error(`${label} URL must use HTTPS unless it targets localhost`);
+	}
+	if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+		throw new Error(`${label} URL must use HTTP or HTTPS`);
+	}
+	url.hash = '';
+	return url;
+}
+
+function entryUrlFor(manifestUrl: URL, entry: string): URL {
+	const entryUrl = parseInstallUrl(new URL(entry, manifestUrl).toString(), 'plugin entry');
+	if (entryUrl.origin !== manifestUrl.origin) throw new Error('entry URL must share the manifest origin');
+	const basePath = manifestUrl.pathname.slice(0, manifestUrl.pathname.lastIndexOf('/') + 1);
+	if (!entryUrl.pathname.startsWith(basePath)) throw new Error('entry URL must stay beside the manifest');
+	return entryUrl;
+}
+
+async function fetchText(url: URL, maxBytes: number, label: string): Promise<string> {
+	const res = await fetch(url, {
+		headers: { accept: label === 'plugin manifest' ? 'application/json,text/plain,*/*' : 'application/javascript,text/plain,*/*' }
+	});
+	if (!res.ok) throw new Error(`${label} fetch failed: ${res.status}`);
+	const size = Number(res.headers.get('content-length') ?? '0');
+	if (Number.isFinite(size) && size > maxBytes) throw new Error(`${label} is too large`);
+	const body = await res.arrayBuffer();
+	if (body.byteLength > maxBytes) throw new Error(`${label} is too large`);
+	return new TextDecoder().decode(body);
 }
 
 function descriptorFromManifest(vaultId: string, manifest: PluginManifest): PluginDescriptor {
@@ -121,4 +179,33 @@ export function readPluginModule(vault: VaultRef, pluginId: string): { code: str
 	const stat = fs.statSync(target);
 	if (!stat.isFile()) throw new Error('plugin module is not a file');
 	return { code: fs.readFileSync(target, 'utf-8'), filename: descriptor.entry };
+}
+
+export async function installPluginFromUrl(vault: VaultRef, input: PluginInstallInput): Promise<PluginDescriptor> {
+	const manifestUrl = parseInstallUrl(input.manifestUrl, 'plugin manifest');
+	const manifestText = await fetchText(manifestUrl, MAX_MANIFEST_BYTES, 'plugin manifest');
+	let rawManifest: unknown;
+	try {
+		rawManifest = JSON.parse(manifestText) as unknown;
+	} catch {
+		throw new Error('plugin manifest must be valid JSON');
+	}
+	const manifest = parseManifest(rawManifest, '');
+	const entryUrl = entryUrlFor(manifestUrl, manifest.entry);
+	const entryCode = await fetchText(entryUrl, MAX_ENTRY_BYTES, 'plugin entry');
+
+	const root = path.resolve(pluginRoot(vault));
+	const targetDir = path.resolve(root, manifest.id);
+	assertInsideRoot(root, targetDir);
+	if (fs.existsSync(targetDir)) {
+		if (!input.replace) throw new Error('plugin already installed; enable replace to overwrite');
+		fs.rmSync(targetDir, { recursive: true, force: true });
+	}
+
+	const entryPath = path.resolve(targetDir, manifest.entry);
+	assertInsideRoot(targetDir, entryPath);
+	fs.mkdirSync(path.dirname(entryPath), { recursive: true });
+	fs.writeFileSync(path.join(targetDir, 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+	fs.writeFileSync(entryPath, entryCode, 'utf-8');
+	return descriptorFromManifest(vault.id, manifest);
 }

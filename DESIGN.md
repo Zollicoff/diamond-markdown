@@ -210,11 +210,21 @@ serves the declared ESM entry module for each valid plugin. The file tree and
 indexer already skip hidden dot folders, so plugin implementation files do not
 appear as notes.
 
+Plugin installation also lives in `src/lib/server/plugins.ts`. Settings posts a
+remote manifest URL to `/api/vaults/[vaultId]/plugins`; the server fetches a
+bounded `plugin.json`, validates it, fetches the declared ESM entry module from
+the same origin and manifest directory, then writes the canonical manifest and
+entry into the vault-local plugin folder. Existing plugin ids are not overwritten
+unless the caller explicitly asks to replace them.
+
 Client boot calls `loadVaultPlugins(vaultId)` after built-in commands are
 registered. Plugin modules export `activate(api)` and can register command
 palette actions through a small API. Runtime command ids are scoped as
 `plugin:<plugin-id>:<command-id>` so plugins cannot overwrite built-in command
 ids accidentally.
+
+Successful installs emit `plugins:reload`; the vault shell disposes the current
+runtime and boots the new plugin set without a full page reload.
 
 Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
 Settings and right-sidebar panels use the same pattern: plugins register small

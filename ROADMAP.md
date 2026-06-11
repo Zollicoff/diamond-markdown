@@ -76,13 +76,14 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 ## v0.5 — Plugins & desktop
 
 - [x] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
-- [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
+- [x] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
   - [x] Settings panel renderer
   - [x] Markdown postprocessor hook
   - [x] Editor-specific command hook
   - [x] Right-panel view hook
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
-- [ ] Plugin registry page (load plugins from URL, not just disk)
+- [x] Plugin install UI (load plugins from manifest URL, not just disk)
+- [ ] Curated plugin registry/catalog
 - [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
