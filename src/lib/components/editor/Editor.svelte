@@ -90,6 +90,18 @@
 				}
 			}),
 			EditorView.domEventHandlers({
+				mousedown(event) {
+					if (event.button !== 0) return false;
+					const target = event.target as HTMLElement | null;
+					if (!target) return false;
+					const link = target.closest<HTMLAnchorElement>('[data-diamond-wikilink]');
+					if (!link?.classList.contains('cm-wikilink--broken')) return false;
+					event.preventDefault();
+					const href = link.getAttribute('href');
+					const tgt = link.dataset.target ?? '';
+					onWikilinkClick?.(tgt, href, false, event);
+					return true;
+				},
 				click(event) {
 					const target = event.target as HTMLElement | null;
 					if (!target) return false;

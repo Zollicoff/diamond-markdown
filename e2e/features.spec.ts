@@ -137,6 +137,64 @@ test('new note command uses an in-app name dialog', async ({ page, request }) =>
 	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`).catch(() => undefined);
 });
 
+test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {
+	const notePath = 'Delete Dialog Note.md';
+	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);
+	if (fs.existsSync(abs)) fs.unlinkSync(abs);
+	const created = await request.post('/api/vaults/default/note', {
+		data: { path: notePath, content: '# Delete Dialog Note\n\nTemporary note.\n', commitNow: false }
+	});
+	expect(created.ok()).toBe(true);
+
+	await openVault(page);
+	const file = page.locator('.file-link').filter({ hasText: 'Delete Dialog Note' });
+	await expect(file).toBeVisible();
+	await file.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	const dialog = page.getByRole('alertdialog', { name: 'Delete note' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toBeHidden();
+	expect(fs.existsSync(abs)).toBe(true);
+
+	await file.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Delete' }).click();
+	await expect.poll(() => fs.existsSync(abs)).toBe(false);
+});
+
+test('broken wikilinks use an in-app create confirmation dialog', async ({ page, request }) => {
+	const sourcePath = 'Broken Wikilink Dialog.md';
+	const target = 'Confirm Created Target';
+	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(sourcePath)}`).catch(() => undefined);
+	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(`${target}.md`)}`).catch(() => undefined);
+
+	const saved = await request.post('/api/vaults/default/note', {
+		data: { path: sourcePath, content: `# Broken Wikilink Dialog\n\n[[${target}]]\n` }
+	});
+	expect(saved.ok()).toBe(true);
+
+	await page.goto(`/vault/default/note/${encodeURIComponent(sourcePath)}`);
+	const link = page.locator('.cm-wikilink--broken').filter({ hasText: target }).first();
+	await expect(link).toBeVisible();
+	await link.click();
+	const dialog = page.getByRole('alertdialog', { name: 'Create note' });
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toContainText(`Create note "${target}"?`);
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toBeHidden();
+	await expect(page).toHaveURL(new RegExp(`/vault/default/note/${encodeURIComponent(sourcePath)}$`));
+
+	await link.click();
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Create note' }).click();
+	await expect(page).toHaveURL(/\/vault\/default\/note\/Confirm%20Created%20Target\.md$/);
+
+	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(sourcePath)}`).catch(() => undefined);
+	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(`${target}.md`)}`).catch(() => undefined);
+});
+
 test('vault plugins are discovered and register boot commands', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-vault');
 	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'boot-test');

@@ -10,6 +10,7 @@
 	import type { OpenMode } from '$lib/workspace/types';
 	import { on as onBus } from '$lib/events';
 	import { workspace } from '$lib/workspace/store.svelte';
+	import { alertDialog } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -200,7 +201,7 @@
 			if (node.type === 'file') await api.renameNote(vaultId, node.path, newPath);
 			else await api.renameFolder(vaultId, node.path, newPath);
 		} catch (e) {
-			alert((e as Error).message);
+			await alertDialog({ title: 'Could not rename item', message: (e as Error).message, tone: 'danger' });
 		}
 	}
 
@@ -213,7 +214,7 @@
 			if (isFolder) await api.renameFolder(vaultId, srcPath, newPath);
 			else await api.renameNote(vaultId, srcPath, newPath);
 		} catch (e) {
-			alert((e as Error).message);
+			await alertDialog({ title: 'Could not move item', message: (e as Error).message, tone: 'danger' });
 		}
 	}
 

@@ -32,6 +32,27 @@ export interface VaultEventMap {
 		confirmLabel?: string;
 		resolve: (value: string | null) => void;
 	};
+	'dialog:confirm': {
+		title: string;
+		message: string;
+		confirmLabel?: string;
+		cancelLabel?: string;
+		tone?: 'default' | 'danger';
+		resolve: (confirmed: boolean) => void;
+	};
+	'dialog:alert': {
+		title: string;
+		message: string;
+		confirmLabel?: string;
+		tone?: 'default' | 'danger' | 'success';
+		resolve: () => void;
+	};
+	'toast:show': {
+		title: string;
+		message?: string;
+		tone?: 'default' | 'danger' | 'success';
+		timeoutMs?: number;
+	};
 }
 
 type Handler<K extends keyof VaultEventMap> = (payload: VaultEventMap[K]) => void;

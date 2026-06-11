@@ -7,6 +7,7 @@ import { toggleLeftSidebar, toggleRightSidebar, openTab, openNote } from '$lib/w
 import { emit } from '$lib/events';
 import { api } from '$lib/vault-api';
 import { cycle as cycleTheme, setMode as setThemeMode } from '$lib/theme.svelte';
+import { alertDialog } from '$lib/dialogs';
 
 export function registerViewCommands(): void {
 	register({
@@ -105,7 +106,7 @@ export function registerViewCommands(): void {
 				const title = res.path.split('/').pop()!.replace(/\.md$/, '');
 				openNote(ctx.vaultId!, res.path, title, 'replace');
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not open daily note', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -119,9 +120,9 @@ export function registerViewCommands(): void {
 			try {
 				const res = await api.publish(ctx.vaultId!);
 				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
-				alert(msg);
+				await alertDialog({ title: 'Publish complete', message: msg, tone: 'success' });
 			} catch (e) {
-				alert('Publish failed: ' + (e as Error).message);
+				await alertDialog({ title: 'Publish failed', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});

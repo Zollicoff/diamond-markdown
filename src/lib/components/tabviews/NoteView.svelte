@@ -10,6 +10,7 @@
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { READING_SPEED_WPM } from '$lib/util/constants';
+	import { confirmDialog } from '$lib/dialogs';
 
 	type ViewComponent = any;
 
@@ -133,8 +134,13 @@
 		}
 	}
 
-	function reloadFromDisk(): void {
-		if (dirty && !confirm('Reload from disk and discard unsaved edits?')) return;
+	async function reloadFromDisk(): Promise<void> {
+		if (dirty && !(await confirmDialog({
+			title: 'Reload from disk',
+			message: 'Reload this note from disk and discard unsaved edits?',
+			confirmLabel: 'Reload',
+			tone: 'danger'
+		}))) return;
 		void load();
 	}
 
@@ -191,14 +197,18 @@
 		return 'replace';
 	}
 
-	function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
+	async function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): Promise<void> {
 		if (resolved && href) {
 			const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
 			const notePath = href.replace(`/vault/${vaultId}/note/`, '');
 			openNote(vaultId, decodeURIComponent(notePath), noteTitle, modeFor(e));
 			return;
 		}
-		const createPath = confirm(`Create note "${target}"?`)
+		const createPath = await confirmDialog({
+			title: 'Create note',
+			message: `Create note "${target}"?`,
+			confirmLabel: 'Create note'
+		})
 			? (target.endsWith('.md') ? target : `${target}.md`)
 			: null;
 		if (!createPath) return;

@@ -10,17 +10,10 @@ import { api } from '$lib/vault-api';
 import { register, type CommandContext } from '../registry';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
+import { alertDialog, confirmDialog, notify, promptText } from '$lib/dialogs';
 
 async function promptPath(title: string, label: string, confirmLabel: string, placeholder = ''): Promise<string | null> {
-	if (typeof window === 'undefined') return null;
-	return new Promise((resolve) => {
-		emit('dialog:prompt', { title, label, placeholder, confirmLabel, resolve });
-	});
-}
-
-async function confirmAction(msg: string): Promise<boolean> {
-	if (typeof window === 'undefined') return false;
-	return window.confirm(msg);
+	return promptText({ title, label, placeholder, confirmLabel });
 }
 
 function ensureMd(s: string): string {
@@ -47,7 +40,7 @@ export function registerFsCommands(): void {
 			try {
 				await api.createNote(vaultId, rel, `---\ntitle: ${title}\n---\n\n`);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not create note', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -70,7 +63,7 @@ export function registerFsCommands(): void {
 			try {
 				await api.createFolder(vaultId, rel);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not create folder', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -83,11 +76,16 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			if (!ctx.node || ctx.node.type !== 'file') return;
 			const { vaultId } = ctx;
-			if (!(await confirmAction(`Delete "${ctx.node.name}"? Reversible via git log.`))) return;
+			if (!(await confirmDialog({
+				title: 'Delete note',
+				message: `Delete "${ctx.node.name}"?\n\nThis is reversible through git history.`,
+				confirmLabel: 'Delete',
+				tone: 'danger'
+			}))) return;
 			try {
 				await api.deleteNote(vaultId!, ctx.node.path);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not delete note', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -102,7 +100,7 @@ export function registerFsCommands(): void {
 			try {
 				await api.duplicateNote(ctx.vaultId!, ctx.node.path);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not duplicate note', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -119,11 +117,16 @@ export function registerFsCommands(): void {
 			const msg = force
 				? `Delete folder "${ctx.node.path}" and everything inside it?`
 				: `Delete empty folder "${ctx.node.path}"?`;
-			if (!(await confirmAction(msg))) return;
+			if (!(await confirmDialog({
+				title: force ? 'Delete folder and contents' : 'Delete folder',
+				message: msg,
+				confirmLabel: 'Delete',
+				tone: 'danger'
+			}))) return;
 			try {
 				await api.deleteFolder(ctx.vaultId!, ctx.node.path, force);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not delete folder', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -135,7 +138,11 @@ export function registerFsCommands(): void {
 		category: 'file',
 		async exec(ctx: CommandContext) {
 			if (!ctx.node) return;
-			await navigator.clipboard?.writeText(ctx.node.path).catch(() => {});
+			await navigator.clipboard?.writeText(ctx.node.path).then(() => {
+				notify({ title: 'Path copied', message: ctx.node?.path, tone: 'success' });
+			}).catch(() => {
+				notify({ title: 'Could not copy path', tone: 'danger' });
+			});
 		}
 	});
 
@@ -180,7 +187,7 @@ export function registerFsCommands(): void {
 			try {
 				await api.toggleExcluded(ctx.vaultId, ctx.node.path);
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not update excluded folders', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});

@@ -3,6 +3,7 @@ import type { PluginCommandManifest, PluginDescriptor } from './types';
 import { registerRightPanel, registerSettingsPanel } from './extensions.svelte';
 import { createPluginFilesApi, type PluginFilesApi } from './capabilities';
 import { getActivePluginEditor, type ActivePluginEditor } from './editor-commands.svelte';
+import { alertDialog, notify } from '$lib/dialogs';
 
 interface WorkerCommandMessage {
 	type: 'registerCommand';
@@ -510,7 +511,7 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 					});
 				}).catch((error) => {
 					console.error(`[plugin:${plugin.id}] worker command failed:`, error);
-					alert(`Plugin worker command failed: ${(error as Error).message}`);
+					void alertDialog({ title: 'Plugin worker command failed', message: (error as Error).message, tone: 'danger' });
 				});
 			}
 		};
@@ -551,7 +552,7 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 					});
 				}).catch((error) => {
 					console.error(`[plugin:${plugin.id}] worker editor command failed:`, error);
-					alert(`Plugin worker editor command failed: ${(error as Error).message}`);
+					void alertDialog({ title: 'Plugin worker editor command failed', message: (error as Error).message, tone: 'danger' });
 				});
 			}
 		};
@@ -634,6 +635,7 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 			}
 			if (message.type === 'notify') {
 				console.info(`[plugin:${plugin.id}] ${message.message}`);
+				notify({ title: plugin.name, message: message.message, tone: 'success' });
 				return;
 			}
 			if (message.type === 'capabilityRequest') {

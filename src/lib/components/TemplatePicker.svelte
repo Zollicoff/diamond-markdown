@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { on as onBus, emit } from '$lib/events';
+	import { alertDialog } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -78,13 +79,13 @@
 			const url = `/api/vaults/${vaultId}/templates?name=${encodeURIComponent(t.name)}&title=${encodeURIComponent(activeNoteTitle)}`;
 			const res = await fetch(url);
 			if (!res.ok) {
-				alert(`Couldn't load template: ${res.statusText}`);
+				await alertDialog({ title: 'Could not load template', message: res.statusText, tone: 'danger' });
 				return;
 			}
 			const data = await res.json() as { content: string };
 			emit('template:insert', { vaultId, content: data.content });
 		} catch (e) {
-			alert(`Template load failed: ${(e as Error).message}`);
+			await alertDialog({ title: 'Template load failed', message: (e as Error).message, tone: 'danger' });
 		}
 	}
 </script>

@@ -13,6 +13,7 @@ import { getActivePluginEditor, type PluginEditorCommandContext } from './editor
 import type { PluginDescriptor } from './types';
 import { createPluginFilesApi, type PluginFilesApi } from './capabilities';
 import { loadWorkerPlugin } from './worker-runtime';
+import { alertDialog, notify as showToast } from '$lib/dialogs';
 
 export interface PluginCommandDef {
 	id: string;
@@ -150,7 +151,7 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 								await command.exec({ ...ctx, vaultId, pluginId: plugin.id });
 							} catch (e) {
 								console.error(`[plugin:${plugin.id}] command failed:`, e);
-								alert(`Plugin command failed: ${(e as Error).message}`);
+								await alertDialog({ title: 'Plugin command failed', message: (e as Error).message, tone: 'danger' });
 							}
 						}
 					};
@@ -184,7 +185,7 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 								await command.exec(pluginCtx);
 							} catch (e) {
 								console.error(`[plugin:${plugin.id}] editor command failed:`, e);
-								alert(`Plugin editor command failed: ${(e as Error).message}`);
+								await alertDialog({ title: 'Plugin editor command failed', message: (e as Error).message, tone: 'danger' });
 							}
 						}
 					};
@@ -265,6 +266,7 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 				},
 				notify(message) {
 					console.info(`[plugin:${plugin.id}] ${message}`);
+					showToast({ title: plugin.name, message, tone: 'success' });
 				}
 			};
 

@@ -215,6 +215,19 @@ release verifier runs repeated `node build` smoke servers against the same build
 tree. Avoiding `.br`/`.gz` sidecars keeps those smoke runs from crashing on
 stale compressed-asset lookups.
 
+## App dialogs and notifications
+
+Browser-native `alert()` / `confirm()` calls are intentionally avoided in app
+code. Commands, note interactions, plugin failures, and template/file actions
+route user interaction through `src/lib/dialogs.ts`, which emits typed events
+for `AppDialogs.svelte`.
+
+This keeps command modules decoupled from Svelte component trees while still
+giving the app Obsidian-style modal dialogs and non-blocking toast
+notifications. New user-facing confirmations or status messages should use
+`promptText`, `confirmDialog`, `alertDialog`, or `notify`; they should not call
+browser globals directly.
+
 ## File tree rendering
 
 `FileTree.svelte` flattens the expanded tree into visible rows and renders only
