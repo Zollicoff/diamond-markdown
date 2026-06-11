@@ -2,14 +2,24 @@ import type { NoteDoc } from '$lib/types';
 
 type PluginRenderCleanup = void | (() => void) | Promise<void | (() => void)>;
 
-export interface PluginSettingsPanelContext {
+export interface PluginExtensionContext {
 	vaultId: string;
 	pluginId: string;
+	extensionId: string;
+}
+
+export interface PluginSettingsPanelContext extends PluginExtensionContext {
 	panelId: string;
 }
 
 export interface PluginRightPanelContext extends PluginSettingsPanelContext {
 	doc: NoteDoc;
+}
+
+export interface PluginMarkdownPostprocessorContext extends PluginExtensionContext {
+	doc: NoteDoc;
+	processorId: string;
+	root: HTMLElement;
 }
 
 export interface PluginSettingsPanelDef {
@@ -32,6 +42,14 @@ export interface PluginRightPanelDef {
 	) => PluginRenderCleanup;
 }
 
+export interface PluginMarkdownPostprocessorDef {
+	id: string;
+	process: (
+		root: HTMLElement,
+		context: PluginMarkdownPostprocessorContext
+	) => PluginRenderCleanup;
+}
+
 export interface RegisteredSettingsPanel {
 	id: string;
 	localId: string;
@@ -50,12 +68,21 @@ export interface RegisteredRightPanel {
 	render: PluginRightPanelDef['render'];
 }
 
+export interface RegisteredMarkdownPostprocessor {
+	id: string;
+	localId: string;
+	pluginId: string;
+	process: PluginMarkdownPostprocessorDef['process'];
+}
+
 interface PluginExtensionState {
+	markdownPostprocessorsByVault: Record<string, RegisteredMarkdownPostprocessor[]>;
 	settingsPanelsByVault: Record<string, RegisteredSettingsPanel[]>;
 	rightPanelsByVault: Record<string, RegisteredRightPanel[]>;
 }
 
 const state = $state<PluginExtensionState>({
+	markdownPostprocessorsByVault: {},
 	settingsPanelsByVault: {},
 	rightPanelsByVault: {}
 });
@@ -87,6 +114,26 @@ export function listSettingsPanels(vaultId: string): RegisteredSettingsPanel[] {
 	return state.settingsPanelsByVault[vaultId] ?? [];
 }
 
+export function registerMarkdownPostprocessor(vaultId: string, processor: RegisteredMarkdownPostprocessor): () => void {
+	const current = state.markdownPostprocessorsByVault[vaultId] ?? [];
+	state.markdownPostprocessorsByVault[vaultId] = [
+		...current.filter((item) => item.id !== processor.id),
+		processor
+	].sort((a, b) => a.id.localeCompare(b.id));
+	return () => unregisterMarkdownPostprocessor(vaultId, processor.id);
+}
+
+export function unregisterMarkdownPostprocessor(vaultId: string, id: string): void {
+	const current = state.markdownPostprocessorsByVault[vaultId] ?? [];
+	const next = current.filter((processor) => processor.id !== id);
+	if (next.length === current.length) return;
+	state.markdownPostprocessorsByVault[vaultId] = next;
+}
+
+export function listMarkdownPostprocessors(vaultId: string): RegisteredMarkdownPostprocessor[] {
+	return state.markdownPostprocessorsByVault[vaultId] ?? [];
+}
+
 export function registerRightPanel(vaultId: string, panel: RegisteredRightPanel): () => void {
 	const current = state.rightPanelsByVault[vaultId] ?? [];
 	state.rightPanelsByVault[vaultId] = sortPanels([
@@ -108,6 +155,7 @@ export function listRightPanels(vaultId: string): RegisteredRightPanel[] {
 }
 
 export function clearVaultExtensions(vaultId: string): void {
+	delete state.markdownPostprocessorsByVault[vaultId];
 	delete state.settingsPanelsByVault[vaultId];
 	delete state.rightPanelsByVault[vaultId];
 }

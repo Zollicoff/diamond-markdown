@@ -2,15 +2,19 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { openNote, openTab } from '$lib/workspace/actions';
+	import { listMarkdownPostprocessors } from '$lib/plugins/extensions.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import type { NoteDoc } from '$lib/types';
 
 	interface Props {
 		html: string;
 		vaultId?: string;
+		doc?: NoteDoc;
 	}
 
-	let { html, vaultId }: Props = $props();
+	let { html, vaultId, doc }: Props = $props();
 	let host: HTMLElement;
+	const markdownPostprocessors = $derived(vaultId ? listMarkdownPostprocessors(vaultId) : []);
 
 	// Hover-preview state — popped when the user lingers on a wikilink.
 	let hoverCard = $state<{ x: number; y: number; html: string } | null>(null);
@@ -189,19 +193,59 @@
 		}
 	}
 
-	// After HTML changes: scroll to hash if URL has one, render mermaid blocks.
+	function applyCleanup(fn: (() => void) | void, cleanups: (() => void)[], disposed: boolean): void {
+		if (typeof fn !== 'function') return;
+		if (disposed) {
+			try { fn(); } catch (e) { console.error('[plugins] markdown cleanup failed:', e); }
+			return;
+		}
+		cleanups.push(fn);
+	}
+
+	// After HTML changes: render mermaid blocks, run plugin postprocessors, then scroll to hash.
 	$effect(() => {
 		void html; // dep
+		const processors = markdownPostprocessors;
 		if (!host) return;
+		let disposed = false;
+		const cleanups: (() => void)[] = [];
 		queueMicrotask(() => {
-			void renderMermaidIn(host);
-			const hash = window.location.hash;
-			if (hash && hash.length > 1) {
-				const id = decodeURIComponent(hash.slice(1));
-				const target = host.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
-				target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			}
+			void (async () => {
+				if (disposed) return;
+				await renderMermaidIn(host);
+				if (disposed) return;
+				if (vaultId && doc) {
+					for (const processor of processors) {
+						try {
+							const result = await processor.process(host, {
+								vaultId,
+								pluginId: processor.pluginId,
+								extensionId: processor.localId,
+								processorId: processor.localId,
+								doc,
+								root: host
+							});
+							applyCleanup(result as void | (() => void), cleanups, disposed);
+						} catch (e) {
+							console.error(`[plugin:${processor.pluginId}] markdown postprocessor failed:`, e);
+						}
+					}
+				}
+				if (disposed) return;
+				const hash = window.location.hash;
+				if (hash && hash.length > 1) {
+					const id = decodeURIComponent(hash.slice(1));
+					const target = host.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+					target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			})();
 		});
+		return () => {
+			disposed = true;
+			for (const cleanup of cleanups.splice(0)) {
+				try { cleanup(); } catch (e) { console.error('[plugins] markdown cleanup failed:', e); }
+			}
+		};
 	});
 
 	onMount(() => () => clearHover());

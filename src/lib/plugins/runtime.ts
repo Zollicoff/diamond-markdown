@@ -2,8 +2,10 @@ import { register, unregister, type CommandContext, type CommandDef } from '$lib
 import { api as vaultApi } from '$lib/vault-api';
 import {
 	clearVaultExtensions,
+	registerMarkdownPostprocessor,
 	registerRightPanel,
 	registerSettingsPanel,
+	type PluginMarkdownPostprocessorDef,
 	type PluginRightPanelDef,
 	type PluginSettingsPanelDef
 } from './extensions.svelte';
@@ -23,6 +25,7 @@ export interface PluginApi {
 	vaultId: string;
 	pluginId: string;
 	registerCommand: (command: PluginCommandDef) => void;
+	registerMarkdownPostprocessor: (processor: PluginMarkdownPostprocessorDef) => void;
 	registerRightPanel: (panel: PluginRightPanelDef) => void;
 	registerSettingsPanel: (panel: PluginSettingsPanelDef) => void;
 	notify: (message: string) => void;
@@ -56,6 +59,10 @@ function scopedSettingsPanelId(pluginId: string, panelId: string): string {
 
 function scopedRightPanelId(pluginId: string, panelId: string): string {
 	return `plugin:${pluginId}:right:${panelId}`;
+}
+
+function scopedMarkdownPostprocessorId(pluginId: string, processorId: string): string {
+	return `plugin:${pluginId}:markdown:${processorId}`;
 }
 
 function isCommandId(value: string): boolean {
@@ -107,6 +114,18 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 					};
 					register(wrapped);
 					registered.add(id);
+				},
+				registerMarkdownPostprocessor(processor) {
+					if (!isCommandId(processor.id)) throw new Error(`invalid markdown postprocessor id: ${processor.id}`);
+					if (typeof processor.process !== 'function') throw new Error('markdown postprocessor function required');
+					const id = scopedMarkdownPostprocessorId(plugin.id, processor.id);
+					const unregisterProcessor = registerMarkdownPostprocessor(vaultId, {
+						id,
+						localId: processor.id,
+						pluginId: plugin.id,
+						process: processor.process
+					});
+					disposers.push(unregisterProcessor);
 				},
 				registerSettingsPanel(panel) {
 					if (!isCommandId(panel.id)) throw new Error(`invalid settings panel id: ${panel.id}`);

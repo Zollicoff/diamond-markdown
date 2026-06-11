@@ -78,7 +78,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
 - [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
   - [x] Settings panel renderer
-  - [ ] Markdown extension hook
+  - [x] Markdown postprocessor hook
   - [ ] Editor-specific command hook
   - [x] Right-panel view hook
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)

@@ -168,6 +168,17 @@ export function activate(api) {
       return () => button.removeEventListener('click', run);
     }
   });
+  api.registerMarkdownPostprocessor({
+    id: 'preview-marker',
+    process(root, context) {
+      const marker = document.createElement('span');
+      marker.dataset.testid = 'plugin-markdown-marker';
+      marker.textContent = context.doc.path;
+      root.append(marker);
+      window.__diamondPluginMarkdownRan = root.querySelector('h1')?.textContent ?? '';
+      return () => marker.remove();
+    }
+  });
 }
 `);
 
@@ -197,6 +208,9 @@ export function activate(api) {
 	await expect(page.getByTestId('plugin-right-panel-marker')).toHaveText('Home.md');
 	await page.getByTestId('plugin-right-panel-button').click();
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginRightPanelRan)).toBe('Home.md');
+	await page.getByRole('tab', { name: 'Read' }).click();
+	await expect(page.getByTestId('plugin-markdown-marker')).toHaveText('Home.md');
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginMarkdownRan)).toBe('Home');
 
 	await page.keyboard.press('Meta+P');
 	await page.locator('input[placeholder="Run a command…"]').fill('Plugin Boot Test');

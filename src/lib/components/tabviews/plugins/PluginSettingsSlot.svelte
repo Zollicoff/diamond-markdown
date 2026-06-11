@@ -30,6 +30,7 @@
 			const result = panel.render(host, {
 				vaultId,
 				pluginId: panel.pluginId,
+				extensionId: panel.localId,
 				panelId: panel.localId
 			});
 			if (result && typeof (result as Promise<void | (() => void)>).then === 'function') {

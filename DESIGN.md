@@ -223,6 +223,11 @@ unregisters them when the vault shell unloads. Right-sidebar panels receive the
 active note document so plugins can build note-aware sidebars without owning the
 workspace shell.
 
+Markdown postprocessors are intentionally client-side. The server still returns
+sanitized HTML; `Preview.svelte` inserts that HTML, renders Mermaid blocks, then
+runs registered plugin postprocessors against the preview root with the active
+`NoteDoc` context.
+
 Current plugins execute as trusted browser ESM. Sandboxed iframe/Worker execution
 remains a v0.5 requirement before untrusted third-party plugins are safe.
 

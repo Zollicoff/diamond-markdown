@@ -59,6 +59,7 @@ The public API is intentionally small while the plugin system is young:
 - `api.vaultId`
 - `api.pluginId`
 - `api.registerCommand(command)`
+- `api.registerMarkdownPostprocessor(processor)`
 - `api.registerRightPanel(panel)`
 - `api.registerSettingsPanel(panel)`
 - `api.notify(message)`
@@ -101,6 +102,29 @@ export function activate(api) {
 
 Right-panel renderers receive the active `doc` object. They rerender when the
 active note changes, and may return a cleanup function.
+
+## Markdown Postprocessors
+
+Plugins can enhance sanitized rendered markdown in Read mode:
+
+```js
+export function activate(api) {
+  api.registerMarkdownPostprocessor({
+    id: 'mark-todos',
+    process(root, context) {
+      for (const item of root.querySelectorAll('li')) {
+        if (item.textContent?.startsWith('TODO')) item.classList.add('plugin-todo');
+      }
+      console.info(`Processed ${context.doc.path}`);
+    }
+  });
+}
+```
+
+Postprocessors run after Diamond inserts the server-sanitized HTML and renders
+Mermaid blocks. The context includes `doc`, `root`, `pluginId`, and
+`processorId`. They may return a cleanup function, which runs before the preview
+rerenders or unloads.
 
 ## Security Notes
 

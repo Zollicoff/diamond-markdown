@@ -282,7 +282,7 @@
 		{:else if viewLoadError}
 			<div class="loading err">Could not load view: {viewLoadError}</div>
 		{:else if mode === 'read' && PreviewView}
-			<PreviewView html={doc.html} {vaultId} />
+			<PreviewView html={doc.html} {vaultId} {doc} />
 		{:else if mode === 'read' && waitingForPreview}
 			<div class="loading">Loading preview…</div>
 		{:else if mode !== 'read' && EditorView}
