@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/vault-api';
 	import type { GitSyncStatus } from '$lib/types';
+	import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '$lib/sync/commands';
 
 	interface Props {
 		vaultId: string;
@@ -25,42 +26,8 @@
 	const hasDiverged = $derived(!!status?.diverged);
 	const hasRemoteChanges = $derived(!!status && !status.diverged && status.behind > 0);
 	const hasConflicts = $derived((status?.conflicted.length ?? 0) > 0);
-	const setupCommands = $derived.by(() => buildSetupCommands(status, vaultPath, remoteUrl));
-	const resolutionCommands = $derived.by(() => buildResolutionCommands(status, vaultPath));
-
-	function shellQuote(value: string): string {
-		return `'${value.replaceAll("'", "'\\''")}'`;
-	}
-
-	function buildSetupCommands(next: GitSyncStatus | null, pathHint: string, remoteHint: string): string {
-		if (!next?.needsRemote) return '';
-		const cd = pathHint ? `cd ${shellQuote(pathHint)}` : '# cd /path/to/vault';
-		const remote = remoteHint.trim() || 'https://github.com/owner/repo.git';
-		const branch = next.branch ?? 'main';
-		return [
-			cd,
-			`git remote add origin ${shellQuote(remote)}`,
-			`git push -u origin ${shellQuote(branch)}`
-		].join('\n');
-	}
-
-	function buildResolutionCommands(next: GitSyncStatus | null, pathHint: string): string {
-		if (!next) return '';
-		const cd = pathHint ? `cd ${shellQuote(pathHint)}` : '# cd /path/to/vault';
-		const branch = next.branch ? shellQuote(next.branch) : '<branch>';
-		const remoteRef = next.branch ? shellQuote(`origin/${next.branch}`) : 'origin/<branch>';
-
-		if (next.conflicted.length > 0) {
-			return [cd, 'git status', '# resolve conflicted files', 'git add -A', 'git commit', 'git push'].join('\n');
-		}
-		if (next.diverged) {
-			return [cd, 'git fetch origin', `git merge ${remoteRef}`, '# resolve any conflicts', 'git add -A', 'git commit', 'git push'].join('\n');
-		}
-		if (next.behind > 0) {
-			return [cd, `git pull --ff-only origin ${branch}`].join('\n');
-		}
-		return '';
-	}
+	const setupCommands = $derived.by(() => buildGitSyncSetupCommands(status, vaultPath, remoteUrl));
+	const resolutionCommands = $derived.by(() => buildGitSyncResolutionCommands(status, vaultPath));
 
 	function applyStatus(next: GitSyncStatus): void {
 		status = next;
