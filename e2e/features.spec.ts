@@ -313,7 +313,7 @@ export function activate(api) {
 		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByLabel('Settings').click();
 		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
-		await page.getByRole('button', { name: 'Install' }).click();
+		await page.getByRole('button', { name: 'Install', exact: true }).click();
 		await expect(page.getByText('Installed Remote Test Plugin. Plugin runtime reload requested.')).toBeVisible();
 		await expect(page.locator('.plugin-card').filter({ hasText: 'remote-test' }).getByText(/Remote Test Plugin/)).toBeVisible();
 		await expect(page.getByText('Installed from a remote manifest.')).toBeVisible();

@@ -190,9 +190,12 @@ test('touch swipes switch workspace tabs and panes', async ({ page }) => {
 test('settings tab opens with theme + vault info', async ({ page }) => {
 	await openFirstVault(page);
 	await page.getByLabel('Settings').click();
+	await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 	await expect(page.getByText('Theme', { exact: true })).toBeVisible();
 	await expect(page.getByText('Excluded folders')).toBeVisible();
+	await page.getByRole('button', { name: 'Sync' }).click();
+	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 });
 
 test('left sidebar collapses and re-expands via the topbar chevron', async ({ page }) => {

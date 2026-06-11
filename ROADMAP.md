@@ -62,7 +62,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Mobile touch gestures (swipe to switch tabs / panes)
 - [x] Light-mode highlight.js per-token theming
 - [x] Outline scroll inside Live mode
-- [ ] Settings page consolidation
+- [x] Settings page consolidation
 - [x] Multi-select / drag-select in graph
 
 ## v0.4 — Performance & scale
