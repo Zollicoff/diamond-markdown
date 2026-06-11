@@ -22,7 +22,12 @@ export interface PluginMarkdownPostprocessorContext extends PluginExtensionConte
 	root: HTMLElement;
 }
 
-export interface PluginSettingsPanelDef {
+export interface PluginIframePanelFields {
+	html: string;
+	height?: number;
+}
+
+export interface PluginDomSettingsPanelDef {
 	id: string;
 	title: string;
 	description?: string;
@@ -32,7 +37,15 @@ export interface PluginSettingsPanelDef {
 	) => PluginRenderCleanup;
 }
 
-export interface PluginRightPanelDef {
+export interface PluginIframeSettingsPanelDef extends PluginIframePanelFields {
+	id: string;
+	title: string;
+	description?: string;
+}
+
+export type PluginSettingsPanelDef = PluginDomSettingsPanelDef | PluginIframeSettingsPanelDef;
+
+export interface PluginDomRightPanelDef {
 	id: string;
 	title: string;
 	description?: string;
@@ -42,6 +55,14 @@ export interface PluginRightPanelDef {
 	) => PluginRenderCleanup;
 }
 
+export interface PluginIframeRightPanelDef extends PluginIframePanelFields {
+	id: string;
+	title: string;
+	description?: string;
+}
+
+export type PluginRightPanelDef = PluginDomRightPanelDef | PluginIframeRightPanelDef;
+
 export interface PluginMarkdownPostprocessorDef {
 	id: string;
 	process: (
@@ -50,23 +71,51 @@ export interface PluginMarkdownPostprocessorDef {
 	) => PluginRenderCleanup;
 }
 
-export interface RegisteredSettingsPanel {
+export interface RegisteredDomSettingsPanel {
 	id: string;
 	localId: string;
 	pluginId: string;
 	title: string;
 	description?: string;
-	render: PluginSettingsPanelDef['render'];
+	mode: 'dom';
+	render: PluginDomSettingsPanelDef['render'];
 }
 
-export interface RegisteredRightPanel {
+export interface RegisteredIframeSettingsPanel {
 	id: string;
 	localId: string;
 	pluginId: string;
 	title: string;
 	description?: string;
-	render: PluginRightPanelDef['render'];
+	mode: 'iframe';
+	html: string;
+	height?: number;
 }
+
+export type RegisteredSettingsPanel = RegisteredDomSettingsPanel | RegisteredIframeSettingsPanel;
+
+export interface RegisteredDomRightPanel {
+	id: string;
+	localId: string;
+	pluginId: string;
+	title: string;
+	description?: string;
+	mode: 'dom';
+	render: PluginDomRightPanelDef['render'];
+}
+
+export interface RegisteredIframeRightPanel {
+	id: string;
+	localId: string;
+	pluginId: string;
+	title: string;
+	description?: string;
+	mode: 'iframe';
+	html: string;
+	height?: number;
+}
+
+export type RegisteredRightPanel = RegisteredDomRightPanel | RegisteredIframeRightPanel;
 
 export interface RegisteredMarkdownPostprocessor {
 	id: string;

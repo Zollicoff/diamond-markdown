@@ -98,11 +98,13 @@ use the full API, including UI renderers and markdown postprocessors, and should
 only come from sources you trust.
 
 Worker plugins declare `"execution": "worker"` in `plugin.json`. Diamond loads
-their entry module inside a module Worker and currently exposes only:
+their entry module inside a module Worker and currently exposes:
 
 - `api.vaultId`
 - `api.pluginId`
 - `api.registerCommand(command)`
+- `api.registerRightPanel(panel)` for iframe panels only
+- `api.registerSettingsPanel(panel)` for iframe panels only
 - `api.notify(message)`
 
 Worker command handlers receive a serializable command context, not live DOM or
@@ -135,7 +137,8 @@ Editor command contexts include `editor`, `doc`, `notePath`, `paneId`, `tabId`,
 
 ## Settings Panels
 
-Plugins can add a small settings panel to the Settings tab:
+Trusted plugins can add a small DOM-rendered settings panel to the Settings
+tab:
 
 ```js
 export function activate(api) {
@@ -153,9 +156,34 @@ export function activate(api) {
 `render(container, context)` may return a cleanup function. Diamond calls that
 cleanup when the vault UI unloads or the plugin runtime is disposed.
 
+Trusted and worker plugins can also register sandboxed iframe settings panels
+by providing `html` instead of `render`:
+
+```js
+export function activate(api) {
+  api.registerSettingsPanel({
+    id: 'safe-settings',
+    title: 'Safe Settings',
+    html: `
+      <button id="status">Waiting</button>
+      <script>
+        window.addEventListener('message', (event) => {
+          if (event.data?.type !== 'diamond:panel-context') return;
+          document.getElementById('status').textContent = event.data.context.pluginId;
+        });
+      <\/script>
+    `,
+    height: 120
+  });
+}
+```
+
+Iframe panels run with `sandbox="allow-scripts"`. They receive panel context by
+`postMessage` and cannot read the parent document.
+
 ## Right Panels
 
-Plugins can add note-aware panels to the right sidebar:
+Trusted plugins can add note-aware DOM-rendered panels to the right sidebar:
 
 ```js
 export function activate(api) {
@@ -171,6 +199,9 @@ export function activate(api) {
 
 Right-panel renderers receive the active `doc` object. They rerender when the
 active note changes, and may return a cleanup function.
+
+Trusted and worker plugins can register right-sidebar iframe panels the same
+way as settings panels. The posted context includes the active `doc`.
 
 ## Markdown Postprocessors
 
@@ -198,5 +229,6 @@ rerenders or unloads.
 ## Security Notes
 
 Trusted plugins run in the main app context. Worker plugins isolate command
-logic from the DOM, but UI extensions still require trusted execution until
-iframe-hosted plugin panels land. Only install plugins you trust.
+logic from the DOM, and iframe panels isolate plugin UI from the parent document.
+File/editor capability proxying is still planned, so only install plugins you
+trust.

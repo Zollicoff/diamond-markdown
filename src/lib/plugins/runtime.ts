@@ -61,6 +61,7 @@ export interface PluginRuntime {
 }
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+const MAX_IFRAME_HTML_BYTES = 128 * 1024;
 
 function scopedCommandId(pluginId: string, commandId: string): string {
 	return `plugin:${pluginId}:${commandId}`;
@@ -84,6 +85,20 @@ function scopedMarkdownPostprocessorId(pluginId: string, processorId: string): s
 
 function isCommandId(value: string): boolean {
 	return ID_RE.test(value);
+}
+
+function cleanIframeHtml(value: unknown): string {
+	if (typeof value !== 'string' || !value.trim()) throw new Error('iframe panel html required');
+	const html = value.trim();
+	if (new TextEncoder().encode(html).byteLength > MAX_IFRAME_HTML_BYTES) throw new Error('iframe panel html is too large');
+	return html;
+}
+
+function cleanIframeHeight(value: unknown): number | undefined {
+	if (value === undefined || value === null || value === '') return undefined;
+	const height = Number(value);
+	if (!Number.isFinite(height)) return undefined;
+	return Math.min(720, Math.max(80, Math.round(height)));
 }
 
 export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> {
@@ -188,31 +203,61 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 				registerSettingsPanel(panel) {
 					if (!isCommandId(panel.id)) throw new Error(`invalid settings panel id: ${panel.id}`);
 					if (!panel.title?.trim()) throw new Error('settings panel title required');
-					if (typeof panel.render !== 'function') throw new Error('settings panel render function required');
 					const id = scopedSettingsPanelId(plugin.id, panel.id);
-					const unregisterPanel = registerSettingsPanel(vaultId, {
+					const common = {
 						id,
 						localId: panel.id,
 						pluginId: plugin.id,
 						title: panel.title.trim(),
-						description: panel.description?.trim(),
-						render: panel.render
-					});
+						description: panel.description?.trim()
+					};
+					let unregisterPanel: () => void;
+					if ('html' in panel) {
+						unregisterPanel = registerSettingsPanel(vaultId, {
+							...common,
+							mode: 'iframe',
+							html: cleanIframeHtml(panel.html),
+							height: cleanIframeHeight(panel.height)
+						});
+					} else if (typeof panel.render === 'function') {
+						unregisterPanel = registerSettingsPanel(vaultId, {
+							...common,
+							mode: 'dom',
+							render: panel.render
+						});
+					} else {
+						throw new Error('settings panel render function or html required');
+					}
 					disposers.push(unregisterPanel);
 				},
 				registerRightPanel(panel) {
 					if (!isCommandId(panel.id)) throw new Error(`invalid right panel id: ${panel.id}`);
 					if (!panel.title?.trim()) throw new Error('right panel title required');
-					if (typeof panel.render !== 'function') throw new Error('right panel render function required');
 					const id = scopedRightPanelId(plugin.id, panel.id);
-					const unregisterPanel = registerRightPanel(vaultId, {
+					const common = {
 						id,
 						localId: panel.id,
 						pluginId: plugin.id,
 						title: panel.title.trim(),
-						description: panel.description?.trim(),
-						render: panel.render
-					});
+						description: panel.description?.trim()
+					};
+					let unregisterPanel: () => void;
+					if ('html' in panel) {
+						unregisterPanel = registerRightPanel(vaultId, {
+							...common,
+							mode: 'iframe',
+							html: cleanIframeHtml(panel.html),
+							height: cleanIframeHeight(panel.height)
+						});
+					} else if (typeof panel.render === 'function') {
+						unregisterPanel = registerRightPanel(vaultId, {
+							...common,
+							mode: 'dom',
+							render: panel.render
+						});
+					} else {
+						throw new Error('right panel render function or html required');
+					}
 					disposers.push(unregisterPanel);
 				},
 				notify(message) {

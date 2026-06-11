@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { NoteDoc } from '$lib/types';
 	import type { RegisteredRightPanel } from '$lib/plugins/extensions.svelte';
+	import PluginIframePanel from '$lib/components/plugins/PluginIframePanel.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -11,9 +12,28 @@
 	let { vaultId, doc, panel }: Props = $props();
 	let host = $state<HTMLElement | null>(null);
 	let error = $state<string | null>(null);
+	const iframeContext = $derived({
+		vaultId,
+		pluginId: panel.pluginId,
+		extensionId: panel.localId,
+		panelId: panel.localId,
+		doc: {
+			path: doc.path,
+			content: doc.content,
+			revision: doc.revision,
+			mtime: doc.mtime,
+			frontmatter: JSON.parse(JSON.stringify(doc.frontmatter ?? {})) as Record<string, unknown>,
+			body: doc.body,
+			html: doc.html,
+			outgoingLinks: doc.outgoingLinks.map((link) => ({ target: link.target, resolved: link.resolved })),
+			backlinks: doc.backlinks.map((link) => ({ path: link.path, title: link.title })),
+			tags: [...doc.tags]
+		}
+	});
 
 	$effect(() => {
 		if (!host) return;
+		if (panel.mode !== 'dom') return;
 		let disposed = false;
 		let cleanup: (() => void) | null = null;
 		error = null;
@@ -64,9 +84,18 @@
 	{#if panel.description}
 		<p class="description">{panel.description}</p>
 	{/if}
-	<div class="plugin-panel-host" bind:this={host}></div>
-	{#if error}
-		<p class="err">Plugin panel failed: {error}</p>
+	{#if panel.mode === 'iframe'}
+		<PluginIframePanel
+			title={panel.title}
+			html={panel.html}
+			height={panel.height}
+			context={iframeContext}
+		/>
+	{:else}
+		<div class="plugin-panel-host" bind:this={host}></div>
+		{#if error}
+			<p class="err">Plugin panel failed: {error}</p>
+		{/if}
 	{/if}
 </section>
 

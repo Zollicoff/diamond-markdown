@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RegisteredSettingsPanel } from '$lib/plugins/extensions.svelte';
+	import PluginIframePanel from '$lib/components/plugins/PluginIframePanel.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -12,6 +13,7 @@
 
 	$effect(() => {
 		if (!host) return;
+		if (panel.mode !== 'dom') return;
 		let disposed = false;
 		let cleanup: (() => void) | null = null;
 		error = null;
@@ -61,9 +63,23 @@
 	{#if panel.description}
 		<p class="group-hint">{panel.description}</p>
 	{/if}
-	<div class="plugin-settings-host" bind:this={host}></div>
-	{#if error}
-		<div class="err">Plugin settings failed: {error}</div>
+	{#if panel.mode === 'iframe'}
+		<PluginIframePanel
+			title={panel.title}
+			html={panel.html}
+			height={panel.height}
+			context={{
+				vaultId,
+				pluginId: panel.pluginId,
+				extensionId: panel.localId,
+				panelId: panel.localId
+			}}
+		/>
+	{:else}
+		<div class="plugin-settings-host" bind:this={host}></div>
+		{#if error}
+			<div class="err">Plugin settings failed: {error}</div>
+		{/if}
 	{/if}
 </section>
 

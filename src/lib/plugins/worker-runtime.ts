@@ -1,9 +1,23 @@
 import { register, unregister, type CommandContext, type CommandDef } from '$lib/commands';
 import type { PluginCommandManifest, PluginDescriptor } from './types';
+import { registerRightPanel, registerSettingsPanel } from './extensions.svelte';
 
 interface WorkerCommandMessage {
 	type: 'registerCommand';
 	command: PluginCommandManifest & { shortcut?: string };
+}
+
+interface WorkerIframePanelDef {
+	id: string;
+	title: string;
+	description?: string;
+	html: string;
+	height?: number;
+}
+
+interface WorkerPanelMessage {
+	type: 'registerSettingsPanel' | 'registerRightPanel';
+	panel: WorkerIframePanelDef;
 }
 
 interface WorkerNotifyMessage {
@@ -28,6 +42,7 @@ interface WorkerCompleteMessage {
 
 type WorkerMessage =
 	| WorkerCommandMessage
+	| WorkerPanelMessage
 	| WorkerNotifyMessage
 	| WorkerReadyMessage
 	| WorkerErrorMessage
@@ -43,9 +58,11 @@ export interface WorkerPluginRuntime {
 }
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+const MAX_IFRAME_HTML_BYTES = 128 * 1024;
 
 const WORKER_SOURCE = `
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+const MAX_IFRAME_HTML_BYTES = 128 * 1024;
 const commands = new Map();
 let api = null;
 let dispose = null;
@@ -68,6 +85,24 @@ function cleanCommand(command) {
   };
 }
 
+function cleanPanel(panel, label) {
+  if (!panel || typeof panel !== 'object') throw new Error(label + ' panel required');
+  if (!ID_RE.test(panel.id ?? '')) throw new Error('invalid ' + label + ' panel id: ' + panel.id);
+  if (typeof panel.title !== 'string' || !panel.title.trim()) throw new Error(label + ' panel title required');
+  if (typeof panel.html !== 'string' || !panel.html.trim()) throw new Error(label + ' panel html required');
+  const encodedLength = new TextEncoder().encode(panel.html).byteLength;
+  if (encodedLength > MAX_IFRAME_HTML_BYTES) throw new Error(label + ' panel html is too large');
+  const out = {
+    id: panel.id.trim(),
+    title: panel.title.trim(),
+    description: typeof panel.description === 'string' ? panel.description.trim().slice(0, 500) : undefined,
+    html: panel.html.trim()
+  };
+  const height = Number(panel.height);
+  if (Number.isFinite(height)) out.height = Math.min(720, Math.max(80, Math.round(height)));
+  return out;
+}
+
 function makeApi(vaultId, pluginId) {
   return {
     vaultId,
@@ -83,11 +118,11 @@ function makeApi(vaultId, pluginId) {
     registerMarkdownPostprocessor() {
       throw new Error('worker plugins cannot register markdown postprocessors');
     },
-    registerRightPanel() {
-      throw new Error('worker plugins cannot register right panels');
+    registerRightPanel(panel) {
+      self.postMessage({ type: 'registerRightPanel', panel: cleanPanel(panel, 'right') });
     },
-    registerSettingsPanel() {
-      throw new Error('worker plugins cannot register settings panels');
+    registerSettingsPanel(panel) {
+      self.postMessage({ type: 'registerSettingsPanel', panel: cleanPanel(panel, 'settings') });
     },
     notify(message) {
       self.postMessage({ type: 'notify', message: String(message).slice(0, 500) });
@@ -154,10 +189,31 @@ function serializableContext(ctx: CommandContext): CommandContext {
 	return out;
 }
 
+function cleanWorkerIframePanel(panel: WorkerIframePanelDef, label: string): WorkerIframePanelDef {
+	if (!panel || typeof panel !== 'object') throw new Error(`${label} panel required`);
+	const candidate = panel as Partial<WorkerIframePanelDef>;
+	if (typeof candidate.id !== 'string' || !ID_RE.test(candidate.id)) throw new Error(`invalid ${label} panel id: ${candidate.id}`);
+	if (typeof candidate.title !== 'string' || !candidate.title.trim()) throw new Error(`${label} panel title required`);
+	if (typeof candidate.html !== 'string' || !candidate.html.trim()) throw new Error(`${label} panel html required`);
+	const id = candidate.id.trim();
+	const title = candidate.title.trim();
+	const html = candidate.html.trim();
+	if (new TextEncoder().encode(html).byteLength > MAX_IFRAME_HTML_BYTES) throw new Error(`${label} panel html is too large`);
+	const height = Number(candidate.height);
+	return {
+		id,
+		title,
+		description: typeof candidate.description === 'string' ? candidate.description.trim().slice(0, 500) : undefined,
+		html,
+		height: Number.isFinite(height) ? Math.min(720, Math.max(80, Math.round(height))) : undefined
+	};
+}
+
 export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor): Promise<WorkerPluginRuntime> {
 	const workerUrl = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
 	const worker = new Worker(workerUrl, { type: 'module', name: `diamond-plugin-${plugin.id}` });
 	const registered = new Set<string>();
+	const panelDisposers: (() => void)[] = [];
 	const pending = new Map<number, PendingCommand>();
 	let requestId = 0;
 	let readyResolve: () => void;
@@ -204,37 +260,84 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 		registered.add(id);
 	}
 
+	function registerWorkerSettingsPanel(panel: WorkerIframePanelDef): void {
+		const cleanPanel = cleanWorkerIframePanel(panel, 'settings');
+		const id = `plugin:${plugin.id}:settings:${cleanPanel.id}`;
+		const dispose = registerSettingsPanel(vaultId, {
+			id,
+			localId: cleanPanel.id,
+			pluginId: plugin.id,
+			title: cleanPanel.title,
+			description: cleanPanel.description,
+			mode: 'iframe',
+			html: cleanPanel.html,
+			height: cleanPanel.height
+		});
+		panelDisposers.push(dispose);
+	}
+
+	function registerWorkerRightPanel(panel: WorkerIframePanelDef): void {
+		const cleanPanel = cleanWorkerIframePanel(panel, 'right');
+		const id = `plugin:${plugin.id}:right:${cleanPanel.id}`;
+		const dispose = registerRightPanel(vaultId, {
+			id,
+			localId: cleanPanel.id,
+			pluginId: plugin.id,
+			title: cleanPanel.title,
+			description: cleanPanel.description,
+			mode: 'iframe',
+			html: cleanPanel.html,
+			height: cleanPanel.height
+		});
+		panelDisposers.push(dispose);
+	}
+
 	worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
 		const message = event.data;
-		if (message.type === 'registerCommand') {
-			registerWorkerCommand(message.command);
-			return;
-		}
-		if (message.type === 'notify') {
-			console.info(`[plugin:${plugin.id}] ${message.message}`);
-			return;
-		}
-		if (message.type === 'ready') {
-			readyResolve();
-			return;
-		}
-		if (message.type === 'commandComplete') {
-			const item = pending.get(message.requestId);
-			if (!item) return;
-			pending.delete(message.requestId);
-			item.resolve();
-			return;
-		}
-		if (message.type === 'commandError') {
-			const item = message.requestId ? pending.get(message.requestId) : null;
-			if (!item) return;
-			pending.delete(message.requestId!);
-			item.reject(new Error(message.error));
-			return;
-		}
-		if (message.type === 'error') {
-			readyReject(new Error(message.error));
-			rejectPending(new Error(message.error));
+		try {
+			if (message.type === 'registerCommand') {
+				registerWorkerCommand(message.command);
+				return;
+			}
+			if (message.type === 'registerSettingsPanel') {
+				registerWorkerSettingsPanel(message.panel);
+				return;
+			}
+			if (message.type === 'registerRightPanel') {
+				registerWorkerRightPanel(message.panel);
+				return;
+			}
+			if (message.type === 'notify') {
+				console.info(`[plugin:${plugin.id}] ${message.message}`);
+				return;
+			}
+			if (message.type === 'ready') {
+				readyResolve();
+				return;
+			}
+			if (message.type === 'commandComplete') {
+				const item = pending.get(message.requestId);
+				if (!item) return;
+				pending.delete(message.requestId);
+				item.resolve();
+				return;
+			}
+			if (message.type === 'commandError') {
+				const item = message.requestId ? pending.get(message.requestId) : null;
+				if (!item) return;
+				pending.delete(message.requestId!);
+				item.reject(new Error(message.error));
+				return;
+			}
+			if (message.type === 'error') {
+				readyReject(new Error(message.error));
+				rejectPending(new Error(message.error));
+			}
+		} catch (error) {
+			const workerError = error instanceof Error ? error : new Error(String(error));
+			console.error(`[plugin:${plugin.id}] worker message rejected:`, workerError);
+			readyReject(workerError);
+			rejectPending(workerError);
 		}
 	};
 
@@ -257,6 +360,7 @@ export async function loadWorkerPlugin(vaultId: string, plugin: PluginDescriptor
 		dispose() {
 			for (const id of registered) unregister(id);
 			registered.clear();
+			for (const dispose of panelDisposers.splice(0)) dispose();
 			rejectPending(new Error('worker plugin disposed'));
 			worker.postMessage({ type: 'dispose' });
 			worker.terminate();

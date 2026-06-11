@@ -83,7 +83,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
   - [x] Right-panel view hook
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
   - [x] Worker execution for command-only plugin logic
-  - [ ] Iframe-hosted settings/right-panel renderers
+  - [x] Iframe-hosted settings/right-panel renderers
   - [ ] Capability proxy for file/editor APIs
 - [x] Plugin install UI (load plugins from manifest URL, not just disk)
 - [x] Curated plugin registry/catalog

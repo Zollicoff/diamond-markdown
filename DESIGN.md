@@ -235,10 +235,11 @@ runtime and boots the new plugin set without a full page reload.
 
 Manifests choose an execution mode. `trusted` is the backwards-compatible
 default and runs plugin ESM in the app context. `worker` loads the entry module
-through `src/lib/plugins/worker-runtime.ts`, where command-only plugin logic
-runs inside a module Worker. Worker plugins can register command-palette actions
-and notify the host, but they cannot register editor commands, panels, or
-markdown postprocessors because those still require live app/DOM objects.
+through `src/lib/plugins/worker-runtime.ts`, where plugin logic runs inside a
+module Worker. Worker plugins can register command-palette actions, notify the
+host, and register iframe-hosted settings/right panels. They cannot register
+editor commands or markdown postprocessors because those require live app/DOM
+objects.
 
 Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
 Settings and right-sidebar panels use the same pattern: plugins register small
@@ -246,6 +247,12 @@ DOM renderers, Diamond renders them inside bounded hosts, and runtime cleanup
 unregisters them when the vault shell unloads. Right-sidebar panels receive the
 active note document so plugins can build note-aware sidebars without owning the
 workspace shell.
+
+Panel renderers can also be iframe-backed. When a plugin registers a panel with
+`html` instead of `render`, Settings and right-sidebar slots render it through
+`PluginIframePanel.svelte` using a sandboxed `srcdoc` iframe with scripts
+enabled but parent-origin access blocked. The host sends serializable panel
+context to the iframe with `postMessage`.
 
 Editor commands reuse the normal command registry but resolve their mutable
 surface through `src/lib/plugins/editor-commands.svelte.ts`. `NoteView.svelte`
@@ -257,10 +264,10 @@ sanitized HTML; `Preview.svelte` inserts that HTML, renders Mermaid blocks, then
 runs registered plugin postprocessors against the preview root with the active
 `NoteDoc` context.
 
-Worker execution isolates command logic from the DOM and app objects, but it is
-not a complete untrusted-plugin permission system. Iframe-hosted UI renderers
-and a stricter capability proxy remain required before arbitrary third-party
-plugins are safe.
+Worker execution plus iframe panels isolate command logic and plugin UI from
+the main DOM, but this is not a complete untrusted-plugin permission system. A
+stricter capability proxy for file/editor APIs remains required before
+arbitrary third-party plugins are safe.
 
 ## Offline / PWA
 

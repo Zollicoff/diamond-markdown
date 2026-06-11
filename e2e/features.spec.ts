@@ -425,6 +425,62 @@ export function activate(api) {
 	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker returned no-note'))).toBe(true);
 });
 
+test('worker plugins register sandboxed iframe panels', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'worker-frame-plugin-vault');
+	const pluginDir = path.join(vaultDir, '.diamondmd', 'plugins', 'worker-frames');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(pluginDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({
+		id: 'worker-frames',
+		name: 'Worker Frames Plugin',
+		version: '0.1.0',
+		description: 'Registers sandboxed iframe panels from a Worker.',
+		entry: 'main.js',
+		execution: 'worker',
+		commands: []
+	}, null, 2));
+	fs.writeFileSync(path.join(pluginDir, 'main.js'), `
+const settingsHtml = '<!doctype html><meta charset="utf-8"><button data-testid="settings-value">waiting</button><script>window.addEventListener("message", (event) => { if (event.data?.type !== "diamond:panel-context") return; let parentAccess = "open"; try { parent.document.body; } catch { parentAccess = "blocked"; } const ctx = event.data.context; document.querySelector("[data-testid=settings-value]").textContent = ctx.pluginId + ":" + ctx.vaultId + ":" + parentAccess; });<\\/script>';
+const rightHtml = '<!doctype html><meta charset="utf-8"><div data-testid="right-value">waiting</div><script>window.addEventListener("message", (event) => { if (event.data?.type !== "diamond:panel-context") return; let parentAccess = "open"; try { parent.document.body; } catch { parentAccess = "blocked"; } const ctx = event.data.context; document.querySelector("[data-testid=right-value]").textContent = ctx.doc.path + ":" + parentAccess; });<\\/script>';
+
+export function activate(api) {
+  api.registerSettingsPanel({
+    id: 'frame-settings',
+    title: 'Worker Frame Settings',
+    description: 'Settings UI rendered in a sandboxed iframe.',
+    html: settingsHtml,
+    height: 90
+  });
+  api.registerRightPanel({
+    id: 'frame-right',
+    title: 'Worker Frame Right',
+    description: 'Right panel UI rendered in a sandboxed iframe.',
+    html: rightHtml,
+    height: 90
+  });
+}
+`);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Worker Frame Plugin Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Settings').click();
+	await expect(page.getByText('Worker Frames Plugin')).toBeVisible();
+	const settingsFrame = page.frameLocator('iframe[title="Worker Frame Settings"]');
+	await expect(settingsFrame.getByTestId('settings-value')).toHaveText(`worker-frames:${vault.id}:blocked`);
+
+	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
+	await expect(page.getByText('Worker Frame Right')).toBeVisible();
+	const rightFrame = page.frameLocator('iframe[title="Worker Frame Right"]');
+	await expect(rightFrame.getByTestId('right-value')).toHaveText('Home.md:blocked');
+});
+
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.toolbar-btn.sort').click();
