@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { theme, setMode, type ThemeMode } from '$lib/theme.svelte';
 	import { api } from '$lib/vault-api';
+	import GitSyncPanel from './GitSyncPanel.svelte';
 
 	const vault = $derived(page.data.vault as { id: string; name: string; path: string; excludedFolders: string[] });
 	let excluded = $state<string[]>([]);
@@ -86,6 +87,8 @@
 			<a class="link-btn" href="/">Open vault picker →</a>
 		</div>
 	</section>
+
+	<GitSyncPanel vaultId={vault.id} />
 
 	<section class="group">
 		<h2>Excluded folders</h2>

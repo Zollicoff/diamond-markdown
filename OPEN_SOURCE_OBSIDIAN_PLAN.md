@@ -48,7 +48,7 @@ Risks:
 
 ### 3. Make Sync Real
 
-- Add explicit git status/pull/push UI per vault.
+- Maintain the explicit git status/pull/push UI per vault.
 - Add conflict detection before save when the working tree diverges.
 - Add a conflict-resolution workflow for remote pulls and local edits.
 - Support per-vault remote setup instructions and health checks.
@@ -96,7 +96,7 @@ For the next public milestone, aim for:
 - zero moderate/high audit findings
 - green e2e suite
 - explicit self-hosting/security documentation
-- git sync status UI
+- basic GitHub sync status/pull/push UI
 - path/indexer route tests
 - mobile polish pass
 

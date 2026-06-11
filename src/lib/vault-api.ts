@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { NoteDoc, SearchHit, TreeNode } from './types';
+import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode } from './types';
 import { emit } from './events';
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -175,5 +175,41 @@ export const api = {
 		});
 		emit('tree:invalidate', { vaultId });
 		return res;
+	},
+
+	async syncStatus(vaultId: string): Promise<GitSyncStatus> {
+		return json(`/api/vaults/${vaultId}/sync`);
+	},
+
+	async setSyncRemote(vaultId: string, remoteUrl: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'set-remote', remoteUrl })
+		});
+	},
+
+	async fetchSync(vaultId: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'fetch' })
+		});
+	},
+
+	async pullSync(vaultId: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'pull' })
+		});
+	},
+
+	async pushSync(vaultId: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'push' })
+		});
 	}
 };

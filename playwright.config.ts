@@ -4,6 +4,7 @@ import { buildFixture, FIXTURE_PATHS } from './e2e/setup-fixture';
 
 const PORT = 4173;
 const FIXTURE_ROOT = FIXTURE_PATHS.FIXTURE_ROOT;
+const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 // Build a clean test vault before the webServer boots.
 buildFixture();
@@ -24,7 +25,10 @@ export default defineConfig({
 	use: {
 		baseURL: `http://127.0.0.1:${PORT}`,
 		trace: 'on-first-retry',
-		screenshot: 'only-on-failure'
+		screenshot: 'only-on-failure',
+		launchOptions: CHROMIUM_EXECUTABLE_PATH
+			? { executablePath: CHROMIUM_EXECUTABLE_PATH }
+			: undefined
 	},
 	projects: [
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }

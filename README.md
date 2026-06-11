@@ -105,6 +105,7 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 ### Versioning
 - Git auto-commit on save (debounced, per-vault repo)
 - Per-note history viewer with diff
+- GitHub sync panel in Settings — configure a GitHub remote, fetch status, pull fast-forward updates, and push local commits
 
 ### Daily notes
 - ⌘⇧D opens today's `Daily Notes/YYYY-MM-DD.md`
@@ -142,6 +143,7 @@ The open-source replacement track is broken out in
 Single SvelteKit app:
 
 - Server (`src/lib/server/`) handles filesystem, git, indexing — never exposes raw paths, only vault-relative paths
+- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with clean-worktree, fast-forward, and divergence guards
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`
 - Typed event bus (`src/lib/events.ts`) — `note:saved`, `note:renamed`, etc. Decouples panes / panels / index.

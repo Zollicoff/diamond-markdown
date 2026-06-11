@@ -66,3 +66,20 @@ test('search rail icon dedupes — clicking twice activates the same tab', async
 	// No second search tab should appear.
 	expect(await tabs.count()).toBe(initialCount);
 });
+
+test('settings exposes GitHub sync status and controls', async ({ page }) => {
+	await openVault(page);
+	await page.getByLabel('Settings').click();
+	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
+	await expect(page.getByPlaceholder('https://github.com/owner/repo.git')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
+	await expect(page.getByText(/Add a GitHub remote|Vault is clean|Commit or discard/)).toBeVisible({ timeout: 5_000 });
+});
+
+test('sync API rejects non-GitHub remotes', async ({ request }) => {
+	const res = await request.post('/api/vaults/default/sync', {
+		data: { action: 'set-remote', remoteUrl: 'https://example.com/owner/repo.git' }
+	});
+	expect(res.status()).toBe(409);
+	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
+});

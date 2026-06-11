@@ -29,6 +29,10 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	return g;
 }
 
+export async function getVaultGit(vault: Vault): Promise<SimpleGit> {
+	return gitFor(vault);
+}
+
 type Verb = 'create' | 'edit' | 'rename' | 'delete';
 
 export async function commitChange(

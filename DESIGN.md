@@ -123,6 +123,21 @@ Verbs: `create`, `edit`, `rename`, `delete`. Multi-file operations (rename with 
 
 `user.name` / `user.email` fall back to whatever's globally configured; if neither exists we use `DiamondMD <noreply@diamondmd>`.
 
+## GitHub sync semantics
+
+Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
+`/api/vaults/[vaultId]/sync`. The sync route is intentionally conservative:
+
+- Only GitHub HTTPS and SSH remotes are accepted for `origin`.
+- Status reports branch, sha, clean/dirty state, conflicted files, ahead/behind counts, and the redacted remote URL.
+- Fetch updates remote refs without changing local files.
+- Pull is fast-forward only and requires a clean worktree.
+- Push requires a clean worktree and refuses when the remote is ahead.
+- Diverged histories are reported as a manual-merge state; the app does not create merge commits automatically.
+
+This keeps the browser UI safe for normal Obsidian-style sync without hiding
+Git's real conflict model.
+
 ## Security model
 
 Single-user by default. Authentication is not built in — deploy behind Tailscale, a reverse proxy, or on localhost.

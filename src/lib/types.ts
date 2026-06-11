@@ -65,3 +65,34 @@ export interface SearchHit {
 	score?: number;
 	snippet?: string;
 }
+
+export interface GitFileStatus {
+	path: string;
+	index: string;
+	workingDir: string;
+}
+
+export interface GitSyncStatus {
+	initialized: boolean;
+	branch: string | null;
+	sha: string | null;
+	remoteUrl: string | null;
+	remoteDisplayUrl: string | null;
+	upstream: string | null;
+	remoteBranch: string | null;
+	clean: boolean;
+	conflicted: string[];
+	files: GitFileStatus[];
+	ahead: number;
+	behind: number;
+	canPull: boolean;
+	canPush: boolean;
+	needsRemote: boolean;
+	message?: string;
+}
+
+export interface GitSyncResult {
+	ok: boolean;
+	status: GitSyncStatus;
+	message: string;
+}
