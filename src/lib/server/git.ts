@@ -7,6 +7,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import type { Vault } from './vault';
 
@@ -15,13 +16,17 @@ const gitCache = new Map<string, SimpleGit>();
 async function gitFor(vault: Vault): Promise<SimpleGit> {
 	let g = gitCache.get(vault.id);
 	if (g) return g;
-	g = simpleGit(vault.path);
-	gitCache.set(vault.id, g);
-	// Lazy init
+
+	// Lazy init. Use explicit `git -C <vault> init` before constructing the
+	// long-lived simple-git instance so vaults nested inside another repo do
+	// not accidentally operate on the parent repository.
 	const gitDir = path.join(vault.path, '.git');
 	if (!fs.existsSync(gitDir)) {
-		await g.init();
+		execFileSync('git', ['-C', vault.path, 'init'], { stdio: 'ignore' });
 	}
+	g = simpleGit(vault.path);
+	gitCache.set(vault.id, g);
+
 	// Ensure a usable identity even if the user hasn't set one globally.
 	const cfg = await g.listConfig();
 	if (!cfg.all['user.email']) await g.addConfig('user.email', 'noreply@diamondmd', false, 'local');

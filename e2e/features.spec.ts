@@ -87,6 +87,54 @@ test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
 });
 
+test('note API rejects path traversal reads and writes', async ({ request }) => {
+	const read = await request.get(`/api/vaults/default/note?path=${encodeURIComponent('../package.json')}`);
+	expect(read.status()).toBe(400);
+	expect(await read.text()).toContain('path escapes vault');
+
+	const write = await request.post('/api/vaults/default/note', {
+		data: { path: '../escape.md', content: '# should not write\n' }
+	});
+	expect(write.status()).toBe(400);
+	expect(await write.text()).toContain('path escapes vault');
+	expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, '..', 'escape.md'))).toBe(false);
+});
+
+test('raw asset API serves safe headers and blocks symlink escapes', async ({ request }) => {
+	const assetDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'assets');
+	const assetPath = path.join(assetDir, 'tiny.svg');
+	const outsidePath = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'outside-secret.txt');
+	const symlinkPath = path.join(assetDir, 'outside-secret.txt');
+	fs.mkdirSync(assetDir, { recursive: true });
+	fs.writeFileSync(assetPath, '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
+	fs.writeFileSync(outsidePath, 'outside vault');
+	try {
+		fs.symlinkSync(outsidePath, symlinkPath);
+	} catch {
+		// If the filesystem disallows symlinks, the rest of the test still
+		// verifies headers for normal raw assets.
+	}
+
+	try {
+		const ok = await request.get('/api/vaults/default/raw/assets/tiny.svg');
+		expect(ok.status()).toBe(200);
+		expect(ok.headers()['content-type']).toContain('image/svg+xml');
+		expect(ok.headers()['x-content-type-options']).toBe('nosniff');
+		expect(ok.headers()['content-security-policy']).toContain('sandbox');
+		expect(await ok.text()).toContain('<svg');
+
+		if (fs.existsSync(symlinkPath)) {
+			const escape = await request.get('/api/vaults/default/raw/assets/outside-secret.txt');
+			expect(escape.status()).toBe(400);
+			expect(await escape.text()).toContain('path escapes vault');
+		}
+	} finally {
+		if (fs.existsSync(assetPath)) fs.unlinkSync(assetPath);
+		if (fs.existsSync(symlinkPath)) fs.unlinkSync(symlinkPath);
+		if (fs.existsSync(outsidePath)) fs.unlinkSync(outsidePath);
+	}
+});
+
 test('note save rejects stale revisions instead of overwriting disk changes', async ({ request }) => {
 	const notePath = 'Stale Save Test.md';
 	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);

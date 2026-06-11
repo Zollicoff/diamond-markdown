@@ -30,10 +30,12 @@ diamondmd/
 │   │   ├── server/         ← only code that touches disk/git lives here
 │   │   │   ├── vault.ts
 │   │   │   ├── paths.ts
+│   │   │   ├── note-service.ts
 │   │   │   ├── wikilink.ts
 │   │   │   ├── markdown.ts
 │   │   │   ├── indexer.ts
-│   │   │   └── git.ts
+│   │   │   ├── git.ts
+│   │   │   └── git-sync.ts
 │   │   └── components/     ← client-side Svelte components
 │   └── routes/
 │       ├── +layout.svelte
@@ -89,10 +91,12 @@ The indexer builds a `Map<title, notePath>` and an `aliases Map` to keep resolut
 1. Client sends full note body (markdown + frontmatter) to `POST /api/vaults/[id]/note`
 2. Client includes the content revision it loaded. The server rejects the save
    with `409` if the file has changed on disk since that revision.
-3. Server writes atomically (write to `foo.md.tmp`, rename)
-4. Server re-indexes the note (extract links, tags; update backlink/tag index)
-5. Server calls `git add <rel> && git commit -m "edit: <path>"` via `simple-git`
-6. Server returns the new git sha + updated backlinks
+3. The HTTP route delegates to `src/lib/server/note-service.ts`; filesystem
+   writes do not live in Svelte components or route glue.
+4. Server writes atomically (write to `foo.md.tmp`, rename)
+5. Server re-indexes the note (extract links, tags; update backlink/tag index)
+6. Server calls `git add <rel> && git commit -m "edit: <path>"` via `simple-git`
+7. Server returns the new git sha + updated revision metadata
 
 A debounce layer (client-side) avoids commit spam while typing — default is "commit on blur or after 3s idle," configurable.
 
