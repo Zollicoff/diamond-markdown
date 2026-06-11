@@ -80,7 +80,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
   - [x] Settings panel renderer
   - [ ] Markdown extension hook
   - [ ] Editor-specific command hook
-  - [ ] Right-panel view hook
+  - [x] Right-panel view hook
 - [ ] Sandboxed execution (iframes for UI; Worker for logic)
 - [ ] Plugin registry page (load plugins from URL, not just disk)
 - [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.

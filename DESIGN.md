@@ -217,9 +217,11 @@ palette actions through a small API. Runtime command ids are scoped as
 ids accidentally.
 
 Plugin extension registrations live in `src/lib/plugins/extensions.svelte.ts`.
-The first extension point is a Settings panel renderer: plugins register a
-small DOM renderer, Settings renders it inside a bounded host, and runtime
-cleanup unregisters it when the vault shell unloads.
+Settings and right-sidebar panels use the same pattern: plugins register small
+DOM renderers, Diamond renders them inside bounded hosts, and runtime cleanup
+unregisters them when the vault shell unloads. Right-sidebar panels receive the
+active note document so plugins can build note-aware sidebars without owning the
+workspace shell.
 
 Current plugins execute as trusted browser ESM. Sandboxed iframe/Worker execution
 remains a v0.5 requirement before untrusted third-party plugins are safe.

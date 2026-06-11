@@ -148,6 +148,26 @@ export function activate(api) {
       return () => button.removeEventListener('click', run);
     }
   });
+  api.registerRightPanel({
+    id: 'note-context',
+    title: 'Boot Test Right Panel',
+    description: 'Right panel registered by a vault plugin.',
+    render(container, context) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Run plugin right panel';
+      button.dataset.testid = 'plugin-right-panel-button';
+      const marker = document.createElement('span');
+      marker.dataset.testid = 'plugin-right-panel-marker';
+      marker.textContent = context.doc.path;
+      const run = () => {
+        window.__diamondPluginRightPanelRan = context.doc.path;
+      };
+      button.addEventListener('click', run);
+      container.append(button, marker);
+      return () => button.removeEventListener('click', run);
+    }
+  });
 }
 `);
 
@@ -170,6 +190,13 @@ export function activate(api) {
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginActivated)).toBe('boot-test');
+	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
+	await expect(page.getByLabel('Editor pane').getByText('Home')).toBeVisible();
+	await expect(page.getByText('Boot Test Right Panel')).toBeVisible();
+	await expect(page.getByText('Right panel registered by a vault plugin.')).toBeVisible();
+	await expect(page.getByTestId('plugin-right-panel-marker')).toHaveText('Home.md');
+	await page.getByTestId('plugin-right-panel-button').click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginRightPanelRan)).toBe('Home.md');
 
 	await page.keyboard.press('Meta+P');
 	await page.locator('input[placeholder="Run a command…"]').fill('Plugin Boot Test');

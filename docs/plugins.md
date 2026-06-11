@@ -59,6 +59,7 @@ The public API is intentionally small while the plugin system is young:
 - `api.vaultId`
 - `api.pluginId`
 - `api.registerCommand(command)`
+- `api.registerRightPanel(panel)`
 - `api.registerSettingsPanel(panel)`
 - `api.notify(message)`
 
@@ -81,6 +82,25 @@ export function activate(api) {
 
 `render(container, context)` may return a cleanup function. Diamond calls that
 cleanup when the vault UI unloads or the plugin runtime is disposed.
+
+## Right Panels
+
+Plugins can add note-aware panels to the right sidebar:
+
+```js
+export function activate(api) {
+  api.registerRightPanel({
+    id: 'note-stats',
+    title: 'Note Stats',
+    render(container, context) {
+      container.textContent = `${context.doc.path}: ${context.doc.body.length} chars`;
+    }
+  });
+}
+```
+
+Right-panel renderers receive the active `doc` object. They rerender when the
+active note changes, and may return a cleanup function.
 
 ## Security Notes
 

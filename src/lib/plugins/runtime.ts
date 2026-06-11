@@ -2,7 +2,9 @@ import { register, unregister, type CommandContext, type CommandDef } from '$lib
 import { api as vaultApi } from '$lib/vault-api';
 import {
 	clearVaultExtensions,
+	registerRightPanel,
 	registerSettingsPanel,
+	type PluginRightPanelDef,
 	type PluginSettingsPanelDef
 } from './extensions.svelte';
 import type { PluginDescriptor } from './types';
@@ -21,6 +23,7 @@ export interface PluginApi {
 	vaultId: string;
 	pluginId: string;
 	registerCommand: (command: PluginCommandDef) => void;
+	registerRightPanel: (panel: PluginRightPanelDef) => void;
 	registerSettingsPanel: (panel: PluginSettingsPanelDef) => void;
 	notify: (message: string) => void;
 }
@@ -49,6 +52,10 @@ function scopedCommandId(pluginId: string, commandId: string): string {
 
 function scopedSettingsPanelId(pluginId: string, panelId: string): string {
 	return `plugin:${pluginId}:settings:${panelId}`;
+}
+
+function scopedRightPanelId(pluginId: string, panelId: string): string {
+	return `plugin:${pluginId}:right:${panelId}`;
 }
 
 function isCommandId(value: string): boolean {
@@ -107,6 +114,21 @@ export async function loadVaultPlugins(vaultId: string): Promise<PluginRuntime> 
 					if (typeof panel.render !== 'function') throw new Error('settings panel render function required');
 					const id = scopedSettingsPanelId(plugin.id, panel.id);
 					const unregisterPanel = registerSettingsPanel(vaultId, {
+						id,
+						localId: panel.id,
+						pluginId: plugin.id,
+						title: panel.title.trim(),
+						description: panel.description?.trim(),
+						render: panel.render
+					});
+					disposers.push(unregisterPanel);
+				},
+				registerRightPanel(panel) {
+					if (!isCommandId(panel.id)) throw new Error(`invalid right panel id: ${panel.id}`);
+					if (!panel.title?.trim()) throw new Error('right panel title required');
+					if (typeof panel.render !== 'function') throw new Error('right panel render function required');
+					const id = scopedRightPanelId(plugin.id, panel.id);
+					const unregisterPanel = registerRightPanel(vaultId, {
 						id,
 						localId: panel.id,
 						pluginId: plugin.id,
