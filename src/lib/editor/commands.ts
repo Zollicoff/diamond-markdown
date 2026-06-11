@@ -6,7 +6,8 @@
  * the view so undo history stays correct.
  */
 
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
+import { slugifyHeading } from '$lib/util/strings';
 
 export interface EditorApi {
 	/** Wrap the current selection in prefix/suffix (e.g. '**' / '**'). */
@@ -25,6 +26,8 @@ export interface EditorApi {
 	insertWikilink(): void;
 	/** Insert a fenced code block, preserving the selection as the body. */
 	insertCodeBlock(lang?: string): void;
+	/** Scroll the editor to the markdown heading with this renderer/outline id. */
+	scrollToHeading(id: string): boolean;
 	focus(): void;
 }
 
@@ -166,6 +169,31 @@ export function makeEditorApi(getView: () => EditorView | null): EditorApi {
 					selection: { anchor: from + 4 + lang.length + 1, head: from + 4 + lang.length + 1 + body.length }
 				});
 			});
+		},
+
+		scrollToHeading(id) {
+			const view = getView();
+			if (!view) return false;
+			let inFence = false;
+			for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+				const line = view.state.doc.line(lineNo);
+				if (/^\s*```/.test(line.text)) {
+					inFence = !inFence;
+					continue;
+				}
+				if (inFence) continue;
+				const match = /^(#{1,6})\s+(.+?)\s*$/.exec(line.text);
+				if (!match) continue;
+				const text = match[2].replace(/[#*_`]+/g, '').trim();
+				if (slugifyHeading(text) !== id) continue;
+				view.dispatch({
+					selection: { anchor: line.from },
+					effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 })
+				});
+				view.focus();
+				return true;
+			}
+			return false;
 		},
 
 		focus() {

@@ -42,6 +42,7 @@ type WorkerCapabilityName =
 	| 'editor.toggleHeading'
 	| 'editor.insertWikilink'
 	| 'editor.insertCodeBlock'
+	| 'editor.scrollToHeading'
 	| 'editor.focus';
 
 interface WorkerCapabilityRequestMessage {
@@ -175,6 +176,9 @@ function makeEditorProxy(target) {
     },
     insertCodeBlock(lang) {
       return requestCapability('editor.insertCodeBlock', { target, lang });
+    },
+    scrollToHeading(id) {
+      return requestCapability('editor.scrollToHeading', { target, id });
     },
     focus() {
       return requestCapability('editor.focus', { target });
@@ -450,6 +454,10 @@ async function runWorkerCapability(files: PluginFilesApi, message: WorkerCapabil
 		case 'editor.insertCodeBlock':
 			activeEditorForTarget(readEditorTarget(input)).editor.insertCodeBlock(readOptionalString(input, 'lang', 32));
 			return { ok: true };
+		case 'editor.scrollToHeading':
+			return {
+				ok: activeEditorForTarget(readEditorTarget(input)).editor.scrollToHeading(readString(input, 'id', 256))
+			};
 		case 'editor.focus':
 			activeEditorForTarget(readEditorTarget(input)).editor.focus();
 			return { ok: true };

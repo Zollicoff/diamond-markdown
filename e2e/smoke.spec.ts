@@ -169,6 +169,18 @@ test('mode buttons (Live / Source / Read) are inline in the note topbar', async 
 	await expect(sourceBtn).toHaveClass(/active/);
 });
 
+test('outline jumps scroll the live editor to headings', async ({ page }) => {
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await expect(page.getByRole('tab', { name: 'Live' })).toHaveClass(/active/);
+
+	await page.locator('.outline .h-btn[title="Shortcuts"]').click();
+	await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('#shortcuts');
+	await expect(page.locator('.cm-activeLine')).toContainText('Shortcuts');
+	await expect.poll(() => page.locator('.cm-scroller').first().evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
 test('wikilink toolbar button inserts double-bracket [[]] syntax', async ({ page }) => {
 	await openFirstVault(page);
 	await openFirstNote(page);

@@ -107,6 +107,10 @@
 				// Only the focused note view should consume the template insert.
 				if (e.vaultId !== vaultId || !isFocused) return;
 				editorApi?.insertTemplate(e.content);
+			}),
+			onBus('outline:jump', (e) => {
+				if (e.vaultId !== vaultId || e.path !== path || !isFocused) return;
+				jumpToHeading(e.headingId);
 			})
 		];
 		return () => offs.forEach((off) => off());
@@ -132,6 +136,22 @@
 	function reloadFromDisk(): void {
 		if (dirty && !confirm('Reload from disk and discard unsaved edits?')) return;
 		void load();
+	}
+
+	function scrollReadHeading(id: string): boolean {
+		const root = document.querySelector('.pane.active .preview') as HTMLElement | null;
+		const el = root?.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+		if (!el) return false;
+		el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		return true;
+	}
+
+	function jumpToHeading(id: string): void {
+		if (mode === 'read') {
+			scrollReadHeading(id);
+			return;
+		}
+		editorApi?.scrollToHeading(id);
 	}
 
 	let idleTimer: ReturnType<typeof setTimeout> | null = null;

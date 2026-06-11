@@ -16,7 +16,7 @@
 <aside class="right">
 	{#if doc}
 		<div class="stack">
-			<OutlinePanel body={doc.body} />
+			<OutlinePanel {vaultId} path={doc.path} body={doc.body} />
 			<BacklinksPanel
 				{vaultId}
 				backlinks={doc.backlinks}

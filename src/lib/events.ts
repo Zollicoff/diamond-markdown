@@ -21,6 +21,7 @@ export interface VaultEventMap {
 	'palette:template-pick': { vaultId: string; activeNoteTitle?: string; };
 	'plugins:reload': { vaultId: string; };
 	'history:open':  { vaultId: string; path: string; };
+	'outline:jump':  { vaultId: string; path: string; headingId: string; };
 	'template:insert': { vaultId: string; content: string; };
 	'note:rename-request': { vaultId: string; path: string; };
 	'dialog:prompt': {

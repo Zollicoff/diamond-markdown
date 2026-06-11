@@ -1,11 +1,14 @@
 <script lang="ts">
+	import { emit as emitBus } from '$lib/events';
 	import { slugifyHeading } from '$lib/util/strings';
 
 	interface Props {
+		vaultId: string;
+		path: string;
 		body: string;
 	}
 
-	let { body }: Props = $props();
+	let { vaultId, path, body }: Props = $props();
 
 	interface Heading { level: number; text: string; id: string; }
 
@@ -29,14 +32,12 @@
 	const minLevel = $derived(headings.length ? Math.min(...headings.map((h) => h.level)) : 1);
 
 	function jump(id: string): void {
-		// Use URL hash so the Preview's scroll-to-hash effect picks it up,
-		// AND so the link is shareable / reload-stable.
+		// Keep the URL shareable/reload-stable, while NoteView handles
+		// the mode-specific scroll target (Read DOM or CodeMirror editor).
 		const url = new URL(window.location.href);
 		url.hash = id;
-		// Replace state — outline navigation shouldn't pollute history.
 		window.history.replaceState(null, '', url.toString());
-		const el = document.querySelector(`.preview #${CSS.escape(id)}`) as HTMLElement | null;
-		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		emitBus('outline:jump', { vaultId, path, headingId: id });
 	}
 </script>
 
