@@ -17,7 +17,8 @@ Diamond Markdown already has the right foundation:
 - A small plugin runtime with manifest discovery, catalog installs, workers,
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
-  `.obsidian`, attachment folders, and Git readiness before registration.
+  `.obsidian`, attachment folders, media outside named attachment folders,
+  Obsidian plugin folders, Canvas files, and Git readiness before registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
 
@@ -70,15 +71,22 @@ Use small, pushable slices:
 - **Plugin panel split.** Separate plugin install state, manifest validation
    feedback, catalog rendering, and installed-plugin rendering.
 - **Import and migration helpers.** Add an Obsidian-vault import checklist:
-   ignore `.obsidian`, detect attachment folders, preserve markdown unchanged,
-   and recommend git initialization before first sync.
+   ignore `.obsidian`, detect attachment folders, flag media outside named
+   attachment folders, preserve plugin settings and Canvas files unchanged, and
+   recommend git initialization before first sync.
+- **Graph view projection extraction.** Move graph filtering, visible-edge
+   projection, selection-box math, and screen-to-graph coordinate conversion
+   into pure helpers with focused tests.
 
 ## Next Implementation Slices
 
-1. **Import and migration helpers.** Expand migration guidance for unsupported
-   Obsidian plugin settings, canvas files, and unusual attachment layouts.
-2. **Verification hardening.** Add tests for remaining dialog-driven
-   destructive actions, sync recovery copy, and deeper import edge cases.
+1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
+   `FileTreePanel` into pure helpers and small presentational pieces.
+2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
+   import edges such as attachment embed variants, Canvas read-only previews,
+   and plugin-settings visibility without executing Obsidian plugins.
+3. **Verification hardening.** Add tests for remaining dialog-driven
+   destructive actions and sync recovery flows before expanding automation.
 
 ## Verification Gates
 

@@ -10,6 +10,11 @@
 		type GNode,
 		type GEdge
 	} from '$lib/graph/sim';
+	import {
+		buildGraphProjection,
+		selectNodesInBox,
+		selectionBoxFromPoints
+	} from '$lib/graph/view';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 
 	interface Props {
@@ -95,31 +100,18 @@
 	});
 
 	// --- Filter projection ---------------------------------------------
-	const visiblePaths = $derived.by<Set<string>>(() => {
-		const q = searchQuery.trim().toLowerCase();
-		const set = new Set<string>();
-		for (const n of nodes) {
-			if (hideOrphans && n.degree === 0) continue;
-			if (q && !n.title.toLowerCase().includes(q) && !n.path.toLowerCase().includes(q)) continue;
-			set.add(n.path);
-		}
-		return set;
-	});
-	const visibleNodes = $derived<GNode[]>(nodes.filter((n) => visiblePaths.has(n.path)));
-	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
-	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
-	const selectedCount = $derived(selectedPaths.filter((path) => visiblePaths.has(path)).length);
-	const selectionBox = $derived.by(() => {
-		if (!selecting || !selectStart || !selectEnd) return null;
-		const x = Math.min(selectStart.x, selectEnd.x);
-		const y = Math.min(selectStart.y, selectEnd.y);
-		return {
-			x,
-			y,
-			width: Math.abs(selectEnd.x - selectStart.x),
-			height: Math.abs(selectEnd.y - selectStart.y)
-		};
-	});
+	const graphProjection = $derived.by(() => buildGraphProjection(
+		nodes,
+		edges,
+		{ hideOrphans, searchQuery },
+		selectedPaths
+	));
+	const visiblePaths = $derived(graphProjection.visiblePaths);
+	const visibleNodes = $derived(graphProjection.visibleNodes);
+	const visibleEdges = $derived(graphProjection.visibleEdges);
+	const filtersActive = $derived(graphProjection.filtersActive);
+	const selectedCount = $derived(graphProjection.selectedCount);
+	const selectionBox = $derived.by(() => selectionBoxFromPoints(selecting, selectStart, selectEnd));
 
 	// --- Load + sim loop -----------------------------------------------
 	let initialCenterDone = false;
@@ -212,27 +204,15 @@
 	}
 
 	function finishSelection(additive: boolean): void {
-		if (!selectionBox || selectionBox.width < 8 || selectionBox.height < 8) {
-			selecting = false;
-			selectStart = null;
-			selectEnd = null;
-			return;
+		if (selectionBox) {
+			selectedPaths = selectNodesInBox(
+				visibleNodes,
+				selectionBox,
+				{ viewX, viewY, viewScale },
+				selectedPaths,
+				additive
+			);
 		}
-		const x1 = (selectionBox.x - viewX) / viewScale;
-		const y1 = (selectionBox.y - viewY) / viewScale;
-		const x2 = (selectionBox.x + selectionBox.width - viewX) / viewScale;
-		const y2 = (selectionBox.y + selectionBox.height - viewY) / viewScale;
-		const minX = Math.min(x1, x2);
-		const maxX = Math.max(x1, x2);
-		const minY = Math.min(y1, y2);
-		const maxY = Math.max(y1, y2);
-		const next = additive ? [...selectedPaths] : [];
-		for (const n of visibleNodes) {
-			if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY && !next.includes(n.path)) {
-				next.push(n.path);
-			}
-		}
-		selectedPaths = next;
 		selecting = false;
 		selectStart = null;
 		selectEnd = null;
