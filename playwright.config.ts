@@ -28,6 +28,10 @@ export default defineConfig({
 		baseURL: `http://127.0.0.1:${PORT}`,
 		trace: 'on-first-retry',
 		screenshot: 'only-on-failure',
+		// Production builds auto-register the SvelteKit service worker. Block it
+		// in e2e so repeated release runs never serve stale immutable chunks from
+		// a previous build on the same localhost origin.
+		serviceWorkers: 'block',
 		launchOptions: CHROMIUM_EXECUTABLE_PATH
 			? { executablePath: CHROMIUM_EXECUTABLE_PATH }
 			: undefined
