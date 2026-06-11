@@ -29,16 +29,19 @@ export interface VaultImportAnalysis {
 	path: string;
 	markdownFiles: number;
 	assetFiles: number;
+	canvasFiles: number;
 	totalFiles: number;
 	obsidianConfig: boolean;
 	diamondConfig: boolean;
 	gitRepository: boolean;
 	likelyAttachmentFolders: string[];
+	obsidianPluginFolders: string[];
 	recommendedExcludedFolders: string[];
 	ignoredFolders: string[];
 	warnings: string[];
 	checklist: VaultImportCheckItem[];
 	markdownExamples: string[];
+	canvasExamples: string[];
 }
 
 export interface TreeNode {

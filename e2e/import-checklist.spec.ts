@@ -11,16 +11,19 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 		path: '/vault',
 		markdownFiles: 2,
 		assetFiles: 1,
+		canvasFiles: 0,
 		totalFiles: 3,
 		obsidianConfig: false,
 		diamondConfig: false,
 		gitRepository: true,
 		likelyAttachmentFolders: [],
+		obsidianPluginFolders: [],
 		recommendedExcludedFolders: [],
 		ignoredFolders: [],
 		warnings: [],
 		checklist: [{ id: 'markdown', label: 'Markdown notes', detail: '2 markdown files found.', level: 'ok' }],
 		markdownExamples: ['Daily.md'],
+		canvasExamples: [],
 		...overrides
 	};
 }
@@ -28,8 +31,11 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 test.describe('import checklist helpers', () => {
 	test('summarizes import readiness without mutating analysis shape', () => {
 		expect(importSummary(analysis())).toBe('2 notes · 1 asset');
+		expect(importSummary(analysis({ canvasFiles: 1 }))).toBe('2 notes · 1 asset · 1 canvas');
 		expect(importReadiness(analysis())).toEqual({ level: 'ok', label: 'Ready' });
-		expect(importReadiness(analysis({ obsidianConfig: true }))).toEqual({ level: 'info', label: 'Ready with notes' });
+		expect(importReadiness(analysis({
+			checklist: [{ id: 'canvas', label: 'Canvas files', detail: '1 Canvas file found.', level: 'info' }]
+		}))).toEqual({ level: 'info', label: 'Ready with notes' });
 		expect(importReadiness(analysis({
 			checklist: [{ id: 'git', label: 'Git sync readiness', detail: 'No .git folder found.', level: 'warn' }]
 		}))).toEqual({ level: 'warn', label: 'Needs review' });

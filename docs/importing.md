@@ -11,6 +11,8 @@ an existing Obsidian vault. The preflight reports:
 - markdown file count
 - likely attachment folders
 - whether `.obsidian` exists
+- Obsidian plugin folders that will be preserved but not executed
+- Obsidian Canvas files that will be preserved but not rendered yet
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
@@ -18,6 +20,14 @@ The `.obsidian` folder is preserved on disk but skipped from note indexing.
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
 the vault.
+
+If media files are present outside a named attachment folder, the preflight
+marks that as a review item. Diamond still registers the vault in place, but
+you should verify embeds after opening it.
+
+Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
+disk. Diamond Markdown does not execute Obsidian plugins or render Canvas boards
+yet.
 
 ## GitHub Sync
 

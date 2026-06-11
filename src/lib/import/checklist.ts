@@ -8,14 +8,17 @@ export interface ImportReadiness {
 export function importSummary(analysis: VaultImportAnalysis): string {
 	const notes = `${analysis.markdownFiles} note${analysis.markdownFiles === 1 ? '' : 's'}`;
 	const assets = `${analysis.assetFiles} asset${analysis.assetFiles === 1 ? '' : 's'}`;
-	return `${notes} · ${assets}`;
+	const canvas = analysis.canvasFiles > 0
+		? ` · ${analysis.canvasFiles} canvas`
+		: '';
+	return `${notes} · ${assets}${canvas}`;
 }
 
 export function importReadiness(analysis: VaultImportAnalysis): ImportReadiness {
 	if (analysis.checklist.some((check) => check.level === 'warn')) {
 		return { level: 'warn', label: 'Needs review' };
 	}
-	if (analysis.obsidianConfig || analysis.likelyAttachmentFolders.length > 0) {
+	if (analysis.checklist.some((check) => check.level === 'info')) {
 		return { level: 'info', label: 'Ready with notes' };
 	}
 	return { level: 'ok', label: 'Ready' };

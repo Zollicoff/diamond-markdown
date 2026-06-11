@@ -54,6 +54,13 @@
 		</div>
 	{/if}
 
+	{#if analysis.canvasExamples.length > 0}
+		<div class="note">
+			<span class="note-label">Canvas files</span>
+			<span class="mono">{compactPathList(analysis.canvasExamples, 3)}</span>
+		</div>
+	{/if}
+
 	{#if analysis.warnings.length > 0}
 		<ul class="warnings">
 			{#each analysis.warnings as warning}

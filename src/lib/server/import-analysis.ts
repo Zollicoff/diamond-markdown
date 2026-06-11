@@ -63,12 +63,14 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 
 	let markdownFiles = 0;
 	let assetFiles = 0;
+	let canvasFiles = 0;
 	let totalFiles = 0;
 	let unreadableEntries = 0;
 	let skippedSymlinks = 0;
 	let hiddenMarkdownRisk = false;
 
 	const markdownExamples: string[] = [];
+	const canvasExamples: string[] = [];
 	const ignoredFolders = new Set<string>();
 	const recommendedExcludedFolders = new Set<string>();
 	const hiddenFolders = new Set<string>();
@@ -77,6 +79,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const gitRepository = fs.existsSync(path.join(root, '.git'));
 	let obsidianConfig = fs.existsSync(path.join(root, '.obsidian'));
 	let diamondConfig = fs.existsSync(path.join(root, '.diamondmd'));
+	const obsidianPluginFolders = sorted(obsidianConfig ? listObsidianPluginFolders(root) : []);
 
 	function noteMarkdown(rel: string): void {
 		markdownFiles += 1;
@@ -87,6 +90,11 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		assetFiles += 1;
 		const folder = path.dirname(rel).split(path.sep).join('/');
 		if (folder && folder !== '.') assetFolders.add(folder);
+	}
+
+	function noteCanvas(rel: string): void {
+		canvasFiles += 1;
+		if (canvasExamples.length < MAX_EXAMPLES) canvasExamples.push(rel);
 	}
 
 	function walk(dir: string): void {
@@ -135,6 +143,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			totalFiles += 1;
 			const ext = path.extname(entry.name).toLowerCase();
 			if (ext === '.md' || ext === '.markdown') noteMarkdown(rel);
+			else if (ext === '.canvas') noteCanvas(rel);
 			else if (ASSET_EXTENSIONS.has(ext)) noteAsset(rel);
 		}
 	}
@@ -166,6 +175,11 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (skippedSymlinks > 0) warnings.push(`${skippedSymlinks} symlink${skippedSymlinks === 1 ? '' : 's'} skipped during inspection.`);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
+	const attachmentDetail = likelyAttachmentFolders.length > 0
+		? `Likely attachment folders: ${likelyAttachmentFolders.slice(0, 5).join(', ')}.`
+		: assetFiles > 0
+			? `${assetFiles} asset file${assetFiles === 1 ? '' : 's'} found outside named attachment folders; verify embed paths after import.`
+			: 'No likely attachment folder was detected.';
 	const checklist: VaultImportCheckItem[] = [
 		item(
 			'markdown',
@@ -184,12 +198,26 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			obsidianConfig ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-plugins',
+			'Obsidian plugins',
+			obsidianPluginFolders.length > 0
+				? `${obsidianPluginFolders.length} Obsidian plugin folder${obsidianPluginFolders.length === 1 ? '' : 's'} found; Diamond preserves settings but does not run Obsidian plugins.`
+				: 'No Obsidian plugin folders were found.',
+			obsidianPluginFolders.length > 0 ? 'info' : 'ok'
+		),
+		item(
+			'canvas',
+			'Canvas files',
+			canvasFiles > 0
+				? `${canvasFiles} Canvas file${canvasFiles === 1 ? '' : 's'} found; Diamond preserves them but does not render Canvas boards yet.`
+				: 'No Obsidian Canvas files were found.',
+			canvasFiles > 0 ? 'info' : 'ok'
+		),
+		item(
 			'attachments',
 			'Attachments',
-			likelyAttachmentFolders.length > 0
-				? `Likely attachment folders: ${likelyAttachmentFolders.slice(0, 5).join(', ')}.`
-				: 'No likely attachment folder was detected.',
-			likelyAttachmentFolders.length > 0 ? 'info' : 'ok'
+			attachmentDetail,
+			likelyAttachmentFolders.length > 0 || assetFiles > 0 ? 'info' : 'ok'
 		),
 		item(
 			'git',
@@ -211,15 +239,31 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		path: root,
 		markdownFiles,
 		assetFiles,
+		canvasFiles,
 		totalFiles,
 		obsidianConfig,
 		diamondConfig,
 		gitRepository,
 		likelyAttachmentFolders,
+		obsidianPluginFolders,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),
 		ignoredFolders: sorted(ignoredFolders),
 		warnings,
 		checklist,
-		markdownExamples
+		markdownExamples,
+		canvasExamples
 	};
+}
+
+function listObsidianPluginFolders(root: string): string[] {
+	const pluginsRoot = path.join(root, '.obsidian', 'plugins');
+	let entries: fs.Dirent[];
+	try {
+		entries = fs.readdirSync(pluginsRoot, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	return entries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => `.obsidian/plugins/${entry.name}`);
 }
