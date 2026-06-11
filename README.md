@@ -146,8 +146,9 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Starts the existing built SvelteKit/Node backend on loopback, waits for it,
   then opens a native desktop webview to the local app
 - Supports attaching to an already-running backend with `DIAMOND_SERVER_URL`
-- Current packaged builds still require a Node runtime until the backend is
-  replaced with native Rust commands or bundled as a sidecar
+- Supports current-platform self-contained builds via
+  `npm run desktop:build:self-contained`, which prepares a Node sidecar and
+  bundles it through Tauri
 
 ### Plugins
 - Vault-local ESM plugins from `.diamondmd/plugins/<plugin-id>/`
@@ -162,7 +163,7 @@ See [ROADMAP.md](./ROADMAP.md) — summary:
 - **v0.2** ✓ Obsidian-core parity shipped 2026-04-25
 - **v0.3** — Polish, service worker, mobile gestures
 - **v0.4** — Refinements + perf (large vaults)
-- **v0.5** — Plugin API, Tauri desktop wrapper
+- **v0.5** — Plugin API, Tauri desktop wrapper, sidecar-ready desktop runtime
 
 The open-source replacement track is broken out in
 [OPEN_SOURCE_OBSIDIAN_PLAN.md](./OPEN_SOURCE_OBSIDIAN_PLAN.md).

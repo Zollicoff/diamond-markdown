@@ -1,7 +1,8 @@
 use std::{
   env,
+  ffi::OsString,
   net::{SocketAddr, TcpListener, TcpStream},
-  path::PathBuf,
+  path::{Path, PathBuf},
   process::{Child, Command, Stdio},
   sync::Mutex,
   thread,
@@ -14,6 +15,12 @@ const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_BODY_LIMIT: &str = "10485760";
 
 struct BackendProcess(Option<Child>);
+
+#[derive(Debug)]
+struct NodeRuntime {
+  program: OsString,
+  source: String,
+}
 
 impl Drop for BackendProcess {
   fn drop(&mut self) {
@@ -69,6 +76,85 @@ fn bundled_backend_script(app: &tauri::App) -> Result<PathBuf, String> {
     .map_err(|err| format!("failed to resolve bundled resources: {err}"))
 }
 
+fn node_file_name() -> &'static str {
+  if cfg!(windows) { "node.exe" } else { "node" }
+}
+
+fn is_node_sidecar_name(name: &str) -> bool {
+  if cfg!(windows) {
+    name.starts_with("node-") && name.ends_with(".exe")
+  } else {
+    name.starts_with("node-")
+  }
+}
+
+fn push_node_candidates(candidates: &mut Vec<PathBuf>, dir: &Path) {
+  candidates.push(dir.join(node_file_name()));
+
+  if let Ok(entries) = std::fs::read_dir(dir) {
+    for entry in entries.flatten() {
+      let path = entry.path();
+      if !path.is_file() {
+        continue;
+      }
+
+      let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+        continue;
+      };
+
+      if is_node_sidecar_name(name) {
+        candidates.push(path);
+      }
+    }
+  }
+}
+
+fn bundled_node_candidates(app: &tauri::App) -> Vec<PathBuf> {
+  let mut candidates = Vec::new();
+
+  if let Ok(exe) = env::current_exe() {
+    if let Some(dir) = exe.parent() {
+      push_node_candidates(&mut candidates, &dir.join("binaries"));
+      push_node_candidates(&mut candidates, dir);
+    }
+  }
+
+  if let Ok(resource_dir) = app.path().resource_dir() {
+    push_node_candidates(&mut candidates, &resource_dir.join("binaries"));
+    push_node_candidates(&mut candidates, &resource_dir);
+  }
+
+  if cfg!(debug_assertions) {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    push_node_candidates(&mut candidates, &manifest_dir.join("binaries"));
+  }
+
+  candidates
+}
+
+fn node_runtime(app: &tauri::App) -> NodeRuntime {
+  if let Ok(node) = env::var("DIAMOND_NODE_BIN") {
+    return NodeRuntime {
+      program: OsString::from(node),
+      source: "DIAMOND_NODE_BIN".to_string(),
+    };
+  }
+
+  for candidate in bundled_node_candidates(app) {
+    if candidate.is_file() {
+      return NodeRuntime {
+        source: candidate.display().to_string(),
+        program: candidate.into_os_string(),
+      };
+    }
+  }
+
+  NodeRuntime {
+    program: OsString::from("node"),
+    source: "PATH".to_string(),
+  }
+}
+
 fn start_backend(app: &tauri::App) -> Result<(String, BackendProcess), String> {
   if let Ok(url) = env::var("DIAMOND_SERVER_URL") {
     return Ok((url, BackendProcess(None)));
@@ -88,7 +174,7 @@ fn start_backend(app: &tauri::App) -> Result<(String, BackendProcess), String> {
     ));
   }
 
-  let node = env::var("DIAMOND_NODE_BIN").unwrap_or_else(|_| "node".to_string());
+  let node = node_runtime(app);
   let cwd = if cfg!(debug_assertions) {
     script
       .parent()
@@ -106,7 +192,9 @@ fn start_backend(app: &tauri::App) -> Result<(String, BackendProcess), String> {
       .map_err(|err| format!("failed to resolve packaged backend working directory: {err}"))?
   };
 
-  let child = Command::new(node)
+  eprintln!("[diamond-desktop] using Node runtime from {}", node.source);
+
+  let child = Command::new(&node.program)
     .arg(&script)
     .current_dir(cwd)
     .env("HOST", DEFAULT_HOST)

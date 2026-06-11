@@ -26,6 +26,19 @@ For a full Tauri bundle:
 npm run desktop:build
 ```
 
+For a self-contained bundle on the current host platform:
+
+```sh
+npm run desktop:build:self-contained
+```
+
+That command prepares `src-tauri/binaries/node-<target-triple>` and builds with
+`src-tauri/tauri.sidecar.conf.json`, which adds the prepared runtime as a Tauri
+sidecar. On macOS and Linux, the prep script defaults to the official Node.js
+runtime for the current Node version so the bundle does not depend on a
+Homebrew/system Node install. Run the command separately on each release target,
+or provide the target-specific sidecar binaries before cross-compiling.
+
 ## Environment
 
 - `DIAMOND_SERVER_URL` - attach the desktop shell to an already-running Diamond
@@ -34,7 +47,15 @@ npm run desktop:build
   `build/index.js` in development and the bundled `backend/build/index.js` in
   packaged builds. Packaged builds also include `sample-vault/` so first-run
   vault seeding works from Tauri resources.
-- `DIAMOND_NODE_BIN` - override the Node executable. Defaults to `node`.
+- `DIAMOND_NODE_BIN` - override the Node executable. Without this override, the
+  desktop shell checks for a bundled sidecar first and falls back to `node` on
+  `PATH`.
+- `DIAMOND_NODE_SOURCE` - explicit source executable used by
+  `npm run desktop:prepare-node-sidecar`. Without this override, the prep script
+  downloads/caches the official Node.js runtime for the current host when
+  supported, then falls back to the resolved `node` on `PATH`.
+- `DIAMOND_NODE_VERSION` - Node.js runtime version for the downloaded sidecar.
+  Defaults to the Node version running the prep script.
 - `DIAMOND_DESKTOP_PORT` - force the loopback port. Defaults to an available
   random local port.
 
@@ -44,7 +65,13 @@ The wrapper is local-only: it binds the backend to `127.0.0.1`, sets `ORIGIN` to
 the selected loopback URL, and kills the child backend process when the Tauri app
 exits.
 
-The remaining desktop hardening work is to remove the system Node runtime
-dependency. The clean target is either a native Rust filesystem/git backend or a
-bundled per-platform Node sidecar. Until then, packaged desktop builds require a
-Node runtime on `PATH` or an explicit `DIAMOND_NODE_BIN`.
+The runtime lookup order is:
+
+1. `DIAMOND_NODE_BIN`
+2. bundled sidecar next to the Tauri executable or inside Tauri resources
+3. `node` on `PATH`
+
+The remaining desktop release work is to automate sidecar preparation for every
+published target, or replace the Node backend with native Rust filesystem/git
+commands. The current scripts make the current host platform self-contained
+when a sidecar build is used.
