@@ -183,7 +183,7 @@ Single SvelteKit app:
 - Server (`src/lib/server/`) handles filesystem, git, indexing — never exposes raw paths, only vault-relative paths
 - Desktop (`src-tauri/`) wraps the same server app in Tauri and launches it on
   loopback for local desktop use
-- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with clean-worktree, fast-forward, and divergence guards
+- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with clean-worktree, fast-forward, divergence guards, and write blocking when the last fetched remote is behind or diverged
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`
 - Plugin runtime (`src/lib/plugins/`) — vault-local manifests and ESM modules register scoped commands at vault boot

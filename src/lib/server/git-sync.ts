@@ -9,39 +9,11 @@
 import type { SimpleGit } from 'simple-git';
 import type { GitSyncResult, GitSyncStatus } from '$lib/types';
 import type { Vault } from './vault';
-import { getVaultGit } from './git';
+import { getVaultGit, hasRef, parseAheadBehind, rawOrNull } from './git';
 
 const GITHUB_HTTPS_REMOTE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
 const GITHUB_SSH_REMOTE = /^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
 const GITHUB_SSH_URL_REMOTE = /^ssh:\/\/git@github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
-
-async function rawOrNull(g: SimpleGit, args: string[]): Promise<string | null> {
-	try {
-		const out = await g.raw(args);
-		const trimmed = out.trim();
-		return trimmed || null;
-	} catch {
-		return null;
-	}
-}
-
-async function hasRef(g: SimpleGit, ref: string): Promise<boolean> {
-	try {
-		await g.raw(['show-ref', '--verify', '--quiet', ref]);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function parseAheadBehind(raw: string | null): { ahead: number; behind: number } {
-	if (!raw) return { ahead: 0, behind: 0 };
-	const [aheadRaw, behindRaw] = raw.split(/\s+/);
-	return {
-		ahead: Number.parseInt(aheadRaw ?? '0', 10) || 0,
-		behind: Number.parseInt(behindRaw ?? '0', 10) || 0
-	};
-}
 
 function parsePathList(raw: string | null): string[] {
 	if (!raw) return [];

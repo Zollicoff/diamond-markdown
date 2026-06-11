@@ -13,6 +13,11 @@ import { simpleGit, type SimpleGit } from 'simple-git';
 import type { Vault } from './vault';
 
 const gitCache = new Map<string, SimpleGit>();
+const VAULT_WRITE_BLOCKED_MESSAGES = new Set([
+	'resolve merge conflicts before editing vault files',
+	'local and remote histories diverged; resolve sync before editing vault files',
+	'pull remote changes before editing vault files'
+]);
 
 async function gitFor(vault: Vault): Promise<SimpleGit> {
 	let g = gitCache.get(vault.id);
@@ -46,8 +51,65 @@ async function gitFor(vault: Vault): Promise<SimpleGit> {
 	return g;
 }
 
+export async function rawOrNull(g: SimpleGit, args: string[]): Promise<string | null> {
+	try {
+		const out = await g.raw(args);
+		const trimmed = out.trim();
+		return trimmed || null;
+	} catch {
+		return null;
+	}
+}
+
+export async function hasRef(g: SimpleGit, ref: string): Promise<boolean> {
+	try {
+		await g.raw(['show-ref', '--verify', '--quiet', ref]);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export function parseAheadBehind(raw: string | null): { ahead: number; behind: number } {
+	if (!raw) return { ahead: 0, behind: 0 };
+	const [aheadRaw, behindRaw] = raw.split(/\s+/);
+	return {
+		ahead: Number.parseInt(aheadRaw ?? '0', 10) || 0,
+		behind: Number.parseInt(behindRaw ?? '0', 10) || 0
+	};
+}
+
 export async function getVaultGit(vault: Vault): Promise<SimpleGit> {
 	return gitFor(vault);
+}
+
+export async function assertVaultCanWrite(vault: Vault): Promise<void> {
+	const g = await gitFor(vault);
+	const status = await g.status();
+	if ((status.conflicted ?? []).length > 0) {
+		throw new Error('resolve merge conflicts before editing vault files');
+	}
+
+	const remoteUrl = await rawOrNull(g, ['remote', 'get-url', 'origin']);
+	const branch = status.current || await rawOrNull(g, ['rev-parse', '--abbrev-ref', 'HEAD']);
+	if (!remoteUrl || !branch || branch === 'HEAD') return;
+
+	const remoteBranch = `origin/${branch}`;
+	if (!(await hasRef(g, `refs/remotes/${remoteBranch}`))) return;
+
+	const { ahead, behind } = parseAheadBehind(
+		await rawOrNull(g, ['rev-list', '--left-right', '--count', `HEAD...${remoteBranch}`])
+	);
+	if (ahead > 0 && behind > 0) {
+		throw new Error('local and remote histories diverged; resolve sync before editing vault files');
+	}
+	if (behind > 0) {
+		throw new Error('pull remote changes before editing vault files');
+	}
+}
+
+export function isVaultWriteBlockedError(e: unknown): boolean {
+	return e instanceof Error && VAULT_WRITE_BLOCKED_MESSAGES.has(e.message);
 }
 
 type Verb = 'create' | 'edit' | 'rename' | 'delete';

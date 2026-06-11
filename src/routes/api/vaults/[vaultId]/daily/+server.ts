@@ -5,7 +5,7 @@ import path from 'node:path';
 import { getVault } from '$lib/server/vault';
 import { resolveInVault } from '$lib/server/paths';
 import { upsertNote } from '$lib/server/indexer';
-import { commitChange } from '$lib/server/git';
+import { assertVaultCanWrite, commitChange } from '$lib/server/git';
 import { expandTemplate, CURSOR_TOKEN } from '$lib/server/templates';
 
 const DAILY_FOLDER = 'Daily Notes';
@@ -29,6 +29,12 @@ export const POST: RequestHandler = async ({ params }) => {
 	const absTarget = resolveInVault(vault, rel);
 	if (fs.existsSync(absTarget)) {
 		return json({ path: rel, created: false });
+	}
+
+	try {
+		await assertVaultCanWrite(vault);
+	} catch (e) {
+		throw error(409, (e as Error).message);
 	}
 
 	// Ensure folder exists.

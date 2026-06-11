@@ -103,6 +103,7 @@ Check:
 - Pull is fast-forward only.
 - Push refuses when the vault is dirty or behind.
 - Diverged histories are reported as manual-merge state.
+- After fetch, behind/diverged/merge-conflicted vaults block write APIs with `409`.
 
 ## 7. Basic Auth Smoke
 

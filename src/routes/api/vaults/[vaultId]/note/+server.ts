@@ -4,6 +4,15 @@ import { getVault } from '$lib/server/vault';
 import { deleteNote, loadNote, NoteConflictError, saveNote } from '$lib/server/note-service';
 import { ensureMdExt } from '$lib/server/paths';
 import { renameNoteAtomically, duplicateNoteAtomically } from '$lib/server/rename';
+import { assertVaultCanWrite, isVaultWriteBlockedError } from '$lib/server/git';
+
+function mutationStatus(e: unknown): number {
+	if (e instanceof NoteConflictError) return e.status;
+	const message = (e as Error).message;
+	if (message.includes('path escapes vault')) return 400;
+	if (isVaultWriteBlockedError(e)) return 409;
+	return 400;
+}
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
@@ -23,10 +32,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	const body = (await request.json()) as { path: string; content: string; commitNow?: boolean; expectedRevision?: string };
 	if (!body?.path || typeof body?.content !== 'string') throw error(400, 'path and content required');
 	try {
+		await assertVaultCanWrite(vault);
 		return json(await saveNote(vault, body));
 	}
 	catch (e) {
-		throw error(e instanceof NoteConflictError ? e.status : 400, (e as Error).message);
+		throw error(mutationStatus(e), (e as Error).message);
 	}
 };
 
@@ -42,23 +52,25 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 
 	if (body.duplicate) {
 		try {
+			await assertVaultCanWrite(vault);
 			const src = ensureMdExt(body.from);
 			const dst = body.to ? ensureMdExt(body.to) : undefined;
 			const res = await duplicateNoteAtomically(vault, src, dst);
 			return json({ ok: true, ...res });
 		} catch (e) {
-			throw error(409, (e as Error).message);
+			throw error(mutationStatus(e), (e as Error).message);
 		}
 	}
 
 	if (!body.to) throw error(400, 'to required for rename');
 	try {
+		await assertVaultCanWrite(vault);
 		const from = ensureMdExt(body.from);
 		const to = ensureMdExt(body.to);
 		const res = await renameNoteAtomically(vault, from, to);
 		return json({ ok: true, from, to, ...res });
 	} catch (e) {
-		throw error(409, (e as Error).message);
+		throw error(mutationStatus(e), (e as Error).message);
 	}
 };
 
@@ -66,7 +78,8 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
 	try {
+		await assertVaultCanWrite(vault);
 		return json(await deleteNote(vault, url.searchParams.get('path') || ''));
 	}
-	catch (e) { throw error(400, (e as Error).message); }
+	catch (e) { throw error(mutationStatus(e), (e as Error).message); }
 };

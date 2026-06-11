@@ -788,6 +788,13 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 	expect(status.conflictCandidates).toEqual(['Shared.md']);
 	expect(status.message).toContain('overlapping file');
 
+	const blockedSave = await request.post(`/api/vaults/${vault.id}/note`, {
+		data: { path: 'After Divergence.md', content: '# After divergence\n' }
+	});
+	expect(blockedSave.status()).toBe(409);
+	expect(await blockedSave.text()).toContain('resolve sync before editing vault files');
+	expect(fs.existsSync(path.join(vaultDir, 'After Divergence.md'))).toBe(false);
+
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
@@ -796,6 +803,62 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 	await expect(page.locator('.change-box.local').getByText('LocalOnly.md')).toBeVisible();
 	await expect(page.locator('.change-box.remote').getByText('RemoteOnly.md')).toBeVisible();
 	await expect(page.locator('.change-box.overlap').getByText('Shared.md')).toBeVisible();
+});
+
+test('vault writes are blocked when fetched remote commits need pulling', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-origin.git');
+	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-remote-worktree');
+	for (const dir of [vaultDir, bareDir, cloneDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nBase.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Sync Behind Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	const branch = git(vaultDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+	git(vaultDir, ['push', '-u', 'origin', branch]);
+	execFileSync('git', ['--git-dir', bareDir, 'symbolic-ref', 'HEAD', `refs/heads/${branch}`]);
+
+	execFileSync('git', ['clone', '--branch', branch, bareDir, cloneDir], { stdio: 'ignore' });
+	git(cloneDir, ['config', 'user.email', 'remote@example.test']);
+	git(cloneDir, ['config', 'user.name', 'Remote Test']);
+	fs.writeFileSync(path.join(cloneDir, 'RemoteOnly.md'), '# Remote only\n');
+	git(cloneDir, ['add', 'RemoteOnly.md']);
+	git(cloneDir, ['commit', '-m', 'remote: add note']);
+	git(cloneDir, ['push', 'origin', branch]);
+
+	const fetched = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'fetch' } });
+	expect(fetched.ok()).toBe(true);
+	const statusRes = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(statusRes.ok()).toBe(true);
+	const status = await statusRes.json() as {
+		ahead: number;
+		behind: number;
+		diverged: boolean;
+		canPull: boolean;
+		canPush: boolean;
+	};
+	expect(status.ahead).toBe(0);
+	expect(status.behind).toBe(1);
+	expect(status.diverged).toBe(false);
+	expect(status.canPull).toBe(true);
+	expect(status.canPush).toBe(false);
+
+	const blockedSave = await request.post(`/api/vaults/${vault.id}/note`, {
+		data: { path: 'Local While Behind.md', content: '# Should not save\n' }
+	});
+	expect(blockedSave.status()).toBe(409);
+	expect(await blockedSave.text()).toContain('pull remote changes before editing vault files');
+	expect(fs.existsSync(path.join(vaultDir, 'Local While Behind.md'))).toBe(false);
 });
 
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {

@@ -153,6 +153,10 @@ Remote sync lives in `src/lib/server/git-sync.ts` and is exposed through
 - Diverged histories are reported as a manual-merge state with local-only,
   remote-only, and overlapping changed-file lists computed from the merge base.
   The app does not create merge commits automatically.
+- Note, folder, daily-note, plugin-install, and publish writes call the same sync guard:
+  if the last fetched `origin/<branch>` is behind the local checkout, diverged,
+  or has merge conflicts, the API returns `409` instead of creating another
+  vault mutation.
 
 This keeps the browser UI safe for normal Obsidian-style sync without hiding
 Git's real conflict model.

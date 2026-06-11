@@ -53,7 +53,9 @@ Risks:
 ### 3. Make Sync Real
 
 - Maintain the explicit git status/pull/push UI per vault.
-- Add conflict detection before save when the working tree diverges.
+- Add conflict detection before save when the working tree diverges. ✓ Write
+  APIs now block after fetch when the remote is behind, diverged, or
+  merge-conflicted.
 - Add a conflict-resolution workflow for remote pulls and local edits.
 - Support per-vault remote setup instructions and health checks.
 
