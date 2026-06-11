@@ -14,6 +14,59 @@ async function openVault(page: Page): Promise<void> {
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 }
 
+test('indexer writes a config-scoped warm cache and refreshes it on note save', async ({ request }) => {
+	const cacheDir = path.join(FIXTURE_PATHS.CONFIG_DIR, 'index-cache');
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'cache-vault');
+	fs.rmSync(cacheDir, { recursive: true, force: true });
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(vaultDir, 'Cache Seed.md'),
+		'---\ntitle: Cache Seed\ntags: [cache]\n---\n# Cache Seed\n\nLinks to [[Second Note]].\n'
+	);
+	fs.writeFileSync(path.join(vaultDir, 'Second Note.md'), '# Second Note\n\nTarget.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Cache Test Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string; path: string } };
+
+	const search = await request.get(`/api/vaults/${vault.id}/search?q=Cache`);
+	expect(search.ok()).toBe(true);
+	const searchBody = await search.json() as { results: { path: string }[] };
+	expect(searchBody.results.some((r) => r.path === 'Cache Seed.md')).toBe(true);
+
+	const cacheFiles = fs.readdirSync(cacheDir).filter((name) => name.endsWith('.json'));
+	expect(cacheFiles).toHaveLength(1);
+	const cachePath = path.join(cacheDir, cacheFiles[0]);
+	const cache = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as {
+		version: number;
+		vaultId: string;
+		vaultPath: string;
+		files: { rel: string }[];
+		notes: { notePath: string }[];
+		linksOutRaw: { notePath: string; targets: string[] }[];
+	};
+	expect(cache.version).toBe(1);
+	expect(cache.vaultId).toBe(vault.id);
+	expect(cache.vaultPath).toBe(path.resolve(vaultDir));
+	expect(cache.files.map((f) => f.rel)).toContain('Cache Seed.md');
+	expect(cache.notes.map((n) => n.notePath)).toContain('Cache Seed.md');
+	expect(cache.linksOutRaw.find((row) => row.notePath === 'Cache Seed.md')?.targets).toContain('Second Note');
+
+	const saved = await request.post(`/api/vaults/${vault.id}/note`, {
+		data: { path: 'Cache Added.md', content: '# Cache Added\n\nMore cache text.\n', commitNow: false }
+	});
+	expect(saved.ok()).toBe(true);
+	const updated = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as {
+		files: { rel: string }[];
+		notes: { notePath: string }[];
+	};
+	expect(updated.files.map((f) => f.rel)).toContain('Cache Added.md');
+	expect(updated.notes.map((n) => n.notePath)).toContain('Cache Added.md');
+});
+
 test('search rail icon opens a search tab; results fire on input', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();

@@ -104,17 +104,27 @@ A debounce layer (client-side) avoids commit spam while typing — default is "c
 ## Index lifecycle
 
 On server start:
-- For each vault, walk the tree, parse frontmatter + links + tags for every `.md`
+- For each vault, collect a stat snapshot of markdown files, respecting hidden
+  folders, `node_modules`, and per-vault excluded folders.
+- If `~/.diamondmd/index-cache/<vault-id>-<hash>.json` matches the vault id,
+  absolute vault path, excluded-folder list, and exact file snapshot, hydrate
+  the in-memory index from that cache.
+- If the cache is missing, stale, corrupt, or unreadable, walk the tree, parse
+  frontmatter + links + tags for every `.md`, then rewrite the cache.
 - Build: `links: Map<notePath, Set<outgoing notePath>>`, `backlinks: Map<notePath, Set<incoming notePath>>`, `tags: Map<tag, Set<notePath>>`
 
 On save:
-- Re-parse the changed note only; update the maps incrementally.
+- Re-parse the changed note only, rebuild derived lookup maps from indexed note
+  metadata, and refresh the cache.
 
 On delete:
-- Remove the note from all maps; remove references *to* it.
+- Remove the note from all maps, remove references *to* it, and refresh the cache.
 
 On rename:
 - Parse every note that links to the old path; rewrite wikilinks; commit all changes as one "rename" commit.
+
+The cache is derived state and lives in the app config directory, never inside a
+vault. It is safe to delete; the next index read rebuilds it from markdown files.
 
 ## Git semantics
 

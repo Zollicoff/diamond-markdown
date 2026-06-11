@@ -68,8 +68,8 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 ## v0.4 — Performance & scale
 
 - [x] Git sync status / pull / push UI with divergence warnings
+- [x] Indexer warm-cache on disk for fast startup
 - [ ] Virtualized file tree for very large vaults
-- [ ] Indexer warm-cache on disk for fast startup
 - [ ] Quadtree-backed graph sim (drop O(n²) for very large vaults)
 - [ ] Conflict resolution UI when pulling a remote that diverged
 
