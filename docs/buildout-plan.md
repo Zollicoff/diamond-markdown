@@ -62,8 +62,9 @@ Use small, pushable slices:
    failures.
 2. **Git sync UX extraction.** Keep command builders and state labels outside
    `GitSyncPanel`; move remaining branch/status rendering helpers into modules.
-3. **Note view split.** Extract save/reload/link-create behavior from
-   `NoteView` so the component focuses on layout and editor/preview switching.
+3. **Note view split.** Extract metadata, wikilink navigation, save/reload, and
+   link-create behavior from `NoteView` so the component focuses on layout and
+   editor/preview switching.
 4. **Plugin panel split.** Separate plugin install state, manifest validation
    feedback, catalog rendering, and installed-plugin rendering.
 5. **Import and migration helpers.** Add an Obsidian-vault import checklist:

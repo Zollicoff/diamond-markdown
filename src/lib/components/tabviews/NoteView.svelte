@@ -9,8 +9,18 @@
 	import { openNote } from '$lib/workspace/actions';
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
-	import { READING_SPEED_WPM } from '$lib/util/constants';
 	import { confirmDialog } from '$lib/dialogs';
+	import {
+		ensureMarkdownPath,
+		formatSavedAt,
+		isStaleRevisionError,
+		markdownWordCount,
+		notePathFromVaultHref,
+		noteTitleFromPath,
+		openModeForPointer,
+		readingTimeLabel,
+		resolveNoteLink
+	} from '$lib/note/view';
 
 	type ViewComponent = any;
 
@@ -175,33 +185,18 @@
 	}
 
 	const resolveLink: LinkResolver = (target: string) => {
-		if (!doc) return { resolved: false };
-		const t = target.trim().toLowerCase();
-		for (const link of doc.outgoingLinks) {
-			if (link.resolved && (link.target.toLowerCase() === t || link.resolved.toLowerCase() === t)) {
-				return { resolved: true, href: `/vault/${vaultId}/note/${encodeURI(link.resolved)}` };
-			}
-		}
-		for (const b of doc.backlinks) {
-			if (b.path.toLowerCase() === t || b.title.toLowerCase() === t) {
-				return { resolved: true, href: `/vault/${vaultId}/note/${encodeURI(b.path)}` };
-			}
-		}
-		return { resolved: false };
+		return resolveNoteLink(doc, vaultId, target);
 	};
 
 	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
-		if (e.button === 1) return 'new-tab';
-		if (e.metaKey || e.ctrlKey) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
+		return openModeForPointer(e);
 	}
 
 	async function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): Promise<void> {
 		if (resolved && href) {
-			const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
-			const notePath = href.replace(`/vault/${vaultId}/note/`, '');
-			openNote(vaultId, decodeURIComponent(notePath), noteTitle, modeFor(e));
+			const notePath = notePathFromVaultHref(vaultId, href);
+			if (!notePath) return;
+			openNote(vaultId, notePath, noteTitleFromPath(notePath), modeFor(e));
 			return;
 		}
 		const createPath = await confirmDialog({
@@ -209,7 +204,7 @@
 			message: `Create note "${target}"?`,
 			confirmLabel: 'Create note'
 		})
-			? (target.endsWith('.md') ? target : `${target}.md`)
+			? ensureMarkdownPath(target)
 			: null;
 		if (!createPath) return;
 		goto(`/vault/${vaultId}/note/${encodeURI(createPath)}`);
@@ -221,8 +216,9 @@
 
 	function handleWikilinkContext(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
 		if (!resolved || !href) return;
-		const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
-		const notePath = decodeURIComponent(href.replace(`/vault/${vaultId}/note/`, ''));
+		const notePath = notePathFromVaultHref(vaultId, href);
+		if (!notePath) return;
+		const noteTitle = noteTitleFromPath(notePath);
 		menuPos = { x: e.clientX, y: e.clientY };
 		menuItems = [
 			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, notePath, noteTitle, 'replace') },
@@ -234,17 +230,9 @@
 		menuOpen = true;
 	}
 
-	const wordCount = $derived.by<number>(() => {
-		// Strip frontmatter, then count word-shaped tokens.
-		const stripped = content.replace(/^---[\s\S]*?\n---\s*\n/, '').replace(/`[^`]*`/g, ' ').replace(/```[\s\S]*?```/g, ' ');
-		const m = stripped.match(/[\p{L}\p{N}'-]+/gu);
-		return m ? m.length : 0;
-	});
-
-	const readingTime = $derived<string>(
-		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / READING_SPEED_WPM))} min`
-	);
-	const isConflict = $derived(err?.includes('note changed on disk') ?? false);
+	const wordCount = $derived(markdownWordCount(content));
+	const readingTime = $derived(readingTimeLabel(wordCount));
+	const isConflict = $derived(isStaleRevisionError(err));
 	const waitingForEditor = $derived(mode !== 'read' && (!EditorView || !ToolbarView));
 	const waitingForPreview = $derived(mode === 'read' && !PreviewView);
 
@@ -280,12 +268,6 @@
 		});
 	});
 
-	function fmtSaved(ms: number | null): string {
-		if (!ms) return '';
-		const d = Date.now() - ms;
-		if (d < 2000) return 'just saved';
-		return `saved ${Math.round(d / 1000)}s ago`;
-	}
 </script>
 
 <div class="note-view">
@@ -303,7 +285,7 @@
 			{#if saving}<span class="status saving">saving…</span>
 			{:else if err}<span class="status err" title={err}>{isConflict ? 'conflict' : 'error'}</span>
 			{:else if dirty}<span class="status dirty">●</span>
-			{:else if savedAt}<span class="status saved">{fmtSaved(savedAt)}</span>{/if}
+			{:else if savedAt}<span class="status saved">{formatSavedAt(savedAt)}</span>{/if}
 			{#if isConflict}
 				<button class="btn danger" onclick={reloadFromDisk}>Reload</button>
 			{/if}
