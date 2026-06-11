@@ -9,9 +9,10 @@ The repeatable verification command is:
 npm run verify:release
 ```
 
-It runs the dependency audit, Svelte diagnostics, production build, and full
-Playwright e2e suite. On macOS, it uses an installed Google Chrome executable as
-a fallback when Playwright's managed Chromium cache is unavailable.
+It runs the dependency audit, Svelte diagnostics, production build, automated
+read-only smoke, and full Playwright e2e suite. On macOS, it uses an installed
+Google Chrome executable as a fallback when Playwright's managed Chromium cache
+is unavailable.
 
 ## 1. Repository State
 
@@ -105,10 +106,10 @@ Check:
 
 ## 7. Read-Only Smoke
 
-Run the production server with a disposable config/vault:
+Run the automated read-only smoke:
 
 ```sh
-DIAMOND_READ_ONLY=true HOST=127.0.0.1 PORT=4174 node build
+npm run verify:readonly
 ```
 
 Required:
@@ -117,6 +118,7 @@ Required:
 - `GET /api/vaults` works.
 - A write request such as `POST /api/vaults/default/note` returns `403`.
 - The home and vault screens show the read-only banner.
+- The script uses a disposable config/vault and removes it after the check.
 
 ## 8. Documentation
 
