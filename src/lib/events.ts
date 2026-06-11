@@ -22,6 +22,14 @@ export interface VaultEventMap {
 	'history:open':  { vaultId: string; path: string; };
 	'template:insert': { vaultId: string; content: string; };
 	'note:rename-request': { vaultId: string; path: string; };
+	'dialog:prompt': {
+		title: string;
+		label: string;
+		value?: string;
+		placeholder?: string;
+		confirmLabel?: string;
+		resolve: (value: string | null) => void;
+	};
 }
 
 type Handler<K extends keyof VaultEventMap> = (payload: VaultEventMap[K]) => void;

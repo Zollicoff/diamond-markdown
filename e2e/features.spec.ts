@@ -78,6 +78,25 @@ test('search rail icon opens a search tab; results fire on input', async ({ page
 	await expect(search.locator('.result').first()).toContainText(/Frontmatter/i);
 });
 
+test('new note command uses an in-app name dialog', async ({ page, request }) => {
+	const notePath = 'Dialog Created Note.md';
+	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);
+	if (fs.existsSync(abs)) fs.unlinkSync(abs);
+
+	await openVault(page);
+	await page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }).click();
+	const dialog = page.getByRole('dialog', { name: 'New note' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByLabel('Name in vault root').fill('Dialog Created Note');
+	await dialog.getByRole('button', { name: 'Create note' }).click();
+	await expect(dialog).toBeHidden();
+	await expect.poll(() => fs.existsSync(abs)).toBe(true);
+
+	const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+	expect(loaded.ok()).toBe(true);
+	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`).catch(() => undefined);
+});
+
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {
 	await openVault(page);
 	await page.locator('.toolbar-btn.sort').click();

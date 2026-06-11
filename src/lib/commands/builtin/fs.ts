@@ -11,10 +11,11 @@ import { register, type CommandContext } from '../registry';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
 
-async function promptPath(msg: string, placeholder = ''): Promise<string | null> {
+async function promptPath(title: string, label: string, confirmLabel: string, placeholder = ''): Promise<string | null> {
 	if (typeof window === 'undefined') return null;
-	const v = window.prompt(msg, placeholder);
-	return v?.trim() || null;
+	return new Promise((resolve) => {
+		emit('dialog:prompt', { title, label, placeholder, confirmLabel, resolve });
+	});
 }
 
 async function confirmAction(msg: string): Promise<boolean> {
@@ -35,7 +36,11 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			const vaultId = ctx.vaultId!;
 			const parent = ctx.node?.type === 'directory' ? ctx.node.path : '';
-			const raw = await promptPath(`New note in "${parent || '(root)'}"`);
+			const raw = await promptPath(
+				'New note',
+				`Name in ${parent || 'vault root'}`,
+				'Create note'
+			);
 			if (!raw) return;
 			const rel = (parent ? `${parent}/` : '') + ensureMd(raw);
 			const title = raw.split('/').pop()!.replace(/\.md$/, '');
@@ -55,7 +60,11 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			const vaultId = ctx.vaultId!;
 			const parent = ctx.node?.type === 'directory' ? ctx.node.path : '';
-			const raw = await promptPath(`New folder in "${parent || '(root)'}"`);
+			const raw = await promptPath(
+				'New folder',
+				`Name in ${parent || 'vault root'}`,
+				'Create folder'
+			);
 			if (!raw) return;
 			const rel = (parent ? `${parent}/` : '') + raw.replace(/^\/+|\/+$/g, '');
 			try {

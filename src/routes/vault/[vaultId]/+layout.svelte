@@ -11,6 +11,7 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import TemplatePicker from '$lib/components/TemplatePicker.svelte';
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
+	import PromptDialog from '$lib/components/PromptDialog.svelte';
 	import { hydrate as hydrateWorkspace, workspace } from '$lib/workspace/store.svelte';
 	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar, activePane, activeTab } from '$lib/workspace/actions';
 	import { registerBuiltinCommands } from '$lib/commands';
@@ -142,6 +143,7 @@
 <CommandPalette {vaultId} />
 <TemplatePicker {vaultId} />
 <HistoryViewer {vaultId} />
+<PromptDialog />
 
 <style>
 	.shell {
