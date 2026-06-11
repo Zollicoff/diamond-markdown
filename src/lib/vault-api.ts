@@ -28,11 +28,11 @@ export const api = {
 		return json(`/api/vaults/${vaultId}/note?path=${encodeURIComponent(path)}`);
 	},
 
-	async saveNote(vaultId: string, path: string, content: string): Promise<{ created: boolean; sha: string | null }> {
+	async saveNote(vaultId: string, path: string, content: string, expectedRevision?: string): Promise<{ created: boolean; sha: string | null }> {
 		const res = await json<{ created: boolean; sha: string | null }>(`/api/vaults/${vaultId}/note`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path, content })
+			body: JSON.stringify({ path, content, expectedRevision })
 		});
 		emit(res.created ? 'note:created' : 'note:saved', { vaultId, path, sha: res.sha });
 		emit('tree:invalidate', { vaultId });

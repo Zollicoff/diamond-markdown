@@ -51,6 +51,10 @@ export interface Frontmatter {
 export interface NoteDoc {
 	path: string;
 	content: string;
+	/** SHA-256 of the exact file content returned by the server. */
+	revision: string;
+	/** File modified time in ms since epoch. */
+	mtime: number;
 	frontmatter: Frontmatter;
 	body: string;
 	html: string;

@@ -1,4 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { FIXTURE_PATHS } from './setup-fixture';
 
 /**
  * Feature spec — covers surfaces that don't fit the smoke or hotkey
@@ -82,4 +85,32 @@ test('sync API rejects non-GitHub remotes', async ({ request }) => {
 	});
 	expect(res.status()).toBe(409);
 	expect(await res.text()).toContain('only GitHub HTTPS or SSH remotes are supported');
+});
+
+test('note save rejects stale revisions instead of overwriting disk changes', async ({ request }) => {
+	const notePath = 'Stale Save Test.md';
+	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);
+	fs.writeFileSync(abs, '# Stale Save Test\n\nOriginal body.\n');
+
+	try {
+		const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+		expect(loaded.ok()).toBe(true);
+		const doc = await loaded.json() as { revision: string };
+		expect(doc.revision).toMatch(/^[a-f0-9]{64}$/);
+
+		fs.writeFileSync(abs, '# Stale Save Test\n\nExternal disk change.\n');
+		const stale = await request.post('/api/vaults/default/note', {
+			data: {
+				path: notePath,
+				content: '# Stale Save Test\n\nStale browser edit.\n',
+				expectedRevision: doc.revision
+			}
+		});
+
+		expect(stale.status()).toBe(409);
+		expect(await stale.text()).toContain('note changed on disk; reload before saving');
+		expect(fs.readFileSync(abs, 'utf-8')).toContain('External disk change.');
+	} finally {
+		if (fs.existsSync(abs)) fs.unlinkSync(abs);
+	}
 });

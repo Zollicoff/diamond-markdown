@@ -87,10 +87,12 @@ The indexer builds a `Map<title, notePath>` and an `aliases Map` to keep resolut
 ## Save flow
 
 1. Client sends full note body (markdown + frontmatter) to `POST /api/vaults/[id]/note`
-2. Server writes atomically (write to `foo.md.tmp`, rename)
-3. Server re-indexes the note (extract links, tags; update backlink/tag index)
-4. Server calls `git add <rel> && git commit -m "edit: <path>"` via `simple-git`
-5. Server returns the new git sha + updated backlinks
+2. Client includes the content revision it loaded. The server rejects the save
+   with `409` if the file has changed on disk since that revision.
+3. Server writes atomically (write to `foo.md.tmp`, rename)
+4. Server re-indexes the note (extract links, tags; update backlink/tag index)
+5. Server calls `git add <rel> && git commit -m "edit: <path>"` via `simple-git`
+6. Server returns the new git sha + updated backlinks
 
 A debounce layer (client-side) avoids commit spam while typing — default is "commit on blur or after 3s idle," configurable.
 

@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getVault } from '$lib/server/vault';
@@ -9,6 +10,10 @@ import { renderMarkdown } from '$lib/server/markdown';
 import { splitFrontmatter } from '$lib/server/frontmatter';
 import { commitChange } from '$lib/server/git';
 import { renameNoteAtomically, duplicateNoteAtomically } from '$lib/server/rename';
+
+function contentRevision(content: string): string {
+	return crypto.createHash('sha256').update(content, 'utf-8').digest('hex');
+}
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const vault = getVault(params.vaultId);
@@ -22,6 +27,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	catch (e) { throw error(400, (e as Error).message); }
 	if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw error(404, 'note not found');
 	const content = fs.readFileSync(abs, 'utf-8');
+	const stat = fs.statSync(abs);
 	const { frontmatter, body } = splitFrontmatter(content);
 	const idx = getIndex(vault);
 	const { html, outgoingLinks } = renderMarkdown(vault, idx, body);
@@ -33,6 +39,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	return json({
 		path: rel,
 		content,
+		revision: contentRevision(content),
+		mtime: stat.mtimeMs,
 		frontmatter,
 		body,
 		html,
@@ -45,7 +53,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 export const POST: RequestHandler = async ({ params, request }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
-	const body = (await request.json()) as { path: string; content: string; commitNow?: boolean };
+	const body = (await request.json()) as { path: string; content: string; commitNow?: boolean; expectedRevision?: string };
 	if (!body?.path || typeof body?.content !== 'string') throw error(400, 'path and content required');
 	let rel: string;
 	let abs: string;
@@ -55,6 +63,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	}
 	catch (e) { throw error(400, (e as Error).message); }
 	const existed = fs.existsSync(abs);
+	if (existed && body.expectedRevision) {
+		const current = fs.readFileSync(abs, 'utf-8');
+		if (contentRevision(current) !== body.expectedRevision && current !== body.content) {
+			throw error(409, 'note changed on disk; reload before saving');
+		}
+	}
 	fs.mkdirSync(path.dirname(abs), { recursive: true });
 	const tmp = abs + '.tmp';
 	fs.writeFileSync(tmp, body.content);

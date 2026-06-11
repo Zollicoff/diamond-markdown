@@ -92,7 +92,7 @@
 		saving = true;
 		err = null;
 		try {
-			await api.saveNote(vaultId, path, content);
+			await api.saveNote(vaultId, path, content, doc.revision);
 			dirty = false;
 			savedAt = Date.now();
 			// Refresh for fresh html + backlinks.
@@ -102,6 +102,11 @@
 		} finally {
 			saving = false;
 		}
+	}
+
+	function reloadFromDisk(): void {
+		if (dirty && !confirm('Reload from disk and discard unsaved edits?')) return;
+		void load();
 	}
 
 	let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -184,6 +189,7 @@
 	const readingTime = $derived<string>(
 		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / READING_SPEED_WPM))} min`
 	);
+	const isConflict = $derived(err?.includes('note changed on disk') ?? false);
 
 	function fmtSaved(ms: number | null): string {
 		if (!ms) return '';
@@ -206,9 +212,12 @@
 				<button class:active={mode === 'read'}   onclick={() => onModeChange?.('read')}   role="tab" aria-selected={mode === 'read'}>Read</button>
 			</div>
 			{#if saving}<span class="status saving">saving…</span>
-			{:else if err}<span class="status err" title={err}>error</span>
+			{:else if err}<span class="status err" title={err}>{isConflict ? 'conflict' : 'error'}</span>
 			{:else if dirty}<span class="status dirty">●</span>
 			{:else if savedAt}<span class="status saved">{fmtSaved(savedAt)}</span>{/if}
+			{#if isConflict}
+				<button class="btn danger" onclick={reloadFromDisk}>Reload</button>
+			{/if}
 			<button
 				class="btn"
 				onclick={() => emitBus('history:open', { vaultId, path })}
@@ -289,6 +298,8 @@
 		cursor: pointer;
 	}
 	.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+	.btn.danger { color: var(--danger); }
+	.btn.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
 	.btn:disabled { opacity: 0.4; cursor: default; }
 
 	.body { flex: 1; min-height: 0; overflow: hidden; }
