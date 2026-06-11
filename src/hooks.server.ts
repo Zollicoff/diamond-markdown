@@ -1,4 +1,5 @@
 import { json, type Handle } from '@sveltejs/kit';
+import { authChallenge, basicAuthAccepted, basicAuthConfig } from '$lib/server/auth';
 import { isReadOnlyMode, readOnlyMessage } from '$lib/server/read-only';
 
 /**
@@ -23,6 +24,11 @@ import { isReadOnlyMode, readOnlyMessage } from '$lib/server/read-only';
  * the only place to drop it is here.
  */
 export const handle: Handle = async ({ event, resolve }) => {
+	const auth = basicAuthConfig();
+	if (auth && event.url.pathname !== '/api/health' && !basicAuthAccepted(event.request.headers.get('authorization'), auth)) {
+		return authChallenge(auth);
+	}
+
 	if (
 		isReadOnlyMode() &&
 		event.url.pathname.startsWith('/api/') &&

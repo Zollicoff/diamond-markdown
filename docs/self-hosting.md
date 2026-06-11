@@ -12,9 +12,12 @@ Use one of these deployment shapes:
 - Private network: expose through Tailscale, WireGuard, or a trusted LAN.
 - Reverse proxy: put authentication in front of Diamond Markdown before any
   internet exposure.
+- Built-in Basic Auth: set `DIAMOND_BASIC_AUTH` for a simple single-user
+  password gate on all pages and APIs except `/api/health`.
 
-Do not expose the Node server directly to the public internet. Diamond Markdown
-does not include built-in multi-user authentication or authorization.
+Do not expose the Node server directly to the public internet without Basic
+Auth or a trusted proxy auth layer. Diamond Markdown does not include multi-user
+authentication or per-vault authorization.
 
 ## Requirements
 
@@ -41,6 +44,9 @@ Useful environment variables:
 - `PORT`: HTTP port.
 - `DIAMOND_CONFIG_DIR`: where `config.json` is stored.
 - `DIAMOND_DEFAULT_VAULT_DIR`: first-run vault destination.
+- `DIAMOND_BASIC_AUTH`: optional `username:password` Basic Auth credentials.
+- `DIAMOND_BASIC_AUTH_REALM`: optional browser prompt realm. Defaults to
+  `Diamond Markdown`.
 - `DIAMOND_READ_ONLY`: set to `true`, `1`, `yes`, or `on` to block write
   APIs for public demos or browse-only vaults.
 
@@ -53,6 +59,24 @@ HOST=127.0.0.1 \
 PORT=4173 \
 node build
 ```
+
+## Basic Auth
+
+Basic Auth is a simple single-user guard for small self-hosted installs:
+
+```sh
+DIAMOND_BASIC_AUTH='zach:use-a-long-random-password' \
+HOST=127.0.0.1 \
+PORT=4173 \
+node build
+```
+
+All pages and vault APIs require the configured credentials. `/api/health` stays
+available without credentials so local process monitors can check liveness
+without storing note-access credentials.
+
+Use HTTPS at the reverse proxy or a private tunnel such as Tailscale. Basic Auth
+credentials are only encoded by the browser, not encrypted by HTTP itself.
 
 ## Read-Only Mode
 
@@ -133,6 +157,8 @@ Git history is useful, but it is not a full backup plan.
 ## Security Checklist
 
 - Server is localhost/private-network only, or protected by proxy auth.
+- `DIAMOND_BASIC_AUTH` is enabled for any internet-reachable single-user
+  deployment that does not already sit behind trusted proxy authentication.
 - Vault paths are trusted local directories.
 - Git credentials are managed by SSH agent or credential helper.
 - `DIAMOND_READ_ONLY=true` is enabled for public demo vaults that should not be

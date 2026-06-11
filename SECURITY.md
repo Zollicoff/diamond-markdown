@@ -13,7 +13,8 @@ until versioned releases begin.
 
 - Run on localhost, behind Tailscale, or behind a trusted reverse proxy.
 - Do not expose the server directly to the public internet without an
-  authentication layer in front of it.
+  authentication layer in front of it. `DIAMOND_BASIC_AUTH=user:password` is
+  available for simple single-user deployments.
 - Register only vault directories you trust.
 - Use `DIAMOND_READ_ONLY=true` for browse-only demos, but do not treat it as
   an authentication layer.
@@ -36,11 +37,11 @@ Email the maintainer or use a private channel with:
 
 ## Security Model
 
-The app currently assumes one trusted user. It does not provide built-in
-multi-user authentication or authorization. The server rejects vault path
-escapes and symlink escapes through `src/lib/server/paths.ts`; new filesystem
-routes must use that resolver rather than reading client-supplied paths
-directly.
+The app currently assumes one trusted user. It provides optional Basic Auth as a
+single shared password gate, but it does not provide multi-user authentication
+or authorization. The server rejects vault path escapes and symlink escapes
+through `src/lib/server/paths.ts`; new filesystem routes must use that resolver
+rather than reading client-supplied paths directly.
 
 When `DIAMOND_READ_ONLY=true`, the server hook rejects non-GET API requests
 before they reach route handlers. This is intended for public browsing and demo

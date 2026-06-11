@@ -43,6 +43,8 @@ Risks:
 - Document the security model in README: localhost/Tailscale/reverse proxy by
   default, no built-in multi-user auth yet.
 - Add optional basic auth or trusted-header auth for simple self-hosted installs.
+  ✓ Basic Auth is available via `DIAMOND_BASIC_AUTH`; trusted-header auth remains
+  a possible later proxy integration.
 - Add read-only mode for public demos and sample vaults. ✓ Basic server-enforced
   `DIAMOND_READ_ONLY` mode is available; future work can hide more write
   controls in the UI.

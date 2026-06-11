@@ -105,6 +105,7 @@ const server = spawn(process.execPath, ['build'], {
 		...process.env,
 		DIAMOND_CONFIG_DIR: path.join(tmpDir, 'config'),
 		DIAMOND_DEFAULT_VAULT_DIR: path.join(tmpDir, 'vault'),
+		DIAMOND_BASIC_AUTH: '',
 		DIAMOND_READ_ONLY: 'true',
 		HOST,
 		PORT: port

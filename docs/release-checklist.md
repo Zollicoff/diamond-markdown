@@ -10,9 +10,9 @@ npm run verify:release
 ```
 
 It runs the dependency audit, Svelte diagnostics, production build, automated
-read-only smoke, and full Playwright e2e suite. On macOS, it uses an installed
-Google Chrome executable as a fallback when Playwright's managed Chromium cache
-is unavailable.
+Basic Auth smoke, automated read-only smoke, and full Playwright e2e suite. On
+macOS, it uses an installed Google Chrome executable as a fallback when
+Playwright's managed Chromium cache is unavailable.
 
 ## 1. Repository State
 
@@ -104,7 +104,23 @@ Check:
 - Push refuses when the vault is dirty or behind.
 - Diverged histories are reported as manual-merge state.
 
-## 7. Read-Only Smoke
+## 7. Basic Auth Smoke
+
+Run the automated Basic Auth smoke:
+
+```sh
+npm run verify:auth
+```
+
+Required:
+
+- `/api/health` works without credentials.
+- Pages and vault APIs return `401` without credentials.
+- Wrong credentials return `401`.
+- Correct credentials can load the home page and `GET /api/vaults`.
+- The script uses a disposable config/vault and removes it after the check.
+
+## 8. Read-Only Smoke
 
 Run the automated read-only smoke:
 
@@ -120,7 +136,7 @@ Required:
 - The home and vault screens show the read-only banner.
 - The script uses a disposable config/vault and removes it after the check.
 
-## 8. Documentation
+## 9. Documentation
 
 Check:
 
@@ -129,7 +145,7 @@ Check:
 - `SECURITY.md` and `docs/self-hosting.md` describe the current security model.
 - New user-visible behavior is documented in `DESIGN.md` when architectural.
 
-## 9. Tag Or Deploy
+## 10. Tag Or Deploy
 
 Only after all required checks pass:
 

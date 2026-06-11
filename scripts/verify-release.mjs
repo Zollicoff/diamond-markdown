@@ -26,7 +26,13 @@ function playwrightEnv() {
 run('Dependency audit', 'npm', ['audit', '--audit-level=moderate']);
 run('Type and Svelte diagnostics', 'npm', ['run', 'check']);
 run('Production build', 'npm', ['run', 'build', '--', '--logLevel', 'warn'], { CI: '1' });
+run('Basic Auth production smoke', 'npm', ['run', 'verify:auth']);
 run('Read-only production smoke', 'npm', ['run', 'verify:readonly']);
-run('Full Playwright e2e suite', 'npm', ['run', 'test:e2e'], { CI: '1', ...playwrightEnv() });
+run('Full Playwright e2e suite', 'npm', ['run', 'test:e2e'], {
+	CI: '1',
+	DIAMOND_BASIC_AUTH: '',
+	DIAMOND_READ_ONLY: '',
+	...playwrightEnv()
+});
 
 console.log('\nRelease verification passed.');

@@ -145,7 +145,9 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Optional `DIAMOND_READ_ONLY=true` mode for browse-only demos: read APIs stay
   available while write APIs return `403`
 - Designed for localhost, Tailscale/private networks, or authenticated reverse
-  proxy deployment; no built-in multi-user auth yet
+  proxy deployment
+- Optional `DIAMOND_BASIC_AUTH=user:password` guard for simple single-user
+  self-hosted installs; no multi-user auth or per-vault authorization yet
 
 ### Desktop
 - Tauri v2 shell in `src-tauri/`

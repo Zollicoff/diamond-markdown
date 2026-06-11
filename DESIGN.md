@@ -168,6 +168,17 @@ The mode is meant for public demos and sample vaults. It is not authentication:
 private vault deployments still need localhost/private-network binding or a
 trusted authenticated reverse proxy.
 
+## Basic Auth mode
+
+`DIAMOND_BASIC_AUTH=username:password` enables a server-hook Basic Auth gate for
+all pages and API routes except `/api/health`. The implementation lives in
+`src/lib/server/auth.ts` and is checked in `src/hooks.server.ts` before route
+handlers run, so filesystem routes do not need to duplicate auth checks.
+
+This is intentionally small: one shared credential for single-user deployments.
+It is not multi-user auth, does not map users to vaults, and should be used only
+over HTTPS, localhost, or a trusted private network.
+
 ## Bundle boundaries
 
 The vault workspace shell lazy-loads tab views from `TabContent.svelte`.
