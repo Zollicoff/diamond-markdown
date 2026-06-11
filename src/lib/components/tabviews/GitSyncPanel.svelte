@@ -3,6 +3,7 @@
 	import { api } from '$lib/vault-api';
 	import type { GitSyncStatus } from '$lib/types';
 	import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '$lib/sync/commands';
+	import { buildGitSyncUiState } from '$lib/sync/status';
 
 	interface Props {
 		vaultId: string;
@@ -17,15 +18,7 @@
 	let message = $state<string | null>(null);
 	let error = $state<string | null>(null);
 
-	const isBusy = $derived(busy !== null);
-	const canSaveRemote = $derived(remoteUrl.trim().length > 0 && !isBusy);
-	const canCheck = $derived(!!status?.remoteUrl && !isBusy);
-	const canFetch = $derived(!!status?.remoteUrl && !isBusy);
-	const canPull = $derived(!!status?.canPull && !isBusy);
-	const canPush = $derived(!!status?.canPush && !isBusy);
-	const hasDiverged = $derived(!!status?.diverged);
-	const hasRemoteChanges = $derived(!!status && !status.diverged && status.behind > 0);
-	const hasConflicts = $derived((status?.conflicted.length ?? 0) > 0);
+	const ui = $derived(buildGitSyncUiState(status, remoteUrl, busy));
 	const setupCommands = $derived.by(() => buildGitSyncSetupCommands(status, vaultPath, remoteUrl));
 	const resolutionCommands = $derived.by(() => buildGitSyncResolutionCommands(status, vaultPath));
 
@@ -82,7 +75,7 @@
 			class="remote-form"
 			onsubmit={(event) => {
 				event.preventDefault();
-				if (!canSaveRemote) return;
+				if (!ui.canSaveRemote) return;
 				void run('remote', () => api.setSyncRemote(vaultId, remoteUrl));
 			}}
 		>
@@ -92,15 +85,15 @@
 				spellcheck="false"
 				placeholder="https://github.com/owner/repo.git"
 				bind:value={remoteUrl}
-				disabled={isBusy}
+				disabled={ui.isBusy}
 			/>
-			<button class="small-btn" disabled={!canSaveRemote}>Save</button>
+			<button class="small-btn" disabled={!ui.canSaveRemote}>Save</button>
 		</form>
 	</div>
 
 	<div class="sync-status">
 		<div class="status-main">
-			<div class="dot" class:ok={status?.clean && !status?.needsRemote} class:warn={!status?.clean || status?.needsRemote}></div>
+			<div class="dot" class:ok={ui.indicator === 'ok'} class:warn={ui.indicator === 'warn'} class:danger={ui.indicator === 'danger'}></div>
 			<div class="status-copy">
 				<div class="status-title">{status?.message ?? 'Checking sync status...'}</div>
 				<div class="status-meta mono">
@@ -124,14 +117,14 @@
 	</div>
 
 	<div class="actions">
-		<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh</button>
-		<button class="action-btn" onclick={() => run('check', () => api.checkSync(vaultId))} disabled={!canCheck}>Check remote</button>
-		<button class="action-btn" onclick={() => run('fetch', () => api.fetchSync(vaultId))} disabled={!canFetch}>Fetch</button>
-		<button class="action-btn" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!canPull}>Pull</button>
-		<button class="action-btn primary" onclick={() => run('push', () => api.pushSync(vaultId))} disabled={!canPush}>Push</button>
+		<button class="action-btn" onclick={loadStatus} disabled={ui.isBusy}>Refresh</button>
+		<button class="action-btn" onclick={() => run('check', () => api.checkSync(vaultId))} disabled={!ui.canCheck}>Check remote</button>
+		<button class="action-btn" onclick={() => run('fetch', () => api.fetchSync(vaultId))} disabled={!ui.canFetch}>Fetch</button>
+		<button class="action-btn" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!ui.canPull}>Pull</button>
+		<button class="action-btn primary" onclick={() => run('push', () => api.pushSync(vaultId))} disabled={!ui.canPush}>Push</button>
 	</div>
 
-	{#if status?.needsRemote}
+	{#if ui.recovery === 'setup'}
 		<div class="sync-block">
 			<div class="diverged-head">
 				<div>
@@ -144,7 +137,7 @@
 		</div>
 	{/if}
 
-	{#if hasRemoteChanges && status}
+	{#if ui.recovery === 'remote-changes' && status}
 		<div class="sync-block">
 			<div class="diverged-head">
 				<div>
@@ -159,14 +152,14 @@
 				Pull the fast-forward changes, then continue editing. Diamond blocks new vault mutations while the last fetched remote is ahead.
 			</p>
 			<div class="panel-actions">
-				<button class="action-btn primary" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!canPull}>Pull now</button>
-				<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh</button>
+				<button class="action-btn primary" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!ui.canPull}>Pull now</button>
+				<button class="action-btn" onclick={loadStatus} disabled={ui.isBusy}>Refresh</button>
 			</div>
 			{@render commandBlock(resolutionCommands)}
 		</div>
 	{/if}
 
-	{#if hasConflicts && status}
+	{#if ui.recovery === 'conflicts' && status}
 		<div class="sync-block danger-block">
 			<div class="diverged-head">
 				<div>
@@ -184,7 +177,7 @@
 		</div>
 	{/if}
 
-	{#if hasDiverged && status}
+	{#if ui.recovery === 'diverged' && status}
 		<div class="sync-block diverged-panel">
 			<div class="diverged-head">
 				<div>
@@ -199,7 +192,7 @@
 				Diamond will not auto-merge vault files. Resolve the git history outside the app, then refresh sync status.
 			</p>
 			<div class="panel-actions">
-				<button class="action-btn" onclick={loadStatus} disabled={isBusy}>Refresh after resolve</button>
+				<button class="action-btn" onclick={loadStatus} disabled={ui.isBusy}>Refresh after resolve</button>
 			</div>
 			{@render commandBlock(resolutionCommands)}
 
@@ -321,6 +314,7 @@
 	}
 	.dot.ok { background: var(--success); }
 	.dot.warn { background: var(--accent); }
+	.dot.danger { background: var(--danger); }
 	.status-copy { min-width: 0; }
 	.status-title { font-size: 0.88rem; color: var(--fg); }
 	.status-meta {
