@@ -24,6 +24,9 @@ async function initializeGit(vault: Vault): Promise<SimpleGit> {
 	// Lazy init. Use explicit `git -C <vault> init` before constructing the
 	// long-lived simple-git instance so vaults nested inside another repo do
 	// not accidentally operate on the parent repository.
+	if (!fs.existsSync(vault.path) || !fs.statSync(vault.path).isDirectory()) {
+		throw new Error('vault directory is unavailable');
+	}
 	const gitDir = path.join(vault.path, '.git');
 	const initialized = !fs.existsSync(gitDir);
 	if (initialized) {
