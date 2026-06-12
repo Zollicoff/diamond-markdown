@@ -230,6 +230,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'data.json'), JSON.stringify({
 		laneWidth: 280,
+		secretValue: 'do-not-render-this-value',
 		showCheckboxes: true
 	}));
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
@@ -254,7 +255,14 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
-	await expect(page.locator('.import-card')).toContainText('Kanban (obsidian-kanban): enabled, settings: laneWidth, showCheckboxes');
+	await expect(page.locator('.import-card')).toContainText('Preserved read-only');
+	await expect(page.locator('.import-card')).toContainText('Diamond will not execute Obsidian community plugins');
+	await expect(page.locator('.import-card')).toContainText('Kanban (obsidian-kanban): enabled, settings: laneWidth, secretValue, showCheckboxes');
+	await expect(page.locator('.import-card')).toContainText('Enabled in Obsidian');
+	await expect(page.locator('.import-card')).toContainText('3 setting keys');
+	await expect(page.locator('.import-card')).toContainText('Top-level keys: laneWidth, secretValue, showCheckboxes');
+	await expect(page.locator('.import-card')).toContainText('Preserved for manual migration; Diamond will not execute this Obsidian plugin.');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-value');
 
 	await page.getByRole('button', { name: 'Add vault', exact: true }).click();
 	await expect(page).toHaveURL(/\/vault\/obsidian-ui-import$/);

@@ -51,7 +51,7 @@ The main remaining product risks are:
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
 | GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, divergence/recovery UI | Background sync and conflict resolution remain manual by design |
-| Import from Obsidian | Partial | `.obsidian` detection, plugin settings visibility, attachment folder detection, Canvas preservation | No full plugin migration; some Obsidian config remains guidance-only |
+| Import from Obsidian | Partial | `.obsidian` detection, plugin settings migration guidance, attachment folder detection, Canvas preservation | No full plugin migration or execution; some Obsidian config remains guidance-only |
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
@@ -67,7 +67,7 @@ The main remaining product risks are:
 2. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,
    plugins, offline, and desktop are explicitly scoped.
 3. **Canvas/import polish.** Continue daily-driver compatibility work around
-   deeper Canvas interaction parity and clearer plugin-settings migration guidance
+   deeper Canvas interaction parity and additional Obsidian config edge cases
    without executing Obsidian plugins.
 
 ## Current Product Line

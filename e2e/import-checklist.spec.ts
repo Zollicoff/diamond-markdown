@@ -3,9 +3,10 @@ import {
 	compactPathList,
 	importReadiness,
 	importSummary,
+	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
-import type { VaultImportAnalysis } from '../src/lib/types';
+import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
 function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnalysis {
 	return {
@@ -49,7 +50,7 @@ test.describe('import checklist helpers', () => {
 	});
 
 	test('summarizes Obsidian plugin metadata without implying execution', () => {
-		expect(obsidianPluginSummary([
+		const plugins: ObsidianPluginInfo[] = [
 			{
 				folder: '.obsidian/plugins/dataview',
 				id: 'dataview',
@@ -72,6 +73,34 @@ test.describe('import checklist helpers', () => {
 				manifestStatus: 'invalid',
 				settingsStatus: 'missing'
 			}
-		])).toBe('Dataview (dataview): enabled, settings: queries, views, widgets +1; broken: invalid manifest, no settings');
+		];
+		expect(obsidianPluginSummary(plugins)).toBe('Dataview (dataview): enabled, settings: queries, views, widgets +1; broken: invalid manifest, no settings');
+
+		expect(obsidianPluginMigrationNotes(plugins, 2)).toEqual([
+			{
+				id: 'dataview',
+				name: 'Dataview (dataview)',
+				folder: '.obsidian/plugins/dataview',
+				level: 'info',
+				enabledLabel: 'Enabled in Obsidian',
+				manifestLabel: 'Manifest present',
+				settingsLabel: '4 setting keys',
+				detail: '.obsidian/plugins/dataview · v0.5.0 · .obsidian/plugins/dataview/data.json preserved (12 B)',
+				action: 'Preserved for manual migration; Diamond will not execute this Obsidian plugin.',
+				keySummary: 'Top-level keys: queries, views +2 more'
+			},
+			{
+				id: 'broken',
+				name: 'broken',
+				folder: '.obsidian/plugins/broken',
+				level: 'warn',
+				enabledLabel: 'Disabled in Obsidian',
+				manifestLabel: 'Invalid manifest',
+				settingsLabel: 'No settings file',
+				detail: '.obsidian/plugins/broken',
+				action: 'Review the preserved plugin folder before recreating this workflow in Diamond.',
+				keySummary: undefined
+			}
+		]);
 	});
 });

@@ -18,8 +18,8 @@ Diamond Markdown already has the right foundation:
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
   `.obsidian`, attachment folders, media outside named attachment folders,
-  Obsidian plugin folders, Canvas files, and Git readiness before
-  registration.
+  Obsidian plugin folders with manual settings-migration guidance, Canvas
+  files, and Git readiness before registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
 
@@ -191,9 +191,11 @@ Use small, pushable slices:
 - **Obsidian attachment-folder uploads.** Honor a safe
    `.obsidian/app.json` `attachmentFolderPath` for new uploads, falling back to
    `Attachments/` when the setting is missing or unsafe.
-- **Obsidian plugin settings guidance.** Surface top-level keys from preserved
-   plugin `data.json` files during import preview without executing plugins or
-   dumping full settings values into the UI.
+- **Obsidian plugin settings guidance.** Surface per-plugin migration notes for
+   preserved Obsidian `data.json` files during import preview, including
+   enabled state, manifest/settings health, top-level setting keys, and manual
+   action text without executing plugins or dumping full settings values into
+   the UI.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
@@ -334,8 +336,8 @@ Use small, pushable slices:
    scope is available; the local release verifier no longer depends on Unix
    shell syntax.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as deeper Canvas formatting support and deeper
-   plugin-settings migration guidance without executing Obsidian plugins.
+   import edges such as deeper Canvas formatting support and additional
+   Obsidian config interpretation without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 4. **Component diet.** Continue extracting large views only when the split

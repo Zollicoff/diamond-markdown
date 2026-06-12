@@ -11,16 +11,17 @@ an existing Obsidian vault. The preflight reports:
 - markdown file count
 - likely attachment folders
 - whether `.obsidian` exists
-- Obsidian plugin folders plus read-only manifest/settings visibility
+- Obsidian plugin folders plus read-only manifest/settings migration guidance
 - Obsidian Canvas files that will be preserved and opened with visual editing
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
 The `.obsidian` folder is preserved on disk but skipped from note indexing.
 Diamond will not execute Obsidian community plugins. The import preview reads
-plugin manifests plus the top-level keys in each plugin `data.json`, so you can
-see which settings files will be preserved before registering the vault without
-exposing full plugin setting values in the preview.
+plugin manifests plus the top-level keys in each plugin `data.json`, then shows
+per-plugin migration notes for enabled state, manifest health, settings-file
+health, preserved file location, and manual migration action. It does not expose
+full plugin setting values in the preview.
 
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
@@ -88,7 +89,8 @@ initial state of the imported vault is captured explicitly.
 
 ## What Import Does Not Do
 
-- It does not import Obsidian plugins.
+- It does not import or execute Obsidian plugins.
+- It does not automatically migrate Obsidian plugin settings into Diamond plugins.
 - It does not rewrite wikilinks or embeds.
 - It does not move attachments during import.
 - It does not delete or modify `.obsidian`.
