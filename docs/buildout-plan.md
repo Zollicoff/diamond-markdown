@@ -240,6 +240,9 @@ Use small, pushable slices:
 - **Canvas group node compatibility.** Render imported Obsidian Canvas group
    nodes behind cards, include groups in SVG export, and create new group
    nodes through the git-backed Canvas toolbar.
+- **Obsidian callout rendering.** Render `> [!TYPE]` callouts, including
+   collapsed and expanded fold markers, in both read mode and static publish
+   while preserving markdown inside the callout body.
 
 ## Next Implementation Slices
 

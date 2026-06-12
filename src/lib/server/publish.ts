@@ -35,6 +35,7 @@ import {
 	resolveMarkdownImagePath,
 	splitAssetReference
 } from './embed';
+import { renderObsidianCallout } from './callouts';
 import { slugify, escHtml, escAttr } from '$lib/util/strings';
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -205,7 +206,7 @@ function renderBodyForPublish(
 	return purify.sanitize(raw, {
 		ALLOWED_ATTR: [
 			'href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel',
-			'loading', 'width', 'height', 'aria-label', 'controls', 'preload', 'download'
+			'loading', 'width', 'height', 'aria-label', 'controls', 'preload', 'download', 'open'
 		]
 	});
 }
@@ -265,6 +266,12 @@ function createPublishRenderer(
 	outDir: string
 ): Renderer<string, string> {
 	const renderer = new Renderer();
+	renderer.blockquote = (token) => {
+		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
+			async: false,
+			renderer
+		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
+	};
 	renderer.image = ({ href, title, text }: Tokens.Image) => {
 		const meta = parseMarkdownImageText(text);
 		const localPath = resolveMarkdownImagePath(href, sourcePath);
@@ -409,6 +416,9 @@ const STYLES = `/* DiamondMD static export — minimal readable defaults */
 	--accent: #5b3df5;
 	--border: #e1e1e1;
 	--broken: #b00020;
+	--success: #1a7f37;
+	--warn: #9a6700;
+	--danger: #cf222e;
 }
 @media (prefers-color-scheme: dark) {
 	:root {
@@ -419,6 +429,9 @@ const STYLES = `/* DiamondMD static export — minimal readable defaults */
 		--accent: #9f8bff;
 		--border: #2a2c31;
 		--broken: #ff7a88;
+		--success: #3fb950;
+		--warn: #d29922;
+		--danger: #f85149;
 	}
 }
 
@@ -459,6 +472,44 @@ body {
 	margin: 1em 0; padding: 0.4em 1em;
 	border-left: 3px solid var(--border); color: var(--fg-dim); font-style: italic;
 }
+.note .callout {
+	--callout-accent: var(--accent);
+	--callout-bg: color-mix(in srgb, var(--callout-accent), transparent 91%);
+	margin: 1em 0;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--callout-accent), var(--border) 55%);
+	border-left-width: 4px;
+	border-radius: 7px;
+	background: var(--callout-bg);
+	font-style: normal;
+}
+.note .callout-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--fg);
+	font-weight: 700;
+}
+.note .callout-title::before {
+	content: '!';
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	background: var(--callout-accent);
+	color: var(--bg);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.72em;
+}
+.note summary.callout-title { cursor: pointer; }
+.note .callout-body { margin-top: 8px; color: var(--fg-dim); }
+.note .callout-body > :last-child { margin-bottom: 0; }
+.note .callout-note, .note .callout-info, .note .callout-todo { --callout-accent: #0969da; }
+.note .callout-tip, .note .callout-hint, .note .callout-success { --callout-accent: var(--success); }
+.note .callout-warning, .note .callout-caution, .note .callout-important { --callout-accent: var(--warn); }
+.note .callout-danger, .note .callout-error, .note .callout-failure, .note .callout-bug { --callout-accent: var(--danger); }
+.note .callout-example, .note .callout-question, .note .callout-abstract, .note .callout-summary, .note .callout-quote, .note .callout-cite { --callout-accent: var(--accent); }
 .note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; }
 .note pre { background: var(--bg-soft); padding: 14px 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); }
 .note pre code { background: transparent; padding: 0; }

@@ -61,6 +61,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading. Broken links render visibly so you can create missing notes.
 - **Note embed** — `![[Note]]` renders the target note inline (cycle-safe).
 - **Attachment embed** — `![[image.png]]`, `![[audio.mp3]]`, `![[video.mp4]]`, `![[packet.pdf]]`, and other vault files render from local vault assets.
+- **Callout** — Obsidian-style callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+` render in read mode and static publish.
 - **Backlink** — automatically computed index of every note that wikilinks *to* the note you're viewing.
 - **Tag** — `#hashtag` in body text or `tags:` in frontmatter. Tag index lists every tag and the notes that use it.
 - **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized.

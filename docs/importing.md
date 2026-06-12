@@ -36,6 +36,11 @@ such as `![[packet.pdf#page=3|Site packet]]` are preserved in rendered links.
 Static publish copies those non-image attachments into the exported `assets/`
 folder.
 
+Obsidian callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+`
+render as styled callout blocks in read mode and static publish. Fold markers
+use native disclosure blocks, so collapsed and expanded defaults survive
+without client-only JavaScript.
+
 In edit mode, dropping or pasting local files into a note copies them into the
 vault's configured Obsidian attachment folder when `.obsidian/app.json` declares
 a safe relative `attachmentFolderPath`; otherwise Diamond uses `Attachments/`.

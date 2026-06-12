@@ -208,3 +208,76 @@ button {
 	margin: 0 1px;
 }
 .tag:hover { text-decoration: none; filter: brightness(1.1); }
+
+.callout {
+	--callout-accent: var(--link);
+	--callout-bg: color-mix(in srgb, var(--callout-accent), transparent 90%);
+	margin: 1em 0;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--callout-accent), var(--border) 55%);
+	border-left-width: 4px;
+	border-radius: 7px;
+	background: var(--callout-bg);
+}
+.callout-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--fg);
+	font-weight: 700;
+}
+.callout-title::before {
+	content: '!';
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	background: var(--callout-accent);
+	color: var(--bg);
+	font-family: var(--mono);
+	font-size: 0.72em;
+}
+summary.callout-title {
+	cursor: pointer;
+}
+summary.callout-title::marker,
+summary.callout-title::-webkit-details-marker {
+	color: var(--fg-dim);
+}
+.callout-body {
+	margin-top: 8px;
+	color: var(--fg-muted);
+}
+.callout-body > :last-child {
+	margin-bottom: 0;
+}
+.callout-note,
+.callout-info,
+.callout-todo {
+	--callout-accent: var(--link);
+}
+.callout-tip,
+.callout-hint,
+.callout-success {
+	--callout-accent: var(--success);
+}
+.callout-warning,
+.callout-caution,
+.callout-important {
+	--callout-accent: var(--warn);
+}
+.callout-danger,
+.callout-error,
+.callout-failure,
+.callout-bug {
+	--callout-accent: var(--danger);
+}
+.callout-example,
+.callout-question,
+.callout-abstract,
+.callout-summary,
+.callout-quote,
+.callout-cite {
+	--callout-accent: var(--brand-indigo);
+}

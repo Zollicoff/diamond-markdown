@@ -5,6 +5,7 @@ import { FIXTURE_PATHS } from './setup-fixture';
 import type { NoteDoc } from '../src/lib/types';
 import { replaceEmbeds, type ParsedEmbed } from '../src/lib/server/wikilink';
 import { splitAssetReference } from '../src/lib/server/embed';
+import { parseObsidianCallout } from '../src/lib/server/callouts';
 
 function collectEmbeds(markdown: string): ParsedEmbed[] {
 	const embeds: ParsedEmbed[] = [];
@@ -16,6 +17,27 @@ function collectEmbeds(markdown: string): ParsedEmbed[] {
 }
 
 test.describe('Obsidian image embed variants', () => {
+	test('parses Obsidian callout markers with fold metadata', () => {
+		expect(parseObsidianCallout('[!WARNING]- Check this\nHidden details')).toEqual({
+			type: 'warning',
+			title: 'Check this',
+			body: 'Hidden details',
+			fold: 'closed'
+		});
+		expect(parseObsidianCallout('[!TIP]+\nOpen details')).toEqual({
+			type: 'tip',
+			title: 'Tip',
+			body: 'Open details',
+			fold: 'open'
+		});
+		expect(parseObsidianCallout('[!faq] Common question')).toMatchObject({
+			type: 'question',
+			title: 'Common question',
+			fold: null
+		});
+		expect(parseObsidianCallout('Just a normal blockquote')).toBeNull();
+	});
+
 	test('parses image-size pipe metadata separately from alt text', () => {
 		expect(collectEmbeds('![[roof.png|300]] ![[panel.png|320x180]] ![[bill.png|Utility bill]] ![[main.png|Main panel|300x200]] ![[bad.png|0]]')).toEqual([
 			{ raw: '![[roof.png|300]]', target: 'roof.png', alt: null, width: 300, height: null },
@@ -32,6 +54,73 @@ test.describe('Obsidian image embed variants', () => {
 			path: 'Files/clip.mp4',
 			suffix: '?start=10#t=10'
 		});
+	});
+
+	test('renders Obsidian callouts in read mode and static publish output', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'callout-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(vaultDir, { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, 'Target.md'), '---\ntitle: Target\npublic: true\n---\n# Target\n');
+		fs.writeFileSync(
+			path.join(vaultDir, 'Callouts.md'),
+			[
+				'---',
+				'title: Callouts',
+				'public: true',
+				'---',
+				'# Callouts',
+				'',
+				'> [!NOTE] Research note',
+				'> Body with **bold** text, [[Target]], and #risk.',
+				'>',
+				'> - First item',
+				'',
+				'> [!WARNING]- Closed warning',
+				'> Hidden by default.',
+				'',
+				'> [!TIP]+ Open tip',
+				'> Visible by default.',
+				'',
+				'```md',
+				'> [!NOTE] Not a callout in code',
+				'```'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Callout Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Callouts.md')}`);
+		expect(loaded.ok()).toBe(true);
+		const note = await loaded.json() as NoteDoc;
+		expect(note.html).toContain('class="callout callout-note"');
+		expect(note.html).toContain('Research note');
+		expect(note.html).toContain('<strong>bold</strong>');
+		expect(note.html).toContain(`/vault/${vault.id}/note/Target.md`);
+		expect(note.html).toContain(`/vault/${vault.id}/tag/risk`);
+		expect(note.html).toContain('<details class="callout callout-warning callout-foldable">');
+		expect(note.html).toContain('<details class="callout callout-tip callout-foldable" open="">');
+		expect(note.html).toContain('&gt; [!NOTE] Not a callout in code');
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(2);
+
+		const html = fs.readFileSync(path.join(report.outDir, 'callouts.html'), 'utf-8');
+		expect(html).toContain('class="callout callout-note"');
+		expect(html).toContain('Research note');
+		expect(html).toContain('<strong>bold</strong>');
+		expect(html).toContain('href="target.html"');
+		expect(html).toContain('<span class="tag">#risk</span>');
+		expect(html).toContain('<details class="callout callout-warning callout-foldable">');
+		expect(html).toContain('<details class="callout callout-tip callout-foldable" open="">');
+		expect(html).toContain('&gt; [!NOTE] Not a callout in code');
+		const styles = fs.readFileSync(path.join(report.outDir, 'styles.css'), 'utf-8');
+		expect(styles).toContain('.note .callout');
 	});
 
 	test('renders sized image embeds in read mode and static publish output', async ({ request }) => {

@@ -34,6 +34,7 @@ import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
 import { purify } from './sanitize';
+import { renderObsidianCallout } from './callouts';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -45,7 +46,7 @@ marked.use({ renderer: { code: renderCodeBlock } });
 const ALLOWED_ATTR = [
 	'href', 'class', 'data-target', 'data-mermaid-source', 'title', 'src', 'alt',
 	'id', 'target', 'rel', 'loading', 'width', 'height', 'role', 'aria-hidden',
-	'aria-label', 'controls', 'preload', 'download',
+	'aria-label', 'controls', 'preload', 'download', 'open',
 	'style' // KaTeX emits a few inline styles; safe under DOMPurify's CSS sanitization
 ];
 
@@ -181,6 +182,12 @@ function renderCodeBlock({ text, lang }: Tokens.Code): string {
 function createMarkdownRenderer(vault: Vault, sourcePath: string | null): Renderer<string, string> {
 	const renderer = new Renderer();
 	renderer.code = renderCodeBlock;
+	renderer.blockquote = (token) => {
+		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
+			async: false,
+			renderer
+		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
+	};
 	renderer.image = ({ href, title, text }: Tokens.Image) => {
 		const localPath = resolveMarkdownImagePath(href, sourcePath);
 		const src = localPath ? `/api/vaults/${vault.id}/raw/${encodeURI(localPath)}` : href;
