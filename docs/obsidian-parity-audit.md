@@ -29,9 +29,9 @@ The main remaining product risks are:
 3. **Plugin compatibility is intentionally small.** Diamond can support useful
    plugins, but it is not and should not claim full Obsidian plugin parity.
 4. **Large-vault search is improving.** Tree and graph have scale work, and
-   full-text search now uses ranked persisted index results with basic
-   operators, paged loading, and virtualized result rendering, but richer
-   boolean syntax remains basic.
+   full-text search now uses ranked persisted index results with field
+   operators, boolean `OR`, safe regex terms, paged loading, and virtualized
+   result rendering, but advanced grouping remains basic.
 5. **Roadmap wording needs to stay honest.** Public docs should distinguish
    core Obsidian-style parity from full Obsidian ecosystem parity.
 
@@ -47,7 +47,7 @@ The main remaining product risks are:
 | Render pipeline | Done | KaTeX, Mermaid, code highlighting, footnotes, embeds, callouts, block IDs | Continue adding edge cases only when imported vaults expose them |
 | Attachments | Done | Upload/drop/paste, picker, multi-select insert, delete, rename/move with reference rewrites, Obsidian folder config | Deeper gallery/library polish can remain incremental |
 | Canvas | Partial | Read/render/edit many nodes and edges, markdown-aware text-card previews, groups, colors, SVG export, git-backed mutations | Deeper visual editing parity is not full Obsidian Canvas |
-| Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with quoted phrases, field filters, exclusions, paged loading, virtualized results, and capped-result metadata | Richer boolean/regex syntax remains basic |
+| Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe regex terms, paged loading, virtualized results, and capped-result metadata | Advanced grouping and saved-search polish remain basic |
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
 | GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, divergence/recovery UI | Background sync and conflict resolution remain manual by design |

@@ -11,13 +11,16 @@ interface RankedHit extends SearchHit {
 }
 
 type SearchField = 'all' | 'tag' | 'path' | 'file' | 'content';
+type SearchMatcher = 'literal' | 'regex';
 
 interface SearchTerm {
 	field: SearchField;
+	matcher: SearchMatcher;
 	value: string;
 	lower: string;
 	negative: boolean;
 	quoted: boolean;
+	regex?: RegExp;
 }
 
 interface QueryParts {
@@ -25,8 +28,7 @@ interface QueryParts {
 	terms: SearchTerm[];
 	positiveTerms: SearchTerm[];
 	negativeTerms: SearchTerm[];
-	freeTerms: SearchTerm[];
-	freePhraseLower: string;
+	positiveGroups: SearchTerm[][];
 }
 
 interface TermScore {
@@ -35,6 +37,13 @@ interface TermScore {
 	firstIndex: number;
 	bodyIndex: number;
 	length: number;
+}
+
+interface GroupScore {
+	rank: number;
+	firstIndex: number;
+	bodyIndex: number;
+	bodyLength: number;
 }
 
 export function clampSearchLimit(raw: string | null, fallback: number): number {
@@ -112,69 +121,63 @@ function rankNote(idx: VaultIndex, meta: NoteMeta, query: QueryParts): RankedHit
 	const doc = idx.searchDocs.get(meta.notePath);
 	const text = doc?.text ?? '';
 	const textLower = doc?.textLower ?? '';
+	const title = meta.title;
 	const titleLower = meta.title.toLowerCase();
+	const path = meta.notePath;
 	const pathLower = meta.notePath.toLowerCase();
+	const aliases = meta.aliases;
 	const aliasLower = meta.aliases.map((alias) => alias.toLowerCase());
+	const tags = meta.tags.map((tag) => tag.replace(/^#+/, ''));
 	const tagLower = meta.tags.map(normalizeTag);
-	const positiveScores = query.positiveTerms.map((term) => scoreTerm(term, meta, titleLower, pathLower, aliasLower, tagLower, textLower));
 
-	if (positiveScores.length === 0 && query.negativeTerms.length === 0) return null;
-	if (positiveScores.some((score) => !score.matched)) return null;
-	if (query.negativeTerms.some((term) => scoreTerm(term, meta, titleLower, pathLower, aliasLower, tagLower, textLower).matched)) return null;
+	if (query.positiveTerms.length === 0 && query.negativeTerms.length === 0) return null;
 
-	let rank = 0;
-	let firstIndex = Number.MAX_SAFE_INTEGER;
-	let bodyIndex = -1;
-	let bodyLength = query.raw.length;
-	if (query.freePhraseLower && query.freeTerms.length > 1) {
-		const phraseScore = scoreTerm(
-			{ field: 'all', value: query.freePhraseLower, lower: query.freePhraseLower, negative: false, quoted: true },
-			meta,
-			titleLower,
-			pathLower,
-			aliasLower,
-			tagLower,
-			textLower
-		);
-		if (phraseScore.matched) {
-			rank += phraseScore.rank;
-			firstIndex = Math.min(firstIndex, phraseScore.firstIndex);
-			if (phraseScore.bodyIndex >= 0) {
-				bodyIndex = phraseScore.bodyIndex;
-				bodyLength = phraseScore.length;
-			}
-		}
-	}
+	if (query.negativeTerms.some((term) => scoreTerm(term, meta, title, titleLower, path, pathLower, aliases, aliasLower, tags, tagLower, text, textLower).matched)) return null;
 
-	for (const score of positiveScores) {
-		rank += score.rank;
-		firstIndex = Math.min(firstIndex, score.firstIndex);
-		if (bodyIndex < 0 && score.bodyIndex >= 0) {
-			bodyIndex = score.bodyIndex;
-			bodyLength = score.length;
-		}
-	}
+	const groupScores = query.positiveGroups.length === 0
+		? [{ rank: 1, firstIndex: 0, bodyIndex: -1, bodyLength: query.raw.length }]
+		: query.positiveGroups
+			.map((group) => scorePositiveGroup(group, meta, title, titleLower, path, pathLower, aliases, aliasLower, tags, tagLower, text, textLower))
+			.filter((score): score is GroupScore => score !== null);
+	if (groupScores.length === 0) return null;
 
-	const snippet = bodyIndex >= 0 ? snippetAround(text, bodyIndex, bodyLength) : undefined;
+	const best = groupScores.sort((a, b) => {
+		if (b.rank !== a.rank) return b.rank - a.rank;
+		return a.firstIndex - b.firstIndex;
+	})[0];
+
+	const snippet = best.bodyIndex >= 0 ? snippetAround(text, best.bodyIndex, best.bodyLength) : undefined;
 	return {
 		path: meta.notePath,
 		title: meta.title,
 		snippet,
-		rank,
-		firstIndex: firstIndex === Number.MAX_SAFE_INTEGER ? 0 : firstIndex
+		rank: best.rank,
+		firstIndex: best.firstIndex === Number.MAX_SAFE_INTEGER ? 0 : best.firstIndex
 	};
 }
 
 function parseQuery(query: string): QueryParts {
 	const raw = query.replace(/\s+/g, ' ').trim();
-	const terms = tokenizeQuery(raw)
-		.map(parseTerm)
-		.filter((term): term is SearchTerm => term !== null);
+	const terms: SearchTerm[] = [];
+	const positiveGroups: SearchTerm[][] = [];
+	let currentGroup: SearchTerm[] = [];
+	for (const token of tokenizeQuery(raw)) {
+		if (!token.quoted && token.raw === 'OR') {
+			if (currentGroup.length > 0) {
+				positiveGroups.push(currentGroup);
+				currentGroup = [];
+			}
+			continue;
+		}
+		const term = parseTerm(token);
+		if (!term) continue;
+		terms.push(term);
+		if (!term.negative) currentGroup.push(term);
+	}
+	if (currentGroup.length > 0) positiveGroups.push(currentGroup);
 	const positiveTerms = terms.filter((term) => !term.negative);
 	const negativeTerms = terms.filter((term) => term.negative);
-	const freeTerms = positiveTerms.filter((term) => term.field === 'all');
-	const freePhraseLower = freeTerms.map((term) => term.lower).join(' ').trim();
-	return { raw, terms, positiveTerms, negativeTerms, freeTerms, freePhraseLower };
+	return { raw, terms, positiveTerms, negativeTerms, positiveGroups };
 }
 
 function tokenizeQuery(input: string): { raw: string; quoted: boolean }[] {
@@ -208,6 +211,14 @@ function tokenizeQuery(input: string): { raw: string; quoted: boolean }[] {
 				i += 1;
 				continue;
 			}
+			if (char === '/' && shouldReadRegexToken(raw)) {
+				const regex = readRegexLiteral(input, i);
+				if (regex) {
+					raw += regex.raw;
+					i = regex.next;
+					continue;
+				}
+			}
 			if (/\s/.test(char)) break;
 			raw += char;
 			i += 1;
@@ -230,12 +241,16 @@ function parseTerm(token: { raw: string; quoted: boolean }): SearchTerm | null {
 	if (!value) return null;
 	const normalized = field === 'tag' ? normalizeTag(value) : value.toLowerCase();
 	if (!normalized) return null;
+	const regex = parseRegexValue(value);
+	if (looksLikeRegexValue(value) && !regex) return null;
 	return {
 		field: field ?? 'all',
+		matcher: regex ? 'regex' : 'literal',
 		value,
-		lower: normalized,
+		lower: regex ? value : normalized,
 		negative,
-		quoted: token.quoted
+		quoted: token.quoted,
+		regex: regex ?? undefined
 	};
 }
 
@@ -260,17 +275,92 @@ function normalizeField(field: string | undefined): SearchField | null {
 function scoreTerm(
 	term: SearchTerm,
 	meta: NoteMeta,
+	title: string,
 	titleLower: string,
+	path: string,
 	pathLower: string,
+	aliases: string[],
 	aliasLower: string[],
+	tags: string[],
 	tagLower: string[],
+	text: string,
 	textLower: string
 ): TermScore {
+	if (term.matcher === 'regex') return scoreRegexTerm(term, meta, title, path, aliases, tags, text);
 	if (term.field === 'tag') return scoreTagTerm(term, tagLower);
 	if (term.field === 'path') return scorePathTerm(term, pathLower);
 	if (term.field === 'file') return scoreFileTerm(term, meta, titleLower, aliasLower);
 	if (term.field === 'content') return scoreContentTerm(term, textLower);
 	return scoreAllTerm(term, titleLower, pathLower, aliasLower, textLower);
+}
+
+function scoreRegexTerm(term: SearchTerm, meta: NoteMeta, title: string, path: string, aliases: string[], tags: string[], text: string): TermScore {
+	if (!term.regex) return noMatch(term);
+	if (term.field === 'tag') return scoreRegexTagTerm(term, tags);
+	if (term.field === 'path') return scoreRegexPathTerm(term, path);
+	if (term.field === 'file') return scoreRegexFileTerm(term, meta, title, aliases);
+	if (term.field === 'content') return scoreRegexContentTerm(term, text);
+	return scoreRegexAllTerm(term, title, path, aliases, text);
+}
+
+function scorePositiveGroup(
+	group: SearchTerm[],
+	meta: NoteMeta,
+	title: string,
+	titleLower: string,
+	path: string,
+	pathLower: string,
+	aliases: string[],
+	aliasLower: string[],
+	tags: string[],
+	tagLower: string[],
+	text: string,
+	textLower: string
+): GroupScore | null {
+	const scores = group.map((term) => scoreTerm(term, meta, title, titleLower, path, pathLower, aliases, aliasLower, tags, tagLower, text, textLower));
+	if (scores.some((score) => !score.matched)) return null;
+
+	let rank = 0;
+	let firstIndex = Number.MAX_SAFE_INTEGER;
+	let bodyIndex = -1;
+	let bodyLength = group.map((term) => term.value).join(' ').length;
+	const freeTerms = group.filter((term) => term.field === 'all' && term.matcher === 'literal');
+	const freePhraseLower = freeTerms.map((term) => term.lower).join(' ').trim();
+	if (freePhraseLower && freeTerms.length > 1) {
+		const phraseScore = scoreTerm(
+			{ field: 'all', matcher: 'literal', value: freePhraseLower, lower: freePhraseLower, negative: false, quoted: true },
+			meta,
+			title,
+			titleLower,
+			path,
+			pathLower,
+			aliases,
+			aliasLower,
+			tags,
+			tagLower,
+			text,
+			textLower
+		);
+		if (phraseScore.matched) {
+			rank += phraseScore.rank;
+			firstIndex = Math.min(firstIndex, phraseScore.firstIndex);
+			if (phraseScore.bodyIndex >= 0) {
+				bodyIndex = phraseScore.bodyIndex;
+				bodyLength = phraseScore.length;
+			}
+		}
+	}
+
+	for (const score of scores) {
+		rank += score.rank;
+		firstIndex = Math.min(firstIndex, score.firstIndex);
+		if (bodyIndex < 0 && score.bodyIndex >= 0) {
+			bodyIndex = score.bodyIndex;
+			bodyLength = score.length;
+		}
+	}
+
+	return { rank, firstIndex, bodyIndex, bodyLength };
 }
 
 function scoreAllTerm(term: SearchTerm, titleLower: string, pathLower: string, aliasLower: string[], textLower: string): TermScore {
@@ -334,14 +424,184 @@ function scoreTagTerm(term: SearchTerm, tagLower: string[]): TermScore {
 	return { matched: true, rank: 760 + fieldBonus(term), firstIndex: 0, bodyIndex: -1, length: term.value.length };
 }
 
+function scoreRegexAllTerm(term: SearchTerm, title: string, path: string, aliases: string[], text: string): TermScore {
+	const titleMatch = regexMatch(term.regex, title);
+	const aliasMatch = firstRegexMatch(term.regex, aliases);
+	const pathMatch = regexMatch(term.regex, path);
+	const bodyMatch = regexMatch(term.regex, text);
+	const first = minFound(titleMatch?.index ?? -1, aliasMatch?.index ?? -1, pathMatch?.index ?? -1, bodyMatch?.index ?? -1);
+	if (first < 0) return noMatch(term);
+	let rank = 0;
+	if (titleMatch) rank += 220 + fieldBonus(term) + earlyBonus(titleMatch.index);
+	if (aliasMatch) rank += 170 + fieldBonus(term) + earlyBonus(aliasMatch.index);
+	if (pathMatch) rank += 95 + fieldBonus(term) + earlyBonus(pathMatch.index);
+	if (bodyMatch) rank += 60 + fieldBonus(term) + earlyBonus(bodyMatch.index);
+	return {
+		matched: true,
+		rank,
+		firstIndex: first,
+		bodyIndex: bodyMatch?.index ?? -1,
+		length: bodyMatch?.length ?? titleMatch?.length ?? aliasMatch?.length ?? pathMatch?.length ?? term.value.length
+	};
+}
+
+function scoreRegexContentTerm(term: SearchTerm, text: string): TermScore {
+	const bodyMatch = regexMatch(term.regex, text);
+	if (!bodyMatch) return noMatch(term);
+	return {
+		matched: true,
+		rank: 460 + fieldBonus(term) + earlyBonus(bodyMatch.index),
+		firstIndex: bodyMatch.index,
+		bodyIndex: bodyMatch.index,
+		length: bodyMatch.length
+	};
+}
+
+function scoreRegexFileTerm(term: SearchTerm, meta: NoteMeta, title: string, aliases: string[]): TermScore {
+	const stemMatch = regexMatch(term.regex, meta.stem);
+	const titleMatch = regexMatch(term.regex, title);
+	const aliasMatch = firstRegexMatch(term.regex, aliases);
+	const first = minFound(titleMatch?.index ?? -1, aliasMatch?.index ?? -1, stemMatch?.index ?? -1);
+	if (first < 0) return noMatch(term);
+	let rank = 0;
+	if (titleMatch) rank += 820 + fieldBonus(term) + earlyBonus(titleMatch.index);
+	if (aliasMatch) rank += 720 + fieldBonus(term) + earlyBonus(aliasMatch.index);
+	if (stemMatch) rank += 640 + fieldBonus(term) + earlyBonus(stemMatch.index);
+	return {
+		matched: true,
+		rank,
+		firstIndex: first,
+		bodyIndex: -1,
+		length: titleMatch?.length ?? aliasMatch?.length ?? stemMatch?.length ?? term.value.length
+	};
+}
+
+function scoreRegexPathTerm(term: SearchTerm, path: string): TermScore {
+	const pathMatch = regexMatch(term.regex, path);
+	if (!pathMatch) return noMatch(term);
+	return {
+		matched: true,
+		rank: 680 + fieldBonus(term) + earlyBonus(pathMatch.index),
+		firstIndex: pathMatch.index,
+		bodyIndex: -1,
+		length: pathMatch.length
+	};
+}
+
+function scoreRegexTagTerm(term: SearchTerm, tags: string[]): TermScore {
+	const tagMatch = firstRegexMatch(term.regex, tags);
+	if (!tagMatch) return noMatch(term);
+	return { matched: true, rank: 760 + fieldBonus(term), firstIndex: tagMatch.index, bodyIndex: -1, length: tagMatch.length };
+}
+
 function noMatch(term: SearchTerm): TermScore {
 	return { matched: false, rank: 0, firstIndex: -1, bodyIndex: -1, length: term.value.length };
 }
 
 function fieldBonus(term: SearchTerm): number {
+	if (term.matcher === 'regex') return term.field === 'all' ? 130 : 180;
 	if (term.quoted) return 300;
 	if (term.field !== 'all') return 50;
 	return 0;
+}
+
+function shouldReadRegexToken(raw: string): boolean {
+	return raw === '' || /^-?[A-Za-z][\w-]*:$/.test(raw);
+}
+
+function readRegexLiteral(input: string, start: number): { raw: string; next: number } | null {
+	let i = start + 1;
+	let escaped = false;
+	while (i < input.length) {
+		const char = input[i];
+		if (escaped) {
+			escaped = false;
+			i += 1;
+			continue;
+		}
+		if (char === '\\') {
+			escaped = true;
+			i += 1;
+			continue;
+		}
+		if (char === '/') {
+			i += 1;
+			while (i < input.length && /[A-Za-z]/.test(input[i])) i += 1;
+			return { raw: input.slice(start, i), next: i };
+		}
+		i += 1;
+	}
+	return null;
+}
+
+function parseRegexValue(value: string): RegExp | null {
+	const parts = splitRegexValue(value.trim());
+	if (!parts) return null;
+	if (!isProbablySafeRegex(parts.pattern)) return null;
+	const flags = normalizeRegexFlags(parts.flags);
+	if (flags === null) return null;
+	try {
+		return new RegExp(parts.pattern, flags);
+	} catch {
+		return null;
+	}
+}
+
+function looksLikeRegexValue(value: string): boolean {
+	return value.trim().startsWith('/');
+}
+
+function splitRegexValue(value: string): { pattern: string; flags: string } | null {
+	if (!value.startsWith('/')) return null;
+	for (let i = value.length - 1; i > 0; i -= 1) {
+		if (value[i] === '/' && !isEscaped(value, i)) {
+			return {
+				pattern: value.slice(1, i),
+				flags: value.slice(i + 1)
+			};
+		}
+	}
+	return null;
+}
+
+function normalizeRegexFlags(flags: string): string | null {
+	if (!/^[imsu]*$/.test(flags)) return null;
+	const unique = new Set(flags.split('').filter(Boolean));
+	unique.add('i');
+	return [...unique].sort().join('');
+}
+
+function isProbablySafeRegex(pattern: string): boolean {
+	if (!pattern || pattern.length > 120) return false;
+	const compact = pattern.replace(/\\./g, '');
+	if (/\\[1-9]/.test(pattern) || /\\k</.test(pattern)) return false;
+	if (/\(\?<([=!]|!)/.test(pattern)) return false;
+	if (/\([^)]*[+*][^)]*\)[+*{]/.test(compact)) return false;
+	if (/\([^)]*\{[^)]*\}[^)]*\)[+*{]/.test(compact)) return false;
+	if (/([+*?]|\{\d+,?\d*})\s*([+*?]|\{)/.test(compact)) return false;
+	return true;
+}
+
+function isEscaped(value: string, index: number): boolean {
+	let count = 0;
+	for (let i = index - 1; i >= 0 && value[i] === '\\'; i -= 1) count += 1;
+	return count % 2 === 1;
+}
+
+function regexMatch(regex: RegExp | undefined, value: string): { index: number; length: number } | null {
+	if (!regex) return null;
+	regex.lastIndex = 0;
+	const match = regex.exec(value);
+	if (!match || match.index === undefined) return null;
+	return { index: match.index, length: Math.max(1, match[0]?.length ?? 0) };
+}
+
+function firstRegexMatch(regex: RegExp | undefined, values: string[]): { index: number; length: number } | null {
+	for (const value of values) {
+		const match = regexMatch(regex, value);
+		if (match) return match;
+	}
+	return null;
 }
 
 function normalizeTag(tag: string): string {

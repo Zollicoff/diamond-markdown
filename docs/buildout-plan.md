@@ -305,6 +305,10 @@ Use small, pushable slices:
 - **Search query operators.** Support quoted phrases, `tag:`, `path:`,
    `file:`/`title:`, `content:`/`body:`, and leading `-` exclusions inside
    the indexed full-text search path.
+- **Search boolean and regex terms.** Support uppercase `OR` groups and safe
+   `/regex/` terms, including field-scoped regex such as
+   `content:/roof\\s+photos/`, while rejecting invalid or risky regex patterns
+   without crashing search.
 - **Desktop release preflight.** Add `npm run verify:desktop-release` plus
    `docs/desktop-release.md` so current-host desktop bundle inputs, sidecars,
    signing inputs, and artifact expectations are checked before packaging.

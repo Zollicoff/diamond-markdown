@@ -113,6 +113,32 @@ test('indexed full-text search supports filters, quoted phrases, and exclusions'
 	]);
 });
 
+test('indexed full-text search supports boolean OR and safe regex terms', () => {
+	const idx = emptyIndex();
+	addNote(idx, 'Projects/Solar Plan.md', 'Solar Plan', 'Illinois Shines site survey steps and roof photos.', [], ['client/solar', 'active']);
+	addNote(idx, 'Archive/Solar Draft.md', 'Solar Draft', 'Illinois Shines retired draft with old wording.', [], ['client/solar', 'draft']);
+	addNote(idx, 'Projects/Meeting Notes.md', 'Meeting Notes', 'Illinois Shines roof survey from the call.', ['Call Notes'], ['client/water', 'active']);
+	addNote(idx, 'Inbox/Apple Login.md', 'Apple Login', 'OAuth callback returned to the dashboard after Apple auth.', [], ['auth']);
+	addNote(idx, 'Inbox/Random.md', 'Random', 'A normal sentence with or as a lowercase word.', [], ['misc']);
+
+	expect(searchFullTextIndex(idx, 'file:/^Apple/ OR content:/roof\\s+photos/', 10).results.map((hit) => hit.path)).toEqual([
+		'Inbox/Apple Login.md',
+		'Projects/Solar Plan.md'
+	]);
+	expect(searchFullTextIndex(idx, 'content:/site\\s+survey/ -content:/retired|old/', 10).results.map((hit) => hit.path)).toEqual([
+		'Projects/Solar Plan.md'
+	]);
+	expect(searchFullTextIndex(idx, 'tag:/client\\/(solar|water)/ content:/roof\\s+survey|roof\\s+photos/', 10).results.map((hit) => hit.path).sort()).toEqual([
+		'Projects/Meeting Notes.md',
+		'Projects/Solar Plan.md',
+	]);
+	const lowercaseOrPaths = searchFullTextIndex(idx, 'or', 10).results.map((hit) => hit.path);
+	expect(lowercaseOrPaths).toContain('Inbox/Random.md');
+	expect(lowercaseOrPaths).toContain('Archive/Solar Draft.md');
+	expect(searchFullTextIndex(idx, 'content:/([a]+)+$/', 10).total).toBe(0);
+	expect(searchFullTextIndex(idx, 'content:/[/', 10).total).toBe(0);
+});
+
 test('search result view helpers virtualize large returned result sets', () => {
 	const results = Array.from({ length: 120 }, (_, i) => ({
 		path: `Notes/Result ${String(i).padStart(3, '0')}.md`,
