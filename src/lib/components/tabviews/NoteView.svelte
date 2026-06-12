@@ -6,6 +6,7 @@
 	import type { NoteDoc } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
+	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
@@ -53,6 +54,7 @@
 	let savedAt = $state<number | null>(null);
 	let err = $state<string | null>(null);
 	let editorApi = $state<EditorApi | null>(null);
+	let uploadingAttachments = $state(0);
 	let EditorView = $state<NoteViewComponent | null>(null);
 	let PreviewView = $state<NoteViewComponent | null>(null);
 	let ToolbarView = $state<NoteViewComponent | null>(null);
@@ -169,6 +171,23 @@
 		dirty = true;
 	}
 
+	async function handleAttachmentFiles(files: File[]): Promise<void> {
+		if (!files.length || !editorApi) return;
+		uploadingAttachments = files.length;
+		err = null;
+		try {
+			const uploaded = [];
+			for (const file of files) {
+				uploaded.push(await api.uploadAttachment(vaultId, file));
+			}
+			editorApi.insert(attachmentEmbedMarkdown(uploaded.map((file) => file.path)));
+		} catch (e) {
+			err = (e as Error).message;
+		} finally {
+			uploadingAttachments = 0;
+		}
+	}
+
 	const resolveLink: LinkResolver = (target: string) => {
 		return resolveNoteLink(doc, vaultId, target);
 	};
@@ -280,6 +299,12 @@
 		<ToolbarView api={editorApi} />
 	{/if}
 
+	{#if uploadingAttachments > 0}
+		<div class="attachment-status" role="status">
+			Attaching {uploadingAttachments} file{uploadingAttachments === 1 ? '' : 's'}…
+		</div>
+	{/if}
+
 	<div class="body">
 		{#if !doc}
 			<div class="loading">Loading…</div>
@@ -298,6 +323,7 @@
 				onSave={save}
 				onWikilinkClick={handleWikilinkClick}
 				onWikilinkContext={handleWikilinkContext}
+				onFilesInsert={handleAttachmentFiles}
 				onReady={(a: EditorApi) => (editorApi = a)}
 			/>
 		{:else if waitingForEditor}
@@ -315,6 +341,13 @@
 <style>
 	.note-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 	.body { flex: 1; min-height: 0; overflow: hidden; }
+	.attachment-status {
+		padding: 0.45rem 1rem;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg-elev);
+		color: var(--fg-dim);
+		font-size: 0.82rem;
+	}
 	.loading { padding: 2rem; color: var(--fg-dim); }
 	.loading.err { color: var(--danger); }
 </style>

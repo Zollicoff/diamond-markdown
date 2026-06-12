@@ -12,7 +12,7 @@ an existing Obsidian vault. The preflight reports:
 - likely attachment folders
 - whether `.obsidian` exists
 - Obsidian plugin folders plus read-only manifest/settings visibility
-- Obsidian Canvas files that will be preserved and opened read-only
+- Obsidian Canvas files that will be preserved and opened with partial editing
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
@@ -35,14 +35,19 @@ such as `![[packet.pdf#page=3|Site packet]]` are preserved in rendered links.
 Static publish copies those non-image attachments into the exported `assets/`
 folder.
 
+In edit mode, dropping or pasting local files into a note copies them into the
+vault's `Attachments/` folder, assigns a non-overwriting filename, commits the
+new asset to the vault git history, and inserts an Obsidian-style embed link.
+
 If media files are present outside a named attachment folder, the preflight
 marks that as a review item. Diamond still registers the vault in place, but
 you should verify embeds after opening it.
 
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
-disk. Diamond Markdown opens Canvas files as read-only boards and can rename,
-move, delete, or export the `.canvas` files as SVG snapshots, but does not edit
-Canvas nodes or execute Obsidian plugins yet.
+disk. Diamond Markdown opens Canvas files as visual boards and can rename,
+move, delete, export the `.canvas` files as SVG snapshots, and add or edit text
+cards with git-backed commits. Full Canvas whiteboard editing and Obsidian
+plugin execution are not implemented yet.
 
 ## GitHub Sync
 

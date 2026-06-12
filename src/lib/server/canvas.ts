@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CanvasDoc, CanvasEdge, CanvasNode } from '$lib/types';
+import type { CanvasDoc, CanvasEdge, CanvasMutationResult, CanvasNode } from '$lib/types';
 import { canvasBounds, canvasNodeBody, canvasNodeTitle, edgeLines } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
@@ -11,6 +11,7 @@ import { commitChange } from './git';
 interface RawCanvasFile {
 	nodes?: unknown;
 	edges?: unknown;
+	[key: string]: unknown;
 }
 
 export class CanvasFileError extends Error {
@@ -38,6 +39,20 @@ export interface CanvasSvgExport {
 	svg: string;
 }
 
+export type CanvasEditAction = 'add-text-node' | 'update-node-text';
+
+export interface MutateCanvasInput {
+	path: string;
+	action: CanvasEditAction;
+	expectedRevision?: string;
+	nodeId?: string;
+	text?: string;
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+}
+
 function contentRevision(content: string): string {
 	return crypto.createHash('sha256').update(content, 'utf-8').digest('hex');
 }
@@ -62,6 +77,18 @@ function record(value: unknown): Record<string, unknown> | null {
 	return value && typeof value === 'object' && !Array.isArray(value)
 		? value as Record<string, unknown>
 		: null;
+}
+
+function rawCanvasFile(content: string): RawCanvasFile {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(content);
+	} catch {
+		throw new CanvasFileError('invalid Obsidian Canvas JSON');
+	}
+	const file = record(parsed);
+	if (!file) throw new CanvasFileError('invalid Obsidian Canvas JSON');
+	return file;
 }
 
 function normalizeNode(value: unknown, index: number, warnings: string[]): CanvasNode | null {
@@ -120,12 +147,7 @@ function normalizeEdge(value: unknown, index: number, knownNodeIds: Set<string>,
 
 export function parseCanvasContent(content: string): Pick<CanvasDoc, 'nodes' | 'edges' | 'warnings'> {
 	const warnings: string[] = [];
-	let parsed: RawCanvasFile;
-	try {
-		parsed = JSON.parse(content) as RawCanvasFile;
-	} catch {
-		throw new CanvasFileError('invalid Obsidian Canvas JSON');
-	}
+	const parsed = rawCanvasFile(content);
 
 	const rawNodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
 	const rawEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
@@ -257,6 +279,98 @@ export function exportCanvasSvg(vault: Vault, inputPath: string): CanvasSvgExpor
 	return {
 		filename: `${base}.svg`,
 		svg: canvasToSvg(doc)
+	};
+}
+
+function nodeRecord(value: unknown): Record<string, unknown> | null {
+	const node = record(value);
+	return typeof node?.id === 'string' ? node : null;
+}
+
+function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
+	return typeof value === 'number' && Number.isFinite(value)
+		? Math.min(max, Math.max(min, value))
+		: fallback;
+}
+
+function createCanvasNodeId(nodes: unknown[], prefix: string): string {
+	const used = new Set(nodes.map((node) => nodeRecord(node)?.id).filter((id): id is string => Boolean(id)));
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		const id = `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+		if (!used.has(id)) return id;
+	}
+	return `${prefix}-${Date.now().toString(36)}`;
+}
+
+function nextTextNodePosition(nodes: unknown[]): { x: number; y: number } {
+	let maxRight = -Infinity;
+	let minY = Infinity;
+	for (const raw of nodes) {
+		const node = nodeRecord(raw);
+		if (!node) continue;
+		const x = number(node.x);
+		const y = number(node.y);
+		const width = Math.max(80, number(node.width, 240));
+		maxRight = Math.max(maxRight, x + width);
+		minY = Math.min(minY, y);
+	}
+	if (!Number.isFinite(maxRight)) return { x: 0, y: 0 };
+	return { x: maxRight + 80, y: Number.isFinite(minY) ? minY : 0 };
+}
+
+export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Promise<CanvasMutationResult> {
+	const rel = ensureCanvasPath(input.path);
+	const abs = resolveInVault(vault, rel);
+	if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+		throw new CanvasFileError('canvas file not found', 404);
+	}
+
+	const content = fs.readFileSync(abs, 'utf-8');
+	if (input.expectedRevision && contentRevision(content) !== input.expectedRevision) {
+		throw new CanvasFileError('canvas changed on disk; reload before saving', 409);
+	}
+
+	const parsed = rawCanvasFile(content);
+	const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+	if (!Array.isArray(parsed.nodes)) {
+		parsed.nodes = nodes;
+	}
+	if (!Array.isArray(parsed.edges)) {
+		parsed.edges = [];
+	}
+
+	if (input.action === 'add-text-node') {
+		const position = nextTextNodePosition(nodes);
+		nodes.push({
+			id: createCanvasNodeId(nodes, 'text'),
+			type: 'text',
+			x: boundedNumber(input.x, position.x, -100_000, 100_000),
+			y: boundedNumber(input.y, position.y, -100_000, 100_000),
+			width: boundedNumber(input.width, 260, 120, 1200),
+			height: boundedNumber(input.height, 140, 80, 900),
+			text: typeof input.text === 'string' ? input.text : 'New text card'
+		});
+	} else if (input.action === 'update-node-text') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		if (typeof input.text !== 'string') throw new CanvasFileError('text is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		if (node.type !== 'text') throw new CanvasFileError('only text canvas nodes can be edited inline');
+		node.text = input.text;
+	} else {
+		throw new CanvasFileError('unsupported canvas edit action');
+	}
+
+	const nextContent = `${JSON.stringify(parsed, null, 2)}\n`;
+	const tmp = `${abs}.tmp`;
+	fs.writeFileSync(tmp, nextContent);
+	fs.renameSync(tmp, abs);
+	const commit = await commitChange(vault, [rel], 'edit', rel);
+	return {
+		ok: true,
+		path: rel,
+		sha: commit?.sha ?? null,
+		doc: loadCanvas(vault, rel)
 	};
 }
 

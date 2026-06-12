@@ -54,7 +54,7 @@ test.describe('canvas view helpers', () => {
 	});
 });
 
-test('canvas API and file tree open a read-only Obsidian Canvas preview', async ({ page, request }) => {
+test('canvas API and file tree open an editable Obsidian Canvas preview', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -75,12 +75,15 @@ test('canvas API and file tree open a read-only Obsidian Canvas preview', async 
 
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	const boardLink = page.locator('.tree .file-link').filter({ hasText: 'Board' }).first();
+	await expect(boardLink).toBeVisible({ timeout: 10_000 });
+	await boardLink.click();
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.locator('.canvas-view')).toContainText('Board');
-	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · read-only');
-	await expect(page.locator('.canvas-view')).toContainText('Canvas text card');
+	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
+	await expect(page.locator('.canvas-node-text textarea').first()).toHaveValue('Canvas text card');
 	await expect(page.locator('.canvas-view')).toContainText('Home.md');
+	await expect(page.getByRole('button', { name: 'Add text' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Download SVG' })).toHaveAttribute(
 		'href',
 		`/api/vaults/${vault.id}/canvas/export?path=Board.canvas`
@@ -122,6 +125,106 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	expect(fs.existsSync(path.join(vaultDir, 'Export.canvas'))).toBe(true);
 });
 
+test('canvas API adds and edits text cards with clean git commits and stale guards', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-edit-api-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), canvasJson);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Edit API Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+	const before = await loaded.json() as CanvasDoc;
+
+	const edited = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-text',
+			nodeId: 'a',
+			text: 'Edited text card',
+			expectedRevision: before.revision
+		}
+	});
+	expect(edited.ok()).toBe(true);
+	const editedBody = await edited.json() as { sha: string | null; doc: CanvasDoc };
+	expect(editedBody.sha).toBeTruthy();
+	expect(editedBody.doc.nodes.find((node) => node.id === 'a')?.text).toBe('Edited text card');
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const stale = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-text',
+			nodeId: 'a',
+			text: 'Stale edit',
+			expectedRevision: before.revision
+		}
+	});
+	expect(stale.status()).toBe(409);
+
+	const added = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'add-text-node',
+			text: 'Follow-up idea',
+			expectedRevision: editedBody.doc.revision
+		}
+	});
+	expect(added.ok()).toBe(true);
+	const addedBody = await added.json() as { sha: string | null; doc: CanvasDoc };
+	expect(addedBody.sha).toBeTruthy();
+	expect(addedBody.doc.nodes).toHaveLength(3);
+	expect(addedBody.doc.nodes.some((node) => node.type === 'text' && node.text === 'Follow-up idea')).toBe(true);
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as { nodes: { text?: string }[] };
+	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
+	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
+});
+
+test('canvas view adds and saves text cards from the board', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-edit-ui-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), canvasJson);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Edit UI Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await page.getByRole('button', { name: 'Add text' }).click();
+	await expect(page.locator('.canvas-view')).toContainText('3 nodes · 1 edge · editable text cards');
+
+	const firstCard = page.locator('.canvas-node-text').first();
+	const editor = firstCard.locator('textarea');
+	await expect(editor).toBeVisible();
+	await editor.fill('Edited through UI');
+	const saveButton = firstCard.getByRole('button', { name: 'Save text' });
+	await expect(saveButton).toBeEnabled();
+	await saveButton.click();
+	await expect(saveButton).toBeDisabled({ timeout: 10_000 });
+	await expect(editor).toHaveValue('Edited through UI');
+
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return body.nodes.find((node) => node.id === 'a')?.text;
+	}).toBe('Edited through UI');
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
+});
+
 test('canvas API renames, moves, and deletes Canvas files with clean git commits', async ({ request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-file-ops-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
@@ -139,7 +242,7 @@ test('canvas API renames, moves, and deletes Canvas files with clean git commits
 	const renamed = await request.patch(`/api/vaults/${vault.id}/canvas`, {
 		data: { from: 'Board.canvas', to: renamedPath }
 	});
-	expect(renamed.ok()).toBe(true);
+	expect(renamed.ok(), await renamed.text()).toBe(true);
 	const renameBody = await renamed.json() as { from: string; to: string; sha: string | null };
 	expect(renameBody).toMatchObject({ from: 'Board.canvas', to: renamedPath });
 	expect(renameBody.sha).toBeTruthy();
@@ -154,7 +257,7 @@ test('canvas API renames, moves, and deletes Canvas files with clean git commits
 	expect(loadedBody.nodes).toHaveLength(2);
 
 	const deleted = await request.delete(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent(renamedPath)}`);
-	expect(deleted.ok()).toBe(true);
+	expect(deleted.ok(), await deleted.text()).toBe(true);
 	const deleteBody = await deleted.json() as { path: string; sha: string | null };
 	expect(deleteBody.path).toBe(renamedPath);
 	expect(deleteBody.sha).toBeTruthy();
@@ -176,7 +279,9 @@ test('canvas file context menu exposes rename and delete actions', async ({ page
 
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click({ button: 'right' });
+	const boardLink = page.locator('.tree .file-link').filter({ hasText: 'Board' }).first();
+	await expect(boardLink).toBeVisible({ timeout: 10_000 });
+	await boardLink.click({ button: 'right' });
 	await expect(page.getByRole('menuitem', { name: /Rename/ })).toBeVisible();
 	await expect(page.getByRole('menuitem', { name: /Delete Canvas/ })).toBeVisible();
 });

@@ -53,6 +53,7 @@ export default defineConfig({
 			...process.env,
 			PORT: String(PORT),
 			HOST: '127.0.0.1',
+			ORIGIN: `http://127.0.0.1:${PORT}`,
 			DIAMOND_CONFIG_DIR: path.join(FIXTURE_ROOT, 'config'),
 			DIAMOND_DEFAULT_VAULT_DIR: path.join(FIXTURE_ROOT, 'vault')
 		} as Record<string, string>

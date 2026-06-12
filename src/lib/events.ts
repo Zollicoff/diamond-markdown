@@ -14,6 +14,7 @@ export interface VaultEventMap {
 	'note:created':  { vaultId: string; path: string; };
 	'note:deleted':  { vaultId: string; path: string; };
 	'note:renamed':  { vaultId: string; from: string; to: string; linksUpdated: number; };
+	'canvas:saved': { vaultId: string; path: string; sha: string | null; };
 	'canvas:deleted': { vaultId: string; path: string; };
 	'canvas:renamed': { vaultId: string; from: string; to: string; };
 	'folder:renamed': { vaultId: string; from: string; to: string; };

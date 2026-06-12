@@ -109,6 +109,14 @@ export interface NoteDoc {
 	tags: string[];
 }
 
+export interface AttachmentUploadResult {
+	ok: true;
+	path: string;
+	filename: string;
+	size: number;
+	sha: string | null;
+}
+
 export interface CanvasNode {
 	id: string;
 	type: string;
@@ -141,6 +149,13 @@ export interface CanvasDoc {
 	nodes: CanvasNode[];
 	edges: CanvasEdge[];
 	warnings: string[];
+}
+
+export interface CanvasMutationResult {
+	ok: true;
+	path: string;
+	sha: string | null;
+	doc: CanvasDoc;
 }
 
 export interface SearchHit {

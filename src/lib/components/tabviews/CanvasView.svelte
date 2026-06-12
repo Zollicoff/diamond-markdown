@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/vault-api';
 	import type { CanvasDoc, CanvasNode } from '$lib/types';
+	import { emit } from '$lib/events';
 	import {
 		canvasBounds,
 		canvasNodeBody,
@@ -20,6 +21,9 @@
 	let doc = $state<CanvasDoc | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let textDrafts = $state<Record<string, string>>({});
+	let addingText = $state(false);
+	let savingNodeId = $state<string | null>(null);
 
 	const bounds = $derived(canvasBounds(doc?.nodes ?? []));
 	const lines = $derived(doc ? edgeLines(doc, bounds) : []);
@@ -28,6 +32,57 @@
 
 	function nodeClass(node: CanvasNode): string {
 		return `canvas-node canvas-node-${node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown'}`;
+	}
+
+	function setDoc(next: CanvasDoc): void {
+		doc = next;
+		textDrafts = Object.fromEntries(
+			next.nodes
+				.filter((node) => node.type === 'text')
+				.map((node) => [node.id, node.text ?? ''])
+		);
+	}
+
+	function draftFor(node: CanvasNode): string {
+		return textDrafts[node.id] ?? node.text ?? '';
+	}
+
+	function setDraft(node: CanvasNode, value: string): void {
+		textDrafts = { ...textDrafts, [node.id]: value };
+	}
+
+	function draftChanged(node: CanvasNode): boolean {
+		return draftFor(node) !== (node.text ?? '');
+	}
+
+	async function addTextNode(): Promise<void> {
+		if (!doc || addingText) return;
+		addingText = true;
+		error = null;
+		try {
+			const res = await api.addCanvasTextNode(vaultId, path, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Text card added', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			addingText = false;
+		}
+	}
+
+	async function saveTextNode(node: CanvasNode): Promise<void> {
+		if (!doc || savingNodeId || !draftChanged(node)) return;
+		savingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasTextNode(vaultId, path, node.id, draftFor(node), doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Text card saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingNodeId = null;
+		}
 	}
 
 	$effect(() => {
@@ -39,7 +94,7 @@
 		api.canvas(vaultId, currentPath)
 			.then((loaded) => {
 				if (!alive || currentPath !== path) return;
-				doc = loaded;
+				setDoc(loaded);
 			})
 			.catch((e) => {
 				if (!alive || currentPath !== path) return;
@@ -61,7 +116,10 @@
 		</div>
 		{#if doc}
 			<div class="canvas-actions">
-				<div class="canvas-stats mono">{canvasSummary(doc)} · read-only</div>
+				<div class="canvas-stats mono">{canvasSummary(doc)} · editable text cards</div>
+				<button class="mini" disabled={addingText} onclick={addTextNode}>
+					{addingText ? 'Adding…' : 'Add text'}
+				</button>
 				<a class="mini" href={exportHref} download={exportName}>Download SVG</a>
 			</div>
 		{/if}
@@ -106,7 +164,23 @@
 					<article class={nodeClass(node)} style={nodeStyle(node, bounds)}>
 						<div class="node-type">{node.type}</div>
 						<h3 title={canvasNodeTitle(node)}>{canvasNodeTitle(node)}</h3>
-						{#if canvasNodeBody(node)}
+						{#if node.type === 'text'}
+							<textarea
+								class="node-editor"
+								aria-label={`Canvas text for ${node.id}`}
+								value={draftFor(node)}
+								oninput={(event) => setDraft(node, (event.currentTarget as HTMLTextAreaElement).value)}
+							></textarea>
+							<div class="node-actions">
+								<button
+									class="mini node-save"
+									disabled={savingNodeId === node.id || !draftChanged(node)}
+									onclick={() => void saveTextNode(node)}
+								>
+									{savingNodeId === node.id ? 'Saving…' : 'Save text'}
+								</button>
+							</div>
+						{:else if canvasNodeBody(node)}
 							<p>{canvasNodeBody(node)}</p>
 						{:else}
 							<p class="empty">No preview content</p>
@@ -248,6 +322,36 @@
 		font-size: 0.78rem;
 		line-height: 1.35;
 		white-space: pre-wrap;
+	}
+	.node-editor {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		resize: none;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 7px 8px;
+		background: color-mix(in srgb, var(--bg), transparent 8%);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.78rem;
+		line-height: 1.35;
+	}
+	.node-editor:focus {
+		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
+		border-color: var(--accent);
+	}
+	.node-actions {
+		display: flex;
+		justify-content: flex-end;
+	}
+	.node-save {
+		padding: 2px 7px;
+		font-size: 0.7rem;
+	}
+	.mini:disabled {
+		cursor: not-allowed;
+		opacity: 0.55;
 	}
 	.canvas-node p.empty {
 		color: var(--fg-dim);

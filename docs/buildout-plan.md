@@ -18,7 +18,7 @@ Diamond Markdown already has the right foundation:
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
   `.obsidian`, attachment folders, media outside named attachment folders,
-  Obsidian plugin folders, read-only Canvas files, and Git readiness before
+  Obsidian plugin folders, Canvas files, and Git readiness before
   registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
@@ -114,6 +114,8 @@ Use small, pushable slices:
    graph helpers with focused tests.
 - **Canvas SVG export.** Export read-only Obsidian Canvas boards as sanitized
    SVG snapshots from the server and expose the download action in Canvas tabs.
+- **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
+   git-backed server mutations with stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
@@ -132,14 +134,18 @@ Use small, pushable slices:
 - **Attachment reference suffix preservation.** Resolve and publish asset
    embeds from clean vault paths while preserving `#fragment` and `?query`
    suffixes for images, PDFs, video, audio, and generic files.
+- **Attachment upload affordance.** Drop or paste local files into the editor
+   to copy them into `Attachments/`, commit them to vault git history, and
+   insert Obsidian-style embed links.
 
 ## Next Implementation Slices
 
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as Canvas editing, attachment drag/drop affordances, and
-   deeper plugin-settings migration guidance without executing Obsidian plugins.
+   import edges such as deeper Canvas node/edge editing, deeper attachment
+   management, and deeper plugin-settings migration guidance without executing
+   Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 

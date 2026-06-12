@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { CanvasDoc, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { emit } from './events';
 
@@ -47,6 +47,39 @@ export const api = {
 
 	async canvas(vaultId: string, path: string): Promise<CanvasDoc> {
 		return json(`/api/vaults/${vaultId}/canvas?path=${encodeURIComponent(path)}`);
+	},
+
+	async addCanvasTextNode(
+		vaultId: string,
+		path: string,
+		expectedRevision: string,
+		text = 'New text card'
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'add-text-node', expectedRevision, text })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
+	async updateCanvasTextNode(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		text: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'update-node-text', nodeId, text, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
 	},
 
 	async renameCanvas(vaultId: string, from: string, to: string): Promise<{ sha: string | null }> {
@@ -107,6 +140,17 @@ export const api = {
 		await json(`/api/vaults/${vaultId}/note?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
 		emit('note:deleted', { vaultId, path });
 		emit('tree:invalidate', { vaultId });
+	},
+
+	async uploadAttachment(vaultId: string, file: File): Promise<AttachmentUploadResult> {
+		const form = new FormData();
+		form.append('file', file);
+		const res = await json<AttachmentUploadResult>(`/api/vaults/${vaultId}/attachment`, {
+			method: 'POST',
+			body: form
+		});
+		emit('tree:invalidate', { vaultId });
+		return res;
 	},
 
 	async renameNote(vaultId: string, from: string, to: string): Promise<{ linksUpdated: number; touched: string[]; sha: string | null }> {

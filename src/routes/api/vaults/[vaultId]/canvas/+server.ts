@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { deleteCanvas, loadCanvas, CanvasFileError, renameCanvas } from '$lib/server/canvas';
+import { deleteCanvas, loadCanvas, CanvasFileError, mutateCanvas, renameCanvas } from '$lib/server/canvas';
 import { getVault } from '$lib/server/vault';
 import { assertVaultCanWrite, isVaultWriteBlockedError } from '$lib/server/git';
 
@@ -21,6 +21,19 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		if (e instanceof CanvasFileError) throw error(e.status, e.message);
 		const message = (e as Error).message;
 		throw error(message.includes('path escapes vault') ? 400 : 500, message);
+	}
+};
+
+export const POST: RequestHandler = async ({ params, request }) => {
+	const vault = getVault(params.vaultId);
+	if (!vault) throw error(404, 'vault not found');
+	const body = (await request.json().catch(() => ({}))) as Parameters<typeof mutateCanvas>[1];
+	if (!body.path || !body.action) throw error(400, 'path and action required');
+	try {
+		await assertVaultCanWrite(vault);
+		return json(await mutateCanvas(vault, body));
+	} catch (e) {
+		throw error(statusFor(e), (e as Error).message);
 	}
 };
 

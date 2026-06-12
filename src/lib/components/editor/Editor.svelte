@@ -21,6 +21,8 @@
 		onWikilinkClick?: (target: string, href: string | null, resolved: boolean, e: MouseEvent) => void;
 		/** Called when a wikilink pill is right-clicked. */
 		onWikilinkContext?: (target: string, href: string | null, resolved: boolean, e: MouseEvent) => void;
+		/** Called when dropped or pasted files should be inserted as vault attachments. */
+		onFilesInsert?: (files: File[]) => void | Promise<void>;
 		/** Called once after the editor mounts, giving the parent an API handle. */
 		onReady?: (api: EditorApi) => void;
 	}
@@ -33,12 +35,14 @@
 		onSave,
 		onWikilinkClick,
 		onWikilinkContext,
+		onFilesInsert,
 		onReady
 	}: Props = $props();
 
 	let host: HTMLElement;
 	let view: EditorView | null = null;
 	let lastExternal = $state('');
+	let dragDepth = $state(0);
 	const previewCompartment = new Compartment();
 
 	const highlightStyle = HighlightStyle.define([
@@ -60,6 +64,52 @@
 
 	function previewExtension(m: 'live' | 'source'): Extension {
 		return m === 'live' ? livePreview(resolveLink) : [];
+	}
+
+	function hasTransferFiles(data: DataTransfer | null): boolean {
+		return !!data && (Array.from(data.types ?? []).includes('Files') || data.files.length > 0);
+	}
+
+	function transferFiles(data: DataTransfer | null): File[] {
+		return data ? Array.from(data.files).filter((file) => file.size > 0) : [];
+	}
+
+	function handleFiles(files: File[]): void {
+		if (!files.length) return;
+		void onFilesInsert?.(files);
+	}
+
+	function handleEditorDragEnter(event: DragEvent): void {
+		if (!hasTransferFiles(event.dataTransfer)) return;
+		event.preventDefault();
+		dragDepth += 1;
+	}
+
+	function handleEditorDragOver(event: DragEvent): void {
+		if (!hasTransferFiles(event.dataTransfer)) return;
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+	}
+
+	function handleEditorDragLeave(event: DragEvent): void {
+		if (!hasTransferFiles(event.dataTransfer)) return;
+		dragDepth = Math.max(0, dragDepth - 1);
+	}
+
+	function handleEditorDrop(event: DragEvent): void {
+		const files = transferFiles(event.dataTransfer);
+		if (!files.length) return;
+		event.preventDefault();
+		event.stopPropagation();
+		dragDepth = 0;
+		handleFiles(files);
+	}
+
+	function handleEditorPaste(event: ClipboardEvent): void {
+		const files = transferFiles(event.clipboardData);
+		if (!files.length) return;
+		event.preventDefault();
+		handleFiles(files);
 	}
 
 	onMount(() => {
@@ -196,13 +246,46 @@
 	});
 </script>
 
-<div bind:this={host} class="editor"></div>
+<div
+	bind:this={host}
+	class="editor"
+	class:drop-active={dragDepth > 0}
+	role="region"
+	aria-label="Markdown editor attachment drop zone"
+	ondragenter={handleEditorDragEnter}
+	ondragover={handleEditorDragOver}
+	ondragleave={handleEditorDragLeave}
+	ondrop={handleEditorDrop}
+	onpaste={handleEditorPaste}
+>
+	{#if dragDepth > 0}
+		<div class="editor-drop-overlay">Drop to attach</div>
+	{/if}
+</div>
 
 <style>
 	.editor {
 		height: 100%;
 		background: var(--bg);
 		overflow: hidden;
+		position: relative;
+	}
+	.editor.drop-active {
+		outline: 2px dashed var(--accent);
+		outline-offset: -6px;
+	}
+	.editor-drop-overlay {
+		position: absolute;
+		inset: 10px;
+		z-index: 5;
+		display: grid;
+		place-items: center;
+		border: 1px solid var(--accent);
+		border-radius: 8px;
+		background: rgba(10, 17, 28, 0.72);
+		color: var(--fg);
+		font-weight: 700;
+		pointer-events: none;
 	}
 	.editor :global(.cm-editor) {
 		height: 100%;
