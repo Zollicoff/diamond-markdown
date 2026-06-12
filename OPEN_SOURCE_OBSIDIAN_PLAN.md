@@ -76,7 +76,7 @@ Risks:
 
 - Keep the persisted vault index cache warm across restarts.
 - Virtualize the file tree and search results.
-- Keep improving search syntax and consider a token/inverted index if
+- Keep improving advanced search syntax and consider a token/inverted index if
   real-world vaults outgrow the current ranked indexed body corpus.
 - Replace graph O(n^2)-style interactions with spatial indexing for large
   graphs.

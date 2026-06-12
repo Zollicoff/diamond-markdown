@@ -10,10 +10,31 @@ interface RankedHit extends SearchHit {
 	firstIndex: number;
 }
 
+type SearchField = 'all' | 'tag' | 'path' | 'file' | 'content';
+
+interface SearchTerm {
+	field: SearchField;
+	value: string;
+	lower: string;
+	negative: boolean;
+	quoted: boolean;
+}
+
 interface QueryParts {
 	raw: string;
-	lower: string;
-	tokens: string[];
+	terms: SearchTerm[];
+	positiveTerms: SearchTerm[];
+	negativeTerms: SearchTerm[];
+	freeTerms: SearchTerm[];
+	freePhraseLower: string;
+}
+
+interface TermScore {
+	matched: boolean;
+	rank: number;
+	firstIndex: number;
+	bodyIndex: number;
+	length: number;
 }
 
 export function clampSearchLimit(raw: string | null, fallback: number): number {
@@ -53,7 +74,7 @@ export function buildSearchResponse(
 
 export function searchFullTextIndex(idx: VaultIndex, query: string, limit = DEFAULT_FULL_TEXT_SEARCH_LIMIT): SearchResponse {
 	const parts = parseQuery(query);
-	if (!parts.lower) return emptySearchResponse(query, 'full', limit);
+	if (!parts.raw) return emptySearchResponse(query, 'full', limit);
 
 	const ranked: RankedHit[] = [];
 	for (const meta of idx.notes.values()) {
@@ -78,42 +99,47 @@ function rankNote(idx: VaultIndex, meta: NoteMeta, query: QueryParts): RankedHit
 	const titleLower = meta.title.toLowerCase();
 	const pathLower = meta.notePath.toLowerCase();
 	const aliasLower = meta.aliases.map((alias) => alias.toLowerCase());
-	const titlePhrase = titleLower.indexOf(query.lower);
-	const pathPhrase = pathLower.indexOf(query.lower);
-	const aliasPhrase = firstMatchingIndex(aliasLower, query.lower);
-	const bodyPhrase = textLower.indexOf(query.lower);
-	const phraseMatched = [titlePhrase, pathPhrase, aliasPhrase, bodyPhrase].some((index) => index >= 0);
-	const tokenScores = query.tokens.map((token) => rankToken(token, titleLower, pathLower, aliasLower, textLower));
+	const tagLower = meta.tags.map(normalizeTag);
+	const positiveScores = query.positiveTerms.map((term) => scoreTerm(term, meta, titleLower, pathLower, aliasLower, tagLower, textLower));
 
-	if (!phraseMatched && (tokenScores.length === 0 || tokenScores.some((score) => score.firstIndex < 0))) return null;
+	if (positiveScores.length === 0 && query.negativeTerms.length === 0) return null;
+	if (positiveScores.some((score) => !score.matched)) return null;
+	if (query.negativeTerms.some((term) => scoreTerm(term, meta, titleLower, pathLower, aliasLower, tagLower, textLower).matched)) return null;
 
 	let rank = 0;
 	let firstIndex = Number.MAX_SAFE_INTEGER;
-	if (titlePhrase >= 0) {
-		rank += 900 + earlyBonus(titlePhrase);
-		firstIndex = Math.min(firstIndex, titlePhrase);
-	}
-	if (aliasPhrase >= 0) {
-		rank += 760 + earlyBonus(aliasPhrase);
-		firstIndex = Math.min(firstIndex, aliasPhrase);
-	}
-	if (pathPhrase >= 0) {
-		rank += 560 + earlyBonus(pathPhrase);
-		firstIndex = Math.min(firstIndex, pathPhrase);
-	}
-	if (bodyPhrase >= 0) {
-		rank += 420 + earlyBonus(bodyPhrase);
-		firstIndex = Math.min(firstIndex, bodyPhrase);
+	let bodyIndex = -1;
+	let bodyLength = query.raw.length;
+	if (query.freePhraseLower && query.freeTerms.length > 1) {
+		const phraseScore = scoreTerm(
+			{ field: 'all', value: query.freePhraseLower, lower: query.freePhraseLower, negative: false, quoted: true },
+			meta,
+			titleLower,
+			pathLower,
+			aliasLower,
+			tagLower,
+			textLower
+		);
+		if (phraseScore.matched) {
+			rank += phraseScore.rank;
+			firstIndex = Math.min(firstIndex, phraseScore.firstIndex);
+			if (phraseScore.bodyIndex >= 0) {
+				bodyIndex = phraseScore.bodyIndex;
+				bodyLength = phraseScore.length;
+			}
+		}
 	}
 
-	for (const score of tokenScores) {
-		if (score.firstIndex < 0) continue;
+	for (const score of positiveScores) {
 		rank += score.rank;
 		firstIndex = Math.min(firstIndex, score.firstIndex);
+		if (bodyIndex < 0 && score.bodyIndex >= 0) {
+			bodyIndex = score.bodyIndex;
+			bodyLength = score.length;
+		}
 	}
 
-	const bodyIndex = bodyPhrase >= 0 ? bodyPhrase : firstBodyTokenIndex(query.tokens, textLower);
-	const snippet = bodyIndex >= 0 ? snippetAround(text, bodyIndex, bodyPhrase >= 0 ? query.raw.length : query.tokens[0]?.length ?? query.raw.length) : undefined;
+	const snippet = bodyIndex >= 0 ? snippetAround(text, bodyIndex, bodyLength) : undefined;
 	return {
 		path: meta.notePath,
 		title: meta.title,
@@ -125,36 +151,185 @@ function rankNote(idx: VaultIndex, meta: NoteMeta, query: QueryParts): RankedHit
 
 function parseQuery(query: string): QueryParts {
 	const raw = query.replace(/\s+/g, ' ').trim();
-	const lower = raw.toLowerCase();
-	const tokens = [...new Set(lower.split(/[^\p{L}\p{N}_-]+/u).filter(Boolean))];
-	return { raw, lower, tokens };
+	const terms = tokenizeQuery(raw)
+		.map(parseTerm)
+		.filter((term): term is SearchTerm => term !== null);
+	const positiveTerms = terms.filter((term) => !term.negative);
+	const negativeTerms = terms.filter((term) => term.negative);
+	const freeTerms = positiveTerms.filter((term) => term.field === 'all');
+	const freePhraseLower = freeTerms.map((term) => term.lower).join(' ').trim();
+	return { raw, terms, positiveTerms, negativeTerms, freeTerms, freePhraseLower };
 }
 
-function rankToken(token: string, titleLower: string, pathLower: string, aliasLower: string[], textLower: string): { rank: number; firstIndex: number } {
-	const titleIndex = titleLower.indexOf(token);
-	const aliasIndex = firstMatchingIndex(aliasLower, token);
-	const pathIndex = pathLower.indexOf(token);
-	const bodyIndex = textLower.indexOf(token);
+function tokenizeQuery(input: string): { raw: string; quoted: boolean }[] {
+	const tokens: { raw: string; quoted: boolean }[] = [];
+	let i = 0;
+	while (i < input.length) {
+		while (i < input.length && /\s/.test(input[i])) i += 1;
+		let raw = '';
+		let quoted = false;
+		let quote: string | null = null;
+		while (i < input.length) {
+			const char = input[i];
+			if (quote) {
+				if (char === quote) {
+					quote = null;
+					i += 1;
+					continue;
+				}
+				if (char === '\\' && i + 1 < input.length) {
+					raw += input[i + 1];
+					i += 2;
+					continue;
+				}
+				raw += char;
+				i += 1;
+				continue;
+			}
+			if (char === '"' || char === "'") {
+				quoted = true;
+				quote = char;
+				i += 1;
+				continue;
+			}
+			if (/\s/.test(char)) break;
+			raw += char;
+			i += 1;
+		}
+		if (raw.trim()) tokens.push({ raw: raw.trim(), quoted });
+	}
+	return tokens;
+}
+
+function parseTerm(token: { raw: string; quoted: boolean }): SearchTerm | null {
+	let raw = token.raw;
+	let negative = false;
+	if (raw.startsWith('-') && raw.length > 1) {
+		negative = true;
+		raw = raw.slice(1);
+	}
+	const fieldMatch = raw.match(/^([A-Za-z][\w-]*):(.*)$/);
+	const field = normalizeField(fieldMatch?.[1]);
+	const value = (field ? fieldMatch?.[2] ?? '' : raw).replace(/\s+/g, ' ').trim();
+	if (!value) return null;
+	const normalized = field === 'tag' ? normalizeTag(value) : value.toLowerCase();
+	if (!normalized) return null;
+	return {
+		field: field ?? 'all',
+		value,
+		lower: normalized,
+		negative,
+		quoted: token.quoted
+	};
+}
+
+function normalizeField(field: string | undefined): SearchField | null {
+	switch (field?.toLowerCase()) {
+		case 'tag':
+			return 'tag';
+		case 'path':
+			return 'path';
+		case 'file':
+		case 'title':
+		case 'name':
+			return 'file';
+		case 'content':
+		case 'body':
+			return 'content';
+		default:
+			return null;
+	}
+}
+
+function scoreTerm(
+	term: SearchTerm,
+	meta: NoteMeta,
+	titleLower: string,
+	pathLower: string,
+	aliasLower: string[],
+	tagLower: string[],
+	textLower: string
+): TermScore {
+	if (term.field === 'tag') return scoreTagTerm(term, tagLower);
+	if (term.field === 'path') return scorePathTerm(term, pathLower);
+	if (term.field === 'file') return scoreFileTerm(term, meta, titleLower, aliasLower);
+	if (term.field === 'content') return scoreContentTerm(term, textLower);
+	return scoreAllTerm(term, titleLower, pathLower, aliasLower, textLower);
+}
+
+function scoreAllTerm(term: SearchTerm, titleLower: string, pathLower: string, aliasLower: string[], textLower: string): TermScore {
+	const titleIndex = titleLower.indexOf(term.lower);
+	const aliasIndex = firstMatchingIndex(aliasLower, term.lower);
+	const pathIndex = pathLower.indexOf(term.lower);
+	const bodyIndex = textLower.indexOf(term.lower);
 	const first = minFound(titleIndex, aliasIndex, pathIndex, bodyIndex);
-	if (first < 0) return { rank: 0, firstIndex: -1 };
+	if (first < 0) return noMatch(term);
 	let rank = 0;
-	if (titleIndex >= 0) rank += 180 + earlyBonus(titleIndex);
-	if (aliasIndex >= 0) rank += 140 + earlyBonus(aliasIndex);
-	if (pathIndex >= 0) rank += 80 + earlyBonus(pathIndex);
+	if (titleIndex >= 0) rank += 220 + fieldBonus(term) + earlyBonus(titleIndex);
+	if (aliasIndex >= 0) rank += 170 + fieldBonus(term) + earlyBonus(aliasIndex);
+	if (pathIndex >= 0) rank += 95 + fieldBonus(term) + earlyBonus(pathIndex);
 	if (bodyIndex >= 0) {
-		rank += 45 + earlyBonus(bodyIndex);
-		rank += Math.min(60, countOccurrences(textLower, token) * 6);
+		rank += 60 + fieldBonus(term) + earlyBonus(bodyIndex);
+		rank += Math.min(80, countOccurrences(textLower, term.lower) * 8);
 	}
-	return { rank, firstIndex: first };
+	return { matched: true, rank, firstIndex: first, bodyIndex, length: term.value.length };
 }
 
-function firstBodyTokenIndex(tokens: string[], textLower: string): number {
-	let first = -1;
-	for (const token of tokens) {
-		const index = textLower.indexOf(token);
-		if (index >= 0 && (first < 0 || index < first)) first = index;
-	}
-	return first;
+function scoreContentTerm(term: SearchTerm, textLower: string): TermScore {
+	const bodyIndex = textLower.indexOf(term.lower);
+	if (bodyIndex < 0) return noMatch(term);
+	return {
+		matched: true,
+		rank: 460 + fieldBonus(term) + earlyBonus(bodyIndex) + Math.min(80, countOccurrences(textLower, term.lower) * 8),
+		firstIndex: bodyIndex,
+		bodyIndex,
+		length: term.value.length
+	};
+}
+
+function scoreFileTerm(term: SearchTerm, meta: NoteMeta, titleLower: string, aliasLower: string[]): TermScore {
+	const stemIndex = meta.stem.indexOf(term.lower);
+	const titleIndex = titleLower.indexOf(term.lower);
+	const aliasIndex = firstMatchingIndex(aliasLower, term.lower);
+	const first = minFound(titleIndex, aliasIndex, stemIndex);
+	if (first < 0) return noMatch(term);
+	let rank = 0;
+	if (titleIndex >= 0) rank += 820 + fieldBonus(term) + earlyBonus(titleIndex);
+	if (aliasIndex >= 0) rank += 720 + fieldBonus(term) + earlyBonus(aliasIndex);
+	if (stemIndex >= 0) rank += 640 + fieldBonus(term) + earlyBonus(stemIndex);
+	return { matched: true, rank, firstIndex: first, bodyIndex: -1, length: term.value.length };
+}
+
+function scorePathTerm(term: SearchTerm, pathLower: string): TermScore {
+	const pathIndex = pathLower.indexOf(term.lower);
+	if (pathIndex < 0) return noMatch(term);
+	return {
+		matched: true,
+		rank: 680 + fieldBonus(term) + earlyBonus(pathIndex),
+		firstIndex: pathIndex,
+		bodyIndex: -1,
+		length: term.value.length
+	};
+}
+
+function scoreTagTerm(term: SearchTerm, tagLower: string[]): TermScore {
+	const matched = tagLower.some((tag) => tag === term.lower || tag.startsWith(`${term.lower}/`));
+	if (!matched) return noMatch(term);
+	return { matched: true, rank: 760 + fieldBonus(term), firstIndex: 0, bodyIndex: -1, length: term.value.length };
+}
+
+function noMatch(term: SearchTerm): TermScore {
+	return { matched: false, rank: 0, firstIndex: -1, bodyIndex: -1, length: term.value.length };
+}
+
+function fieldBonus(term: SearchTerm): number {
+	if (term.quoted) return 300;
+	if (term.field !== 'all') return 50;
+	return 0;
+}
+
+function normalizeTag(tag: string): string {
+	return tag.trim().replace(/^#+/, '').toLowerCase();
 }
 
 function snippetAround(text: string, index: number, length: number): string {

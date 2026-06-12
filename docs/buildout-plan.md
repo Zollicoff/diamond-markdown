@@ -294,18 +294,23 @@ Use small, pushable slices:
    results across title, alias, path, and body matches, support multi-token
    fallback matches, and return total/limited metadata so UI surfaces do not
    imply every match is rendered.
+- **Search query operators.** Support quoted phrases, `tag:`, `path:`,
+   `file:`/`title:`, `content:`/`body:`, and leading `-` exclusions inside
+   the indexed full-text search path.
 
 ## Next Implementation Slices
 
-1. **Search query language.** Add verified support for more Obsidian-like
-   search operators or advanced filters without sacrificing the indexed path.
-2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
+1. **Desktop release track.** Add release automation docs and a workflow plan
+   for sidecars/signing/artifacts before claiming desktop distribution.
+2. **Search result virtualization.** Render very large result sets without
+   relying on a fixed capped list as the only scale control.
+3. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without
    executing Obsidian plugins.
-3. **Verification hardening.** Add tests for remaining dialog-driven
+4. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
-4. **Component diet.** Continue extracting large views only when the split
+5. **Component diet.** Continue extracting large views only when the split
    directly supports a product-facing feature or verification gap.
 
 ## Verification Gates

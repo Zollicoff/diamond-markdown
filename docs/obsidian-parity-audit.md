@@ -28,8 +28,9 @@ The main remaining product risks are:
 3. **Plugin compatibility is intentionally small.** Diamond can support useful
    plugins, but it is not and should not claim full Obsidian plugin parity.
 4. **Large-vault search is improving.** Tree and graph have scale work, and
-   full-text search now uses ranked persisted index results, but deeper query
-   syntax and virtualized result rendering remain basic.
+   full-text search now uses ranked persisted index results with basic
+   operators, but virtualized result rendering and richer boolean syntax
+   remain basic.
 5. **Roadmap wording needs to stay honest.** Public docs should distinguish
    core Obsidian-style parity from full Obsidian ecosystem parity.
 
@@ -45,7 +46,7 @@ The main remaining product risks are:
 | Render pipeline | Done | KaTeX, Mermaid, code highlighting, footnotes, embeds, callouts, block IDs | Continue adding edge cases only when imported vaults expose them |
 | Attachments | Done | Upload/drop/paste, picker, multi-select insert, delete, rename with reference rewrites, Obsidian folder config | Bulk move/organize UI is still absent |
 | Canvas | Partial | Read/render/edit many nodes and edges, groups, colors, SVG export, git-backed mutations | Deeper visual editing/formatting parity is not full Obsidian Canvas |
-| Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with capped-result metadata | Deeper query syntax and virtualized result rendering remain basic |
+| Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with quoted phrases, field filters, exclusions, and capped-result metadata | Richer boolean/regex syntax and virtualized result rendering remain basic |
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
 | GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, divergence/recovery UI | Background sync and conflict resolution remain manual by design |
@@ -59,10 +60,10 @@ The main remaining product risks are:
 
 ## Highest-Value Next Slices
 
-1. **Search query language.** Add verified support for more Obsidian-like
-   search operators or advanced filters without sacrificing the indexed path.
-2. **Desktop release track.** Add release automation docs and a workflow plan
+1. **Desktop release track.** Add release automation docs and a workflow plan
    for sidecars/signing/artifacts before claiming desktop distribution.
+2. **Search result virtualization.** Render very large result sets without
+   relying on a fixed capped list as the only scale control.
 3. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,
    plugins, offline, and desktop are explicitly scoped.
 4. **Unlinked mentions.** Add a backlinks-adjacent view for note-title mentions

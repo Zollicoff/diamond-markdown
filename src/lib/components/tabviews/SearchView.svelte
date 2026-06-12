@@ -112,6 +112,7 @@
 				bind:this={inputEl}
 				type="text"
 				placeholder={fullText ? 'Search notes and contents…' : 'Search note titles…'}
+				title={fullText ? 'Supports quoted phrases, tag:, path:, file:, content:, and -exclusions.' : 'Search note titles and aliases.'}
 				value={q}
 				oninput={onInput}
 				autocomplete="off"

@@ -22,7 +22,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Outgoing links panel
 - [x] Tag index page
 - [x] Fuzzy quick-switcher
-- [x] Ranked index-backed full-text search
+- [x] Ranked index-backed full-text search with quoted phrases, field filters, and exclusions
 - [x] Git auto-commit on save (debounced)
 - [x] Per-note history viewer (git log + diff)
 - [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)

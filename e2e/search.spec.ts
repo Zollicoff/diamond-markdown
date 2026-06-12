@@ -14,13 +14,13 @@ function emptyIndex(): VaultIndex {
 	};
 }
 
-function addNote(idx: VaultIndex, notePath: string, title: string, text: string, aliases: string[] = []): void {
+function addNote(idx: VaultIndex, notePath: string, title: string, text: string, aliases: string[] = [], tags: string[] = []): void {
 	const stem = notePath.replace(/\.md$/i, '').split('/').pop()?.toLowerCase() ?? notePath.toLowerCase();
 	const meta: NoteMeta = {
 		notePath,
 		title,
 		aliases,
-		tags: [],
+		tags,
 		stem
 	};
 	const normalized = text.replace(/\s+/g, ' ').trim();
@@ -30,6 +30,11 @@ function addNote(idx: VaultIndex, notePath: string, title: string, text: string,
 		text: normalized,
 		textLower: normalized.toLowerCase()
 	});
+	for (const tag of tags) {
+		let notes = idx.tagIndex.get(tag);
+		if (!notes) idx.tagIndex.set(tag, (notes = new Set()));
+		notes.add(notePath);
+	}
 }
 
 test('indexed full-text search ranks title and phrase matches before loose body matches', () => {
@@ -68,4 +73,26 @@ test('indexed full-text search reports capped result sets separately from return
 	expect(response.results).toHaveLength(7);
 	expect(clampSearchLimit('500', 50)).toBe(200);
 	expect(clampSearchLimit('bad', 50)).toBe(50);
+});
+
+test('indexed full-text search supports filters, quoted phrases, and exclusions', () => {
+	const idx = emptyIndex();
+	addNote(idx, 'Projects/Solar Plan.md', 'Solar Plan', 'Illinois Shines site survey steps and roof photos.', [], ['client/solar', 'active']);
+	addNote(idx, 'Archive/Solar Draft.md', 'Solar Draft', 'Illinois Shines retired draft with old wording.', [], ['client/solar', 'draft']);
+	addNote(idx, 'Projects/Meeting Notes.md', 'Meeting Notes', 'Illinois Shines roof survey from the call.', ['Call Notes'], ['client/water', 'active']);
+	addNote(idx, 'Inbox/Random.md', 'Random', 'Loose note without the program phrase.', [], ['misc']);
+
+	expect(searchFullTextIndex(idx, 'tag:#client/solar content:"Illinois Shines" -draft', 10).results.map((hit) => hit.path)).toEqual([
+		'Projects/Solar Plan.md'
+	]);
+	expect(searchFullTextIndex(idx, 'path:Projects file:Meeting', 10).results.map((hit) => hit.path)).toEqual([
+		'Projects/Meeting Notes.md'
+	]);
+	expect(searchFullTextIndex(idx, 'title:"Solar Plan"', 10).results.map((hit) => hit.path)).toEqual([
+		'Projects/Solar Plan.md'
+	]);
+	expect(searchFullTextIndex(idx, 'tag:client', 10).total).toBe(3);
+	expect(searchFullTextIndex(idx, 'content:roof -tag:client/water', 10).results.map((hit) => hit.path)).toEqual([
+		'Projects/Solar Plan.md'
+	]);
 });
