@@ -3,6 +3,8 @@ import type { GraphPoint, GraphTransform } from './view';
 
 export const GRAPH_DRAG_THRESHOLD_PX = 4;
 
+type GraphViewportRect = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
+
 interface ZoomGraphTransformInput {
 	screenPoint: GraphPoint;
 	deltaY: number;
@@ -39,6 +41,21 @@ export function panGraphTransform(
 	return {
 		viewX: origin.x + current.x - start.x,
 		viewY: origin.y + current.y - start.y
+	};
+}
+
+export function centeredGraphTransform(rect: Pick<GraphViewportRect, 'width' | 'height'>): GraphTransform {
+	return {
+		viewX: rect.width / 2,
+		viewY: rect.height / 2,
+		viewScale: 1
+	};
+}
+
+export function graphViewportPoint(clientPoint: GraphPoint, rect: Pick<GraphViewportRect, 'left' | 'top'>): GraphPoint {
+	return {
+		x: clientPoint.x - rect.left,
+		y: clientPoint.y - rect.top
 	};
 }
 

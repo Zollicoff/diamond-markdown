@@ -252,6 +252,9 @@ Use small, pushable slices:
 - **Git sync controls split.** Move the remote configuration form and primary
    fetch/pull/push action row out of `GitSyncPanel` into focused
    presentational sync components while keeping API orchestration centralized.
+- **Graph viewport helper extraction.** Move graph centering and client-to-SVG
+   viewport coordinate math out of `GraphView` into pure interaction helpers
+   with deterministic graph helper coverage.
 
 ## Next Implementation Slices
 

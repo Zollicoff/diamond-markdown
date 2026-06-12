@@ -21,9 +21,11 @@ import {
 	selectionBoxFromPoints
 } from '../src/lib/graph/view';
 import {
+	centeredGraphTransform,
 	graphDragMoved,
 	graphNodePinnedPosition,
 	graphNodeOpenTitle,
+	graphViewportPoint,
 	panGraphTransform,
 	toggleGraphPathSelection,
 	zoomGraphTransform
@@ -130,6 +132,15 @@ test.describe('graph view helpers', () => {
 			{ x: 10, y: 20 },
 			{ x: 25, y: 5 }
 		)).toEqual({ viewX: 55, viewY: 35 });
+		expect(centeredGraphTransform({ width: 900, height: 600 })).toEqual({
+			viewX: 450,
+			viewY: 300,
+			viewScale: 1
+		});
+		expect(graphViewportPoint(
+			{ x: 225, y: 190 },
+			{ left: 25, top: 40 }
+		)).toEqual({ x: 200, y: 150 });
 		expect(graphNodePinnedPosition(
 			{ x: 225, y: 190 },
 			{ x: 25, y: 40 },

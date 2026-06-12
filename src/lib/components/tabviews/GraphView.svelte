@@ -15,9 +15,11 @@
 		selectionBoxFromPoints
 	} from '$lib/graph/view';
 	import {
+		centeredGraphTransform,
 		graphDragMoved,
 		graphNodePinnedPosition,
 		graphNodeOpenTitle,
+		graphViewportPoint,
 		panGraphTransform,
 		toggleGraphPathSelection,
 		zoomGraphTransform
@@ -136,10 +138,8 @@
 		e.preventDefault();
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
-		const cx = e.clientX - rect.left;
-		const cy = e.clientY - rect.top;
 		const next = zoomGraphTransform({
-			screenPoint: { x: cx, y: cy },
+			screenPoint: graphViewportPoint({ x: e.clientX, y: e.clientY }, rect),
 			deltaY: e.deltaY,
 			transform: { viewX, viewY, viewScale }
 		});
@@ -159,7 +159,7 @@
 	function screenPoint(e: PointerEvent): { x: number; y: number } | null {
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return null;
-		return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		return graphViewportPoint({ x: e.clientX, y: e.clientY }, rect);
 	}
 
 	function clearSelection(): void {
@@ -321,10 +321,10 @@
 
 	function center(): void {
 		if (!svgEl) return;
-		const rect = svgEl.getBoundingClientRect();
-		viewX = rect.width / 2;
-		viewY = rect.height / 2;
-		viewScale = 1;
+		const next = centeredGraphTransform(svgEl.getBoundingClientRect());
+		viewX = next.viewX;
+		viewY = next.viewY;
+		viewScale = next.viewScale;
 	}
 
 	/** Restore force tunings + filters to factory defaults, then re-center
