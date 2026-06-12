@@ -45,21 +45,39 @@ async function initializeGit(vault: Vault): Promise<SimpleGit> {
 		}
 	}
 
-	gitCache.set(vault.id, g);
+	gitCache.set(gitCacheKey(vault), g);
 	return g;
 }
 
-async function gitFor(vault: Vault): Promise<SimpleGit> {
-	const cached = gitCache.get(vault.id);
-	if (cached) return cached;
+function gitCacheKey(vault: Vault): string {
+	return `${vault.id}:${path.resolve(vault.path)}`;
+}
 
-	const pending = gitInitCache.get(vault.id);
+async function pointsAtVaultWorktree(g: SimpleGit, vault: Vault): Promise<boolean> {
+	try {
+		const topLevel = (await g.raw(['rev-parse', '--show-toplevel'])).trim();
+		return path.resolve(topLevel) === path.resolve(vault.path);
+	} catch {
+		return false;
+	}
+}
+
+async function gitFor(vault: Vault): Promise<SimpleGit> {
+	const key = gitCacheKey(vault);
+	const cached = gitCache.get(key);
+	if (cached) {
+		const gitDir = path.join(vault.path, '.git');
+		if (fs.existsSync(gitDir) && await pointsAtVaultWorktree(cached, vault)) return cached;
+		gitCache.delete(key);
+	}
+
+	const pending = gitInitCache.get(key);
 	if (pending) return pending;
 
 	const initializing = initializeGit(vault).finally(() => {
-		gitInitCache.delete(vault.id);
+		gitInitCache.delete(key);
 	});
-	gitInitCache.set(vault.id, initializing);
+	gitInitCache.set(key, initializing);
 	return initializing;
 }
 
