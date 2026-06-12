@@ -22,6 +22,7 @@ import {
 } from '../src/lib/graph/view';
 import {
 	graphDragMoved,
+	graphNodePinnedPosition,
 	graphNodeOpenTitle,
 	panGraphTransform,
 	toggleGraphPathSelection,
@@ -129,6 +130,11 @@ test.describe('graph view helpers', () => {
 			{ x: 10, y: 20 },
 			{ x: 25, y: 5 }
 		)).toEqual({ viewX: 55, viewY: 35 });
+		expect(graphNodePinnedPosition(
+			{ x: 225, y: 190 },
+			{ x: 25, y: 40 },
+			{ viewX: 50, viewY: 30, viewScale: 2 }
+		)).toEqual({ x: 75, y: 60 });
 
 		expect(graphDragMoved({ x: 0, y: 0 }, { x: 3, y: 3 })).toBe(true);
 		expect(graphDragMoved({ x: 0, y: 0 }, { x: 2, y: 2 })).toBe(false);

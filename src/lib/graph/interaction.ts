@@ -42,6 +42,17 @@ export function panGraphTransform(
 	};
 }
 
+export function graphNodePinnedPosition(
+	pointer: GraphPoint,
+	viewportOrigin: GraphPoint,
+	transform: GraphTransform
+): GraphPoint {
+	return {
+		x: (pointer.x - viewportOrigin.x - transform.viewX) / transform.viewScale,
+		y: (pointer.y - viewportOrigin.y - transform.viewY) / transform.viewScale
+	};
+}
+
 export function graphDragMoved(
 	start: GraphPoint,
 	current: GraphPoint,

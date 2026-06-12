@@ -16,6 +16,7 @@
 	} from '$lib/graph/view';
 	import {
 		graphDragMoved,
+		graphNodePinnedPosition,
 		graphNodeOpenTitle,
 		panGraphTransform,
 		toggleGraphPathSelection,
@@ -54,8 +55,7 @@
 
 	// --- Drag state ----------------------------------------------------
 	let draggingNode: GNode | null = null;
-	let dragStartX = 0;
-	let dragStartY = 0;
+	let dragStart: { x: number; y: number } | null = null;
 	let dragMoved = false;
 	let suppressNextNodeClick = false;
 	let hoverPath = $state<string | null>(null);
@@ -213,14 +213,19 @@
 		if (draggingNode) {
 			if (!dragMoved) {
 				dragMoved = graphDragMoved(
-					{ x: dragStartX, y: dragStartY },
+					dragStart ?? { x: e.clientX, y: e.clientY },
 					{ x: e.clientX, y: e.clientY }
 				);
 			}
 			const rect = svgEl?.getBoundingClientRect();
 			if (!rect) return;
-			draggingNode.fx = (e.clientX - rect.left - viewX) / viewScale;
-			draggingNode.fy = (e.clientY - rect.top - viewY) / viewScale;
+			const pinned = graphNodePinnedPosition(
+				{ x: e.clientX, y: e.clientY },
+				{ x: rect.left, y: rect.top },
+				{ viewX, viewY, viewScale }
+			);
+			draggingNode.fx = pinned.x;
+			draggingNode.fy = pinned.y;
 			return;
 		}
 		if (!isPanning) return;
@@ -249,6 +254,7 @@
 			draggingNode.fx = null;
 			draggingNode.fy = null;
 			draggingNode = null;
+			dragStart = null;
 		}
 		isPanning = false;
 		releasePointer(e.currentTarget as Element, e.pointerId);
@@ -257,8 +263,7 @@
 	function onNodePointerDown(e: PointerEvent, n: GNode): void {
 		e.stopPropagation();
 		draggingNode = n;
-		dragStartX = e.clientX;
-		dragStartY = e.clientY;
+		dragStart = { x: e.clientX, y: e.clientY };
 		dragMoved = false;
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
