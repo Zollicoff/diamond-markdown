@@ -85,6 +85,9 @@ Use small, pushable slices:
    a read-only node/edge board.
 - **Canvas file operations.** Rename, move, and delete `.canvas` files through
    the same git-backed file tree flow as notes and folders.
+- **File tree toolbar split.** Move new-note/new-folder, sort, auto-reveal,
+   and expand/collapse controls out of `FileTreePanel` into a presentational
+   toolbar component.
 
 ## Next Implementation Slices
 
