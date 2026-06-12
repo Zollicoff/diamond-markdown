@@ -139,6 +139,9 @@ Use small, pushable slices:
 - **Graph settings state extraction.** Move graph setting hydration,
    persistence, snapshots, and reset helpers out of `GraphView` into focused
    graph state modules with deterministic coverage.
+- **File tree panel state extraction.** Move sort/auto-reveal preferences and
+   expansion persistence out of `FileTreePanel` into focused tree state modules
+   with deterministic parsing coverage.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

@@ -16,6 +16,11 @@ export interface SortMenuPosition {
 	left: number;
 }
 
+export interface TreePanelPreferences {
+	sortMode: TreeSortMode;
+	autoReveal: boolean;
+}
+
 export interface FlatTreeRow {
 	node: TreeNode;
 	depth: number;
@@ -41,6 +46,61 @@ export const TREE_DEFAULT_VIEWPORT_HEIGHT = 520;
 
 export function isTreeSortMode(value: unknown): value is TreeSortMode {
 	return typeof value === 'string' && value in TREE_SORT_LABELS;
+}
+
+export function defaultTreePanelPreferences(): TreePanelPreferences {
+	return { sortMode: 'name-asc', autoReveal: false };
+}
+
+export function treePreferencesStorageKey(vaultId: string): string {
+	return `diamond.tree-prefs.${vaultId}`;
+}
+
+export function treeExpansionStorageKey(vaultId: string): string {
+	return `diamond.tree-expand.${vaultId}`;
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? value as Record<string, unknown>
+		: null;
+}
+
+export function parseTreePanelPreferences(raw: string | null): Partial<TreePanelPreferences> {
+	if (!raw) return {};
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return {};
+	}
+
+	const source = record(parsed);
+	if (!source) return {};
+
+	const prefs: Partial<TreePanelPreferences> = {};
+	if (isTreeSortMode(source.sortMode)) prefs.sortMode = source.sortMode;
+	if (typeof source.autoReveal === 'boolean') prefs.autoReveal = source.autoReveal;
+	return prefs;
+}
+
+export function parseTreeExpansion(raw: string | null): Set<string> | null {
+	if (!raw) return null;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return null;
+	}
+	if (!Array.isArray(parsed)) return null;
+	return new Set(parsed.filter((item): item is string => typeof item === 'string'));
+}
+
+export function treePanelPreferencesSnapshot(prefs: TreePanelPreferences): TreePanelPreferences {
+	return {
+		sortMode: prefs.sortMode,
+		autoReveal: prefs.autoReveal
+	};
 }
 
 export function compareTreeNodes(a: TreeNode, b: TreeNode, mode: TreeSortMode): number {

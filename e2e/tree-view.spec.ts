@@ -2,18 +2,24 @@ import { expect, test } from '@playwright/test';
 import type { TreeNode } from '../src/lib/types';
 import {
 	collectDirectoryPaths,
+	defaultTreePanelPreferences,
 	flattenVisibleTreeRows,
 	isCanvasTreeFile,
 	isMarkdownTreeFile,
 	isTreeSortMode,
 	parentDirectoriesForPath,
+	parseTreeExpansion,
+	parseTreePanelPreferences,
 	revealParentDirectories,
 	renamedTreeNodePath,
 	sortMenuPositionFromRect,
 	sortTreeNodes,
+	treeExpansionStorageKey,
 	treeFileDisplayName,
+	treePanelPreferencesSnapshot,
 	treePathIsDescendant,
 	treePathParent,
+	treePreferencesStorageKey,
 	treeRowStyle,
 	visibleTreeWindow,
 	topLevelDirectoryPaths
@@ -136,6 +142,35 @@ test.describe('tree view helpers', () => {
 		expect(isTreeSortMode('name-asc')).toBe(true);
 		expect(isTreeSortMode('surprise')).toBe(false);
 		expect(sortMenuPositionFromRect({ bottom: 40, right: 280 })).toEqual({ top: 44, left: 60 });
+	});
+
+	test('keeps tree panel storage parsing outside the component', () => {
+		expect(defaultTreePanelPreferences()).toEqual({ sortMode: 'name-asc', autoReveal: false });
+		expect(treePreferencesStorageKey('vault-1')).toBe('diamond.tree-prefs.vault-1');
+		expect(treeExpansionStorageKey('vault-1')).toBe('diamond.tree-expand.vault-1');
+		expect(parseTreePanelPreferences(null)).toEqual({});
+		expect(parseTreePanelPreferences('bad-json')).toEqual({});
+		expect(parseTreePanelPreferences(JSON.stringify({
+			sortMode: 'mtime-desc',
+			autoReveal: true,
+			extra: 'ignored'
+		}))).toEqual({ sortMode: 'mtime-desc', autoReveal: true });
+		expect(parseTreePanelPreferences(JSON.stringify({
+			sortMode: 'surprise',
+			autoReveal: 'yes'
+		}))).toEqual({});
+
+		expect(parseTreeExpansion(null)).toBeNull();
+		expect(parseTreeExpansion('bad-json')).toBeNull();
+		expect(parseTreeExpansion(JSON.stringify('Projects'))).toBeNull();
+		expect([...(parseTreeExpansion(JSON.stringify(['Projects', 42, 'Archive'])) ?? [])]).toEqual([
+			'Projects',
+			'Archive'
+		]);
+		expect(treePanelPreferencesSnapshot({ sortMode: 'ctime-asc', autoReveal: true })).toEqual({
+			sortMode: 'ctime-asc',
+			autoReveal: true
+		});
 	});
 
 	test('classifies markdown and canvas files for tree-only behavior', () => {

@@ -11,17 +11,16 @@
 	import { workspace } from '$lib/workspace/store.svelte';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { alertDialog } from '$lib/dialogs';
+	import { createTreePanelState } from '$lib/tree/panel-state.svelte';
 	import {
 		collectDirectoryPaths,
 		isCanvasTreeFile,
 		isMarkdownTreeFile,
-		isTreeSortMode,
 		renamedTreeNodePath,
 		revealParentDirectories,
 		sortTreeNodes,
 		treeFileDisplayName,
-		topLevelDirectoryPaths,
-		type TreeSortMode
+		topLevelDirectoryPaths
 	} from '$lib/tree/view';
 
 	interface Props {
@@ -37,60 +36,31 @@
 	let menuItems = $state<MenuItem[]>([]);
 
 	// --- Toolbar state, persisted per-vault ---------------------------
-	let sortMode = $state<TreeSortMode>('name-asc');
-	let autoReveal = $state(false);
-
-	let expand = $state<Set<string>>(new Set());
-	let toolbarHydrated = false;
-
-	const prefsKey = $derived(`diamond.tree-prefs.${vaultId}`);
-	const expandKey = $derived(`diamond.tree-expand.${vaultId}`);
-
-	function hydratePrefs(): void {
-		if (typeof localStorage === 'undefined') return;
-		try {
-			const raw = localStorage.getItem(prefsKey);
-			if (raw) {
-				const v = JSON.parse(raw) as { sortMode?: unknown; autoReveal?: boolean };
-				if (isTreeSortMode(v.sortMode)) sortMode = v.sortMode;
-				if (typeof v.autoReveal === 'boolean') autoReveal = v.autoReveal;
-			}
-			const ex = localStorage.getItem(expandKey);
-			if (ex) {
-				const arr = JSON.parse(ex) as string[];
-				if (Array.isArray(arr)) expand = new Set(arr);
-			} else {
-				// Default: expand all top-level folders on first visit.
-				expand = topLevelDirectoryPaths(tree);
-			}
-		} catch { /* corrupt — fall through to defaults */ }
-	}
+	const treePanel = createTreePanelState(() => vaultId, () => topLevelDirectoryPaths(tree));
+	const treePrefs = treePanel.prefs;
 
 	$effect(() => {
-		const snap = { sortMode, autoReveal };
-		if (!toolbarHydrated || typeof localStorage === 'undefined') return;
-		try { localStorage.setItem(prefsKey, JSON.stringify(snap)); } catch { /* quota */ }
+		treePanel.persistPreferences();
 	});
 	$effect(() => {
-		if (!toolbarHydrated || typeof localStorage === 'undefined') return;
-		try { localStorage.setItem(expandKey, JSON.stringify([...expand])); } catch { /* quota */ }
+		treePanel.persistExpansion();
 	});
 
-	const sortedTree = $derived(sortTreeNodes(tree, sortMode));
+	const sortedTree = $derived(sortTreeNodes(tree, treePrefs.sortMode));
 
 	// --- Expand / collapse helpers -----------------------------------
 	const allDirPaths = $derived(collectDirectoryPaths(tree));
-	const allCollapsed = $derived(expand.size === 0);
+	const allCollapsed = $derived(treePanel.expanded.size === 0);
 
 	function toggleDir(p: string): void {
-		const next = new Set(expand);
+		const next = new Set(treePanel.expanded);
 		if (next.has(p)) next.delete(p);
 		else next.add(p);
-		expand = next;
+		treePanel.expanded = next;
 	}
 
-	function expandAll(): void { expand = new Set(allDirPaths); }
-	function collapseAll(): void { expand = new Set(); }
+	function expandAll(): void { treePanel.expanded = new Set(allDirPaths); }
+	function collapseAll(): void { treePanel.expanded = new Set(); }
 	function toggleExpandAll(): void { allCollapsed ? expandAll() : collapseAll(); }
 
 	// --- Highlight + auto-reveal -------------------------------------
@@ -102,10 +72,10 @@
 	});
 
 	$effect(() => {
-		if (!autoReveal || !activePath) return;
+		if (!treePrefs.autoReveal || !activePath) return;
 		// Expand every parent folder of the active note path.
-		const next = revealParentDirectories(expand, activePath);
-		if (next !== expand) expand = next;
+		const next = revealParentDirectories(treePanel.expanded, activePath);
+		if (next !== treePanel.expanded) treePanel.expanded = next;
 	});
 
 	// --- Renaming + clicks (unchanged from previous version) ---------
@@ -173,8 +143,7 @@
 	}
 
 	onMount(() => {
-		hydratePrefs();
-		toolbarHydrated = true;
+		treePanel.hydrate();
 		const offs = [
 			onBus('note:rename-request', (e) => {
 				if (e.vaultId !== vaultId) return;
@@ -187,11 +156,11 @@
 
 <FileTreeToolbar
 	{vaultId}
-	{sortMode}
-	{autoReveal}
+	sortMode={treePrefs.sortMode}
+	autoReveal={treePrefs.autoReveal}
 	{allCollapsed}
-	onSortChange={(mode) => (sortMode = mode)}
-	onToggleAutoReveal={() => (autoReveal = !autoReveal)}
+	onSortChange={(mode) => (treePrefs.sortMode = mode)}
+	onToggleAutoReveal={() => (treePrefs.autoReveal = !treePrefs.autoReveal)}
 	onToggleExpandAll={toggleExpandAll}
 />
 
@@ -208,7 +177,7 @@
 		nodes={sortedTree}
 		{vaultId}
 		{activePath}
-		expanded={expand}
+		expanded={treePanel.expanded}
 		onToggleDir={toggleDir}
 		{renamingPath}
 		onContext={onNodeContext}
