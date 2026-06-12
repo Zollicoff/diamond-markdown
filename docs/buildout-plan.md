@@ -112,6 +112,9 @@ Use small, pushable slices:
 - **Graph interaction helper extraction.** Move zoom, pan, drag-threshold,
    selection-toggle, and node-open title logic out of `GraphView` into pure
    graph helpers with focused tests.
+- **Graph simulation runner extraction.** Move the RAF simulation lifecycle,
+   frame cancellation, and per-frame reactivity callback out of `GraphView`
+   into a deterministic graph runner module with lifecycle tests.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through

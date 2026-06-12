@@ -5,10 +5,10 @@
 	import { openNote } from '$lib/workspace/actions';
 	import { buildGraphSimulationData } from '$lib/graph/data';
 	import {
-		simulateStep,
 		type GNode,
 		type GEdge
 	} from '$lib/graph/sim';
+	import { createGraphSimulationRunner } from '$lib/graph/simulation-runner';
 	import {
 		buildGraphProjection,
 		selectNodesInBox,
@@ -66,6 +66,7 @@
 	const graphSettings = createGraphSettingsState(() => vaultId);
 	const settings = graphSettings.settings;
 	let panelOpen = $state(false);
+	const simulationRunner = createGraphSimulationRunner();
 
 	function resetForces(): void {
 		graphSettings.resetForces();
@@ -115,24 +116,20 @@
 		}
 	}
 
-	let rafId = 0;
-	let lastTick = 0;
 	function startSim(): void {
-		cancelAnimationFrame(rafId);
-		lastTick = performance.now();
-		const tick = (now: number): void => {
-			const dt = Math.min(32, now - lastTick) / 16; // normalize to ~60fps
-			lastTick = now;
-			simulateStep(nodes, edges, dt, {
+		simulationRunner.start(
+			nodes,
+			edges,
+			() => ({
 				repulse: settings.repulse,
 				linkForce: settings.linkForce,
 				linkDist: settings.linkDist,
 				centerForce: settings.centerForce
-			});
-			nodes = nodes; // nudge reactivity — sim mutates in place
-			rafId = requestAnimationFrame(tick);
-		};
-		rafId = requestAnimationFrame(tick);
+			}),
+			() => {
+				nodes = nodes; // nudge reactivity — sim mutates in place
+			}
+		);
 	}
 
 	// --- Pointer + view handlers ---------------------------------------
@@ -349,7 +346,7 @@
 	});
 
 	onDestroy(() => {
-		cancelAnimationFrame(rafId);
+		simulationRunner.stop();
 	});
 </script>
 

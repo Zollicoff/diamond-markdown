@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test';
 import type { GNode, GEdge } from '../src/lib/graph/sim';
 import { buildGraphSimulationData } from '../src/lib/graph/data';
 import {
+	createGraphSimulationRunner,
+	type GraphFrameApi
+} from '../src/lib/graph/simulation-runner';
+import {
 	applyGraphSettings,
 	defaultGraphSettings,
 	graphSettingsStorageKey,
@@ -35,6 +39,38 @@ function node(path: string, title: string, degree: number, x = 0, y = 0): GNode 
 		vy: 0,
 		fx: null,
 		fy: null
+	};
+}
+
+function frameHarness(): {
+	api: GraphFrameApi;
+	canceled: number[];
+	pendingIds: () => number[];
+	runNext: (now: number) => void;
+} {
+	let nextId = 1;
+	const callbacks = new Map<number, FrameRequestCallback>();
+	const canceled: number[] = [];
+	return {
+		api: {
+			requestFrame: (callback) => {
+				const id = nextId++;
+				callbacks.set(id, callback);
+				return id;
+			},
+			cancelFrame: (id) => {
+				canceled.push(id);
+				callbacks.delete(id);
+			},
+			now: () => 0
+		},
+		canceled,
+		pendingIds: () => [...callbacks.keys()],
+		runNext: (now) => {
+			const [id, callback] = callbacks.entries().next().value as [number, FrameRequestCallback];
+			callbacks.delete(id);
+			callback(now);
+		}
 	};
 }
 
@@ -215,5 +251,49 @@ test.describe('graph view helpers', () => {
 			['Existing.md'],
 			false
 		)).toEqual(['Existing.md']);
+	});
+
+	test('runs graph simulation frames through a cancellable runner', () => {
+		const nodes = [
+			node('A.md', 'A', 1, 0, 0),
+			node('B.md', 'B', 1, 20, 0)
+		];
+		const frames = frameHarness();
+		const runner = createGraphSimulationRunner(frames.api);
+		let ticks = 0;
+
+		runner.start(
+			nodes,
+			[],
+			{ repulse: 100, linkForce: 0, linkDist: 90, centerForce: 0 },
+			() => { ticks += 1; }
+		);
+		expect(runner.isRunning()).toBe(true);
+		expect(frames.pendingIds()).toEqual([1]);
+
+		frames.runNext(16);
+		expect(ticks).toBe(1);
+		expect(nodes[0].x).toBeLessThan(0);
+		expect(nodes[1].x).toBeGreaterThan(20);
+		expect(frames.pendingIds()).toEqual([2]);
+
+		runner.stop();
+		expect(runner.isRunning()).toBe(false);
+		expect(frames.canceled).toEqual([2]);
+		expect(frames.pendingIds()).toEqual([]);
+	});
+
+	test('restarting the graph simulation cancels the pending frame', () => {
+		const frames = frameHarness();
+		const runner = createGraphSimulationRunner(frames.api);
+		const nodes = [node('A.md', 'A', 0)];
+
+		runner.start(nodes, [], { repulse: 0, linkForce: 0, linkDist: 90, centerForce: 0 }, () => {});
+		expect(frames.pendingIds()).toEqual([1]);
+		runner.start(nodes, [], { repulse: 0, linkForce: 0, linkDist: 90, centerForce: 0 }, () => {});
+
+		expect(frames.canceled).toEqual([1]);
+		expect(frames.pendingIds()).toEqual([2]);
+		expect(runner.isRunning()).toBe(true);
 	});
 });
