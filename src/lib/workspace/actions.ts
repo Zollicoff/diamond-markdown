@@ -6,7 +6,7 @@
  * always current.
  */
 
-import type { Tab, Pane, LayoutNode, NoteTab, OpenMode } from './types';
+import type { Tab, Pane, LayoutNode, NoteTab, CanvasTab, OpenMode } from './types';
 import { workspace, persist, panesInLayoutOrder } from './store.svelte';
 import { on } from '$lib/events';
 
@@ -80,6 +80,7 @@ export function activateAdjacentTabOrPane(
  *  same note in one pane dedupes automatically. */
 function tabIdFor(tab: Tab): string {
 	if (tab.kind === 'note') return `note:${(tab as NoteTab).path}`;
+	if (tab.kind === 'canvas') return `canvas:${(tab as CanvasTab).path}`;
 	if (tab.kind === 'graph') return 'graph';
 	if (tab.kind === 'tags') return `tags:${tab.filter ?? ''}`;
 	if (tab.kind === 'search') return 'search';
@@ -158,8 +159,13 @@ export function openTab(vaultId: string, tab: Tab, mode: OpenMode = 'replace'): 
 }
 
 export function openNote(vaultId: string, path: string, title: string, mode: OpenMode = 'replace'): void {
-	const niceTitle = title || path.split('/').pop()!.replace(/\.md$/, '');
+	const niceTitle = title || path.split('/').pop()!.replace(/\.(md|markdown)$/i, '');
 	openTab(vaultId, { id: `note:${path}`, kind: 'note', path, title: niceTitle }, mode);
+}
+
+export function openCanvas(vaultId: string, path: string, title: string, mode: OpenMode = 'replace'): void {
+	const niceTitle = title || path.split('/').pop()!.replace(/\.canvas$/i, '');
+	openTab(vaultId, { id: `canvas:${path}`, kind: 'canvas', path, title: niceTitle }, mode);
 }
 
 /** Update the query stored on a search tab in-place (no id change — the
@@ -297,13 +303,15 @@ export function renameTabPath(vaultId: string, oldPath: string, newPath: string,
 	for (const pane of Object.values(workspace.panes)) {
 		for (let i = 0; i < pane.tabs.length; i++) {
 			const t = pane.tabs[i];
-			if (t.kind !== 'note') continue;
+			if (!isFileBackedTab(t)) continue;
+			const prefix = t.kind === 'canvas' ? 'canvas' : 'note';
+			const titleExt = t.kind === 'canvas' ? /\.canvas$/i : /\.(md|markdown)$/i;
 			if (t.path === oldPath) {
-				const replaced: NoteTab = {
+				const replaced = {
 					...t,
 					path: newPath,
-					id: `note:${newPath}`,
-					title: newTitle ?? newPath.split('/').pop()!.replace(/\.md$/, '')
+					id: `${prefix}:${newPath}`,
+					title: newTitle ?? newPath.split('/').pop()!.replace(titleExt, '')
 				};
 				pane.tabs[i] = replaced;
 				if (pane.activeTabId === t.id) pane.activeTabId = replaced.id;
@@ -312,11 +320,11 @@ export function renameTabPath(vaultId: string, oldPath: string, newPath: string,
 				// Folder prefix rewrite.
 				const suffix = t.path.slice(oldPath.length);
 				const merged = newPath + suffix;
-				const replaced: NoteTab = {
+				const replaced = {
 					...t,
 					path: merged,
-					id: `note:${merged}`,
-					title: merged.split('/').pop()!.replace(/\.md$/, '')
+					id: `${prefix}:${merged}`,
+					title: merged.split('/').pop()!.replace(titleExt, '')
 				};
 				pane.tabs[i] = replaced;
 				if (pane.activeTabId === t.id) pane.activeTabId = replaced.id;
@@ -332,7 +340,7 @@ export function closeTabsByPath(vaultId: string, pathOrPrefix: string, isFolder:
 	for (const pane of Object.values(workspace.panes)) {
 		const before = pane.tabs.length;
 		pane.tabs = pane.tabs.filter((t) => {
-			if (t.kind !== 'note') return true;
+			if (!isFileBackedTab(t)) return true;
 			if (isFolder) return !(t.path === pathOrPrefix || t.path.startsWith(pathOrPrefix + '/'));
 			return t.path !== pathOrPrefix;
 		});
@@ -351,6 +359,10 @@ export function closeTabsByPath(vaultId: string, pathOrPrefix: string, isFolder:
 	}
 	if (changed) persist(vaultId);
 	return nextFocusedNoteTab();
+}
+
+function isFileBackedTab(tab: Tab): tab is NoteTab | CanvasTab {
+	return tab.kind === 'note' || tab.kind === 'canvas';
 }
 
 export function setActiveTabTitle(vaultId: string, tabId: string, title: string): void {

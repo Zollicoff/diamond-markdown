@@ -48,6 +48,7 @@ export interface TreeNode {
 	name: string;
 	path: string;
 	type: 'file' | 'directory';
+	fileKind?: 'markdown' | 'canvas';
 	/** Modified time (ms since epoch). 0 for directories. */
 	mtime?: number;
 	/** Created/birth time. Falls back to mtime on filesystems without
@@ -89,6 +90,40 @@ export interface NoteDoc {
 	outgoingLinks: OutgoingLink[];
 	backlinks: LinkRef[];
 	tags: string[];
+}
+
+export interface CanvasNode {
+	id: string;
+	type: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	text?: string;
+	file?: string;
+	url?: string;
+	label?: string;
+	color?: string;
+}
+
+export interface CanvasEdge {
+	id: string;
+	fromNode: string;
+	toNode: string;
+	fromSide?: string;
+	toSide?: string;
+	label?: string;
+	color?: string;
+}
+
+export interface CanvasDoc {
+	path: string;
+	title: string;
+	revision: string;
+	mtime: number;
+	nodes: CanvasNode[];
+	edges: CanvasEdge[];
+	warnings: string[];
 }
 
 export interface SearchHit {

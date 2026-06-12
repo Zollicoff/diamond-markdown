@@ -18,7 +18,8 @@ Diamond Markdown already has the right foundation:
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
   `.obsidian`, attachment folders, media outside named attachment folders,
-  Obsidian plugin folders, Canvas files, and Git readiness before registration.
+  Obsidian plugin folders, read-only Canvas files, and Git readiness before
+  registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
 
@@ -77,14 +78,17 @@ Use small, pushable slices:
 - **Graph view projection extraction.** Move graph filtering, visible-edge
    projection, selection-box math, and screen-to-graph coordinate conversion
    into pure helpers with focused tests.
+- **Read-only Canvas preview.** Show `.canvas` files in the tree, open them in
+   workspace tabs and panes, parse Obsidian Canvas JSON server-side, and render
+   a read-only node/edge board.
 
 ## Next Implementation Slices
 
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as attachment embed variants, Canvas read-only previews,
-   and plugin-settings visibility without executing Obsidian plugins.
+   import edges such as attachment embed variants, Canvas editing/export, and
+   plugin-settings visibility without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 

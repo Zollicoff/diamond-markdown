@@ -117,6 +117,7 @@
 		if (!tab) return;
 		let desired: string | null = null;
 		if (tab.kind === 'note') desired = `/vault/${vaultId}/note/${encodeURI(tab.path)}`;
+		if (tab.kind === 'canvas') desired = `/vault/${vaultId}/canvas/${encodeURI(tab.path)}`;
 		if (!desired) return;
 		const current = window.location.pathname;
 		if (current === desired) return;

@@ -154,7 +154,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.markdownExamples).toContain('Daily.md');
 	expect(body.canvasExamples).toContain('Board.canvas');
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
-	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('does not render Canvas boards yet');
+	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('opens read-only Canvas previews');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
 	expect(fs.readFileSync(notePath, 'utf-8')).toBe(before);

@@ -3,6 +3,7 @@
 		name: string;
 		path: string;
 		type: 'file' | 'directory';
+		fileKind?: 'markdown' | 'canvas';
 		mtime?: number;
 		ctime?: number;
 		children?: TreeNode[];
@@ -11,6 +12,10 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import {
+		isCanvasTreeFile,
+		treeFileDisplayName
+	} from '$lib/tree/view';
 
 	interface Props {
 		nodes: TreeNode[];
@@ -175,11 +180,17 @@
 	}
 
 	function initialRenameValue(node: TreeNode): string {
-		return node.type === 'file' ? node.name.replace(/\.md$/, '') : node.name;
+		if (node.type !== 'file') return node.name;
+		return treeFileDisplayName(node);
 	}
 
 	function fileHref(node: TreeNode): string {
+		if (isCanvasTreeFile(node)) return `/vault/${vaultId}/canvas/${encodeURI(node.path)}`;
 		return `/vault/${vaultId}/note/${encodeURI(node.path)}`;
+	}
+
+	function fileLabel(node: TreeNode): string {
+		return treeFileDisplayName(node);
 	}
 
 	function rowStyle(row: VisibleRow): string {
@@ -282,7 +293,10 @@
 									if (e.button === 1 && onFileClick) { e.preventDefault(); onFileClick(e, n); }
 								}}
 							>
-								<span class="file-name">{n.name.replace(/\.md$/, '')}</span>
+								{#if isCanvasTreeFile(n)}
+									<span class="file-kind" aria-hidden="true">□</span>
+								{/if}
+								<span class="file-name">{fileLabel(n)}</span>
 							</a>
 						{/if}
 					</div>
@@ -349,6 +363,7 @@
 	.dir .name { color: var(--fg-muted); }
 	.dir.open .name { color: var(--fg); }
 	.file-name { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.file-kind { color: var(--fg-dim); font-family: var(--mono); font-size: 0.72rem; }
 
 	.file-row {
 		min-height: 26px;

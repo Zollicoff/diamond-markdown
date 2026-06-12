@@ -7,9 +7,11 @@
  * needs. Keep context generic; specific commands cast from it.
  */
 
+import type { TreeNode } from '$lib/types';
+
 export interface CommandContext {
 	vaultId?: string;
-	node?: { path: string; type: 'file' | 'directory'; name: string };
+	node?: TreeNode;
 	paneId?: string;
 	tabId?: string;
 	selection?: string;

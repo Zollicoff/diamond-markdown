@@ -32,6 +32,17 @@ export function fileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
 	];
 }
 
+export function canvasFileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
+	const ctx = { vaultId: deps.vaultId, node };
+	return [
+		{ label: 'Open Canvas', icon: '□', action: () => exec('tabs.open', ctx) },
+		{ label: 'Open in new tab', icon: '⎚', shortcut: '⌘click', action: () => exec('tabs.open-in-new-tab', ctx) },
+		{ label: 'Open in new pane', icon: '⊞', action: () => exec('tabs.open-in-new-pane', ctx) },
+		{ separator: true, label: '' },
+		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) }
+	];
+}
+
 export function folderMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
 	const ctx = { vaultId: deps.vaultId, node };
 	const empty = !node.children || node.children.length === 0;

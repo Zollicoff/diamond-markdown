@@ -209,7 +209,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			'canvas',
 			'Canvas files',
 			canvasFiles > 0
-				? `${canvasFiles} Canvas file${canvasFiles === 1 ? '' : 's'} found; Diamond preserves them but does not render Canvas boards yet.`
+				? `${canvasFiles} Canvas file${canvasFiles === 1 ? '' : 's'} found; Diamond preserves them and opens read-only Canvas previews.`
 				: 'No Obsidian Canvas files were found.',
 			canvasFiles > 0 ? 'info' : 'ok'
 		),

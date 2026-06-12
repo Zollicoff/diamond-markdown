@@ -12,7 +12,7 @@ an existing Obsidian vault. The preflight reports:
 - likely attachment folders
 - whether `.obsidian` exists
 - Obsidian plugin folders that will be preserved but not executed
-- Obsidian Canvas files that will be preserved but not rendered yet
+- Obsidian Canvas files that will be preserved and opened read-only
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
@@ -26,8 +26,8 @@ marks that as a review item. Diamond still registers the vault in place, but
 you should verify embeds after opening it.
 
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
-disk. Diamond Markdown does not execute Obsidian plugins or render Canvas boards
-yet.
+disk. Diamond Markdown opens Canvas files as read-only boards, but does not edit
+Canvas nodes or execute Obsidian plugins yet.
 
 ## GitHub Sync
 

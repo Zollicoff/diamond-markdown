@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { CanvasDoc, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { emit } from './events';
 
@@ -43,6 +43,10 @@ export const api = {
 
 	async note(vaultId: string, path: string): Promise<NoteDoc> {
 		return json(`/api/vaults/${vaultId}/note?path=${encodeURIComponent(path)}`);
+	},
+
+	async canvas(vaultId: string, path: string): Promise<CanvasDoc> {
+		return json(`/api/vaults/${vaultId}/canvas?path=${encodeURIComponent(path)}`);
 	},
 
 	async saveNote(vaultId: string, path: string, content: string, expectedRevision?: string): Promise<{

@@ -8,6 +8,7 @@
 
 import { api } from '$lib/vault-api';
 import { register, type CommandContext } from '../registry';
+import type { TreeNode } from '$lib/types';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
 import { alertDialog, confirmDialog, notify, promptText } from '$lib/dialogs';
@@ -18,6 +19,12 @@ async function promptPath(title: string, label: string, confirmLabel: string, pl
 
 function ensureMd(s: string): string {
 	return /\.[a-z0-9]+$/i.test(s) ? s : s + '.md';
+}
+
+function markdownNode(ctx: CommandContext): TreeNode | null {
+	const node = ctx.node;
+	if (!node || node.type !== 'file') return null;
+	return !node.fileKind || node.fileKind === 'markdown' ? node : null;
 }
 
 export function registerFsCommands(): void {
@@ -74,16 +81,17 @@ export function registerFsCommands(): void {
 		icon: '🗑',
 		category: 'file',
 		async exec(ctx: CommandContext) {
-			if (!ctx.node || ctx.node.type !== 'file') return;
+			const node = markdownNode(ctx);
+			if (!node) return;
 			const { vaultId } = ctx;
 			if (!(await confirmDialog({
 				title: 'Delete note',
-				message: `Delete "${ctx.node.name}"?\n\nThis is reversible through git history.`,
+				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
 				confirmLabel: 'Delete',
 				tone: 'danger'
 			}))) return;
 			try {
-				await api.deleteNote(vaultId!, ctx.node.path);
+				await api.deleteNote(vaultId!, node.path);
 			} catch (e) {
 				await alertDialog({ title: 'Could not delete note', message: (e as Error).message, tone: 'danger' });
 			}
@@ -96,9 +104,10 @@ export function registerFsCommands(): void {
 		icon: '❏',
 		category: 'file',
 		async exec(ctx: CommandContext) {
-			if (!ctx.node || ctx.node.type !== 'file') return;
+			const node = markdownNode(ctx);
+			if (!node) return;
 			try {
-				await api.duplicateNote(ctx.vaultId!, ctx.node.path);
+				await api.duplicateNote(ctx.vaultId!, node.path);
 			} catch (e) {
 				await alertDialog({ title: 'Could not duplicate note', message: (e as Error).message, tone: 'danger' });
 			}
@@ -152,7 +161,7 @@ export function registerFsCommands(): void {
 		icon: '✎',
 		shortcut: 'F2',
 		category: 'file',
-		when: (ctx) => Boolean(ctx.node?.path || ctx.notePath),
+		when: (ctx) => Boolean(markdownNode(ctx)?.path || ctx.notePath),
 		exec(ctx: CommandContext) {
 			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
 			if (!path || !ctx.vaultId) return;
@@ -169,6 +178,7 @@ export function registerFsCommands(): void {
 		icon: '★',
 		category: 'file',
 		exec(ctx: CommandContext) {
+			if (ctx.node && !markdownNode(ctx)) return;
 			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
 			if (!path || !ctx.vaultId) return;
 			const title = (ctx.node?.name ?? path.split('/').pop() ?? path).replace(/\.md$/, '');

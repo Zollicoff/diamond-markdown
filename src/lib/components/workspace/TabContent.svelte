@@ -7,6 +7,7 @@
 
 	const loaders = {
 		note: () => import('$lib/components/tabviews/NoteView.svelte').then((m) => m.default),
+		canvas: () => import('$lib/components/tabviews/CanvasView.svelte').then((m) => m.default),
 		graph: () => import('$lib/components/tabviews/GraphView.svelte').then((m) => m.default),
 		tags: () => import('$lib/components/tabviews/TagsView.svelte').then((m) => m.default),
 		search: () => import('$lib/components/tabviews/SearchView.svelte').then((m) => m.default),
@@ -70,6 +71,8 @@
 	<div class="lazy-state">Loading {loadingKind ?? tab.kind}…</div>
 {:else if tab.kind === 'note'}
 	<View {vaultId} {paneId} tabId={tab.id} path={tab.path} {mode} {isFocused} {onDocLoaded} {onModeChange} />
+{:else if tab.kind === 'canvas'}
+	<View {vaultId} path={tab.path} />
 {:else if tab.kind === 'graph'}
 	<View {vaultId} />
 {:else if tab.kind === 'tags'}

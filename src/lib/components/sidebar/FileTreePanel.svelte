@@ -5,12 +5,25 @@
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { api } from '$lib/vault-api';
 	import { exec } from '$lib/commands';
-	import { openNote } from '$lib/workspace/actions';
-	import { fileMenu, folderMenu, rootMenu } from './menu-builders';
+	import { openCanvas, openNote } from '$lib/workspace/actions';
+	import { canvasFileMenu, fileMenu, folderMenu, rootMenu } from './menu-builders';
 	import type { OpenMode } from '$lib/workspace/types';
 	import { on as onBus } from '$lib/events';
 	import { workspace } from '$lib/workspace/store.svelte';
 	import { alertDialog } from '$lib/dialogs';
+	import {
+		TREE_SORT_LABELS,
+		collectDirectoryPaths,
+		isCanvasTreeFile,
+		isMarkdownTreeFile,
+		isTreeSortMode,
+		revealParentDirectories,
+		sortMenuPositionFromRect,
+		sortTreeNodes,
+		treeFileDisplayName,
+		topLevelDirectoryPaths,
+		type TreeSortMode
+	} from '$lib/tree/view';
 
 	interface Props {
 		vaultId: string;
@@ -25,21 +38,7 @@
 	let menuItems = $state<MenuItem[]>([]);
 
 	// --- Toolbar state, persisted per-vault ---------------------------
-	type SortMode =
-		| 'name-asc' | 'name-desc'
-		| 'mtime-desc' | 'mtime-asc'
-		| 'ctime-desc' | 'ctime-asc';
-
-	const SORT_LABELS: Record<SortMode, string> = {
-		'name-asc':   'File name (A → Z)',
-		'name-desc':  'File name (Z → A)',
-		'mtime-desc': 'Modified time (new → old)',
-		'mtime-asc':  'Modified time (old → new)',
-		'ctime-desc': 'Created time (new → old)',
-		'ctime-asc':  'Created time (old → new)'
-	};
-
-	let sortMode = $state<SortMode>('name-asc');
+	let sortMode = $state<TreeSortMode>('name-asc');
 	let autoReveal = $state(false);
 	let sortMenuOpen = $state(false);
 
@@ -54,8 +53,8 @@
 		try {
 			const raw = localStorage.getItem(prefsKey);
 			if (raw) {
-				const v = JSON.parse(raw) as { sortMode?: SortMode; autoReveal?: boolean };
-				if (v.sortMode && v.sortMode in SORT_LABELS) sortMode = v.sortMode;
+				const v = JSON.parse(raw) as { sortMode?: unknown; autoReveal?: boolean };
+				if (isTreeSortMode(v.sortMode)) sortMode = v.sortMode;
 				if (typeof v.autoReveal === 'boolean') autoReveal = v.autoReveal;
 			}
 			const ex = localStorage.getItem(expandKey);
@@ -64,7 +63,7 @@
 				if (Array.isArray(arr)) expand = new Set(arr);
 			} else {
 				// Default: expand all top-level folders on first visit.
-				expand = new Set(tree.filter((n) => n.type === 'directory').map((n) => n.path));
+				expand = topLevelDirectoryPaths(tree);
 			}
 		} catch { /* corrupt — fall through to defaults */ }
 	}
@@ -79,47 +78,10 @@
 		try { localStorage.setItem(expandKey, JSON.stringify([...expand])); } catch { /* quota */ }
 	});
 
-	// --- Sorting ------------------------------------------------------
-	function compare(a: TreeNode, b: TreeNode, mode: SortMode): number {
-		// Directories always come before files within a level.
-		if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-		const dir = mode.endsWith('-asc') ? 1 : -1;
-		if (mode.startsWith('name')) {
-			return dir * a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-		}
-		const aT = mode.startsWith('mtime') ? (a.mtime ?? 0) : (a.ctime ?? 0);
-		const bT = mode.startsWith('mtime') ? (b.mtime ?? 0) : (b.ctime ?? 0);
-		// For mtime/ctime we want directories alphabetical (no time data),
-		// files by time. With dirs grouped first, fall back to name when
-		// times are 0/equal.
-		if (a.type === 'directory') {
-			return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-		}
-		if (aT === bT) return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-		return dir * (aT - bT);
-	}
-
-	function sortTree(nodes: TreeNode[], mode: SortMode): TreeNode[] {
-		const sorted = [...nodes].sort((a, b) => compare(a, b, mode));
-		return sorted.map((n) =>
-			n.children ? { ...n, children: sortTree(n.children, mode) } : n
-		);
-	}
-
-	const sortedTree = $derived(sortTree(tree, sortMode));
+	const sortedTree = $derived(sortTreeNodes(tree, sortMode));
 
 	// --- Expand / collapse helpers -----------------------------------
-	function allDirs(nodes: TreeNode[], out: Set<string> = new Set()): Set<string> {
-		for (const n of nodes) {
-			if (n.type === 'directory') {
-				out.add(n.path);
-				if (n.children) allDirs(n.children, out);
-			}
-		}
-		return out;
-	}
-
-	const allDirPaths = $derived(allDirs(tree));
+	const allDirPaths = $derived(collectDirectoryPaths(tree));
 	const allCollapsed = $derived(expand.size === 0);
 
 	function toggleDir(p: string): void {
@@ -133,7 +95,7 @@
 	function collapseAll(): void { expand = new Set(); }
 	function toggleExpandAll(): void { allCollapsed ? expandAll() : collapseAll(); }
 
-	function setSort(m: SortMode): void {
+	function setSort(m: TreeSortMode): void {
 		sortMode = m;
 		sortMenuOpen = false;
 	}
@@ -147,7 +109,7 @@
 			// Drop down from button, right-align with the button so the menu
 			// (min-width 220px) extends leftward into the sidebar instead of
 			// off-screen / into the editor pane.
-			sortMenuPos = { top: r.bottom + 4, left: r.right - 220 };
+			sortMenuPos = sortMenuPositionFromRect(r);
 		}
 		sortMenuOpen = !sortMenuOpen;
 	}
@@ -157,25 +119,14 @@
 		const pane = workspace.panes[workspace.activePaneId];
 		if (!pane) return null;
 		const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
-		return tab?.kind === 'note' ? tab.path : null;
+		return tab?.kind === 'note' || tab?.kind === 'canvas' ? tab.path : null;
 	});
 
 	$effect(() => {
 		if (!autoReveal || !activePath) return;
 		// Expand every parent folder of the active note path.
-		const parts = activePath.split('/').slice(0, -1);
-		if (parts.length === 0) return;
-		const next = new Set(expand);
-		let cur = '';
-		let changed = false;
-		for (const p of parts) {
-			cur = cur ? `${cur}/${p}` : p;
-			if (!next.has(cur)) {
-				next.add(cur);
-				changed = true;
-			}
-		}
-		if (changed) expand = next;
+		const next = revealParentDirectories(expand, activePath);
+		if (next !== expand) expand = next;
 	});
 
 	// --- Renaming + clicks (unchanged from previous version) ---------
@@ -190,8 +141,17 @@
 	}
 
 	async function commitRename(node: TreeNode, newName: string): Promise<void> {
-		if (!newName || newName === node.name.replace(/\.md$/, '') || newName === node.name) {
+		const currentName = node.type === 'file' ? treeFileDisplayName(node) : node.name;
+		if (!newName || newName === currentName || newName === node.name) {
 			renamingPath = null;
+			return;
+		}
+		if (isCanvasTreeFile(node)) {
+			renamingPath = null;
+			await alertDialog({
+				title: 'Canvas rename is not available yet',
+				message: 'Canvas files open read-only in this build. Rename support will land with the general file-ops slice.'
+			});
 			return;
 		}
 		const parent = node.path.split('/').slice(0, -1).join('/');
@@ -206,10 +166,19 @@
 	}
 
 	async function handleDropMove(srcPath: string, destFolder: string): Promise<void> {
-		const isFolder = !srcPath.endsWith('.md');
+		const isMarkdown = /\.(md|markdown)$/i.test(srcPath);
+		const isCanvas = /\.canvas$/i.test(srcPath);
+		const isFolder = !isMarkdown && !isCanvas;
 		const name = srcPath.split('/').pop()!;
 		const newPath = destFolder ? `${destFolder}/${name}` : name;
 		if (newPath === srcPath) return;
+		if (isCanvas) {
+			await alertDialog({
+				title: 'Canvas move is not available yet',
+				message: 'Canvas files open read-only in this build. Move support will land with the general file-ops slice.'
+			});
+			return;
+		}
 		try {
 			if (isFolder) await api.renameFolder(vaultId, srcPath, newPath);
 			else await api.renameNote(vaultId, srcPath, newPath);
@@ -220,7 +189,10 @@
 
 	function onNodeContext(e: MouseEvent, node: TreeNode): void {
 		const deps = { vaultId, beginRename };
-		showMenu(e, node.type === 'file' ? fileMenu(node, deps) : folderMenu(node, deps));
+		showMenu(e, node.type === 'file'
+			? isCanvasTreeFile(node) ? canvasFileMenu(node, deps) : fileMenu(node, deps)
+			: folderMenu(node, deps)
+		);
 	}
 
 	function onRootContextFire(e: MouseEvent): void {
@@ -237,7 +209,9 @@
 	function onFileClick(e: MouseEvent, node: TreeNode): void {
 		if (renamingPath === node.path) return;
 		e.preventDefault();
-		openNote(vaultId, node.path, node.name.replace(/\.md$/, ''), modeFor(e));
+		const title = treeFileDisplayName(node);
+		if (isCanvasTreeFile(node)) openCanvas(vaultId, node.path, title, modeFor(e));
+		else if (isMarkdownTreeFile(node)) openNote(vaultId, node.path, title, modeFor(e));
 	}
 
 	onMount(() => {
@@ -285,7 +259,7 @@
 			bind:this={sortBtnEl}
 			class="toolbar-btn sort"
 			onclick={openSortMenu}
-			title="Sort: {SORT_LABELS[sortMode]}"
+			title="Sort: {TREE_SORT_LABELS[sortMode]}"
 			aria-label="Change sort order"
 			aria-haspopup="menu"
 			aria-expanded={sortMenuOpen}
@@ -297,7 +271,7 @@
 		</button>
 		{#if sortMenuOpen}
 			<menu class="sort-menu" role="menu" style="top: {sortMenuPos.top}px; left: {sortMenuPos.left}px;">
-				{#each (Object.keys(SORT_LABELS) as SortMode[]) as m (m)}
+				{#each (Object.keys(TREE_SORT_LABELS) as TreeSortMode[]) as m (m)}
 					<button
 						class="sort-item"
 						class:active={m === sortMode}
@@ -306,7 +280,7 @@
 						onclick={() => setSort(m)}
 					>
 						<span class="check">{m === sortMode ? '✓' : ''}</span>
-						{SORT_LABELS[m]}
+						{TREE_SORT_LABELS[m]}
 					</button>
 				{/each}
 			</menu>
