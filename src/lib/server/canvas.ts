@@ -39,13 +39,16 @@ export interface CanvasSvgExport {
 	svg: string;
 }
 
-export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node';
+export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node' | 'add-edge';
 
 export interface MutateCanvasInput {
 	path: string;
 	action: CanvasEditAction;
 	expectedRevision?: string;
 	nodeId?: string;
+	fromNode?: string;
+	toNode?: string;
+	label?: string;
 	text?: string;
 	x?: number;
 	y?: number;
@@ -287,6 +290,11 @@ function nodeRecord(value: unknown): Record<string, unknown> | null {
 	return typeof node?.id === 'string' ? node : null;
 }
 
+function edgeRecord(value: unknown): Record<string, unknown> | null {
+	const edge = record(value);
+	return typeof edge?.id === 'string' ? edge : null;
+}
+
 function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
 	return typeof value === 'number' && Number.isFinite(value)
 		? Math.min(max, Math.max(min, value))
@@ -307,6 +315,15 @@ function createCanvasNodeId(nodes: unknown[], prefix: string): string {
 		if (!used.has(id)) return id;
 	}
 	return `${prefix}-${Date.now().toString(36)}`;
+}
+
+function createCanvasEdgeId(edges: unknown[]): string {
+	const used = new Set(edges.map((edge) => edgeRecord(edge)?.id).filter((id): id is string => Boolean(id)));
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		const id = `edge-${crypto.randomUUID().slice(0, 8)}`;
+		if (!used.has(id)) return id;
+	}
+	return `edge-${Date.now().toString(36)}`;
 }
 
 function nextTextNodePosition(nodes: unknown[]): { x: number; y: number } {
@@ -339,11 +356,12 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 
 	const parsed = rawCanvasFile(content);
 	const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+	const edges = Array.isArray(parsed.edges) ? parsed.edges : [];
 	if (!Array.isArray(parsed.nodes)) {
 		parsed.nodes = nodes;
 	}
 	if (!Array.isArray(parsed.edges)) {
-		parsed.edges = [];
+		parsed.edges = edges;
 	}
 
 	if (input.action === 'add-text-node') {
@@ -370,6 +388,25 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		node.x = requiredBoundedNumber(input.x, 'x', -100_000, 100_000);
 		node.y = requiredBoundedNumber(input.y, 'y', -100_000, 100_000);
+	} else if (input.action === 'add-edge') {
+		const fromNode = text(input.fromNode);
+		const toNode = text(input.toNode);
+		if (!fromNode || !toNode) throw new CanvasFileError('fromNode and toNode are required');
+		if (fromNode === toNode) throw new CanvasFileError('canvas edge endpoints must be different');
+		const nodeIds = new Set(nodes.map((node) => nodeRecord(node)?.id).filter((id): id is string => Boolean(id)));
+		if (!nodeIds.has(fromNode) || !nodeIds.has(toNode)) {
+			throw new CanvasFileError('canvas edge endpoint not found', 404);
+		}
+		const label = typeof input.label === 'string' ? input.label.trim().slice(0, 200) : '';
+		const edge: Record<string, unknown> = {
+			id: createCanvasEdgeId(edges),
+			fromNode,
+			toNode,
+			fromSide: 'right',
+			toSide: 'left'
+		};
+		if (label) edge.label = label;
+		edges.push(edge);
 	} else {
 		throw new CanvasFileError('unsupported canvas edit action');
 	}

@@ -118,6 +118,9 @@ Use small, pushable slices:
    git-backed server mutations with stale-revision protection.
 - **Canvas node positioning.** Drag Canvas cards to update node coordinates in
    `.canvas` files through git-backed commits with stale-revision protection.
+- **Canvas edge creation.** Connect existing Canvas nodes from the board with
+   optional labels and persist Obsidian-compatible edges through git-backed
+   commits with stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

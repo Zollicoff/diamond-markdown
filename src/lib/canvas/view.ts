@@ -23,6 +23,16 @@ export interface CanvasNodePosition {
 	y: number;
 }
 
+export interface CanvasNodeOption {
+	id: string;
+	label: string;
+}
+
+export interface CanvasConnectionDraft {
+	fromNodeId: string;
+	toNodeId: string;
+}
+
 export type CanvasTextDrafts = Record<string, string>;
 
 const PADDING = 80;
@@ -137,6 +147,32 @@ export function canvasNodesWithPosition(nodes: CanvasNode[], position: CanvasNod
 		return { ...node, x: Math.round(position.x), y: Math.round(position.y) };
 	});
 	return changed ? next : nodes;
+}
+
+export function canvasNodeOptions(nodes: CanvasNode[]): CanvasNodeOption[] {
+	return nodes.map((node) => ({
+		id: node.id,
+		label: `${canvasNodeTitle(node)} (${node.type})`
+	}));
+}
+
+export function canConnectCanvasNodes(fromNodeId: string, toNodeId: string): boolean {
+	return Boolean(fromNodeId && toNodeId && fromNodeId !== toNodeId);
+}
+
+export function canvasConnectionDraft(
+	nodes: CanvasNode[],
+	currentFromNodeId = '',
+	currentToNodeId = ''
+): CanvasConnectionDraft {
+	const ids = new Set(nodes.map((node) => node.id));
+	const fromNodeId = ids.has(currentFromNodeId)
+		? currentFromNodeId
+		: nodes[0]?.id ?? '';
+	const toNodeId = ids.has(currentToNodeId) && currentToNodeId !== fromNodeId
+		? currentToNodeId
+		: nodes.find((node) => node.id !== fromNodeId)?.id ?? '';
+	return { fromNodeId, toNodeId };
 }
 
 function plural(count: number, singular: string): string {

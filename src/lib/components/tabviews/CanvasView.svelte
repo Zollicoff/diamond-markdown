@@ -4,9 +4,12 @@
 	import { emit } from '$lib/events';
 	import {
 		canvasBounds,
+		canvasConnectionDraft,
 		canvasDraftChanged,
 		canvasDraftFor,
+		canConnectCanvasNodes,
 		canvasNodePositionChanged,
+		canvasNodeOptions,
 		canvasNodesWithPosition,
 		canvasSummary,
 		canvasTextDrafts,
@@ -27,9 +30,13 @@
 	let error = $state<string | null>(null);
 	let textDrafts = $state<CanvasTextDrafts>({});
 	let addingText = $state(false);
+	let addingEdge = $state(false);
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
 	let moveSavingNodeId = $state<string | null>(null);
+	let edgeFromNodeId = $state('');
+	let edgeToNodeId = $state('');
+	let edgeLabel = $state('');
 	let dragState = $state<{
 		nodeId: string;
 		pointerId: number;
@@ -48,12 +55,22 @@
 	const displayDoc = $derived(doc ? { ...doc, nodes: displayNodes } : null);
 	const bounds = $derived(canvasBounds(displayNodes));
 	const lines = $derived(displayDoc ? edgeLines(displayDoc, bounds) : []);
+	const nodeOptions = $derived(canvasNodeOptions(doc?.nodes ?? []));
+	const canAddEdge = $derived(Boolean(
+		doc &&
+		nodeOptions.length >= 2 &&
+		canConnectCanvasNodes(edgeFromNodeId, edgeToNodeId) &&
+		!addingEdge
+	));
 	const exportHref = $derived(`/api/vaults/${vaultId}/canvas/export?path=${encodeURIComponent(path)}`);
 	const exportName = $derived(`${path.split('/').pop()?.replace(/\.canvas$/i, '') || 'canvas'}.svg`);
 
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
 		textDrafts = canvasTextDrafts(next.nodes);
+		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
+		edgeFromNodeId = edgeDraft.fromNodeId;
+		edgeToNodeId = edgeDraft.toNodeId;
 	}
 
 	function setDraft(node: CanvasNode, value: string): void {
@@ -87,6 +104,29 @@
 			error = (e as Error).message;
 		} finally {
 			savingNodeId = null;
+		}
+	}
+
+	async function addEdge(): Promise<void> {
+		if (!doc || !canAddEdge) return;
+		addingEdge = true;
+		error = null;
+		try {
+			const res = await api.addCanvasEdge(
+				vaultId,
+				path,
+				edgeFromNodeId,
+				edgeToNodeId,
+				edgeLabel,
+				doc.revision
+			);
+			setDoc(res.doc);
+			edgeLabel = '';
+			emit('toast:show', { title: 'Canvas edge added', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			addingEdge = false;
 		}
 	}
 
@@ -205,6 +245,33 @@
 				<button class="mini" disabled={addingText} onclick={addTextNode}>
 					{addingText ? 'Adding…' : 'Add text'}
 				</button>
+				<form
+					class="edge-form"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void addEdge();
+					}}
+				>
+					<select class="mini edge-select" aria-label="Canvas edge source" bind:value={edgeFromNodeId} disabled={addingEdge || nodeOptions.length < 2}>
+						{#each nodeOptions as option (option.id)}
+							<option value={option.id}>{option.label}</option>
+						{/each}
+					</select>
+					<span class="edge-arrow" aria-hidden="true">→</span>
+					<select class="mini edge-select" aria-label="Canvas edge target" bind:value={edgeToNodeId} disabled={addingEdge || nodeOptions.length < 2}>
+						{#each nodeOptions as option (option.id)}
+							<option value={option.id}>{option.label}</option>
+						{/each}
+					</select>
+					<input
+						class="mini edge-label-input"
+						aria-label="Canvas edge label"
+						placeholder="label"
+						bind:value={edgeLabel}
+						disabled={addingEdge || nodeOptions.length < 2}
+					/>
+					<button class="mini" disabled={!canAddEdge}>{addingEdge ? 'Connecting…' : 'Connect'}</button>
+				</form>
 				<a class="mini" href={exportHref} download={exportName}>Download SVG</a>
 			</div>
 		{/if}
@@ -297,6 +364,8 @@
 	.canvas-actions {
 		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: 10px;
 	}
 	.mini {
@@ -308,6 +377,27 @@
 		font-size: 0.76rem;
 		text-decoration: none;
 		white-space: nowrap;
+	}
+	.edge-form {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.edge-select {
+		max-width: 150px;
+		background: var(--bg);
+	}
+	.edge-label-input {
+		width: 82px;
+		background: var(--bg);
+	}
+	.edge-label-input::placeholder {
+		color: var(--fg-dim);
+	}
+	.edge-arrow {
+		color: var(--fg-dim);
+		font-size: 0.72rem;
 	}
 	.mini:hover {
 		border-color: var(--accent);
@@ -375,5 +465,18 @@
 	.mono {
 		font-family: var(--mono);
 		font-variant-numeric: tabular-nums;
+	}
+
+	@media (max-width: 900px) {
+		.canvas-head {
+			align-items: flex-start;
+		}
+		.canvas-actions {
+			justify-content: flex-start;
+		}
+		.edge-form {
+			width: 100%;
+			flex-wrap: wrap;
+		}
 	}
 </style>
