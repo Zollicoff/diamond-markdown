@@ -145,6 +145,9 @@ Use small, pushable slices:
 - **Git sync recovery view split.** Move recovery headers, command blocks,
    file lists, and diverged-change view models out of the recovery panel so
    future GitHub conflict flows can stay small and testable.
+- **Settings view section split.** Move settings navigation, appearance, vault,
+   excluded-folder, and about sections into focused components with pure
+   settings metadata helpers.
 
 ## Next Implementation Slices
 
