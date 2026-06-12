@@ -24,8 +24,7 @@
 	import {
 		createGraphSettingsState
 	} from '$lib/graph/settings-state.svelte';
-	import GraphCanvas from './GraphCanvas.svelte';
-	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
+	import GraphStage from './GraphStage.svelte';
 	import GraphToolbar from './GraphToolbar.svelte';
 
 	interface Props {
@@ -365,64 +364,49 @@
 		onCenter={center}
 	/>
 
-	{#if loading && nodes.length === 0}
-		<p class="status">Building graph…</p>
-	{:else if err}
-		<p class="err">{err}</p>
-	{:else if nodes.length === 0}
-		<p class="status">No notes yet — add some and come back.</p>
-	{:else}
-		<GraphCanvas
-			{nodes}
-			{visibleNodes}
-			{visibleEdges}
-			{viewX}
-			{viewY}
-			{viewScale}
-			nodeScale={settings.nodeScale}
-			{hoverPath}
-			{selectedPaths}
-			{selectionBox}
-			onSvgMount={(element) => (svgEl = element)}
-			onWheelGraph={onWheel}
-			onPointerDownBackground={onPointerDownBG}
-			onPointerMoveGraph={onPointerMoveBG}
-			onPointerUpGraph={onPointerUpBG}
-			{onNodePointerDown}
-			{onNodePointerMove}
-			{onNodePointerUp}
-			{onNodeClick}
-			{onNodeKeydown}
-			onHoverPath={(path) => (hoverPath = path)}
-		/>
-	{/if}
-
-			{#if panelOpen}
-		<GraphSettingsPanel
-			nodeScale={settings.nodeScale}
-			repulse={settings.repulse}
-			linkForce={settings.linkForce}
-			linkDist={settings.linkDist}
-			centerForce={settings.centerForce}
-			hideOrphans={settings.hideOrphans}
-			searchQuery={settings.searchQuery}
-			{filtersActive}
-			onSetNodeScale={(v) => (settings.nodeScale = v)}
-			onSetRepulse={(v) => (settings.repulse = v)}
-			onSetLinkForce={(v) => (settings.linkForce = v)}
-			onSetLinkDist={(v) => (settings.linkDist = v)}
-			onSetCenterForce={(v) => (settings.centerForce = v)}
-			onSetHideOrphans={(v) => (settings.hideOrphans = v)}
-			onSetSearchQuery={(v) => (settings.searchQuery = v)}
-			onResetForces={resetForces}
-			onResetFilters={resetFilters}
-			onClose={() => (panelOpen = false)}
-		/>
-	{/if}
-
-	<footer class="legend">
-		<span>Drag a node to pin · drag background to pan · shift-click or shift-drag to select · scroll to zoom · click to open in new tab · alt+click for new pane</span>
-	</footer>
+	<GraphStage
+		{loading}
+		error={err}
+		{nodes}
+		{visibleNodes}
+		{visibleEdges}
+		{viewX}
+		{viewY}
+		{viewScale}
+		nodeScale={settings.nodeScale}
+		{hoverPath}
+		{selectedPaths}
+		{selectionBox}
+		{panelOpen}
+		{filtersActive}
+		repulse={settings.repulse}
+		linkForce={settings.linkForce}
+		linkDist={settings.linkDist}
+		centerForce={settings.centerForce}
+		hideOrphans={settings.hideOrphans}
+		searchQuery={settings.searchQuery}
+		onSvgMount={(element) => (svgEl = element)}
+		onWheelGraph={onWheel}
+		onPointerDownBackground={onPointerDownBG}
+		onPointerMoveGraph={onPointerMoveBG}
+		onPointerUpGraph={onPointerUpBG}
+		{onNodePointerDown}
+		{onNodePointerMove}
+		{onNodePointerUp}
+		{onNodeClick}
+		{onNodeKeydown}
+		onHoverPath={(path) => (hoverPath = path)}
+		onSetNodeScale={(value) => (settings.nodeScale = value)}
+		onSetRepulse={(value) => (settings.repulse = value)}
+		onSetLinkForce={(value) => (settings.linkForce = value)}
+		onSetLinkDist={(value) => (settings.linkDist = value)}
+		onSetCenterForce={(value) => (settings.centerForce = value)}
+		onSetHideOrphans={(value) => (settings.hideOrphans = value)}
+		onSetSearchQuery={(value) => (settings.searchQuery = value)}
+		onResetForces={resetForces}
+		onResetFilters={resetFilters}
+		onCloseSettings={() => (panelOpen = false)}
+	/>
 </div>
 
 <style>
@@ -433,20 +417,5 @@
 		height: 100%;
 		min-height: 0;
 		background: var(--bg);
-	}
-
-	.status, .err {
-		padding: 2rem;
-		text-align: center;
-		color: var(--fg-dim);
-		font-size: 0.9rem;
-	}
-	.err { color: var(--danger); }
-
-	.legend {
-		border-top: 1px solid var(--border);
-		padding: 6px 14px;
-		font-size: 0.74rem;
-		color: var(--fg-dim);
 	}
 </style>

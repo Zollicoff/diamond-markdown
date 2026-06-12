@@ -115,6 +115,9 @@ Use small, pushable slices:
 - **Graph simulation runner extraction.** Move the RAF simulation lifecycle,
    frame cancellation, and per-frame reactivity callback out of `GraphView`
    into a deterministic graph runner module with lifecycle tests.
+- **Graph stage split.** Move graph status, canvas staging, settings-panel
+   mounting, and footer legend markup out of `GraphView` into a focused
+   presentational component.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
