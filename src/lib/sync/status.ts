@@ -16,6 +16,7 @@ export interface GitSyncUiState {
 
 export function classifyGitSyncRecovery(status: GitSyncStatus | null): GitSyncRecoveryKind {
 	if (!status) return null;
+	if (!status.initialized) return null;
 	if (status.needsRemote) return 'setup';
 	if (status.conflicted.length > 0) return 'conflicts';
 	if (status.diverged) return 'diverged';
@@ -26,6 +27,7 @@ export function classifyGitSyncRecovery(status: GitSyncStatus | null): GitSyncRe
 
 export function gitSyncIndicator(status: GitSyncStatus | null): GitSyncIndicator {
 	if (!status) return 'loading';
+	if (!status.initialized) return 'warn';
 	if (status.conflicted.length > 0 || status.diverged) return 'danger';
 	if (status.needsRemote || !status.clean || status.behind > 0) return 'warn';
 	return 'ok';
@@ -39,11 +41,11 @@ export function buildGitSyncUiState(
 	const isBusy = busy !== null;
 	return {
 		isBusy,
-		canSaveRemote: remoteUrl.trim().length > 0 && !isBusy,
-		canCheck: !!status?.remoteUrl && !isBusy,
-		canFetch: !!status?.remoteUrl && !isBusy,
-		canPull: !!status?.canPull && !isBusy,
-		canPush: !!status?.canPush && !isBusy,
+		canSaveRemote: remoteUrl.trim().length > 0 && (status?.initialized ?? true) && !isBusy,
+		canCheck: !!status?.initialized && !!status.remoteUrl && !isBusy,
+		canFetch: !!status?.initialized && !!status.remoteUrl && !isBusy,
+		canPull: !!status?.initialized && !!status.canPull && !isBusy,
+		canPush: !!status?.initialized && !!status.canPush && !isBusy,
 		indicator: gitSyncIndicator(status),
 		recovery: classifyGitSyncRecovery(status)
 	};

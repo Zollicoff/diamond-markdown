@@ -7,6 +7,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
 import { promisify } from 'node:util';
 import type { SimpleGit } from 'simple-git';
 import type { GitSyncResult, GitSyncStatus } from '$lib/types';
@@ -102,6 +103,41 @@ function refsFromLsRemote(raw: string | Buffer): string[] {
 		.sort();
 }
 
+function unavailableGitSyncStatus(message: string): GitSyncStatus {
+	return {
+		initialized: false,
+		branch: null,
+		sha: null,
+		remoteUrl: null,
+		remoteDisplayUrl: null,
+		upstream: null,
+		remoteBranch: null,
+		remoteSha: null,
+		clean: false,
+		conflicted: [],
+		files: [],
+		ahead: 0,
+		behind: 0,
+		diverged: false,
+		mergeBase: null,
+		localChanges: [],
+		remoteChanges: [],
+		conflictCandidates: [],
+		canPull: false,
+		canPush: false,
+		needsRemote: false,
+		message
+	};
+}
+
+function isVaultDirectory(vaultPath: string): boolean {
+	try {
+		return fs.statSync(vaultPath).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
 function cleanGitFailure(e: unknown, remoteUrl: string): string {
 	const err = e as { killed?: boolean; signal?: string; stderr?: string | Buffer; stdout?: string | Buffer; message?: string };
 	if (err.killed || err.signal === 'SIGTERM') return `git timed out after ${REMOTE_HEALTH_TIMEOUT_MS / 1000}s`;
@@ -116,6 +152,9 @@ function cleanGitFailure(e: unknown, remoteUrl: string): string {
 }
 
 export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
+	if (!isVaultDirectory(vault.path)) {
+		return unavailableGitSyncStatus('Vault directory is unavailable. Reconnect or remove this vault.');
+	}
 	const g = await getVaultGit(vault);
 	const status = await g.status();
 	const branch = status.current ?? await currentBranch(g);

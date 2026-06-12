@@ -17,7 +17,11 @@
 			<div class="status-title">{status?.message ?? 'Checking sync status...'}</div>
 			<div class="status-meta mono">
 				{#if status}
-					{status.branch ?? 'detached'} @ {status.sha ?? 'no commits'}
+					{#if status.initialized}
+						{status.branch ?? 'detached'} @ {status.sha ?? 'no commits'}
+					{:else}
+						vault unavailable
+					{/if}
 					{#if status.remoteDisplayUrl}
 						<span class="sep">/</span>{status.remoteDisplayUrl}
 					{/if}

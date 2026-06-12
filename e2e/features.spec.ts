@@ -1042,7 +1042,18 @@ test('settings shows local git changes recovery guidance before sync actions', a
 });
 
 test('sync status initializes a clean vault git repo with an initial commit', async ({ request }) => {
-	const res = await request.get('/api/vaults/default/sync');
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'clean-sync-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nReady.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Clean Sync Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const res = await request.get(`/api/vaults/${vault.id}/sync`);
 	expect(res.ok()).toBe(true);
 	const status = await res.json() as {
 		clean: boolean;
@@ -1051,12 +1062,42 @@ test('sync status initializes a clean vault git repo with an initial commit', as
 		needsRemote: boolean;
 		message: string;
 	};
-	expect(fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, '.git'))).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, '.git'))).toBe(true);
 	expect(status.clean).toBe(true);
 	expect(status.files).toHaveLength(0);
 	expect(status.sha).toMatch(/^[a-f0-9]{7,}$/);
 	expect(status.needsRemote).toBe(true);
 	expect(status.message).toContain('Add a GitHub remote');
+});
+
+test('sync status reports missing registered vault directories without crashing', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'missing-sync-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Missing Sync Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+
+	const res = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(res.ok()).toBe(true);
+	const status = await res.json() as {
+		initialized: boolean;
+		clean: boolean;
+		canPull: boolean;
+		canPush: boolean;
+		message: string;
+	};
+	expect(status.initialized).toBe(false);
+	expect(status.clean).toBe(false);
+	expect(status.canPull).toBe(false);
+	expect(status.canPush).toBe(false);
+	expect(status.message).toContain('Vault directory is unavailable');
 });
 
 test('sync API rejects non-GitHub remotes', async ({ request }) => {

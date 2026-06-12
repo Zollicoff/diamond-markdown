@@ -20,11 +20,19 @@ const VAULT_WRITE_BLOCKED_MESSAGES = new Set([
 	'pull remote changes before editing vault files'
 ]);
 
+function isVaultDirectory(vaultPath: string): boolean {
+	try {
+		return fs.statSync(vaultPath).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
 async function initializeGit(vault: Vault): Promise<SimpleGit> {
 	// Lazy init. Use explicit `git -C <vault> init` before constructing the
 	// long-lived simple-git instance so vaults nested inside another repo do
 	// not accidentally operate on the parent repository.
-	if (!fs.existsSync(vault.path) || !fs.statSync(vault.path).isDirectory()) {
+	if (!isVaultDirectory(vault.path)) {
 		throw new Error('vault directory is unavailable');
 	}
 	const gitDir = path.join(vault.path, '.git');

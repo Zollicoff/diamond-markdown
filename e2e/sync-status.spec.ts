@@ -54,6 +54,7 @@ test.describe('git sync UI state', () => {
 	test('uses danger only for states that require manual resolution', () => {
 		expect(gitSyncIndicator(null)).toBe('loading');
 		expect(gitSyncIndicator(status())).toBe('ok');
+		expect(gitSyncIndicator(status({ initialized: false, clean: false, message: 'Vault directory is unavailable.' }))).toBe('warn');
 		expect(gitSyncIndicator(status({ needsRemote: true, remoteUrl: null, remoteDisplayUrl: null }))).toBe('warn');
 		expect(gitSyncIndicator(status({ clean: false, files: [{ path: 'Draft.md', index: ' ', workingDir: 'M' }] }))).toBe('warn');
 		expect(gitSyncIndicator(status({ behind: 1, canPull: true, canPush: false }))).toBe('warn');
@@ -90,6 +91,21 @@ test.describe('git sync UI state', () => {
 		expect(dirty).toMatchObject({
 			indicator: 'warn',
 			recovery: 'local-changes'
+		});
+
+		const unavailable = buildGitSyncUiState(
+			status({ initialized: false, clean: false, message: 'Vault directory is unavailable.' }),
+			'https://github.com/owner/repo.git',
+			null
+		);
+		expect(unavailable).toMatchObject({
+			canSaveRemote: false,
+			canCheck: false,
+			canFetch: false,
+			canPull: false,
+			canPush: false,
+			indicator: 'warn',
+			recovery: null
 		});
 	});
 
