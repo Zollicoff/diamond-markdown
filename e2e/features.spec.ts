@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
+import { formatDate } from '../src/lib/server/templates';
 
 /**
  * Feature spec — covers surfaces that don't fit the smoke or hotkey
@@ -516,6 +517,53 @@ test('generic new note command honors safe Obsidian configured folder', async ({
 	await expect.poll(() => fs.existsSync(path.join(vaultDir, notePath))).toBe(true);
 	const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 	expect(loaded.ok()).toBe(true);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
+test('daily note command honors safe Obsidian daily-note settings', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-daily-notes-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Templates'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'daily-notes.json'), JSON.stringify({
+		folder: 'Journal',
+		template: 'Templates/Daily Template',
+		format: 'YYYY/MMMM/YYYY-MM-DD-ddd'
+	}, null, 2));
+	fs.writeFileSync(
+		path.join(vaultDir, 'Templates', 'Daily Template.md'),
+		'# {{title}}\n\nDate={{date:YYYY-MM-DD}}\nTomorrow={{date+1d:YYYY-MM-DD}}\n{{cursor}}\n'
+	);
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nSeed note.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Daily Notes Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const today = new Date();
+	const datedNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
+	const expectedDatePath = formatDate(datedNoon, 'YYYY/MMMM/YYYY-MM-DD-ddd');
+	const expectedPath = `Journal/${expectedDatePath}.md`;
+	const expectedTitle = path.basename(expectedPath, '.md');
+
+	const opened = await request.post(`/api/vaults/${vault.id}/daily`);
+	expect(opened.ok(), await opened.text()).toBe(true);
+	const openedBody = await opened.json() as { path: string; created: boolean; sha: string | null };
+	expect(openedBody.path).toBe(expectedPath);
+	expect(openedBody.created).toBe(true);
+	expect(openedBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+
+	const content = fs.readFileSync(path.join(vaultDir, expectedPath), 'utf-8');
+	expect(content).toContain(`# ${expectedTitle}`);
+	expect(content).toContain(`Date=${formatDate(datedNoon, 'YYYY-MM-DD')}`);
+	expect(content).toContain(`Tomorrow=${formatDate(new Date(datedNoon.getFullYear(), datedNoon.getMonth(), datedNoon.getDate() + 1, 12, 0, 0), 'YYYY-MM-DD')}`);
+	expect(content).not.toContain('{{cursor}}');
+
+	const reopened = await request.post(`/api/vaults/${vault.id}/daily`);
+	expect(reopened.ok(), await reopened.text()).toBe(true);
+	expect(await reopened.json()).toMatchObject({ path: expectedPath, created: false });
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 });
 
@@ -1850,6 +1898,55 @@ test('folder API rename moves notes and rewrites path-style wikilinks', async ({
 		await request.delete(`/api/vaults/default/folder?path=${encodeURIComponent(from)}&force=1`).catch(() => undefined);
 		await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(linkPath)}`).catch(() => undefined);
 	}
+});
+
+test('note and folder rename honor Obsidian disabled automatic link updates', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-link-update-disabled-vault');
+	const obsidianDir = path.join(vaultDir, '.obsidian');
+	const folderFrom = 'Folder Link Update A';
+	const folderTo = 'Folder Link Update B';
+	const folderTarget = `${folderFrom}/Target.md`;
+	const folderMoved = `${folderTo}/Target.md`;
+
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(obsidianDir, { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, folderFrom), { recursive: true });
+	fs.writeFileSync(path.join(obsidianDir, 'app.json'), JSON.stringify({ alwaysUpdateLinks: false }, null, 2));
+	fs.writeFileSync(path.join(vaultDir, 'Target.md'), '# Target\n\nRename me.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Note Linker.md'), '# Links\n\nSee [[Target]].\n');
+	fs.writeFileSync(path.join(vaultDir, folderTarget), '# Folder Target\n\nRename my folder.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Folder Linker.md'), '# Links\n\nSee [[Folder Link Update A/Target]].\n');
+
+	const registered = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Link Update Disabled Vault', path: vaultDir }
+	});
+	expect(registered.ok(), await registered.text()).toBe(true);
+	const { vault } = await registered.json() as { vault: { id: string } };
+
+	const renamedNote = await request.patch(`/api/vaults/${vault.id}/note`, {
+		data: { from: 'Target.md', to: 'Renamed Target.md' }
+	});
+	expect(renamedNote.ok(), await renamedNote.text()).toBe(true);
+	const renamedNoteBody = await renamedNote.json() as { linksUpdated: number; touched: string[]; sha: string | null };
+	expect(renamedNoteBody.linksUpdated).toBe(0);
+	expect(renamedNoteBody.touched).toEqual([]);
+	expect(renamedNoteBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+	expect(fs.existsSync(path.join(vaultDir, 'Renamed Target.md'))).toBe(true);
+	expect(fs.readFileSync(path.join(vaultDir, 'Note Linker.md'), 'utf-8')).toContain('[[Target]]');
+
+	const renamedFolder = await request.patch(`/api/vaults/${vault.id}/folder`, {
+		data: { from: folderFrom, to: folderTo }
+	});
+	expect(renamedFolder.ok(), await renamedFolder.text()).toBe(true);
+	const renamedFolderBody = await renamedFolder.json() as { movedNotes: number; linksUpdated: number; touched: string[]; sha: string | null };
+	expect(renamedFolderBody.movedNotes).toBe(1);
+	expect(renamedFolderBody.linksUpdated).toBe(0);
+	expect(renamedFolderBody.touched).toEqual([]);
+	expect(renamedFolderBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+	expect(fs.existsSync(path.join(vaultDir, folderMoved))).toBe(true);
+	expect(fs.readFileSync(path.join(vaultDir, 'Folder Linker.md'), 'utf-8')).toContain('[[Folder Link Update A/Target]]');
+
+	expect(git(vaultDir, ['status', '--short'])).toBe('');
 });
 
 test('raw asset API serves safe headers and blocks symlink escapes', async ({ request }) => {

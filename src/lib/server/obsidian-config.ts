@@ -178,17 +178,18 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 
 	const alwaysUpdateLinks = booleanValue(body.alwaysUpdateLinks);
 	if (alwaysUpdateLinks !== null) {
+		base.alwaysUpdateLinks = alwaysUpdateLinks;
 		base.settings.push(setting(
 			'alwaysUpdateLinks',
 			'Update links on rename',
 			alwaysUpdateLinks ? 'Enabled' : 'Disabled in Obsidian',
 			alwaysUpdateLinks
 				? 'Diamond also rewrites known references during explicit rename and move operations.'
-				: 'Diamond explicit rename and move operations still rewrite known references through git-backed edits.',
+				: 'Diamond honors this setting and leaves existing note/folder references unchanged during explicit rename and move operations.',
 			alwaysUpdateLinks ? 'info' : 'warn'
 		));
 		if (!alwaysUpdateLinks) {
-			base.warnings.push('Obsidian disables automatic link updates, but Diamond rewrites references during explicit rename and move operations.');
+			base.warnings.push('Obsidian disables automatic link updates, so note/folder rename and move operations will leave existing references unchanged.');
 		}
 	}
 
@@ -219,4 +220,9 @@ export function preferredObsidianNewNoteFolder(root: string): string | null {
 	const config = readObsidianAppConfig(root);
 	if (config.newFileLocation !== 'folder') return null;
 	return config.newFileFolderStatus === 'safe' ? config.newFileFolderPath ?? null : null;
+}
+
+export function shouldUpdateLinksOnRename(root: string): boolean {
+	const config = readObsidianAppConfig(root);
+	return config.alwaysUpdateLinks !== false;
 }

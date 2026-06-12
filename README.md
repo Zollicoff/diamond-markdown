@@ -101,7 +101,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
-- Obsidian import preflight that preserves `.obsidian`, honors safe attachment/new-note folder settings, and surfaces plugin settings as manual migration guidance
+- Obsidian import support that preserves `.obsidian`, surfaces plugin settings as manual migration guidance, and honors safe attachment/new-note/daily-note settings plus link-update preferences
 - Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel
@@ -130,8 +130,11 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, and push local commits
 
 ### Daily notes
-- ⌘⇧D opens today's `Daily Notes/YYYY-MM-DD.md`
-- Optional `Daily Notes/Template.md` with `{{date}}` / `{{time}}` substitutions
+- ⌘⇧D opens today's daily note, defaulting to `Daily Notes/YYYY-MM-DD.md`
+- Safe Obsidian Daily Notes settings in `.obsidian/daily-notes.json` are reused
+  for folder, template, and date-format paths
+- Optional templates support `{{date}}`, `{{time}}`, `{{title}}`, and
+  `{{cursor}}` substitutions
 
 ### Templates
 - General templates from `Templates/` folder, ⌘⇧T to insert

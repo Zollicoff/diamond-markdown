@@ -10,7 +10,8 @@ import {
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
-import { preferredObsidianNewNoteFolder, safeVaultFolder } from '../src/lib/server/obsidian-config';
+import { preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
+import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
 function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnalysis {
@@ -134,6 +135,58 @@ test.describe('import checklist helpers', () => {
 			newFileFolderPath: 'Notes/Inbox'
 		}));
 		expect(preferredObsidianNewNoteFolder(vaultDir)).toBeNull();
+	});
+
+	test('honors Obsidian automatic link-update preference for rename behavior', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-link-updates-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		expect(shouldUpdateLinksOnRename(vaultDir)).toBe(true);
+
+		fs.writeFileSync(appJson, JSON.stringify({ alwaysUpdateLinks: false }));
+		expect(shouldUpdateLinksOnRename(vaultDir)).toBe(false);
+
+		fs.writeFileSync(appJson, JSON.stringify({ alwaysUpdateLinks: true }));
+		expect(shouldUpdateLinksOnRename(vaultDir)).toBe(true);
+	});
+
+	test('uses safe Obsidian daily note settings for the daily-note plan', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-daily-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'daily-notes.json'), JSON.stringify({
+			folder: 'Journal',
+			template: 'Templates/Daily Template',
+			format: 'YYYY/MMMM/YYYY-MM-DD-ddd'
+		}));
+
+		const plan = dailyNotePlan(vaultDir, new Date(2026, 5, 12, 8, 30, 0));
+		expect(plan).toMatchObject({
+			path: 'Journal/2026/June/2026-06-12-Fri.md',
+			title: '2026-06-12-Fri',
+			templateRel: 'Templates/Daily Template.md',
+			source: 'obsidian-daily-notes'
+		});
+		expect(plan.date.getHours()).toBe(12);
+		expect(obsidianDailyTemplatePath('./Templates/Daily Template')).toBe('Templates/Daily Template.md');
+	});
+
+	test('falls back from unsafe Obsidian daily note settings', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-daily-unsafe-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'daily-notes.json'), JSON.stringify({
+			folder: '../outside',
+			template: '.obsidian/secret',
+			format: '../YYYY'
+		}));
+
+		expect(dailyNotePlan(vaultDir, new Date(2026, 5, 12, 8, 30, 0))).toMatchObject({
+			path: 'Daily Notes/2026-06-12.md',
+			title: '2026-06-12',
+			templateRel: 'Daily Notes/Template.md',
+			source: 'obsidian-daily-notes'
+		});
+		expect(obsidianDailyTemplatePath('.obsidian/secret')).toBeNull();
 	});
 
 	test('summarizes Obsidian plugin metadata without implying execution', () => {

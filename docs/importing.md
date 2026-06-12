@@ -23,12 +23,18 @@ The `.obsidian` folder is preserved on disk but skipped from note indexing.
 Diamond reads known-safe `.obsidian/app.json` settings during preflight and
 shows them as migration notes instead of dumping the raw JSON. It currently
 honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
-attachments, and a safe `newFileLocation: "folder"` plus `newFileFolderPath`
-as the default destination for generic New Note commands. Explicit folder
-context actions such as New note here still use the selected folder. Other app
-settings such as `useMarkdownLinks`, `alwaysUpdateLinks`, `newLinkFormat`, and
-`trashOption` are reported so migration mismatches are visible before opening
-the vault.
+attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
+default destination for generic New Note commands, and `alwaysUpdateLinks` for
+note/folder rename and move operations. Explicit folder context actions such as
+New note here still use the selected folder. Other app settings such as
+`useMarkdownLinks`, `newLinkFormat`, and `trashOption` are reported so migration
+mismatches are visible before opening the vault.
+
+When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
+`folder`, `template`, and `format` settings. Date formats support the same
+Moment-style token subset used by Diamond templates, including `YYYY`, `MM`,
+`DD`, `ddd`, `dddd`, `MMM`, and `MMMM`; unsafe paths fall back to Diamond's
+default `Daily Notes/YYYY-MM-DD.md` and `Daily Notes/Template.md` behavior.
 
 Diamond will not execute Obsidian community plugins. The import preview reads
 plugin manifests plus the top-level keys in each plugin `data.json`, then shows

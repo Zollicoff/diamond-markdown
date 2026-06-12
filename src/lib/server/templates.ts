@@ -14,7 +14,7 @@
  *                           the caret there)
  *
  * Format tokens (case-sensitive, single-pass leftmost-longest):
- *   YYYY YY MM M DD D dddd ddd HH H mm m ss s
+ *   YYYY YY MMMM MMM MM M DD D dddd ddd HH H mm m ss s
  *
  * Literal text inside a format is wrapped in `[brackets]` (Moment-style),
  * so `[Today is] dddd` produces "Today is Monday" — the bracketed bit is
@@ -27,16 +27,32 @@
 
 const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS_LONG = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function pad2(n: number): string { return String(n).padStart(2, '0'); }
 
 // Single-pass alternation so longer tokens beat shorter ones. JS regex
 // alternation is ordered: at each position the first alternative that
 // matches wins, and the match advances past all consumed characters —
-// so MM is picked over M, dddd over ddd, etc. The `\[([^\]]*)\]` arm at
-// the front is the literal-escape: `[anything]` passes through.
+// so MMMM is picked over MMM/MM/M, dddd over ddd, etc. The
+// `\[([^\]]*)\]` arm at the front is the literal-escape:
+// `[anything]` passes through.
 const TOKEN_OR_LITERAL =
-	/\[([^\]]*)\]|YYYY|YY|dddd|ddd|MM|M|DD|D|HH|H|mm|m|ss|s/g;
+	/\[([^\]]*)\]|YYYY|YY|dddd|ddd|MMMM|MMM|MM|M|DD|D|HH|H|mm|m|ss|s/g;
 
 export function formatDate(d: Date, fmt: string): string {
 	return fmt.replace(TOKEN_OR_LITERAL, (match, literal: string | undefined) => {
@@ -46,6 +62,8 @@ export function formatDate(d: Date, fmt: string): string {
 			case 'YY':   return String(d.getFullYear()).slice(-2);
 			case 'dddd': return WEEKDAYS_LONG[d.getDay()];
 			case 'ddd':  return WEEKDAYS_SHORT[d.getDay()];
+			case 'MMMM': return MONTHS_LONG[d.getMonth()];
+			case 'MMM':  return MONTHS_SHORT[d.getMonth()];
 			case 'MM':   return pad2(d.getMonth() + 1);
 			case 'M':    return String(d.getMonth() + 1);
 			case 'DD':   return pad2(d.getDate());

@@ -349,6 +349,14 @@ Use small, pushable slices:
    `newFileFolderPath` as the default destination for generic new-note
    commands, while folder context-menu actions continue to create notes in the
    selected folder.
+- **Obsidian link-update preference.** Honor
+   `.obsidian/app.json` `alwaysUpdateLinks: false` by leaving existing
+   note/folder references unchanged during explicit note and folder rename or
+   move operations; keep reference-safe rewrites as the default when the
+   setting is missing or enabled.
+- **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
+   `folder`, `template`, and Moment-style date-format settings for the daily
+   note command, with unsafe paths falling back to Diamond defaults.
 - **Git sync incoming-file recovery.** Populate remote changed paths for
   behind-only sync states and show incoming file names beside the recovery
   controls before users pull or run one-click sync.

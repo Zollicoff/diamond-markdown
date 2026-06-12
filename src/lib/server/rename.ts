@@ -11,6 +11,7 @@ import path from 'node:path';
 import { simpleGit } from 'simple-git';
 import type { Vault } from './vault';
 import { getIndex, upsertNote, removeNote } from './indexer';
+import { shouldUpdateLinksOnRename } from './obsidian-config';
 import { resolveInVault } from './paths';
 import { WIKILINK_RE } from '$lib/util/strings';
 
@@ -162,9 +163,11 @@ export async function renameNoteAtomically(
 	if (!fs.existsSync(absOld)) throw new Error('source does not exist');
 	if (fs.existsSync(absNew)) throw new Error('destination already exists');
 
-	// Rewrite incoming wikilinks (before the rename so the backlink index
-	// still points at oldPath).
-	const { touched, linksUpdated } = rewriteLinksForNoteRename(vault, oldPath, newPath);
+	// Rewrite incoming wikilinks before the rename so the backlink index still
+	// points at oldPath. Obsidian's alwaysUpdateLinks=false setting opts out.
+	const { touched, linksUpdated } = shouldUpdateLinksOnRename(vault.path)
+		? rewriteLinksForNoteRename(vault, oldPath, newPath)
+		: { touched: [], linksUpdated: 0 };
 
 	// Create any intermediate dirs.
 	fs.mkdirSync(path.dirname(absNew), { recursive: true });
@@ -214,9 +217,11 @@ export async function renameFolderAtomically(
 	}
 	if (fs.existsSync(absNew)) throw new Error('destination already exists');
 
-	// Rewrite links first — before moving, so paths.relative calculations
-	// against the *old* index are still valid.
-	const { touched, linksUpdated } = rewriteLinksForFolderRename(vault, oldFolder, newFolder);
+	// Rewrite links first before moving so path calculations against the old
+	// index are still valid. Obsidian's alwaysUpdateLinks=false setting opts out.
+	const { touched, linksUpdated } = shouldUpdateLinksOnRename(vault.path)
+		? rewriteLinksForFolderRename(vault, oldFolder, newFolder)
+		: { touched: [], linksUpdated: 0 };
 
 	// Enumerate notes under the old folder (for re-indexing later).
 	const oldPrefix = oldFolder.replace(/\/+$/, '') + '/';

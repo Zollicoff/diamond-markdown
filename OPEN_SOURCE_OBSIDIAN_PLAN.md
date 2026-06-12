@@ -4,7 +4,8 @@ Diamond Markdown is already past a basic notes app: vaults, wikilinks,
 backlinks, graph, live preview, git history, templates, daily notes, ranked
 indexed search, tags, embeds, publishing, PWA app-shell caching, conservative
 GitHub sync, attachment organization, Obsidian import guidance with safe
-attachment/new-note folder reuse, plugin scaffolding, and broad Canvas
+attachment/new-note/daily-note settings reuse and link-update preference
+handling, plugin scaffolding, and broad Canvas
 compatibility exist. This plan now tracks the
 remaining work needed to keep it trustworthy as an open-source daily driver
 without overstating full Obsidian ecosystem parity.

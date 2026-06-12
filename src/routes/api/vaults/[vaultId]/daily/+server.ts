@@ -7,24 +7,14 @@ import { resolveInVault } from '$lib/server/paths';
 import { upsertNote } from '$lib/server/indexer';
 import { assertVaultCanWrite, commitChange } from '$lib/server/git';
 import { expandTemplate, CURSOR_TOKEN } from '$lib/server/templates';
-
-const DAILY_FOLDER = 'Daily Notes';
-const TEMPLATE_REL = 'Daily Notes/Template.md';
-
-function todayRel(): string {
-	const d = new Date();
-	const y = d.getFullYear();
-	const m = String(d.getMonth() + 1).padStart(2, '0');
-	const day = String(d.getDate()).padStart(2, '0');
-	return `${DAILY_FOLDER}/${y}-${m}-${day}.md`;
-}
+import { dailyNotePlan } from '$lib/server/obsidian-daily';
 
 export const POST: RequestHandler = async ({ params }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
 
-	const rel = todayRel();
-	const isoDate = rel.split('/').pop()!.replace(/\.md$/, '');
+	const plan = dailyNotePlan(vault.path);
+	const rel = plan.path;
 
 	const absTarget = resolveInVault(vault, rel);
 	if (fs.existsSync(absTarget)) {
@@ -40,25 +30,22 @@ export const POST: RequestHandler = async ({ params }) => {
 	// Ensure folder exists.
 	fs.mkdirSync(path.dirname(absTarget), { recursive: true });
 
-	// Build content from template if present, else a simple heading. We
-	// fix `now` to noon of the dated day so date math like `{{date+1d}}`
-	// in the template lands on the correct calendar day regardless of
-	// the actual time of creation.
-	const [yy, mm, dd] = isoDate.split('-').map(Number);
-	const now = new Date(yy, mm - 1, dd, 12, 0, 0);
+	// Build content from template if present, else a simple heading. The
+	// plan fixes `date` to noon so template date math lands on the dated
+	// day regardless of the actual creation time.
 	let content: string;
 	try {
-		const absTpl = resolveInVault(vault, TEMPLATE_REL);
+		const absTpl = resolveInVault(vault, plan.templateRel);
 		if (fs.existsSync(absTpl)) {
 			const tpl = fs.readFileSync(absTpl, 'utf-8');
 			// File-on-disk content has the cursor token stripped — only the
 			// in-editor `template.insert` flow uses it.
-			content = expandTemplate(tpl, { now, title: isoDate }).split(CURSOR_TOKEN).join('');
+			content = expandTemplate(tpl, { now: plan.date, title: plan.title }).split(CURSOR_TOKEN).join('');
 		} else {
-			content = `# ${isoDate}\n\n`;
+			content = `# ${plan.title}\n\n`;
 		}
 	} catch {
-		content = `# ${isoDate}\n\n`;
+		content = `# ${plan.title}\n\n`;
 	}
 
 	fs.writeFileSync(absTarget, content);

@@ -45,6 +45,7 @@ export interface ObsidianAppConfigInfo {
 	newFileLocation?: string;
 	newFileFolderPath?: string;
 	newFileFolderStatus: 'safe' | 'unsafe' | 'missing' | 'not-configured';
+	alwaysUpdateLinks?: boolean;
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
 }
