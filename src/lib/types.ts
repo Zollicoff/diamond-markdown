@@ -25,6 +25,22 @@ export interface VaultImportCheckItem {
 	level: VaultImportCheckLevel;
 }
 
+export type ObsidianPluginJsonStatus = 'present' | 'missing' | 'invalid';
+
+export interface ObsidianPluginInfo {
+	folder: string;
+	id: string;
+	name: string;
+	version?: string;
+	author?: string;
+	enabled: boolean;
+	manifestPath?: string;
+	manifestStatus: ObsidianPluginJsonStatus;
+	settingsPath?: string;
+	settingsStatus: ObsidianPluginJsonStatus;
+	settingsBytes?: number;
+}
+
 export interface VaultImportAnalysis {
 	path: string;
 	markdownFiles: number;
@@ -36,6 +52,7 @@ export interface VaultImportAnalysis {
 	gitRepository: boolean;
 	likelyAttachmentFolders: string[];
 	obsidianPluginFolders: string[];
+	obsidianPlugins: ObsidianPluginInfo[];
 	recommendedExcludedFolders: string[];
 	ignoredFolders: string[];
 	warnings: string[];

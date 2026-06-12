@@ -5,7 +5,8 @@
 		checkLevelLabel,
 		compactPathList,
 		importReadiness,
-		importSummary
+		importSummary,
+		obsidianPluginSummary
 	} from '$lib/import/checklist';
 
 	interface Props {
@@ -58,6 +59,13 @@
 		<div class="note">
 			<span class="note-label">Canvas files</span>
 			<span class="mono">{compactPathList(analysis.canvasExamples, 3)}</span>
+		</div>
+	{/if}
+
+	{#if analysis.obsidianPlugins.length > 0}
+		<div class="note">
+			<span class="note-label">Obsidian plugin settings</span>
+			<span class="mono">{obsidianPluginSummary(analysis.obsidianPlugins, 3)}</span>
 		</div>
 	{/if}
 

@@ -117,7 +117,14 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ legacyEditor: false }));
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'data.json'), '{}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['dataview']));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'manifest.json'), JSON.stringify({
+		id: 'dataview',
+		name: 'Dataview',
+		version: '0.5.0',
+		author: 'Blacksmith'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'data.json'), '{"queries":true}\n');
 	fs.writeFileSync(notePath, '# Home\n\nObsidian note with ![[roof.png]].\n');
 	fs.writeFileSync(path.join(vaultDir, 'Daily.md'), '# Daily\n\nLog.\n');
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
@@ -138,6 +145,16 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		gitRepository: boolean;
 		likelyAttachmentFolders: string[];
 		obsidianPluginFolders: string[];
+		obsidianPlugins: {
+			id: string;
+			name: string;
+			version?: string;
+			author?: string;
+			enabled: boolean;
+			manifestStatus: string;
+			settingsStatus: string;
+			settingsPath?: string;
+		}[];
 		recommendedExcludedFolders: string[];
 		checklist: { id: string; detail: string; level: string }[];
 		markdownExamples: string[];
@@ -151,6 +168,16 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.gitRepository).toBe(true);
 	expect(body.likelyAttachmentFolders).toContain('Attachments');
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
+	expect(body.obsidianPlugins[0]).toMatchObject({
+		id: 'dataview',
+		name: 'Dataview',
+		version: '0.5.0',
+		author: 'Blacksmith',
+		enabled: true,
+		manifestStatus: 'present',
+		settingsStatus: 'present',
+		settingsPath: '.obsidian/plugins/dataview/data.json'
+	});
 	expect(body.recommendedExcludedFolders).toContain('.obsidian');
 	expect(body.markdownExamples).toContain('Daily.md');
 	expect(body.canvasExamples).toContain('Board.canvas');
@@ -166,7 +193,13 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), '{}\n');
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), '{}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['obsidian-kanban']));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), JSON.stringify({
+		id: 'obsidian-kanban',
+		name: 'Kanban',
+		version: '2.0.0'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'data.json'), '{"laneWidth":280}\n');
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n![[roof.png]]\n');
 	fs.writeFileSync(path.join(vaultDir, 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -188,6 +221,8 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
+	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
+	await expect(page.locator('.import-card')).toContainText('Kanban (obsidian-kanban): enabled, settings');
 
 	await page.getByRole('button', { name: 'Add vault', exact: true }).click();
 	await expect(page).toHaveURL(/\/vault\/obsidian-ui-import$/);

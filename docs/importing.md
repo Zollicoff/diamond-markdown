@@ -11,12 +11,16 @@ an existing Obsidian vault. The preflight reports:
 - markdown file count
 - likely attachment folders
 - whether `.obsidian` exists
-- Obsidian plugin folders that will be preserved but not executed
+- Obsidian plugin folders plus read-only manifest/settings visibility
 - Obsidian Canvas files that will be preserved and opened read-only
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
 The `.obsidian` folder is preserved on disk but skipped from note indexing.
+Diamond will not execute Obsidian community plugins. The import preview reads
+plugin manifests and `data.json` presence so you can see which settings will be
+preserved before registering the vault.
+
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
 the vault.

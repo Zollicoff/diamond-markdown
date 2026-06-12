@@ -120,6 +120,9 @@ Use small, pushable slices:
 - **Graph settings helper extraction.** Move settings defaults, storage keys,
    and persisted-value parsing out of `GraphView` into pure helpers with
    focused tests.
+- **Obsidian plugin settings visibility.** Surface Obsidian plugin manifests,
+   enabled state, and `data.json` presence in import preflight without
+   executing or modifying Obsidian plugins.
 
 ## Next Implementation Slices
 
@@ -127,7 +130,8 @@ Use small, pushable slices:
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as Canvas editing, richer attachment metadata, and
-   plugin-settings visibility without executing Obsidian plugins.
+   deeper plugin-settings migration guidance without executing Obsidian
+   plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 

@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { VaultImportAnalysis, VaultImportCheckItem } from '$lib/types';
+import type {
+	ObsidianPluginInfo,
+	ObsidianPluginJsonStatus,
+	VaultImportAnalysis,
+	VaultImportCheckItem
+} from '$lib/types';
 
 const CONFIG_FOLDERS = new Set(['.obsidian', '.diamondmd']);
 const IGNORED_FOLDERS = new Set(['.git', '.diamond-publish', 'node_modules']);
@@ -79,7 +84,8 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const gitRepository = fs.existsSync(path.join(root, '.git'));
 	let obsidianConfig = fs.existsSync(path.join(root, '.obsidian'));
 	let diamondConfig = fs.existsSync(path.join(root, '.diamondmd'));
-	const obsidianPluginFolders = sorted(obsidianConfig ? listObsidianPluginFolders(root) : []);
+	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
+	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
 	function noteMarkdown(rel: string): void {
 		markdownFiles += 1;
@@ -201,7 +207,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			'obsidian-plugins',
 			'Obsidian plugins',
 			obsidianPluginFolders.length > 0
-				? `${obsidianPluginFolders.length} Obsidian plugin folder${obsidianPluginFolders.length === 1 ? '' : 's'} found; Diamond preserves settings but does not run Obsidian plugins.`
+				? `${obsidianPluginFolders.length} Obsidian plugin folder${obsidianPluginFolders.length === 1 ? '' : 's'} found; Diamond surfaces manifests/settings read-only but does not run Obsidian plugins.`
 				: 'No Obsidian plugin folders were found.',
 			obsidianPluginFolders.length > 0 ? 'info' : 'ok'
 		),
@@ -246,6 +252,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		gitRepository,
 		likelyAttachmentFolders,
 		obsidianPluginFolders,
+		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),
 		ignoredFolders: sorted(ignoredFolders),
 		warnings,
@@ -255,7 +262,34 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	};
 }
 
-function listObsidianPluginFolders(root: string): string[] {
+function readJsonFile(abs: string): { status: ObsidianPluginJsonStatus; value?: unknown; bytes?: number } {
+	if (!fs.existsSync(abs)) return { status: 'missing' };
+	let content = '';
+	try {
+		content = fs.readFileSync(abs, 'utf-8');
+		return { status: 'present', value: JSON.parse(content) as unknown, bytes: Buffer.byteLength(content, 'utf-8') };
+	} catch {
+		return { status: 'invalid', bytes: content ? Buffer.byteLength(content, 'utf-8') : undefined };
+	}
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> | null {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? value as Record<string, unknown>
+		: null;
+}
+
+function jsonString(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function readEnabledObsidianPluginIds(root: string): Set<string> {
+	const plugins = readJsonFile(path.join(root, '.obsidian', 'community-plugins.json'));
+	if (plugins.status !== 'present' || !Array.isArray(plugins.value)) return new Set();
+	return new Set(plugins.value.filter((value): value is string => typeof value === 'string'));
+}
+
+function listObsidianPlugins(root: string): ObsidianPluginInfo[] {
 	const pluginsRoot = path.join(root, '.obsidian', 'plugins');
 	let entries: fs.Dirent[];
 	try {
@@ -263,7 +297,33 @@ function listObsidianPluginFolders(root: string): string[] {
 	} catch {
 		return [];
 	}
+	const enabledIds = readEnabledObsidianPluginIds(root);
 	return entries
 		.filter((entry) => entry.isDirectory())
-		.map((entry) => `.obsidian/plugins/${entry.name}`);
+		.map((entry) => {
+			const folder = `.obsidian/plugins/${entry.name}`;
+			const manifestPath = `${folder}/manifest.json`;
+			const settingsPath = `${folder}/data.json`;
+			const manifest = readJsonFile(path.join(pluginsRoot, entry.name, 'manifest.json'));
+			const settings = readJsonFile(path.join(pluginsRoot, entry.name, 'data.json'));
+			const manifestBody = manifest.status === 'present' ? jsonRecord(manifest.value) : null;
+			const id = jsonString(manifestBody?.id) ?? entry.name;
+			const plugin: ObsidianPluginInfo = {
+				folder,
+				id,
+				name: jsonString(manifestBody?.name) ?? id,
+				enabled: enabledIds.has(entry.name) || enabledIds.has(id),
+				manifestStatus: manifest.status,
+				settingsStatus: settings.status
+			};
+			if (manifest.status !== 'missing') plugin.manifestPath = manifestPath;
+			const version = jsonString(manifestBody?.version);
+			if (version) plugin.version = version;
+			const author = jsonString(manifestBody?.author);
+			if (author) plugin.author = author;
+			if (settings.status !== 'missing') plugin.settingsPath = settingsPath;
+			if (settings.bytes !== undefined) plugin.settingsBytes = settings.bytes;
+			return plugin;
+		})
+		.sort((a, b) => a.folder.localeCompare(b.folder));
 }
