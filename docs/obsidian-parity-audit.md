@@ -32,8 +32,9 @@ The main remaining product risks are:
    full-text search now uses ranked persisted index results with field
    operators, boolean `OR`, safe regex terms, paged loading, and virtualized
    result rendering, but advanced grouping remains basic.
-5. **Roadmap wording needs to stay honest.** Public docs should distinguish
-   core Obsidian-style parity from full Obsidian ecosystem parity.
+5. **Roadmap wording needs to stay honest.** Public docs now distinguish core
+   Obsidian-style parity from full Obsidian ecosystem parity; keep that claim
+   boundary current as features land.
 
 ## Product Parity Matrix
 
@@ -64,11 +65,12 @@ The main remaining product risks are:
 1. **Desktop release CI.** Add and verify a matrix workflow for desktop
    preflight/build/artifact upload once a GitHub credential with `workflow`
    scope is available.
-2. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,
-   plugins, offline, and desktop are explicitly scoped.
-3. **Canvas/import polish.** Continue daily-driver compatibility work around
+2. **Canvas/import polish.** Continue daily-driver compatibility work around
    deeper Canvas interaction parity and remaining Obsidian config edge cases
    without executing Obsidian plugins.
+3. **Verification hardening.** Keep expanding targeted coverage around
+   dialog-driven destructive actions, sync recovery flows, and release-facing
+   claim changes.
 
 ## Current Product Line
 

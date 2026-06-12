@@ -20,7 +20,7 @@ If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, 
 
 ## Status
 
-Pre-1.0, active development. v0.2 is feature-complete against Obsidian's core (math, mermaid, code highlighting, footnotes, embeds, hover preview, outline, themes, templates, bookmarks, recent notes, PWA, daily notes, static publish). See [ROADMAP.md](./ROADMAP.md) for the plan.
+Pre-1.0, active development. The core Obsidian-style note workflow is implemented: wikilinks, backlinks, graph, live preview, math, Mermaid, code highlighting, footnotes, embeds, hover preview, outline, themes, templates, bookmarks, recent notes, PWA app shell, daily notes, static publish, conservative GitHub sync, and broad Canvas compatibility. The remaining work is mainly around release automation, deeper Canvas polish, and intentionally scoped plugin/desktop/offline boundaries. See [ROADMAP.md](./ROADMAP.md) and [docs/obsidian-parity-audit.md](./docs/obsidian-parity-audit.md) for the current claim boundary.
 
 ## Run
 
@@ -179,10 +179,10 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 See [ROADMAP.md](./ROADMAP.md) — summary:
 
 - **v0.1** ✓ MVP shipped 2026-04-22
-- **v0.2** ✓ Obsidian-core parity shipped 2026-04-25
-- **v0.3** — Polish, service worker, mobile gestures
-- **v0.4** — Refinements + perf (large vaults)
-- **v0.5** — Plugin API, Tauri desktop wrapper, sidecar-ready desktop runtime
+- **v0.2** ✓ Obsidian-style core notes workflow shipped 2026-04-25
+- **v0.3** ✓ Polish, service worker, mobile gestures
+- **v0.4** ✓ Git sync and large-vault scale work
+- **v0.5** Partial — plugin API, Tauri desktop wrapper, and current-host sidecar-ready desktop runtime are present; cross-platform desktop release automation remains open
 
 The open-source replacement track is broken out in
 [OPEN_SOURCE_OBSIDIAN_PLAN.md](./OPEN_SOURCE_OBSIDIAN_PLAN.md).

@@ -190,6 +190,10 @@ Use small, pushable slices:
    edge color metadata in the board and SVG export without rewriting the
    original `.canvas` file, and edit node/edge colors through validated
    git-backed Canvas mutations.
+- **Honest public roadmap cleanup.** Align README, ROADMAP, and the open-source
+   Obsidian plan with the parity audit so public docs claim core Obsidian-style
+   workflows, conservative GitHub sync, and broad Canvas compatibility without
+   implying full Canvas/plugin/offline/desktop parity.
 - **Obsidian attachment-folder uploads.** Honor a safe
    `.obsidian/app.json` `attachmentFolderPath` for new uploads, falling back to
    `Attachments/` when the setting is missing or unsafe.

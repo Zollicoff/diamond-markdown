@@ -1,6 +1,12 @@
 # Diamond Markdown — Roadmap
 
-Version numbers signal feature parity, not stability. We're pre-1.0.
+Version numbers signal feature areas, not SemVer stability. We're pre-1.0.
+The current claim boundary lives in
+[docs/obsidian-parity-audit.md](./docs/obsidian-parity-audit.md): Diamond can
+claim an Obsidian-style core notes workflow, conservative GitHub sync, and broad
+Canvas compatibility, but not full Obsidian plugin parity, full Canvas
+whiteboard parity, automatic proprietary-sync replacement, or shipped
+cross-platform desktop release automation.
 
 ## v0.1 — MVP ✓ (shipped 2026-04-22)
 
@@ -28,7 +34,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Per-note history viewer (git log + diff)
 - [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)
 
-## v0.2 — Obsidian-core parity ✓ (shipped 2026-04-25)
+## v0.2 — Obsidian-style core notes workflow ✓ (shipped 2026-04-25)
 
 - [x] Command palette (⌘P)
 - [x] Tag index page
@@ -75,7 +81,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Virtualized file tree for very large vaults
 - [x] Quadtree-backed graph sim (drop O(n²) for very large vaults)
 
-## v0.5 — Plugins & desktop
+## v0.5 — Plugins & desktop (partial)
 
 - [x] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
 - [x] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
@@ -95,7 +101,9 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
 - [ ] **Cross-platform desktop release automation** — prepare/sign/upload Node sidecars or native Rust backend builds for every published macOS / Windows / Linux target.
 
-Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
+Deliberately smaller plugin surface than Obsidian's — too much API = too much
+rewriting. Diamond has useful plugin extension points, but full Obsidian plugin
+runtime compatibility is a non-goal.
 
 ## Open ideas (maybe, maybe not)
 
@@ -106,6 +114,9 @@ Deliberately smaller plugin surface than Obsidian's — too much API = too much 
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
 - **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
+- **Saved searches / search grouping.** Search now has ranked indexed results,
+  operators, regex, pagination, and virtualization; saved/grouped search views
+  can stay incremental.
 
 ## Non-goals
 
