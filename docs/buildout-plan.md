@@ -66,6 +66,8 @@ Use small, pushable slices:
    failures.
 - **Git sync UX extraction.** Keep command builders and state labels outside
    `GitSyncPanel`; move remaining branch/status rendering helpers into modules.
+- **Git sync component split.** Keep `GitSyncPanel` focused on orchestration
+   by moving status-card and recovery-state markup into dedicated components.
 - **Note view split.** Extract metadata, wikilink navigation, save/reload, and
    link-create behavior from `NoteView` so the component focuses on layout and
    editor/preview switching.
