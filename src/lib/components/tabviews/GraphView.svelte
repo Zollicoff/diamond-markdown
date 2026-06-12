@@ -3,6 +3,7 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import { buildGraphSimulationData } from '$lib/graph/data';
 	import {
 		simulateStep,
 		SIM_DEFAULTS,
@@ -127,22 +128,9 @@
 		err = null;
 		try {
 			const data = await api.graph(vaultId);
-			const byPath = new Map<string, GNode>();
-			for (const n of data.nodes) {
-				byPath.set(n.path, {
-					path: n.path,
-					title: n.title,
-					degree: n.degree,
-					x: (Math.random() - 0.5) * 400,
-					y: (Math.random() - 0.5) * 400,
-					vx: 0,
-					vy: 0,
-					fx: null,
-					fy: null
-				});
-			}
-			nodes = [...byPath.values()];
-			edges = data.edges.filter((e) => byPath.has(e.from) && byPath.has(e.to));
+			const graph = buildGraphSimulationData(data);
+			nodes = graph.nodes;
+			edges = graph.edges;
 			startSim();
 			loading = false;
 			if (!initialCenterDone) {

@@ -114,6 +114,9 @@ Use small, pushable slices:
    graph helpers with focused tests.
 - **Canvas SVG export.** Export read-only Obsidian Canvas boards as sanitized
    SVG snapshots from the server and expose the download action in Canvas tabs.
+- **Graph data adapter extraction.** Move API-to-simulation graph conversion
+   and dangling-edge filtering out of `GraphView` into a pure helper with
+   deterministic tests.
 
 ## Next Implementation Slices
 

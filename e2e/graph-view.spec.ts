@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { GNode, GEdge } from '../src/lib/graph/sim';
+import { buildGraphSimulationData } from '../src/lib/graph/data';
 import {
 	buildGraphProjection,
 	screenToGraph,
@@ -90,6 +91,28 @@ test.describe('graph view helpers', () => {
 		expect(toggleGraphPathSelection(['A.md', 'B.md'], 'A.md')).toEqual(['B.md']);
 		expect(graphNodeOpenTitle(node('Folder/Fallback.md', '', 0))).toBe('Fallback');
 		expect(graphNodeOpenTitle(node('Folder/Named.md', 'Named note', 0))).toBe('Named note');
+	});
+
+	test('adapts API graph data into simulation nodes and drops dangling edges', () => {
+		const randomValues = [0.25, 0.75, 0.5, 0.1];
+		const random = (): number => randomValues.shift() ?? 0.5;
+
+		const graph = buildGraphSimulationData({
+			nodes: [
+				{ path: 'A.md', title: 'A', degree: 2 },
+				{ path: 'B.md', title: 'B', degree: 1 }
+			],
+			edges: [
+				{ from: 'A.md', to: 'B.md' },
+				{ from: 'A.md', to: 'Missing.md' }
+			]
+		}, random);
+
+		expect(graph.edges).toEqual([{ from: 'A.md', to: 'B.md' }]);
+		expect(graph.nodes).toEqual([
+			{ path: 'A.md', title: 'A', degree: 2, x: -100, y: 100, vx: 0, vy: 0, fx: null, fy: null },
+			{ path: 'B.md', title: 'B', degree: 1, x: 0, y: -160, vx: 0, vy: 0, fx: null, fy: null }
+		]);
 	});
 
 	test('selects visible nodes inside the drag box without disturbing tiny drags', () => {
