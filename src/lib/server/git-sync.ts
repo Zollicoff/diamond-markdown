@@ -307,11 +307,13 @@ export async function pullGitHubRemote(vault: Vault): Promise<GitSyncResult> {
 
 export async function pushGitHubRemote(vault: Vault): Promise<GitSyncResult> {
 	const g = await getVaultGit(vault);
+	await fetchGitHubRemote(vault);
 	const status = await getGitSyncStatus(vault);
 	if (!status.remoteUrl) throw new Error('GitHub remote is not configured');
 	if (!status.branch) throw new Error('cannot push while HEAD is detached');
 	if (!status.clean) throw new Error('commit or discard local vault changes before pushing');
 	if (status.conflicted.length > 0) throw new Error('resolve merge conflicts before pushing');
+	if (status.ahead > 0 && status.behind > 0) throw new Error('local and remote histories diverged; manual merge required');
 	if (status.behind > 0) throw new Error('pull remote changes before pushing');
 	await g.raw(['push', '-u', 'origin', status.branch]);
 	return {

@@ -234,6 +234,9 @@ Use small, pushable slices:
    against the current saved note with tested line-level added/removed/
    unchanged rows, preserve raw snapshot copy, and restore a snapshot through a
    new git-backed save commit.
+- **Stale-remote push guard.** Fetch remote refs before pushing so unseen
+   GitHub commits turn into an explicit pull/divergence guard instead of a
+   stale non-fast-forward push attempt.
 
 ## Next Implementation Slices
 

@@ -1292,6 +1292,56 @@ test('vault writes are blocked until fetched remote commits are pulled', async (
 	expect(fs.existsSync(path.join(vaultDir, 'Local After Pull.md'))).toBe(true);
 });
 
+test('sync push fetches first and refuses unseen remote commits', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'stale-push-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'stale-push-origin.git');
+	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'stale-push-remote-worktree');
+	for (const dir of [vaultDir, bareDir, cloneDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nBase.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Stale Push Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	const branch = git(vaultDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+	git(vaultDir, ['push', '-u', 'origin', branch]);
+	execFileSync('git', ['--git-dir', bareDir, 'symbolic-ref', 'HEAD', `refs/heads/${branch}`]);
+
+	execFileSync('git', ['clone', '--branch', branch, bareDir, cloneDir], { stdio: 'ignore' });
+	git(cloneDir, ['config', 'user.email', 'remote@example.test']);
+	git(cloneDir, ['config', 'user.name', 'Remote Test']);
+	fs.writeFileSync(path.join(cloneDir, 'RemoteOnly.md'), '# Remote only\n');
+	git(cloneDir, ['add', 'RemoteOnly.md']);
+	git(cloneDir, ['commit', '-m', 'remote: add unseen note']);
+	git(cloneDir, ['push', 'origin', branch]);
+
+	const staleStatus = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(staleStatus.ok()).toBe(true);
+	const staleBody = await staleStatus.json() as { behind: number; canPush: boolean };
+	expect(staleBody.behind).toBe(0);
+	expect(staleBody.canPush).toBe(true);
+
+	const pushed = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'push' } });
+	expect(pushed.status()).toBe(409);
+	expect(await pushed.text()).toContain('pull remote changes before pushing');
+
+	const refreshedStatus = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(refreshedStatus.ok()).toBe(true);
+	const refreshed = await refreshedStatus.json() as { behind: number; canPush: boolean; canPull: boolean };
+	expect(refreshed.behind).toBe(1);
+	expect(refreshed.canPush).toBe(false);
+	expect(refreshed.canPull).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(false);
+});
+
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {
 	const res = await request.get('/service-worker.js');
 	expect(res.ok()).toBe(true);
