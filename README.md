@@ -102,14 +102,14 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
 - Obsidian import support that preserves `.obsidian`, surfaces plugin settings as manual migration guidance, and honors safe attachment/new-note/daily-note settings plus link-update preferences
-- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
+- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, vault-asset file-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)
 
 ### Search
 - Fuzzy quick-switcher
-- Ranked, index-backed full-text search across the vault with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, folder-grouped results, git-backed saved searches, paged loading, and virtualized results
+- Ranked, index-backed full-text search across the vault with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, folder-grouped results, folder facets, git-backed saved searches, paged loading, and virtualized results
 - Command palette (⌘P)
 
 ### Graph view

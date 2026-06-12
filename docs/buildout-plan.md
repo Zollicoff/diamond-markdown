@@ -175,6 +175,9 @@ Use small, pushable slices:
 - **Canvas file-card type routing.** Route Canvas file cards by extension:
    Markdown files open as note tabs, `.canvas` files open as Canvas tabs, and
    unsupported asset paths stay editable without pretending to be note tabs.
+- **Canvas asset file previews.** Render vault-local image previews and raw
+   asset links for Canvas file cards that point at attachments, while keeping
+   Markdown and `.canvas` paths as workspace-tab targets.
 - **Canvas header split.** Move Canvas title, stats, add-node controls, edge
    creation controls, and SVG export markup out of `CanvasView` into focused
    presentational components.
@@ -337,6 +340,10 @@ Use small, pushable slices:
    while adding a client-side grouped row model, virtualized folder headers,
    and Search tab controls so loaded results can be scanned by vault location
    without changing server search semantics.
+- **Search folder facets.** Derive compact folder facets from loaded
+   full-text results, expose one-click `path:` narrowing in the Search tab, and
+   keep the server search response flat so facets remain a client-side
+   dashboard affordance.
 - **Saved searches.** Persist named title/full-text searches in
    `.diamondmd/searches.json`, commit changes with the vault, and expose compact
    restore/delete controls in the Search tab so recurring searches follow

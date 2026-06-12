@@ -24,6 +24,7 @@
 	import CanvasNodeCard from './CanvasNodeCard.svelte';
 
 	interface Props {
+		vaultId: string;
 		nodes: CanvasNode[];
 		bounds: CanvasBounds;
 		lines: CanvasEdgeLine[];
@@ -52,6 +53,7 @@
 	}
 
 	let {
+		vaultId,
 		nodes,
 		bounds,
 		lines,
@@ -150,6 +152,7 @@
 
 		{#each layeredNodes as node (node.id)}
 			<CanvasNodeCard
+				{vaultId}
 				{node}
 				{bounds}
 				draft={canvasDraftFor(node, textDrafts)}

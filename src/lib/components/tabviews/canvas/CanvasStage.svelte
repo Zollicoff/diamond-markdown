@@ -16,6 +16,7 @@
 	import CanvasEdgeList from './CanvasEdgeList.svelte';
 
 	interface Props {
+		vaultId: string;
 		loading: boolean;
 		error: string | null;
 		doc: CanvasDoc | null;
@@ -56,6 +57,7 @@
 	}
 
 	let {
+		vaultId,
 		loading,
 		error,
 		doc,
@@ -124,6 +126,7 @@
 		onDelete={onDeleteEdge}
 	/>
 	<CanvasBoard
+		{vaultId}
 		{nodes}
 		{bounds}
 		{lines}

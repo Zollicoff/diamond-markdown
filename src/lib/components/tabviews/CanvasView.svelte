@@ -544,6 +544,7 @@
 	/>
 
 	<CanvasStage
+		{vaultId}
 		{loading}
 		{error}
 		{doc}

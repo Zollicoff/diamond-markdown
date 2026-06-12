@@ -109,8 +109,9 @@ Canvas node and edge colors are preserved, edited, and rendered in the board and
 side anchors (`fromSide`/`toSide`) and endpoint arrows (`fromEnd`/`toEnd`) are
 respected when drawing board and SVG connections, and can be edited from the
 Canvas edge row. Canvas file cards can open
-their referenced Markdown notes or Canvas files in workspace tabs, unsupported
-asset file cards remain editable but non-openable, and URL cards expose safe
+their referenced Markdown notes or Canvas files in workspace tabs, vault-local
+asset file cards render safe raw previews or links without pretending to be
+note tabs, and URL cards expose safe
 `http`/`https` links. Obsidian plugin execution is not implemented yet.
 
 ## GitHub Sync

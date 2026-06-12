@@ -13,6 +13,9 @@ import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src
 import { isActiveSavedSearch, savedSearchButtonLabel, savedSearchModeLabel, savedSearchName, searchModeFromFullText } from '../src/lib/search/saved';
 import {
 	buildSearchResultRows,
+	searchFolderFacets,
+	searchQueryHasPathFilter,
+	searchQueryWithFolder,
 	searchResultFolder,
 	searchResultRowStyle,
 	visibleSearchRows,
@@ -212,6 +215,31 @@ test('search result view helpers group virtualized rows by folder', () => {
 	expect(searchResultRowStyle(rows.rows[2])).toBe(
 		'--search-result-row-height: 40px; transform: translateY(52px);'
 	);
+});
+
+test('search result view helpers build folder facets and filter queries', () => {
+	const results = [
+		{ path: 'Projects/Solar Plan.md', title: 'Solar Plan', snippet: 'roof survey' },
+		{ path: 'Archive/Solar Draft.md', title: 'Solar Draft', snippet: 'old survey' },
+		{ path: 'Projects/Water Plan.md', title: 'Water Plan', snippet: 'water survey' },
+		{ path: 'Client Work/Solar Prep.md', title: 'Solar Prep', snippet: 'prep' },
+		{ path: 'Inbox.md', title: 'Inbox', snippet: 'root survey' }
+	];
+
+	expect(searchQueryHasPathFilter('roof path:Projects')).toBe(true);
+	expect(searchQueryHasPathFilter('roof -path:Archive')).toBe(true);
+	expect(searchQueryHasPathFilter('roof content:pathology')).toBe(false);
+	expect(searchQueryWithFolder('roof survey', 'Projects')).toBe('roof survey path:"Projects"');
+	expect(searchQueryWithFolder('roof survey', 'Client Work')).toBe('roof survey path:"Client Work"');
+	expect(searchQueryWithFolder('roof survey', 'Vault root')).toBe('roof survey path:/^[^/]+\\.md$/');
+	expect(searchQueryWithFolder('roof path:Projects', 'Archive')).toBe('roof path:Projects');
+
+	expect(searchFolderFacets(results, 'roof survey', 3)).toEqual([
+		{ label: 'Projects', count: 2, query: 'roof survey path:"Projects"' },
+		{ label: 'Archive', count: 1, query: 'roof survey path:"Archive"' },
+		{ label: 'Client Work', count: 1, query: 'roof survey path:"Client Work"' }
+	]);
+	expect(searchFolderFacets(results, 'roof path:Projects')).toEqual([]);
 });
 
 test('saved search helpers persist sanitized vault-local search groups', () => {

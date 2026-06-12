@@ -37,6 +37,8 @@ import {
 	canOpenCanvasNode,
 	canSaveCanvasNodeRefDraft,
 	canvasEdgeSummaries,
+	canvasFileAssetKind,
+	canvasFileAssetPreview,
 	canvasFileOpenTarget,
 	canvasFileNodePath,
 	canvasFileNodeTitle,
@@ -67,6 +69,7 @@ import {
 	edgeLines,
 	canvasNodeStyle,
 	canvasPaletteColorValue,
+	canvasRawAssetHref,
 	normalizeCanvasColor,
 	nodeStyle
 } from '../src/lib/canvas/view';
@@ -265,6 +268,21 @@ test.describe('canvas view helpers', () => {
 		const assetFileNode = { ...doc.nodes[1], id: 'asset-file', file: 'Images/roof.png' };
 		expect(canvasFileOpenTarget(assetFileNode)).toBeNull();
 		expect(canOpenCanvasNode(assetFileNode)).toBe(false);
+		expect(canvasFileAssetKind('Images/roof.png')).toBe('image');
+		expect(canvasFileAssetKind('Docs/program.pdf')).toBe('pdf');
+		expect(canvasFileAssetKind('Audio/walkthrough.mp3')).toBe('audio');
+		expect(canvasFileAssetKind('Video/demo.webm')).toBe('video');
+		expect(canvasFileAssetKind('Archive/site-data.zip')).toBe('file');
+		expect(canvasRawAssetHref('vault id', 'Images/roof photo.png')).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.png');
+		expect(canvasRawAssetHref('vault', '../secret.png')).toBeNull();
+		expect(canvasRawAssetHref('vault', 'https://example.com/roof.png')).toBeNull();
+		expect(canvasFileAssetPreview(assetFileNode, 'vault id')).toEqual({
+			kind: 'image',
+			path: 'Images/roof.png',
+			title: 'roof.png',
+			href: '/api/vaults/vault%20id/raw/Images/roof.png',
+			actionLabel: 'Open image'
+		});
 		const linkNode = {
 			id: 'c',
 			type: 'link',
@@ -542,7 +560,7 @@ test('canvas view renders and creates Obsidian Canvas groups', async ({ page, re
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
-test('canvas file cards route notes, Canvas files, and unsupported assets explicitly', async ({ page, request }) => {
+test('canvas file cards route notes, Canvas files, and vault assets explicitly', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-file-routing-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
@@ -551,13 +569,18 @@ test('canvas file cards route notes, Canvas files, and unsupported assets explic
 		nodes: [{ id: 'nested-a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Nested Canvas card' }],
 		edges: []
 	}, null, 2));
-	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof.png'), 'fake png');
+	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof.svg'), [
+		'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
+		'<rect width="160" height="90" fill="#0f766e"/>',
+		'<path d="M20 62 L80 24 L140 62 Z" fill="#f8fafc"/>',
+		'</svg>'
+	].join(''));
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
 		nodes: [
 			{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Routing board' },
 			{ id: 'b', type: 'file', x: 280, y: 0, width: 220, height: 110, file: 'Home.md' },
 			{ id: 'c', type: 'file', x: 560, y: 0, width: 220, height: 110, file: 'Nested.canvas' },
-			{ id: 'd', type: 'file', x: 840, y: 0, width: 220, height: 110, file: 'Images/roof.png' }
+			{ id: 'd', type: 'file', x: 840, y: 0, width: 240, height: 220, file: 'Images/roof.svg' }
 		],
 		edges: []
 	}, null, 2));
@@ -572,7 +595,9 @@ test('canvas file cards route notes, Canvas files, and unsupported assets explic
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
 	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
-	await expect(page.getByRole('button', { name: 'Open canvas file node Images/roof.png' })).toBeDisabled();
+	await expect(page.getByRole('img', { name: 'Canvas file preview Images/roof.svg' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Preview raw canvas asset Images/roof.svg' })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
+	await expect(page.getByRole('link', { name: 'Open raw canvas asset Images/roof.svg' })).toHaveText('Open image');
 
 	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
 	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');

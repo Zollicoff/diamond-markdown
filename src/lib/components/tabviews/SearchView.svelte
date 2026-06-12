@@ -11,6 +11,7 @@
 	} from '$lib/search/saved';
 	import {
 		buildSearchResultRows,
+		searchFolderFacets,
 		searchResultRowStyle,
 		visibleSearchRows,
 		type SearchResultDisplayRow,
@@ -53,6 +54,7 @@
 	let requestId = 0;
 	let resultRows = $derived(buildSearchResultRows(results, groupMode));
 	let resultWindow = $derived(visibleSearchRows(resultRows, scrollTop, viewportHeight));
+	let folderFacets = $derived(searchFolderFacets(results, q));
 	let currentMode = $derived<SavedSearchMode>(searchModeFromFullText(fullText));
 	let searchAlreadySaved = $derived(savedSearches.some((search) => isActiveSavedSearch(search, q, currentMode)));
 	let canSaveSearch = $derived(
@@ -169,6 +171,13 @@
 		if (groupMode === mode) return;
 		groupMode = mode;
 		resetResultWindow();
+	}
+
+	function narrowToFolder(query: string): void {
+		if (!fullText || query === q) return;
+		q = query;
+		if (!savedNameTouched) savedName = savedSearchName(q);
+		void runSearch(q);
 	}
 
 	async function loadSavedSearches(): Promise<void> {
@@ -334,6 +343,23 @@
 				</button>
 			</div>
 		</div>
+		{#if fullText && folderFacets.length > 1}
+			<div class="folder-facets" aria-label="Search result folders">
+				<span class="facet-label">Folders</span>
+				{#each folderFacets as facet (facet.label)}
+					<button
+						type="button"
+						class="folder-facet"
+						onclick={() => narrowToFolder(facet.query)}
+						aria-label={`Narrow search to ${facet.label}`}
+						title={`Narrow to ${facet.label}`}
+					>
+						<span class="facet-name">{facet.label}</span>
+						<span class="facet-count">{facet.count}</span>
+					</button>
+				{/each}
+			</div>
+		{/if}
 		<div class="saved-search-control">
 			<input
 				type="text"
@@ -531,6 +557,53 @@
 	.segmented button.active {
 		background: color-mix(in srgb, var(--accent) 14%, transparent);
 		color: var(--accent);
+	}
+	.folder-facets {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 8px;
+		min-width: 0;
+		overflow-x: auto;
+		padding-bottom: 1px;
+	}
+	.facet-label {
+		color: var(--fg-dim);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0;
+		flex: 0 0 auto;
+	}
+	.folder-facet {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		max-width: 220px;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.74rem;
+		padding: 3px 7px;
+		cursor: pointer;
+		flex: 0 0 auto;
+	}
+	.folder-facet:hover {
+		border-color: var(--accent);
+		color: var(--fg);
+	}
+	.facet-name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.facet-count {
+		color: var(--fg-dim);
+		font-family: var(--mono);
+		font-size: 0.68rem;
+		flex: 0 0 auto;
 	}
 	.saved-search-control {
 		margin-top: 8px;

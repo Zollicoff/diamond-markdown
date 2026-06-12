@@ -89,6 +89,16 @@ export interface CanvasFileOpenTarget {
 	actionLabel: string;
 }
 
+export type CanvasFileAssetKind = 'image' | 'pdf' | 'audio' | 'video' | 'file';
+
+export interface CanvasFileAssetPreview {
+	kind: CanvasFileAssetKind;
+	path: string;
+	title: string;
+	href: string;
+	actionLabel: string;
+}
+
 export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'code' | 'wikilink' | 'link';
 
 export interface CanvasTextPreviewInline {
@@ -153,6 +163,11 @@ const OBSIDIAN_CANVAS_COLOR_VALUES: Record<string, string> = {
 	cyan: '5',
 	purple: '6'
 };
+const CANVAS_IMAGE_ASSET_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
+const CANVAS_PDF_ASSET_RE = /\.pdf$/i;
+const CANVAS_AUDIO_ASSET_RE = /\.(mp3|wav|ogg|oga|m4a|flac|aac|opus)$/i;
+const CANVAS_VIDEO_ASSET_RE = /\.(mp4|webm|ogv|mov|m4v)$/i;
+const CANVAS_URI_RE = /^[a-z][a-z0-9+.-]*:/i;
 
 export const CANVAS_COLOR_OPTIONS: CanvasColorOption[] = [
 	{ value: '', label: 'default', swatch: '#94a3b8' },
@@ -540,6 +555,51 @@ export function canvasFileOpenTarget(node: CanvasNode): CanvasFileOpenTarget | n
 		return { kind: 'canvas', path: filePath, title, actionLabel: 'Open Canvas' };
 	}
 	return null;
+}
+
+export function canvasFileAssetKind(assetPath: string): CanvasFileAssetKind {
+	if (CANVAS_IMAGE_ASSET_RE.test(assetPath)) return 'image';
+	if (CANVAS_PDF_ASSET_RE.test(assetPath)) return 'pdf';
+	if (CANVAS_AUDIO_ASSET_RE.test(assetPath)) return 'audio';
+	if (CANVAS_VIDEO_ASSET_RE.test(assetPath)) return 'video';
+	return 'file';
+}
+
+export function isCanvasVaultRelativeAssetPath(assetPath: string): boolean {
+	const normalized = assetPath.trim().replace(/\\/g, '/');
+	if (!normalized || normalized.startsWith('/') || CANVAS_URI_RE.test(normalized) || normalized.includes('\0')) {
+		return false;
+	}
+	return !normalized.split('/').some((segment) => segment === '..');
+}
+
+export function canvasRawAssetHref(vaultId: string, assetPath: string): string | null {
+	const normalized = assetPath.trim().replace(/\\/g, '/');
+	if (!isCanvasVaultRelativeAssetPath(normalized)) return null;
+	const encodedPath = normalized.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+	return `/api/vaults/${encodeURIComponent(vaultId)}/raw/${encodedPath}`;
+}
+
+export function canvasFileAssetPreview(node: CanvasNode, vaultId: string): CanvasFileAssetPreview | null {
+	const filePath = canvasFileNodePath(node);
+	if (!filePath || canvasFileOpenTarget(node)) return null;
+	const href = canvasRawAssetHref(vaultId, filePath);
+	if (!href) return null;
+	const kind = canvasFileAssetKind(filePath);
+	const labels: Record<CanvasFileAssetKind, string> = {
+		image: 'Open image',
+		pdf: 'Open PDF',
+		audio: 'Open audio',
+		video: 'Open video',
+		file: 'Open asset'
+	};
+	return {
+		kind,
+		path: filePath,
+		title: canvasFileNodeTitle(node),
+		href,
+		actionLabel: labels[kind]
+	};
 }
 
 export function canvasLinkNodeHref(node: CanvasNode): string | null {

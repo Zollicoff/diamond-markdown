@@ -618,6 +618,15 @@ test('search tab groups results by folder without breaking virtualized result ro
 	await search.getByRole('button', { name: 'Off' }).click();
 	await expect(search.locator('.result-group')).toHaveCount(0);
 	await expect(search.locator('.result')).toHaveCount(4);
+
+	await expect(search.getByLabel('Search result folders')).toContainText('Projects');
+	await search.getByRole('button', { name: 'Narrow search to Projects' }).click();
+	await expect(search.locator('input[type="text"]').first()).toHaveValue('searchgroupneedle path:"Projects"');
+	await expect(search.locator('.hint')).toContainText('2 results', { timeout: 5_000 });
+	await expect(search.locator('.result')).toHaveCount(2);
+	await expect(search.locator('.result').filter({ hasText: 'Projects/Solar.md' })).toBeVisible();
+	await expect(search.locator('.result').filter({ hasText: 'Archive/Old.md' })).toHaveCount(0);
+	await expect(search.getByLabel('Search result folders')).toHaveCount(0);
 });
 
 test('right panel shows unlinked note mentions beside backlinks', async ({ page, request }) => {

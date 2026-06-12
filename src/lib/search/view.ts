@@ -48,6 +48,12 @@ export interface SearchResultRows {
 	resultCount: number;
 }
 
+export interface SearchFolderFacet {
+	label: string;
+	count: number;
+	query: string;
+}
+
 export interface VisibleSearchDisplayRow {
 	row: SearchResultDisplayRow;
 	index: number;
@@ -92,6 +98,45 @@ export function searchResultFolder(path: string): string {
 	const clean = path.replace(/^\/+|\/+$/g, '');
 	const parts = clean.split('/').filter(Boolean);
 	return parts.length > 1 ? parts.slice(0, -1).join('/') : 'Vault root';
+}
+
+export function searchQueryHasPathFilter(query: string): boolean {
+	return /(^|\s)-?path:/i.test(query);
+}
+
+function quotedSearchValue(value: string): string {
+	return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+export function searchQueryWithFolder(query: string, folder: string): string {
+	const trimmed = query.replace(/\s+/g, ' ').trim();
+	if (searchQueryHasPathFilter(trimmed)) return trimmed;
+	const filter = folder === 'Vault root'
+		? 'path:/^[^/]+\\.md$/'
+		: `path:${quotedSearchValue(folder)}`;
+	return trimmed ? `${trimmed} ${filter}` : filter;
+}
+
+export function searchFolderFacets(
+	results: SearchHit[],
+	query = '',
+	max = 6
+): SearchFolderFacet[] {
+	if (searchQueryHasPathFilter(query)) return [];
+	const counts = new Map<string, number>();
+	for (const hit of results) {
+		const folder = searchResultFolder(hit.path);
+		counts.set(folder, (counts.get(folder) ?? 0) + 1);
+	}
+	return [...counts.entries()]
+		.map(([label, count]) => ({ label, count, query: searchQueryWithFolder(query, label) }))
+		.sort((a, b) => {
+			if (b.count !== a.count) return b.count - a.count;
+			if (a.label === 'Vault root') return 1;
+			if (b.label === 'Vault root') return -1;
+			return a.label.localeCompare(b.label);
+		})
+		.slice(0, max);
 }
 
 function searchResultGroupId(label: string): string {

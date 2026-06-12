@@ -14,6 +14,7 @@
 	import CanvasTextNodeEditor from './CanvasTextNodeEditor.svelte';
 
 	interface Props {
+		vaultId: string;
 		node: CanvasNode;
 		bounds: CanvasBounds;
 		draft: string;
@@ -43,6 +44,7 @@
 	}
 
 	let {
+		vaultId,
 		node,
 		bounds,
 		draft,
@@ -134,6 +136,7 @@
 		/>
 	{:else if node.type === 'file' || node.type === 'link'}
 		<CanvasNodeReferenceEditor
+			{vaultId}
 			{node}
 			{refDraft}
 			{refChanged}
