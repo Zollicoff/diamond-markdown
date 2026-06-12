@@ -249,6 +249,9 @@ Use small, pushable slices:
 - **File tree mutation helper extraction.** Move rename and drag/drop mutation
    classification out of `FileTreePanel` into pure tree helpers with coverage
    for note, Canvas, folder, and no-op rename cases.
+- **Git sync controls split.** Move the remote configuration form and primary
+   fetch/pull/push action row out of `GitSyncPanel` into focused
+   presentational sync components while keeping API orchestration centralized.
 
 ## Next Implementation Slices
 

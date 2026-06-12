@@ -5,7 +5,9 @@
 	import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '$lib/sync/commands';
 	import { buildGitSyncRecoveryCopy } from '$lib/sync/recovery';
 	import { buildGitSyncUiState } from '$lib/sync/status';
+	import GitSyncActionBar from './sync/GitSyncActionBar.svelte';
 	import GitSyncRecoveryPanel from './sync/GitSyncRecoveryPanel.svelte';
+	import GitSyncRemoteForm from './sync/GitSyncRemoteForm.svelte';
 	import GitSyncStatusCard from './sync/GitSyncStatusCard.svelte';
 
 	interface Props {
@@ -70,40 +72,28 @@
 <section class="group">
 	<h2>GitHub sync</h2>
 
-	<div class="row">
-		<div class="row-label">
-			<div class="row-title">Remote</div>
-			<div class="row-hint">GitHub HTTPS or SSH remote for this vault's git repo.</div>
-		</div>
-		<form
-			class="remote-form"
-			onsubmit={(event) => {
-				event.preventDefault();
-				if (!ui.canSaveRemote) return;
-				void run('remote', () => api.setSyncRemote(vaultId, remoteUrl));
-			}}
-		>
-			<input
-				class="remote-input mono"
-				type="text"
-				spellcheck="false"
-				placeholder="https://github.com/owner/repo.git"
-				bind:value={remoteUrl}
-				disabled={ui.isBusy}
-			/>
-			<button class="small-btn" disabled={!ui.canSaveRemote}>Save</button>
-		</form>
-	</div>
+	<GitSyncRemoteForm
+		{remoteUrl}
+		canSaveRemote={ui.canSaveRemote}
+		isBusy={ui.isBusy}
+		onRemoteUrlChange={(value) => (remoteUrl = value)}
+		onSaveRemote={() => run('remote', () => api.setSyncRemote(vaultId, remoteUrl))}
+	/>
 
 	<GitSyncStatusCard {status} indicator={ui.indicator} />
 
-	<div class="actions">
-		<button class="action-btn" onclick={loadStatus} disabled={ui.isBusy}>Refresh</button>
-		<button class="action-btn" onclick={() => run('check', () => api.checkSync(vaultId))} disabled={!ui.canCheck}>Check remote</button>
-		<button class="action-btn" onclick={() => run('fetch', () => api.fetchSync(vaultId))} disabled={!ui.canFetch}>Fetch</button>
-		<button class="action-btn" onclick={() => run('pull', () => api.pullSync(vaultId))} disabled={!ui.canPull}>Pull</button>
-		<button class="action-btn primary" onclick={() => run('push', () => api.pushSync(vaultId))} disabled={!ui.canPush}>Push</button>
-	</div>
+	<GitSyncActionBar
+		canCheck={ui.canCheck}
+		canFetch={ui.canFetch}
+		canPull={ui.canPull}
+		canPush={ui.canPush}
+		isBusy={ui.isBusy}
+		onRefresh={loadStatus}
+		onCheck={() => run('check', () => api.checkSync(vaultId))}
+		onFetch={() => run('fetch', () => api.fetchSync(vaultId))}
+		onPull={() => run('pull', () => api.pullSync(vaultId))}
+		onPush={() => run('push', () => api.pushSync(vaultId))}
+	/>
 
 	<GitSyncRecoveryPanel
 		{status}
@@ -141,75 +131,6 @@
 		margin: 0 0 14px;
 	}
 
-	.row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 24px;
-		padding: 10px 0;
-	}
-	.row-label { min-width: 0; flex: 1; }
-	.row-title { font-size: 0.92rem; color: var(--fg); }
-	.row-hint { font-size: 0.78rem; color: var(--fg-dim); margin-top: 2px; }
-
-	.remote-form {
-		display: grid;
-		grid-template-columns: minmax(220px, 320px) auto;
-		gap: 8px;
-		align-items: center;
-		min-width: min(420px, 100%);
-	}
-	.remote-input {
-		min-width: 0;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg);
-		color: var(--fg);
-		padding: 7px 9px;
-		font: inherit;
-		font-size: 0.78rem;
-	}
-	.remote-input:focus {
-		outline: 1px solid var(--accent);
-		border-color: var(--accent);
-	}
-
-	.actions {
-		display: flex;
-		gap: 8px;
-		justify-content: flex-end;
-	}
-	.small-btn,
-	.action-btn {
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		background: var(--bg-elev);
-		color: var(--fg);
-		font: inherit;
-		font-size: 0.78rem;
-		padding: 6px 10px;
-		cursor: pointer;
-	}
-	.action-btn.primary {
-		border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
-		color: var(--accent);
-	}
-	.small-btn:hover:not(:disabled),
-	.action-btn:hover:not(:disabled) {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.small-btn:disabled,
-	.action-btn:disabled,
-	.remote-input:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-	.action-btn.primary:disabled {
-		border-color: var(--border);
-		color: var(--fg-muted);
-	}
-
 	.ok-msg,
 	.err {
 		font-size: 0.82rem;
@@ -217,18 +138,4 @@
 	}
 	.ok-msg { color: var(--success); }
 	.err { color: var(--danger); }
-	.mono { font-family: var(--mono); }
-
-	@media (max-width: 760px) {
-		.row {
-			display: grid;
-		}
-		.remote-form {
-			grid-template-columns: 1fr auto;
-			min-width: 0;
-		}
-		.actions {
-			justify-content: flex-start;
-		}
-	}
 </style>
