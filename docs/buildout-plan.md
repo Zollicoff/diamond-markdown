@@ -227,6 +227,9 @@ Use small, pushable slices:
 - **Settings view section split.** Move settings navigation, appearance, vault,
    excluded-folder, and about sections into focused components with pure
    settings metadata helpers.
+- **App dialog presentation split.** Keep event-bus subscriptions and promise
+   resolution in `AppDialogs` while moving modal and toast DOM/CSS into focused
+   presentation components backed by small dialog helper tests.
 
 ## Next Implementation Slices
 
