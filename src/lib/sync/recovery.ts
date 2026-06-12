@@ -37,6 +37,16 @@ export function buildGitSyncRecoveryCopy(status: GitSyncStatus | null): GitSyncR
 		};
 	}
 
+	if (kind === 'local-changes') {
+		return {
+			kind,
+			title: 'Local vault changes',
+			subtitle: `${status.files.length} uncommitted file${status.files.length === 1 ? '' : 's'} must be reviewed before syncing.`,
+			badge: 'Review',
+			body: 'Diamond blocks pull and push while the vault worktree is dirty so git does not mix external edits with sync operations. Commit or stash these changes outside the app, then refresh sync status.'
+		};
+	}
+
 	if (kind === 'conflicts') {
 		return {
 			kind,

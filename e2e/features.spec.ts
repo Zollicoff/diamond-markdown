@@ -972,6 +972,40 @@ test('settings exposes GitHub sync status and controls', async ({ page }) => {
 	await expect(page.getByText(/Add a GitHub remote|Vault is clean|Commit or discard/)).toBeVisible({ timeout: 5_000 });
 });
 
+test('settings shows local git changes recovery guidance before sync actions', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'dirty-sync-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'dirty-sync-origin.git');
+	for (const dir of [vaultDir, bareDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nBase.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Dirty Sync Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	const branch = git(vaultDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+	git(vaultDir, ['push', '-u', 'origin', branch]);
+
+	fs.writeFileSync(path.join(vaultDir, 'Dirty.md'), '# Dirty\n\nExternal edit.\n');
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Settings').click();
+	const recovery = page.locator('.sync-block').filter({ hasText: 'Uncommitted files' });
+	await expect(recovery.getByText('Local vault changes', { exact: true })).toBeVisible();
+	await expect(recovery.getByText('Uncommitted files')).toBeVisible();
+	await expect(recovery.getByText('Dirty.md')).toBeVisible();
+	await expect(recovery).toContainText("git commit -m 'sync: save local vault changes'");
+	await expect(page.getByRole('button', { name: 'Pull' })).toBeDisabled();
+	await expect(page.getByRole('button', { name: 'Push' })).toBeDisabled();
+});
+
 test('sync status initializes a clean vault git repo with an initial commit', async ({ request }) => {
 	const res = await request.get('/api/vaults/default/sync');
 	expect(res.ok()).toBe(true);

@@ -32,6 +32,16 @@ export function buildGitSyncResolutionCommands(status: GitSyncStatus | null, vau
 	if (status.diverged) {
 		return [cd, 'git fetch origin', `git merge ${remoteRef}`, '# resolve any conflicts', 'git add -A', 'git commit', 'git push'].join('\n');
 	}
+	if (!status.clean) {
+		return [
+			cd,
+			'git status',
+			"git add -A",
+			"git commit -m 'sync: save local vault changes'",
+			"# or stash instead of committing:",
+			"git stash push -u -m 'diamond markdown local changes'"
+		].join('\n');
+	}
 	if (status.behind > 0) {
 		return [cd, `git pull --ff-only origin ${branch}`].join('\n');
 	}

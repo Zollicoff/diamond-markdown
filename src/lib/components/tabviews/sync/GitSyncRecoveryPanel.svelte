@@ -59,6 +59,27 @@
 	</div>
 {/if}
 
+{#if recovery === 'local-changes' && status}
+	<div class="sync-block">
+		<header class="panel-head">
+			<div>
+				<div class="panel-title">{copy?.title}</div>
+				<div class="panel-subtitle">{copy?.subtitle}</div>
+			</div>
+			<span class="badge">{copy?.badge}</span>
+		</header>
+		<p>{copy?.body}</p>
+		<div class="panel-actions">
+			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh after commit or stash</button>
+		</div>
+		{@render commandBlock(resolutionCommands)}
+		<div class="change-box local local-files">
+			<h3>Uncommitted files</h3>
+			{@render fileStatusList(status.files)}
+		</div>
+	</div>
+{/if}
+
 {#if recovery === 'conflicts' && status}
 	<div class="sync-block danger-block">
 		<header class="panel-head">
@@ -118,6 +139,21 @@
 		</ul>
 	{:else}
 		<div class="empty">{empty}</div>
+	{/if}
+{/snippet}
+
+{#snippet fileStatusList(files: GitSyncStatus['files'])}
+	{#if files.length > 0}
+		<ul class="change-list">
+			{#each files as file (file.path)}
+				<li class="mono" title={`${file.index}${file.workingDir} ${file.path}`}>
+					<span class="status-code">{file.index}{file.workingDir}</span>
+					<span>{file.path}</span>
+				</li>
+			{/each}
+		</ul>
+	{:else}
+		<div class="empty">No uncommitted files reported.</div>
 	{/if}
 {/snippet}
 
@@ -234,6 +270,9 @@
 		padding: 8px;
 		background: var(--bg-elev);
 	}
+	.local-files {
+		margin-top: 10px;
+	}
 	.change-box.hot {
 		border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
 	}
@@ -258,6 +297,12 @@
 		white-space: nowrap;
 		font-size: 0.72rem;
 		color: var(--fg);
+	}
+	.status-code {
+		display: inline-block;
+		min-width: 3ch;
+		margin-right: 6px;
+		color: var(--fg-muted);
 	}
 	.empty {
 		color: var(--fg-dim);

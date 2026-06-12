@@ -1,7 +1,7 @@
 import type { GitSyncStatus } from '../types';
 
 export type GitSyncIndicator = 'loading' | 'ok' | 'warn' | 'danger';
-export type GitSyncRecoveryKind = 'setup' | 'remote-changes' | 'conflicts' | 'diverged' | null;
+export type GitSyncRecoveryKind = 'setup' | 'local-changes' | 'remote-changes' | 'conflicts' | 'diverged' | null;
 
 export interface GitSyncUiState {
 	isBusy: boolean;
@@ -19,6 +19,7 @@ export function classifyGitSyncRecovery(status: GitSyncStatus | null): GitSyncRe
 	if (status.needsRemote) return 'setup';
 	if (status.conflicted.length > 0) return 'conflicts';
 	if (status.diverged) return 'diverged';
+	if (!status.clean) return 'local-changes';
 	if (status.behind > 0) return 'remote-changes';
 	return null;
 }

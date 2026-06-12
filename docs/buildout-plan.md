@@ -94,6 +94,9 @@ Use small, pushable slices:
 - **Obsidian image embed sizing.** Support image embed pipe metadata such as
    `![[image.png|300]]` and `![[image.png|300x200]]` in read mode and static
    publish output.
+- **Dirty sync recovery state.** Surface local uncommitted vault changes as a
+   distinct warning/review state with file visibility and commit/stash recovery
+   commands.
 
 ## Next Implementation Slices
 

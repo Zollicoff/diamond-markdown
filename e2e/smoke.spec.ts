@@ -257,8 +257,8 @@ test('light theme applies readable highlight.js token colors', async ({ page }) 
 });
 
 test('wikilink toolbar button inserts double-bracket [[]] syntax', async ({ page }) => {
-	await openFirstVault(page);
-	await openFirstNote(page);
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
 	// Switch to Source mode for deterministic raw-markdown reads.
 	await page.getByRole('tab', { name: 'Source' }).click();
 	const editor = page.locator('.cm-content').first();
