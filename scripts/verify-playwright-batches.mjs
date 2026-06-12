@@ -9,6 +9,7 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const e2eDir = 'e2e';
 const splitSpecFiles = new Set([
 	path.join(e2eDir, 'attachments.spec.ts'),
+	path.join(e2eDir, 'canvas-view.spec.ts'),
 	path.join(e2eDir, 'features.spec.ts')
 ]);
 const requiredBuildOutput = ['build/handler.js', 'build/server/manifest.js'];
@@ -45,6 +46,7 @@ async function playwrightEnv(batchIndex) {
 		DIAMOND_BASIC_AUTH: '',
 		DIAMOND_READ_ONLY: '',
 		DIAMOND_E2E_FIXTURE_ROOT: path.join(batchFixtureRunRoot, `batch-${String(batchIndex).padStart(3, '0')}`),
+		DIAMOND_REQUIRE_EXISTING_BUILD: '1',
 		PLAYWRIGHT_PORT: String(await pickFreeLoopbackPort())
 	};
 	if (!process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && process.platform === 'darwin' && fs.existsSync(macChrome)) {

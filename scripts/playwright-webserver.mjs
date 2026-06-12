@@ -1,8 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const REQUIRED_BUILD_OUTPUT = ['build/handler.js', 'build/server/manifest.js'];
+const REQUIRE_EXISTING_BUILD = process.env.DIAMOND_REQUIRE_EXISTING_BUILD === '1';
 
 function run(command, args, options = {}) {
 	const result = spawnSync(command, args, {
@@ -16,7 +18,14 @@ function run(command, args, options = {}) {
 }
 
 function missingBuildOutput() {
-	return REQUIRED_BUILD_OUTPUT.filter((file) => !fs.existsSync(file));
+	const missing = REQUIRED_BUILD_OUTPUT.filter((file) => !fs.existsSync(file));
+	if (missing.length > 0) return missing;
+
+	const manifest = fs.readFileSync('build/server/manifest.js', 'utf-8');
+	const chunkRefs = [...manifest.matchAll(/import\('(\.\/chunks\/[^']+)'\)/g)].map((match) =>
+		path.join('build/server', match[1])
+	);
+	return chunkRefs.filter((file) => !fs.existsSync(file));
 }
 
 function cleanBuildOutput() {
@@ -28,11 +37,15 @@ function cleanBuildOutput() {
 function ensureBuildOutput() {
 	let missing = missingBuildOutput();
 	if (missing.length === 0) return;
+	if (REQUIRE_EXISTING_BUILD) {
+		console.error(`Existing production build output is incomplete: ${missing.join(', ')}`);
+		process.exit(1);
+	}
 	for (let attempt = 1; attempt <= 2 && missing.length > 0; attempt += 1) {
 		if (attempt > 1) {
 			console.error(`Production build output incomplete (${missing.join(', ')}); retrying build.`);
-			cleanBuildOutput();
 		}
+		cleanBuildOutput();
 		run(npmCommand, ['run', 'build', '--', '--logLevel', 'warn'], { timeoutMs: 90_000 });
 		missing = missingBuildOutput();
 	}
