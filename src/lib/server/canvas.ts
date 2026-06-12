@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasNode } from '$lib/types';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
+import { commitChange } from './git';
 
 interface RawCanvasFile {
 	nodes?: unknown;
@@ -17,11 +18,24 @@ export class CanvasFileError extends Error {
 	}
 }
 
+export interface RenameCanvasResult {
+	ok: true;
+	from: string;
+	to: string;
+	sha: string | null;
+}
+
+export interface DeleteCanvasResult {
+	ok: true;
+	path: string;
+	sha: string | null;
+}
+
 function contentRevision(content: string): string {
 	return crypto.createHash('sha256').update(content, 'utf-8').digest('hex');
 }
 
-function ensureCanvasPath(inputPath: string): string {
+export function ensureCanvasPath(inputPath: string): string {
 	const rel = normalizeVaultPath(inputPath);
 	if (!rel.toLowerCase().endsWith('.canvas')) {
 		throw new CanvasFileError('canvas path must end with .canvas');
@@ -141,4 +155,35 @@ export function loadCanvas(vault: Vault, inputPath: string): CanvasDoc {
 		edges,
 		warnings
 	};
+}
+
+export async function renameCanvas(vault: Vault, fromInput: string, toInput: string): Promise<RenameCanvasResult> {
+	const from = ensureCanvasPath(fromInput);
+	const to = ensureCanvasPath(toInput);
+	if (from === to) return { ok: true, from, to, sha: null };
+
+	const fromAbs = resolveInVault(vault, from);
+	const toAbs = resolveInVault(vault, to);
+	if (!fs.existsSync(fromAbs) || !fs.statSync(fromAbs).isFile()) {
+		throw new CanvasFileError('canvas file not found', 404);
+	}
+	if (fs.existsSync(toAbs)) {
+		throw new CanvasFileError('destination already exists', 409);
+	}
+
+	fs.mkdirSync(path.dirname(toAbs), { recursive: true });
+	fs.renameSync(fromAbs, toAbs);
+	const commit = await commitChange(vault, [from, to], 'rename', `${from} → ${to}`);
+	return { ok: true, from, to, sha: commit?.sha ?? null };
+}
+
+export async function deleteCanvas(vault: Vault, inputPath: string): Promise<DeleteCanvasResult> {
+	const rel = ensureCanvasPath(inputPath);
+	const abs = resolveInVault(vault, rel);
+	if (fs.existsSync(abs)) {
+		if (!fs.statSync(abs).isFile()) throw new CanvasFileError('canvas path is not a file', 400);
+		fs.unlinkSync(abs);
+	}
+	const commit = await commitChange(vault, [rel], 'delete', rel);
+	return { ok: true, path: rel, sha: commit?.sha ?? null };
 }

@@ -17,6 +17,7 @@
 		isCanvasTreeFile,
 		isMarkdownTreeFile,
 		isTreeSortMode,
+		renamedTreeNodePath,
 		revealParentDirectories,
 		sortMenuPositionFromRect,
 		sortTreeNodes,
@@ -146,19 +147,11 @@
 			renamingPath = null;
 			return;
 		}
-		if (isCanvasTreeFile(node)) {
-			renamingPath = null;
-			await alertDialog({
-				title: 'Canvas rename is not available yet',
-				message: 'Canvas files open read-only in this build. Rename support will land with the general file-ops slice.'
-			});
-			return;
-		}
-		const parent = node.path.split('/').slice(0, -1).join('/');
-		const newPath = (parent ? `${parent}/` : '') + (node.type === 'file' ? `${newName}.md` : newName);
+		const newPath = renamedTreeNodePath(node, newName);
 		renamingPath = null;
 		try {
-			if (node.type === 'file') await api.renameNote(vaultId, node.path, newPath);
+			if (isCanvasTreeFile(node)) await api.renameCanvas(vaultId, node.path, newPath);
+			else if (node.type === 'file') await api.renameNote(vaultId, node.path, newPath);
 			else await api.renameFolder(vaultId, node.path, newPath);
 		} catch (e) {
 			await alertDialog({ title: 'Could not rename item', message: (e as Error).message, tone: 'danger' });
@@ -172,15 +165,9 @@
 		const name = srcPath.split('/').pop()!;
 		const newPath = destFolder ? `${destFolder}/${name}` : name;
 		if (newPath === srcPath) return;
-		if (isCanvas) {
-			await alertDialog({
-				title: 'Canvas move is not available yet',
-				message: 'Canvas files open read-only in this build. Move support will land with the general file-ops slice.'
-			});
-			return;
-		}
 		try {
 			if (isFolder) await api.renameFolder(vaultId, srcPath, newPath);
+			else if (isCanvas) await api.renameCanvas(vaultId, srcPath, newPath);
 			else await api.renameNote(vaultId, srcPath, newPath);
 		} catch (e) {
 			await alertDialog({ title: 'Could not move item', message: (e as Error).message, tone: 'danger' });

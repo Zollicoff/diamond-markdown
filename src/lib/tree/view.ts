@@ -92,6 +92,18 @@ export function treeFileDisplayName(node: TreeNode): string {
 	return node.name.replace(/\.(md|markdown|canvas)$/i, '');
 }
 
+export function renamedTreeNodePath(node: TreeNode, newName: string): string {
+	const parent = node.path.split('/').slice(0, -1).join('/');
+	const trimmed = newName.trim().replace(/^\/+|\/+$/g, '');
+	if (!trimmed) return node.path;
+	if (node.type === 'directory') return parent ? `${parent}/${trimmed}` : trimmed;
+
+	const existingExt = node.name.match(/\.(md|markdown|canvas)$/i)?.[0] ?? '';
+	const hasKnownExt = /\.(md|markdown|canvas)$/i.test(trimmed);
+	const fileName = hasKnownExt || !existingExt ? trimmed : `${trimmed}${existingExt}`;
+	return parent ? `${parent}/${fileName}` : fileName;
+}
+
 export function isCanvasTreeFile(node: TreeNode): boolean {
 	return node.type === 'file' && (node.fileKind === 'canvas' || node.path.toLowerCase().endsWith('.canvas'));
 }

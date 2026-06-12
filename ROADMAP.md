@@ -97,6 +97,8 @@ Deliberately smaller plugin surface than Obsidian's — too much API = too much 
 
 ## Open ideas (maybe, maybe not)
 
+- **Editable Canvas.** Read-only Canvas previews exist; full visual editing,
+  export, and Obsidian Canvas parity would need its own focused track.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
@@ -104,7 +106,7 @@ Deliberately smaller plugin surface than Obsidian's — too much API = too much 
 
 ## Non-goals
 
-- **Canvas.** Obsidian's visual whiteboarding. Not shipping. Folks who need it have Obsidian.
+- **Full Canvas parity as core.** Diamond opens `.canvas` boards read-only and supports file-tree operations; full visual whiteboarding remains out of core unless the project explicitly takes on that track.
 - **Hosted publish service.** We provide the static-site exporter; you bring the host (gh-pages, Cloudflare Pages, Vercel, Netlify, your own box). No proprietary hosting.
 - **Native mobile apps.** Responsive web is the target. PWA install, yes. App Store listings, no.
 - **Plugin runtime parity with Obsidian.** Their plugin API is huge. We keep ours small on purpose.

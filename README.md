@@ -16,7 +16,7 @@ Obsidian is great. It's also Electron, its sync is proprietary and paid, and its
 - **Multi-vault from day one.** Different folders, different indexes, one app.
 - **Open source (MIT).**
 
-If you want Obsidian's plugin ecosystem and Canvas, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow in a browser with real version history, Diamond Markdown is for you.
+If you want Obsidian's full plugin ecosystem and editable Canvas whiteboards, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, read-only Canvas previews, and real version history in a browser, Diamond Markdown is for you.
 
 ## Status
 
@@ -94,7 +94,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Tabs + split panes (recursive layout tree)
 - Touch swipes switch adjacent tabs first, then adjacent panes at tab boundaries
 - Polymorphic tabs: notes, graph, tags, search, settings
-- File tree with folders, rename / move / delete, drag-drop
+- File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
+- Read-only Obsidian Canvas previews for `.canvas` boards
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)

@@ -432,6 +432,14 @@ export function bindVaultEvents(vaultId: string): () => void {
 			if (e.vaultId !== vaultId) return;
 			closeTabsByPath(vaultId, e.path, false);
 		}),
+		on('canvas:renamed', (e) => {
+			if (e.vaultId !== vaultId) return;
+			renameTabPath(vaultId, e.from, e.to);
+		}),
+		on('canvas:deleted', (e) => {
+			if (e.vaultId !== vaultId) return;
+			closeTabsByPath(vaultId, e.path, false);
+		}),
 		on('folder:renamed', (e) => {
 			if (e.vaultId !== vaultId) return;
 			renameTabPath(vaultId, e.from, e.to);

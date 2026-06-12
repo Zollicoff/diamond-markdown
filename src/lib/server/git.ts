@@ -135,9 +135,11 @@ export async function commitChange(
 	if (files.length === 0) return null;
 	const g = await gitFor(vault);
 	await g.raw(['add', '-A', '--', ...files]);
-	// If nothing's actually staged (e.g. content unchanged), skip.
-	const status = await g.status();
-	if (status.staged.length === 0 && status.not_added.length === 0 && status.modified.length === 0) {
+	// If nothing is staged, skip. `git status()` is not reliable enough here,
+	// and `git diff --quiet` can treat a pure rename with identical content as
+	// no patch. Name-status reports staged renames/deletes explicitly.
+	const staged = await g.raw(['diff', '--cached', '--name-status', '--', ...files]);
+	if (!staged.trim()) {
 		return null;
 	}
 	try {

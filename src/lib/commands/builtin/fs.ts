@@ -12,6 +12,7 @@ import type { TreeNode } from '$lib/types';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
 import { alertDialog, confirmDialog, notify, promptText } from '$lib/dialogs';
+import { isCanvasTreeFile } from '$lib/tree/view';
 
 async function promptPath(title: string, label: string, confirmLabel: string, placeholder = ''): Promise<string | null> {
 	return promptText({ title, label, placeholder, confirmLabel });
@@ -25,6 +26,12 @@ function markdownNode(ctx: CommandContext): TreeNode | null {
 	const node = ctx.node;
 	if (!node || node.type !== 'file') return null;
 	return !node.fileKind || node.fileKind === 'markdown' ? node : null;
+}
+
+function canvasNode(ctx: CommandContext): TreeNode | null {
+	const node = ctx.node;
+	if (!node || !isCanvasTreeFile(node)) return null;
+	return node;
 }
 
 export function registerFsCommands(): void {
@@ -110,6 +117,28 @@ export function registerFsCommands(): void {
 				await api.duplicateNote(ctx.vaultId!, node.path);
 			} catch (e) {
 				await alertDialog({ title: 'Could not duplicate note', message: (e as Error).message, tone: 'danger' });
+			}
+		}
+	});
+
+	register({
+		id: 'canvas.delete',
+		title: 'Delete Canvas',
+		icon: '🗑',
+		category: 'file',
+		async exec(ctx: CommandContext) {
+			const node = canvasNode(ctx);
+			if (!node) return;
+			if (!(await confirmDialog({
+				title: 'Delete Canvas',
+				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
+				confirmLabel: 'Delete',
+				tone: 'danger'
+			}))) return;
+			try {
+				await api.deleteCanvas(ctx.vaultId!, node.path);
+			} catch (e) {
+				await alertDialog({ title: 'Could not delete Canvas', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});

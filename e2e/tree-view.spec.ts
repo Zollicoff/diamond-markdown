@@ -7,6 +7,7 @@ import {
 	isTreeSortMode,
 	parentDirectoriesForPath,
 	revealParentDirectories,
+	renamedTreeNodePath,
 	sortMenuPositionFromRect,
 	sortTreeNodes,
 	treeFileDisplayName,
@@ -101,5 +102,8 @@ test.describe('tree view helpers', () => {
 		expect(isCanvasTreeFile(markdown)).toBe(false);
 		expect(isMarkdownTreeFile(markdown)).toBe(true);
 		expect(isMarkdownTreeFile(canvas)).toBe(false);
+		expect(renamedTreeNodePath(canvas, 'Roadmap')).toBe('Boards/Roadmap.canvas');
+		expect(renamedTreeNodePath(markdown, 'Weekly')).toBe('Notes/Weekly.markdown');
+		expect(renamedTreeNodePath(dir('Boards'), 'Canvases')).toBe('Canvases');
 	});
 });

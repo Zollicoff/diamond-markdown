@@ -83,6 +83,8 @@ Use small, pushable slices:
 - **Read-only Canvas preview.** Show `.canvas` files in the tree, open them in
    workspace tabs and panes, parse Obsidian Canvas JSON server-side, and render
    a read-only node/edge board.
+- **Canvas file operations.** Rename, move, and delete `.canvas` files through
+   the same git-backed file tree flow as notes and folders.
 
 ## Next Implementation Slices
 

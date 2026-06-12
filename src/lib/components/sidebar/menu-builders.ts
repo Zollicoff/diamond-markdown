@@ -39,7 +39,10 @@ export function canvasFileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[
 		{ label: 'Open in new tab', icon: '⎚', shortcut: '⌘click', action: () => exec('tabs.open-in-new-tab', ctx) },
 		{ label: 'Open in new pane', icon: '⊞', action: () => exec('tabs.open-in-new-pane', ctx) },
 		{ separator: true, label: '' },
-		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) }
+		{ label: 'Rename', icon: '✎', shortcut: 'F2', action: () => deps.beginRename(node) },
+		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) },
+		{ separator: true, label: '' },
+		{ label: 'Delete Canvas', icon: '🗑', danger: true, action: () => exec('canvas.delete', ctx) }
 	];
 }
 

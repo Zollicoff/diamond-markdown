@@ -26,8 +26,9 @@ marks that as a review item. Diamond still registers the vault in place, but
 you should verify embeds after opening it.
 
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
-disk. Diamond Markdown opens Canvas files as read-only boards, but does not edit
-Canvas nodes or execute Obsidian plugins yet.
+disk. Diamond Markdown opens Canvas files as read-only boards and can rename,
+move, or delete the `.canvas` files from the file tree, but does not edit Canvas
+nodes or execute Obsidian plugins yet.
 
 ## GitHub Sync
 

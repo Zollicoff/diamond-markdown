@@ -49,6 +49,26 @@ export const api = {
 		return json(`/api/vaults/${vaultId}/canvas?path=${encodeURIComponent(path)}`);
 	},
 
+	async renameCanvas(vaultId: string, from: string, to: string): Promise<{ sha: string | null }> {
+		const res = await json<{ from: string; to: string; sha: string | null }>(
+			`/api/vaults/${vaultId}/canvas`,
+			{
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ from, to })
+			}
+		);
+		emit('canvas:renamed', { vaultId, from: res.from, to: res.to });
+		emit('tree:invalidate', { vaultId });
+		return { sha: res.sha };
+	},
+
+	async deleteCanvas(vaultId: string, path: string): Promise<void> {
+		await json(`/api/vaults/${vaultId}/canvas?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+		emit('canvas:deleted', { vaultId, path });
+		emit('tree:invalidate', { vaultId });
+	},
+
 	async saveNote(vaultId: string, path: string, content: string, expectedRevision?: string): Promise<{
 		created: boolean;
 		sha: string | null;
