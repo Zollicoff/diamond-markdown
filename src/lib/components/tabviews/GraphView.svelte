@@ -16,6 +16,7 @@
 	} from '$lib/graph/view';
 	import GraphCanvas from './GraphCanvas.svelte';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
+	import GraphToolbar from './GraphToolbar.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -378,24 +379,19 @@
 </script>
 
 <div class="graph-view">
-	<header class="bar">
-		<h2>Graph</h2>
-		<span class="count mono">
-			{#if filtersActive}
-				{visibleNodes.length} of {nodes.length} nodes · {visibleEdges.length} edges
-			{:else}
-				{nodes.length} nodes · {edges.length} edges
-			{/if}
-		</span>
-		{#if selectedCount > 0}
-			<span class="selected-count mono">{selectedCount} selected</span>
-			<button class="mini" onclick={clearSelection} title="Clear graph selection">Clear</button>
-		{/if}
-		<span class="spacer"></span>
-		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces, filters, display">⚙ Settings</button>
-		<button class="mini" onclick={resetAll} title="Restore force defaults, clear filters, re-center">Reset</button>
-		<button class="mini" onclick={center} title="Re-center the current view">Center</button>
-	</header>
+	<GraphToolbar
+		{filtersActive}
+		visibleNodeCount={visibleNodes.length}
+		totalNodeCount={nodes.length}
+		visibleEdgeCount={visibleEdges.length}
+		totalEdgeCount={edges.length}
+		{selectedCount}
+		{panelOpen}
+		onClearSelection={clearSelection}
+		onToggleSettings={() => (panelOpen = !panelOpen)}
+		onReset={resetAll}
+		onCenter={center}
+	/>
 
 	{#if loading && nodes.length === 0}
 		<p class="status">Building graph…</p>
@@ -466,41 +462,6 @@
 		min-height: 0;
 		background: var(--bg);
 	}
-	.bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 8px 14px;
-		border-bottom: 1px solid var(--border);
-	}
-	h2 {
-		font-family: 'Bricolage Grotesque', var(--sans);
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 600;
-	}
-	.count { font-size: 0.72rem; color: var(--fg-dim); }
-	.selected-count {
-		font-size: 0.72rem;
-		color: var(--accent);
-		background: var(--accent-soft);
-		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-		border-radius: 999px;
-		padding: 2px 8px;
-	}
-	.spacer { flex: 1; }
-	.mini {
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 3px 9px;
-		color: var(--fg-muted);
-		cursor: pointer;
-		font: inherit;
-		font-size: 0.76rem;
-	}
-	.mini:hover { color: var(--accent); border-color: var(--accent); }
-	.mini.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
 	.status, .err {
 		padding: 2rem;
@@ -516,5 +477,4 @@
 		font-size: 0.74rem;
 		color: var(--fg-dim);
 	}
-	.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 </style>

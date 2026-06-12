@@ -97,6 +97,9 @@ Use small, pushable slices:
 - **Dirty sync recovery state.** Surface local uncommitted vault changes as a
    distinct warning/review state with file visibility and commit/stash recovery
    commands.
+- **Graph toolbar split.** Move graph counts, selection clear, settings toggle,
+   reset, and centering controls out of `GraphView` into a presentational
+   `GraphToolbar` component.
 
 ## Next Implementation Slices
 
