@@ -134,6 +134,8 @@ Use small, pushable slices:
 - **Canvas file and URL node editing.** Edit Canvas file paths, URL targets,
    and optional display labels inline through git-backed commits with
    stale-revision protection.
+- **Canvas board split.** Move Canvas SVG edge rendering and node-card layout
+   out of `CanvasView` into a focused presentational board component.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

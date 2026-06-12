@@ -14,7 +14,6 @@
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
-		canvasNodeRefDraftChanged,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
@@ -30,8 +29,8 @@
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
 	import CanvasAddNodeForm from './canvas/CanvasAddNodeForm.svelte';
+	import CanvasBoard from './canvas/CanvasBoard.svelte';
 	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
-	import CanvasNodeCard from './canvas/CanvasNodeCard.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -405,50 +404,25 @@
 			onSaveLabel={saveEdgeLabel}
 			onDelete={deleteEdge}
 		/>
-		<div class="canvas-scroll">
-			<div class="canvas-board" style={`width: ${bounds.width}px; height: ${bounds.height}px;`}>
-				<svg class="edge-layer" width={bounds.width} height={bounds.height} aria-hidden="true">
-					{#each lines as line (line.edge.id)}
-						<line
-							x1={line.x1}
-							y1={line.y1}
-							x2={line.x2}
-							y2={line.y2}
-							class="edge"
-						/>
-						{#if line.edge.label}
-							<text
-								x={(line.x1 + line.x2) / 2}
-								y={(line.y1 + line.y2) / 2 - 6}
-								class="edge-label"
-							>{line.edge.label}</text>
-						{/if}
-					{/each}
-				</svg>
-
-				{#each displayNodes as node (node.id)}
-					<CanvasNodeCard
-						{node}
-						{bounds}
-						draft={canvasDraftFor(node, textDrafts)}
-						changed={canvasDraftChanged(node, textDrafts)}
-						refDraft={canvasNodeRefDraftFor(node, refDrafts)}
-						refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
-						refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
-						saving={savingNodeId === node.id}
-						moving={movingNodeId === node.id || moveSavingNodeId === node.id}
-						deleting={deletingNodeId === node.id}
-						disableDelete={deletingNodeId !== null || savingNodeId !== null || movingNodeId !== null || moveSavingNodeId !== null || savingEdgeId !== null || deletingEdgeId !== null}
-						onDraftChange={setDraft}
-						onRefDraftChange={setRefDraft}
-						onSave={saveTextNode}
-						onSaveRef={saveRefNode}
-						onDelete={deleteNode}
-						onMovePointerDown={startMoveNode}
-					/>
-				{/each}
-			</div>
-		</div>
+		<CanvasBoard
+			nodes={displayNodes}
+			{bounds}
+			{lines}
+			{textDrafts}
+			{refDrafts}
+			{savingNodeId}
+			{movingNodeId}
+			{moveSavingNodeId}
+			{deletingNodeId}
+			{savingEdgeId}
+			{deletingEdgeId}
+			onDraftChange={setDraft}
+			onRefDraftChange={setRefDraft}
+			onSave={saveTextNode}
+			onSaveRef={saveRefNode}
+			onDelete={deleteNode}
+			onMovePointerDown={startMoveNode}
+		/>
 	{/if}
 </section>
 
@@ -524,41 +498,6 @@
 	.mini:hover {
 		border-color: var(--accent);
 		color: var(--accent);
-	}
-	.canvas-scroll {
-		flex: 1;
-		min-height: 0;
-		overflow: auto;
-		background:
-			linear-gradient(var(--border) 1px, transparent 1px),
-			linear-gradient(90deg, var(--border) 1px, transparent 1px),
-			var(--bg);
-		background-size: 36px 36px;
-	}
-	.canvas-board {
-		position: relative;
-		min-width: 100%;
-		min-height: 100%;
-	}
-	.edge-layer {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		overflow: visible;
-	}
-	.edge {
-		stroke: var(--border-strong);
-		stroke-width: 2;
-		opacity: 0.75;
-	}
-	.edge-label {
-		fill: var(--fg-dim);
-		font-family: var(--mono);
-		font-size: 11px;
-		paint-order: stroke;
-		stroke: var(--bg);
-		stroke-width: 4px;
-		stroke-linejoin: round;
 	}
 	.mini:disabled {
 		cursor: not-allowed;
