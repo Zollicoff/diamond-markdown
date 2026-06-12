@@ -237,6 +237,9 @@ Use small, pushable slices:
 - **Stale-remote push guard.** Fetch remote refs before pushing so unseen
    GitHub commits turn into an explicit pull/divergence guard instead of a
    stale non-fast-forward push attempt.
+- **Canvas group node compatibility.** Render imported Obsidian Canvas group
+   nodes behind cards, include groups in SVG export, and create new group
+   nodes through the git-backed Canvas toolbar.
 
 ## Next Implementation Slices
 

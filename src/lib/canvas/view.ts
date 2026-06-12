@@ -64,7 +64,7 @@ export interface CanvasFileOpenTarget {
 export type CanvasTextDrafts = Record<string, string>;
 export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
-export type CanvasAddNodeType = 'text' | 'file' | 'link';
+export type CanvasAddNodeType = 'text' | 'file' | 'link' | 'group';
 
 const PADDING = 80;
 const OBSIDIAN_CANVAS_COLORS: Record<string, CanvasDisplayColor> = {
@@ -85,17 +85,19 @@ const OBSIDIAN_CANVAS_COLORS: Record<string, CanvasDisplayColor> = {
 export function canvasAddNodePlaceholder(type: CanvasAddNodeType): string {
 	if (type === 'file') return 'Note.md';
 	if (type === 'link') return 'https://example.com';
+	if (type === 'group') return 'Group label';
 	return 'New text card';
 }
 
 export function canvasAddNodeButtonLabel(type: CanvasAddNodeType): string {
 	if (type === 'file') return 'Add file';
 	if (type === 'link') return 'Add URL';
+	if (type === 'group') return 'Add group';
 	return 'Add text';
 }
 
 export function canSubmitCanvasAddNode(type: CanvasAddNodeType, value: string): boolean {
-	return type === 'text' || value.trim().length > 0;
+	return type === 'text' || type === 'group' || value.trim().length > 0;
 }
 
 export function canvasBounds(nodes: CanvasNode[]): CanvasBounds {
@@ -180,6 +182,7 @@ export function canvasEdgeStyle(edge: Pick<CanvasEdge, 'color'>): string {
 export function canvasSvgNodeColors(node: CanvasNode): { fill: string; stroke: string } {
 	const color = canvasDisplayColor(node.color);
 	if (color) return { fill: color.fill, stroke: color.accent };
+	if (node.type === 'group') return { fill: '#e2e8f0', stroke: '#64748b' };
 	if (node.type === 'file') return { fill: '#f8fafc', stroke: '#64748b' };
 	if (node.type === 'link') return { fill: '#ecfeff', stroke: '#0891b2' };
 	if (node.type === 'text') return { fill: '#fffbeb', stroke: '#d97706' };
@@ -192,6 +195,21 @@ export function canvasSvgEdgeStroke(edge: Pick<CanvasEdge, 'color'>): string {
 
 export function canvasNodeClass(node: CanvasNode): string {
 	return `canvas-node canvas-node-${node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown'}`;
+}
+
+export function isCanvasGroupNode(node: CanvasNode): boolean {
+	return node.type === 'group';
+}
+
+export function canvasContentNodes(nodes: CanvasNode[]): CanvasNode[] {
+	return nodes.filter((node) => !isCanvasGroupNode(node));
+}
+
+export function canvasLayeredNodes(nodes: CanvasNode[]): CanvasNode[] {
+	return [
+		...nodes.filter(isCanvasGroupNode),
+		...canvasContentNodes(nodes)
+	];
 }
 
 function center(node: CanvasNode, bounds: CanvasBounds): { x: number; y: number } {
@@ -223,10 +241,12 @@ export function canvasNodeTitle(node: CanvasNode): string {
 	if (node.label) return node.label;
 	if (node.type === 'file' && node.file) return node.file;
 	if (node.type === 'link' && node.url) return node.url;
+	if (node.type === 'group') return 'Group';
 	return node.label ?? node.type;
 }
 
 export function canvasNodeBody(node: CanvasNode): string {
+	if (node.type === 'group') return '';
 	if (node.text) return node.text;
 	if (node.file) return node.file;
 	if (node.url) return node.url;
@@ -341,7 +361,7 @@ export function canvasNodesWithPosition(nodes: CanvasNode[], position: CanvasNod
 }
 
 export function canvasNodeOptions(nodes: CanvasNode[]): CanvasNodeOption[] {
-	return nodes.map((node) => ({
+	return canvasContentNodes(nodes).map((node) => ({
 		id: node.id,
 		label: `${canvasNodeTitle(node)} (${node.type})`
 	}));
@@ -356,13 +376,14 @@ export function canvasConnectionDraft(
 	currentFromNodeId = '',
 	currentToNodeId = ''
 ): CanvasConnectionDraft {
-	const ids = new Set(nodes.map((node) => node.id));
+	const connectableNodes = canvasContentNodes(nodes);
+	const ids = new Set(connectableNodes.map((node) => node.id));
 	const fromNodeId = ids.has(currentFromNodeId)
 		? currentFromNodeId
-		: nodes[0]?.id ?? '';
+		: connectableNodes[0]?.id ?? '';
 	const toNodeId = ids.has(currentToNodeId) && currentToNodeId !== fromNodeId
 		? currentToNodeId
-		: nodes.find((node) => node.id !== fromNodeId)?.id ?? '';
+		: connectableNodes.find((node) => node.id !== fromNodeId)?.id ?? '';
 	return { fromNodeId, toNodeId };
 }
 

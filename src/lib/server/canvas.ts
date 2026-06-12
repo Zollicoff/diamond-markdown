@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasMutationResult, CanvasNode } from '$lib/types';
-import { canvasBounds, canvasNodeBody, canvasNodeTitle, canvasSvgEdgeStroke, canvasSvgNodeColors, edgeLines } from '$lib/canvas/view';
+import { canvasBounds, canvasLayeredNodes, canvasNodeBody, canvasNodeTitle, canvasSvgEdgeStroke, canvasSvgNodeColors, edgeLines } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -56,7 +56,7 @@ export interface MutateCanvasInput {
 	expectedRevision?: string;
 	nodeId?: string;
 	edgeId?: string;
-	nodeType?: 'text' | 'file' | 'link';
+	nodeType?: 'text' | 'file' | 'link' | 'group';
 	fromNode?: string;
 	toNode?: string;
 	label?: string;
@@ -126,7 +126,7 @@ function normalizeNode(value: unknown, index: number, warnings: string[]): Canva
 		x: number(node.x),
 		y: number(node.y),
 		width: Math.max(80, number(node.width, 240)),
-		height: Math.max(minHeight, number(node.height, type === 'text' ? 120 : minHeight)),
+		height: Math.max(minHeight, number(node.height, type === 'text' ? 120 : type === 'group' ? 240 : minHeight)),
 		text: text(node.text),
 		file: text(node.file),
 		url: text(node.url),
@@ -242,7 +242,7 @@ export function canvasToSvg(doc: CanvasDoc): string {
 		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${canvasSvgEdgeStroke(line.edge)}"></line>${label}`;
 	}).join('');
 
-	const nodeMarkup = doc.nodes.map((node) => {
+	const nodeMarkup = canvasLayeredNodes(doc.nodes).map((node) => {
 		const colors = canvasSvgNodeColors(node);
 		const x = node.x - bounds.minX;
 		const y = node.y - bounds.minY;
@@ -275,6 +275,7 @@ svg { background: #f8fafc; color: #0f172a; font-family: Inter, ui-sans-serif, sy
 .node-type { fill: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
 .node-title { fill: #0f172a; font-size: 14px; font-weight: 700; }
 .node-body { fill: #475569; font-size: 12px; }
+.node-group rect { stroke-dasharray: 8 6; opacity: 0.72; }
 </style>
 <title>${escHtml(doc.title)} Canvas export</title>
 <desc>${doc.nodes.length} nodes and ${doc.edges.length} edges exported from Diamond Markdown.</desc>
@@ -383,9 +384,9 @@ function cleanCanvasUrl(value: unknown): string {
 	return parsed.toString();
 }
 
-function canvasNodeType(value: unknown): 'text' | 'file' | 'link' {
+function canvasNodeType(value: unknown): 'text' | 'file' | 'link' | 'group' {
 	if (value === undefined || value === 'text') return 'text';
-	if (value === 'file' || value === 'link') return value;
+	if (value === 'file' || value === 'link' || value === 'group') return value;
 	throw new CanvasFileError('unsupported canvas node type');
 }
 
@@ -414,14 +415,16 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 	if (input.action === 'add-node' || input.action === 'add-text-node') {
 		const type = input.action === 'add-text-node' ? 'text' : canvasNodeType(input.nodeType);
 		const position = nextNodePosition(nodes);
-		const minHeight = type === 'text' ? 80 : 150;
+		const minHeight = type === 'text' ? 80 : type === 'group' ? 120 : 150;
+		const defaultWidth = type === 'group' ? 480 : 260;
+		const defaultHeight = type === 'text' ? 140 : type === 'group' ? 260 : 160;
 		const node: Record<string, unknown> = {
 			id: createCanvasNodeId(nodes, type),
 			type,
 			x: boundedNumber(input.x, position.x, -100_000, 100_000),
 			y: boundedNumber(input.y, position.y, -100_000, 100_000),
-			width: boundedNumber(input.width, 260, 120, 1200),
-			height: boundedNumber(input.height, type === 'text' ? 140 : 160, minHeight, 900)
+			width: boundedNumber(input.width, defaultWidth, 120, 1200),
+			height: boundedNumber(input.height, defaultHeight, minHeight, 900)
 		};
 		if (type === 'text') {
 			node.text = typeof input.text === 'string' && input.text.trim() ? input.text : 'New text card';
@@ -429,10 +432,12 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 			node.file = normalizeVaultPath(requiredText(input.file, 'file', 500));
 			const label = cleanOptionalLabel(input.label);
 			if (label) node.label = label;
-		} else {
+		} else if (type === 'link') {
 			node.url = cleanCanvasUrl(input.url);
 			const label = cleanOptionalLabel(input.label);
 			if (label) node.label = label;
+		} else {
+			node.label = cleanOptionalLabel(input.label ?? input.text) || 'Group';
 		}
 		nodes.push(node);
 	} else if (input.action === 'update-node-text') {

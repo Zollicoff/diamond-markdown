@@ -25,6 +25,8 @@ import {
 	canvasFileNodePath,
 	canvasFileNodeTitle,
 	canvasLinkNodeHref,
+	canvasContentNodes,
+	canvasLayeredNodes,
 	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeColorStyle,
@@ -85,6 +87,13 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');
 		expect(canvasNodeTitle({ ...doc.nodes[1], label: 'Home note' })).toBe('Home note');
+		const groupNode = { id: 'group', type: 'group', x: -40, y: -30, width: 640, height: 240, label: 'Research cluster' };
+		expect(canvasNodeTitle(groupNode)).toBe('Research cluster');
+		expect(canvasNodeTitle({ ...groupNode, label: undefined })).toBe('Group');
+		expect(canvasNodeBody(groupNode)).toBe('');
+		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
+		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
+		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
 		expect(canvasNodeBody({ ...doc.nodes[1], label: 'Home note' })).toBe('Home.md');
 		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
@@ -96,6 +105,7 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeStyle(doc.nodes[0], bounds)).toContain('--canvas-node-bg: #fee2e2');
 		expect(canvasSvgNodeColors(doc.nodes[0])).toEqual({ fill: '#fee2e2', stroke: '#dc2626' });
 		expect(canvasSvgNodeColors({ ...doc.nodes[0], color: undefined })).toEqual({ fill: '#fffbeb', stroke: '#d97706' });
+		expect(canvasSvgNodeColors({ ...groupNode, color: undefined })).toEqual({ fill: '#e2e8f0', stroke: '#64748b' });
 		expect(canvasEdgeStyle(doc.edges[0])).toBe('stroke: #0891b2;');
 		expect(canvasSvgEdgeStroke(doc.edges[0])).toBe('#0891b2');
 		expect(canvasSvgEdgeStroke({ ...doc.edges[0], color: 'bad' })).toBe('#94a3b8');
@@ -153,8 +163,11 @@ test.describe('canvas view helpers', () => {
 		expect(canvasLinkNodeHref({ ...linkNode, url: 'javascript:alert(1)' })).toBeNull();
 		expect(canOpenCanvasNode({ ...linkNode, url: 'ftp://example.com/file' })).toBe(false);
 		expect(canvasAddNodePlaceholder('file')).toBe('Note.md');
+		expect(canvasAddNodePlaceholder('group')).toBe('Group label');
 		expect(canvasAddNodeButtonLabel('link')).toBe('Add URL');
+		expect(canvasAddNodeButtonLabel('group')).toBe('Add group');
 		expect(canSubmitCanvasAddNode('text', '')).toBe(true);
+		expect(canSubmitCanvasAddNode('group', '')).toBe(true);
 		expect(canSubmitCanvasAddNode('file', '')).toBe(false);
 		expect(canSubmitCanvasAddNode('file', 'Home.md')).toBe(true);
 		expect(canvasNodePositionChanged(doc.nodes[1], 360, 90)).toBe(true);
@@ -183,7 +196,12 @@ test.describe('canvas view helpers', () => {
 			{ id: 'a', label: 'text (text)' },
 			{ id: 'b', label: 'Home.md (file)' }
 		]);
+		expect(canvasNodeOptions([groupNode, ...doc.nodes])).toEqual([
+			{ id: 'a', label: 'text (text)' },
+			{ id: 'b', label: 'Home.md (file)' }
+		]);
 		expect(canvasConnectionDraft(doc.nodes)).toEqual({ fromNodeId: 'a', toNodeId: 'b' });
+		expect(canvasConnectionDraft([groupNode, ...doc.nodes])).toEqual({ fromNodeId: 'a', toNodeId: 'b' });
 		expect(canvasConnectionDraft(doc.nodes, 'b', 'a')).toEqual({ fromNodeId: 'b', toNodeId: 'a' });
 		expect(canConnectCanvasNodes('a', 'b')).toBe(true);
 		expect(canConnectCanvasNodes('a', 'a')).toBe(false);
@@ -246,6 +264,63 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
 	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
 	await expect(page.locator('.note-view')).toContainText('Home');
+});
+
+test('canvas view renders and creates Obsidian Canvas groups', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-group-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
+		nodes: [
+			{ id: 'group-a', type: 'group', x: -40, y: -30, width: 560, height: 240, label: 'Research cluster', color: '5' },
+			{ id: 'note-a', type: 'text', x: 20, y: 40, width: 220, height: 120, text: 'Inside the group' }
+		],
+		edges: []
+	}, null, 2));
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Group Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+	expect(loaded.ok()).toBe(true);
+	const before = await loaded.json() as CanvasDoc;
+	expect(before.nodes.find((node) => node.id === 'group-a')).toMatchObject({
+		type: 'group',
+		label: 'Research cluster',
+		color: '5'
+	});
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator('.canvas-node-group').filter({ hasText: 'Research cluster' })).toBeVisible();
+	await expect(page.locator('.canvas-node-group').first()).toHaveAttribute('style', /--canvas-node-border: #0891b2/);
+	await expect(page.locator('.canvas-node-text textarea')).toHaveValue('Inside the group');
+	await expect(page.getByLabel('Canvas edge source')).not.toContainText('Research cluster');
+
+	const exported = await request.get(`/api/vaults/${vault.id}/canvas/export?path=${encodeURIComponent('Board.canvas')}`);
+	expect(exported.ok()).toBe(true);
+	const svg = await exported.text();
+	expect(svg).toContain('node-group');
+	expect(svg).toContain('Research cluster');
+	expect(svg).toContain('stroke-dasharray');
+
+	await page.getByLabel('Canvas node type').selectOption('group');
+	await page.getByLabel('Canvas node value').fill('Follow-up zone');
+	await page.getByRole('button', { name: 'Add group' }).click();
+	await expect(page.locator('.canvas-view')).toContainText('3 nodes · 0 edges · editable text cards');
+	await expect(page.locator('.canvas-node-group').filter({ hasText: 'Follow-up zone' })).toBeVisible();
+
+	await expect.poll(async () => {
+		const saved = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await saved.json() as CanvasDoc;
+		return body.nodes.some((node) => node.type === 'group' && node.label === 'Follow-up zone');
+	}).toBe(true);
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
 test('canvas file cards route notes, Canvas files, and unsupported assets explicitly', async ({ page, request }) => {

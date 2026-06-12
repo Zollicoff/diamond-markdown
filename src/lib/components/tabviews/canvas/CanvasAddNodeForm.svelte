@@ -34,6 +34,7 @@
 		<option value="text">Text</option>
 		<option value="file">File</option>
 		<option value="link">URL</option>
+		<option value="group">Group</option>
 	</select>
 	<input
 		class="mini node-value-input"

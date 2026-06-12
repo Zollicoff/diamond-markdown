@@ -4,6 +4,7 @@
 		canvasDraftChanged,
 		canvasDraftFor,
 		canvasEdgeStyle,
+		canvasLayeredNodes,
 		canvasNodeRefDraftChanged,
 		canvasNodeRefDraftFor,
 		canSaveCanvasNodeRefDraft,
@@ -65,6 +66,7 @@
 		savingEdgeId !== null ||
 		deletingEdgeId !== null
 	);
+	const layeredNodes = $derived(canvasLayeredNodes(nodes));
 </script>
 
 <div class="canvas-scroll">
@@ -89,7 +91,7 @@
 			{/each}
 		</svg>
 
-		{#each nodes as node (node.id)}
+		{#each layeredNodes as node (node.id)}
 			<CanvasNodeCard
 				{node}
 				{bounds}

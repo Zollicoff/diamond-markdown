@@ -5,6 +5,7 @@
 		canvasNodeClass,
 		canvasNodeStyle,
 		canvasNodeTitle,
+		isCanvasGroupNode,
 		type CanvasBounds,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
@@ -67,7 +68,19 @@
 		<div class="node-type">{node.type}</div>
 	</div>
 	<h3 title={title}>{title}</h3>
-	{#if node.type === 'text'}
+	{#if isCanvasGroupNode(node)}
+		<div class="group-fill"></div>
+		<div class="node-actions group-actions">
+			<button
+				class="mini node-remove"
+				aria-label={`Remove canvas node ${title}`}
+				disabled={disableDelete}
+				onclick={() => void onDelete(node)}
+			>
+				{deleting ? 'Removing...' : 'Remove'}
+			</button>
+		</div>
+	{:else if node.type === 'text'}
 		<textarea
 			class="node-editor"
 			aria-label={`Canvas text for ${node.id}`}
@@ -145,6 +158,7 @@
 		background: color-mix(in srgb, var(--bg-elev), var(--bg) 20%);
 		background: var(--canvas-node-bg, color-mix(in srgb, var(--bg-elev), var(--bg) 20%));
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+		z-index: 1;
 	}
 	.canvas-node-text {
 		border-color: var(--canvas-node-border, color-mix(in srgb, var(--accent), var(--border-strong) 70%));
@@ -163,7 +177,14 @@
 	}
 	.canvas-node-group {
 		border-color: var(--canvas-node-border, color-mix(in srgb, var(--accent), var(--border-strong) 75%));
-		background: var(--canvas-node-bg, color-mix(in srgb, var(--bg-elev), transparent 22%));
+		border-style: dashed;
+		background: var(--canvas-node-bg, color-mix(in srgb, var(--bg-elev), transparent 42%));
+		box-shadow: none;
+		z-index: 0;
+	}
+	.canvas-node-group h3 {
+		color: var(--canvas-node-type-color, var(--fg-muted));
+		font-size: 0.78rem;
 	}
 	.node-topline {
 		display: flex;
@@ -256,6 +277,13 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
+	}
+	.group-fill {
+		flex: 1;
+		min-height: 0;
+	}
+	.group-actions {
+		justify-content: flex-start;
 	}
 	.node-save,
 	.node-remove {

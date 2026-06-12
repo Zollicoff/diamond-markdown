@@ -31,6 +31,7 @@ async function addCanvasNodeRequest(
 	const payload: Record<string, unknown> = { path, action: 'add-node', nodeType, expectedRevision };
 	if (nodeType === 'file') payload.file = value;
 	else if (nodeType === 'link') payload.url = value;
+	else if (nodeType === 'group') payload.label = value || 'Group';
 	else payload.text = value || 'New text card';
 	const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
 		method: 'POST',
