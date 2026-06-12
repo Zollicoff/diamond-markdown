@@ -4,6 +4,7 @@ import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { NoteDoc } from '../src/lib/types';
 import { replaceEmbeds, type ParsedEmbed } from '../src/lib/server/wikilink';
+import { splitAssetReference } from '../src/lib/server/embed';
 
 function collectEmbeds(markdown: string): ParsedEmbed[] {
 	const embeds: ParsedEmbed[] = [];
@@ -23,6 +24,14 @@ test.describe('Obsidian image embed variants', () => {
 			{ raw: '![[main.png|Main panel|300x200]]', target: 'main.png', alt: 'Main panel', width: 300, height: 200 },
 			{ raw: '![[bad.png|0]]', target: 'bad.png', alt: '0', width: null, height: null }
 		]);
+		expect(splitAssetReference('Files/packet.pdf#page=3')).toEqual({
+			path: 'Files/packet.pdf',
+			suffix: '#page=3'
+		});
+		expect(splitAssetReference('Files/clip.mp4?start=10#t=10')).toEqual({
+			path: 'Files/clip.mp4',
+			suffix: '?start=10#t=10'
+		});
 	});
 
 	test('renders sized image embeds in read mode and static publish output', async ({ request }) => {
@@ -32,7 +41,7 @@ test.describe('Obsidian image embed variants', () => {
 		fs.writeFileSync(path.join(vaultDir, 'roof.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
 		fs.writeFileSync(
 			path.join(vaultDir, 'Sized.md'),
-			'---\ntitle: Sized\npublic: true\n---\n# Sized\n\n![[roof.svg|320x180]]\n\n![[roof.svg|Utility bill]]\n'
+			'---\ntitle: Sized\npublic: true\n---\n# Sized\n\n![[roof.svg|320x180]]\n\n![[roof.svg|Utility bill]]\n\n![[roof.svg#diagram|Roof diagram]]\n'
 		);
 
 		const created = await request.post('/api/vaults', {
@@ -48,6 +57,8 @@ test.describe('Obsidian image embed variants', () => {
 		expect(note.html).toContain('height="180"');
 		expect(note.html).toContain('alt="roof.svg"');
 		expect(note.html).toContain('alt="Utility bill"');
+		expect(note.html).toContain(`/api/vaults/${vault.id}/raw/roof.svg#diagram`);
+		expect(note.html).toContain('alt="Roof diagram"');
 
 		const published = await request.post(`/api/vaults/${vault.id}/publish`);
 		expect(published.ok()).toBe(true);
@@ -60,6 +71,8 @@ test.describe('Obsidian image embed variants', () => {
 		expect(html).toContain('height="180"');
 		expect(html).toContain('alt="roof.svg"');
 		expect(html).toContain('alt="Utility bill"');
+		expect(html).toContain('src="images/roof.svg#diagram"');
+		expect(html).toContain('alt="Roof diagram"');
 	});
 
 	test('renders non-image attachment embeds in read mode and static publish output', async ({ request }) => {
@@ -83,7 +96,7 @@ test.describe('Obsidian image embed variants', () => {
 				'',
 				'![[Files/clip.mp4|320x180]]',
 				'',
-				'![[Files/packet.pdf|Site packet]]',
+				'![[Files/packet.pdf#page=3|Site packet]]',
 				'',
 				'![[Files/bundle.zip|Download bundle]]'
 			].join('\n')
@@ -105,7 +118,7 @@ test.describe('Obsidian image embed variants', () => {
 		expect(note.html).toContain('width="320"');
 		expect(note.html).toContain('height="180"');
 		expect(note.html).toContain('embed-pdf');
-		expect(note.html).toContain(`/api/vaults/${vault.id}/raw/Files/packet.pdf`);
+		expect(note.html).toContain(`/api/vaults/${vault.id}/raw/Files/packet.pdf#page=3`);
 		expect(note.html).toContain('embed-file');
 		expect(note.html).toContain('Download bundle');
 
@@ -118,7 +131,7 @@ test.describe('Obsidian image embed variants', () => {
 		const html = fs.readFileSync(path.join(report.outDir, 'attachments.html'), 'utf-8');
 		expect(html).toContain('assets/voice.mp3');
 		expect(html).toContain('assets/clip.mp4');
-		expect(html).toContain('assets/packet.pdf');
+		expect(html).toContain('assets/packet.pdf#page=3');
 		expect(html).toContain('assets/bundle.zip');
 		expect(fs.existsSync(path.join(report.outDir, 'assets', 'voice.mp3'))).toBe(true);
 		expect(fs.existsSync(path.join(report.outDir, 'assets', 'clip.mp4'))).toBe(true);

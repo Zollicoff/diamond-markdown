@@ -25,7 +25,8 @@ import {
 	embedImageAttrs,
 	parseMarkdownImageText,
 	renderAttachmentEmbedHtml,
-	resolveMarkdownImagePath
+	resolveMarkdownImagePath,
+	splitAssetReference
 } from './embed';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
@@ -80,16 +81,18 @@ function renderInner(
 	const processed = processOutsideCode(mathReplaced, (chunk) => {
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
-				const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
-				return `<img src="${escAttr(src)}" ${embedImageAttrs(e)}>`;
+				const ref = splitAssetReference(e.target);
+				const src = `/api/vaults/${vault.id}/raw/${encodeURI(ref.path)}${ref.suffix}`;
+				return `<img src="${escAttr(src)}" ${embedImageAttrs({ ...e, target: ref.path })}>`;
 			}
 			const attachmentKind = attachmentEmbedKind(e.target);
 			if (attachmentKind) {
+				const ref = splitAssetReference(e.target);
 				try {
-					const abs = resolveInVault(vault, e.target);
+					const abs = resolveInVault(vault, ref.path);
 					if (fs.statSync(abs).isFile()) {
-						const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
-						return renderAttachmentEmbedHtml(e, src, attachmentKind);
+						const src = `/api/vaults/${vault.id}/raw/${encodeURI(ref.path)}${ref.suffix}`;
+						return renderAttachmentEmbedHtml({ ...e, target: ref.path }, src, attachmentKind);
 					}
 				} catch {
 					// Fall through to note resolution / broken embed display.

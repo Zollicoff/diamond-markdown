@@ -129,15 +129,17 @@ Use small, pushable slices:
 - **File tree virtualization helper extraction.** Move expanded-row flattening,
    viewport windowing, row styling, and drag/drop path ancestry helpers out of
    `FileTree` into pure tree helpers with focused tests.
+- **Attachment reference suffix preservation.** Resolve and publish asset
+   embeds from clean vault paths while preserving `#fragment` and `?query`
+   suffixes for images, PDFs, video, audio, and generic files.
 
 ## Next Implementation Slices
 
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as Canvas editing, richer attachment metadata, and
-   deeper plugin-settings migration guidance without executing Obsidian
-   plugins.
+   import edges such as Canvas editing, attachment drag/drop affordances, and
+   deeper plugin-settings migration guidance without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 

@@ -32,7 +32,8 @@ import {
 	embedImageAttrs,
 	parseMarkdownImageText,
 	renderAttachmentEmbedHtml,
-	resolveMarkdownImagePath
+	resolveMarkdownImagePath,
+	splitAssetReference
 } from './embed';
 import { slugify, escHtml, escAttr } from '$lib/util/strings';
 
@@ -165,19 +166,21 @@ function renderBodyForPublish(
 	const processed = processOutsideCode(body, (chunk) => {
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
-				const copied = copyImageForPublish(vault, e.target, imagesCopied, outDir);
+				const ref = splitAssetReference(e.target);
+				const copied = copyImageForPublish(vault, ref.path, imagesCopied, outDir);
 				if (!copied) {
 					return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
 				}
-				return `<img src="images/${encodeURI(copied)}" ${embedImageAttrs(e)}>`;
+				return `<img src="images/${encodeURI(copied)}${escAttr(ref.suffix)}" ${embedImageAttrs({ ...e, target: ref.path })}>`;
 			}
 			const attachmentKind = attachmentEmbedKind(e.target);
 			if (attachmentKind) {
-				const copied = copyAttachmentForPublish(vault, e.target, attachmentsCopied, outDir);
+				const ref = splitAssetReference(e.target);
+				const copied = copyAttachmentForPublish(vault, ref.path, attachmentsCopied, outDir);
 				if (!copied) {
 					return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
 				}
-				return renderAttachmentEmbedHtml(e, `assets/${encodeURI(copied)}`, attachmentKind);
+				return renderAttachmentEmbedHtml({ ...e, target: ref.path }, `assets/${encodeURI(copied)}${ref.suffix}`, attachmentKind);
 			}
 			const display = e.alt ?? e.target;
 			return escHtml(display);

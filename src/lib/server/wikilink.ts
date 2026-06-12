@@ -12,7 +12,7 @@
  */
 
 import { WIKILINK_RE } from '$lib/util/strings';
-import { parseObsidianEmbedMeta } from './embed';
+import { parseObsidianEmbedMeta, splitAssetReference } from './embed';
 
 export interface ParsedWikilink {
 	/** Exact substring from the source, including `[[` and `]]`. */
@@ -105,5 +105,5 @@ export function replaceEmbeds(body: string, render: (e: ParsedEmbed) => string):
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
 
 export function isImagePath(p: string): boolean {
-	return IMAGE_EXT_RE.test(p);
+	return IMAGE_EXT_RE.test(splitAssetReference(p).path);
 }

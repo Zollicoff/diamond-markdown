@@ -10,6 +10,20 @@ export interface ImageRenderMeta {
 
 export type AttachmentEmbedKind = 'audio' | 'video' | 'pdf' | 'file';
 
+export interface AssetReference {
+	path: string;
+	suffix: string;
+}
+
+export function splitAssetReference(target: string): AssetReference {
+	const marker = target.search(/[?#]/);
+	if (marker < 0) return { path: target, suffix: '' };
+	return {
+		path: target.slice(0, marker),
+		suffix: target.slice(marker)
+	};
+}
+
 export function parseImageSizeSpec(raw: string): Pick<ImageRenderMeta, 'width' | 'height'> | null {
 	const size = raw.trim().match(/^(\d{1,5})(?:\s*x\s*(\d{1,5}))?$/i);
 	if (!size) return null;
@@ -79,7 +93,7 @@ const VIDEO_EXT_RE = /\.(?:mp4|webm|ogv|mov|m4v)$/i;
 const PDF_EXT_RE = /\.pdf$/i;
 
 export function attachmentEmbedKind(target: string): AttachmentEmbedKind | null {
-	const cleanTarget = target.split('#')[0].split('?')[0];
+	const cleanTarget = splitAssetReference(target).path;
 	const ext = path.posix.extname(cleanTarget).toLowerCase();
 	if (!ext || ext === '.md') return null;
 	if (AUDIO_EXT_RE.test(cleanTarget)) return 'audio';
