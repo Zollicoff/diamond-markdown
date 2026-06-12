@@ -7,6 +7,7 @@
 		importReadiness,
 		importSummary,
 		obsidianAppConfigSummary,
+		obsidianDailyNotesSummary,
 		obsidianPluginMigrationNotes,
 		obsidianPluginSummary
 	} from '$lib/import/checklist';
@@ -76,6 +77,31 @@
 		{#if analysis.obsidianAppConfig.settings.length > 0}
 			<ul class="config-settings" aria-label="Obsidian app config settings">
 				{#each analysis.obsidianAppConfig.settings as setting (setting.id)}
+					<li class={`config-row ${setting.level}`}>
+						<div class="config-main">
+							<div>
+								<div class="config-name">{setting.label}</div>
+								<div class="config-detail">{setting.detail}</div>
+							</div>
+							<span class="config-value mono">{setting.value}</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if analysis.obsidianDailyNotes.status !== 'missing'}
+		<div class="note">
+			<span class="note-label">Obsidian Daily Notes</span>
+			<span>{obsidianDailyNotesSummary(analysis.obsidianDailyNotes)}</span>
+			{#if analysis.obsidianDailyNotes.path}
+				<span class="mono">{analysis.obsidianDailyNotes.path}</span>
+			{/if}
+		</div>
+		{#if analysis.obsidianDailyNotes.settings.length > 0}
+			<ul class="config-settings" aria-label="Obsidian Daily Notes settings">
+				{#each analysis.obsidianDailyNotes.settings as setting (setting.id)}
 					<li class={`config-row ${setting.level}`}>
 						<div class="config-main">
 							<div>

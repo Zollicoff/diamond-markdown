@@ -1,5 +1,6 @@
 import type {
 	ObsidianAppConfigInfo,
+	ObsidianDailyNotesInfo,
 	ObsidianPluginInfo,
 	ObsidianPluginJsonStatus,
 	VaultImportAnalysis,
@@ -91,6 +92,13 @@ export function obsidianAppConfigSummary(config: ObsidianAppConfigInfo): string 
 	if (config.status === 'invalid') return '.obsidian/app.json is present but invalid.';
 	if (config.settings.length === 0) return '.obsidian/app.json found; no supported app settings were recognized.';
 	return `${config.settings.length} supported app setting${config.settings.length === 1 ? '' : 's'} found.`;
+}
+
+export function obsidianDailyNotesSummary(config: ObsidianDailyNotesInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/daily-notes.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/daily-notes.json is present but invalid.';
+	if (config.settings.length === 0) return `.obsidian/daily-notes.json found; today's note resolves to ${config.plannedPath}.`;
+	return `${config.settings.length} Daily Notes setting${config.settings.length === 1 ? '' : 's'} found; today's note resolves to ${config.plannedPath}.`;
 }
 
 function formatBytes(bytes: number | undefined): string {

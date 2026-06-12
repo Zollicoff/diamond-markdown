@@ -6,6 +6,7 @@ import {
 	compactPathList,
 	importReadiness,
 	importSummary,
+	obsidianDailyNotesSummary,
 	obsidianAppConfigSummary,
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
@@ -29,6 +30,15 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			status: 'missing',
 			attachmentFolderStatus: 'missing',
 			newFileFolderStatus: 'not-configured',
+			settings: [],
+			warnings: []
+		},
+		obsidianDailyNotes: {
+			status: 'missing',
+			folderStatus: 'missing',
+			templateStatus: 'missing',
+			formatStatus: 'missing',
+			plannedPath: 'Daily Notes/2026-06-12.md',
 			settings: [],
 			warnings: []
 		},
@@ -100,6 +110,43 @@ test.describe('import checklist helpers', () => {
 			],
 			warnings: []
 		})).toBe('2 supported app settings found.');
+	});
+
+	test('summarizes Obsidian Daily Notes config without raw JSON', () => {
+		expect(obsidianDailyNotesSummary(analysis().obsidianDailyNotes)).toBe('No .obsidian/daily-notes.json file was found.');
+		expect(obsidianDailyNotesSummary({
+			path: '.obsidian/daily-notes.json',
+			status: 'invalid',
+			bytes: 12,
+			folderStatus: 'missing',
+			templateStatus: 'missing',
+			formatStatus: 'missing',
+			plannedPath: 'Daily Notes/2026-06-12.md',
+			settings: [],
+			warnings: ['invalid']
+		})).toBe('.obsidian/daily-notes.json is present but invalid.');
+		expect(obsidianDailyNotesSummary({
+			path: '.obsidian/daily-notes.json',
+			status: 'present',
+			bytes: 96,
+			folderPath: 'Journal',
+			folderStatus: 'safe',
+			templatePath: 'Templates/Daily Template.md',
+			templateStatus: 'safe',
+			format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
+			formatStatus: 'safe',
+			plannedPath: 'Journal/2026/June/2026-06-12-Fri.md',
+			settings: [
+				{
+					id: 'folder',
+					label: 'Daily note folder',
+					value: 'Journal',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				}
+			],
+			warnings: []
+		})).toBe("1 Daily Notes setting found; today's note resolves to Journal/2026/June/2026-06-12-Fri.md.");
 	});
 
 	test('guards Obsidian configured vault folders before reuse', () => {

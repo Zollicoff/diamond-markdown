@@ -8,6 +8,7 @@ import type {
 	VaultImportCheckItem
 } from '$lib/types';
 import { readObsidianAppConfig } from './obsidian-config';
+import { readObsidianDailyNotesConfig } from './obsidian-daily';
 
 const CONFIG_FOLDERS = new Set(['.obsidian', '.diamondmd']);
 const IGNORED_FOLDERS = new Set(['.git', '.diamond-publish', 'node_modules']);
@@ -86,6 +87,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	let obsidianConfig = fs.existsSync(path.join(root, '.obsidian'));
 	let diamondConfig = fs.existsSync(path.join(root, '.diamondmd'));
 	const obsidianAppConfig = readObsidianAppConfig(root);
+	const obsidianDailyNotes = readObsidianDailyNotesConfig(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
@@ -182,6 +184,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (unreadableEntries > 0) warnings.push(`${unreadableEntries} folder${unreadableEntries === 1 ? '' : 's'} could not be read.`);
 	if (skippedSymlinks > 0) warnings.push(`${skippedSymlinks} symlink${skippedSymlinks === 1 ? '' : 's'} skipped during inspection.`);
 	warnings.push(...obsidianAppConfig.warnings);
+	warnings.push(...obsidianDailyNotes.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
 	const attachmentDetail = likelyAttachmentFolders.length > 0
@@ -219,6 +222,18 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				? `${obsidianPluginFolders.length} Obsidian plugin folder${obsidianPluginFolders.length === 1 ? '' : 's'} found; Diamond surfaces manifests/settings read-only but does not run Obsidian plugins.`
 				: 'No Obsidian plugin folders were found.',
 			obsidianPluginFolders.length > 0 ? 'info' : 'ok'
+		),
+		item(
+			'obsidian-daily-notes',
+			'Daily Notes settings',
+			obsidianDailyNotes.status === 'present'
+				? `${obsidianDailyNotes.settings.length} Daily Notes setting${obsidianDailyNotes.settings.length === 1 ? '' : 's'} found; today's note resolves to ${obsidianDailyNotes.plannedPath}.`
+				: obsidianDailyNotes.status === 'invalid'
+					? '.obsidian/daily-notes.json is invalid; Diamond will use default Daily Notes behavior.'
+					: 'No Obsidian Daily Notes settings were found.',
+			obsidianDailyNotes.status === 'invalid' || obsidianDailyNotes.settings.some((setting) => setting.level === 'warn')
+				? 'warn'
+				: obsidianDailyNotes.status === 'present' ? 'info' : 'ok'
 		),
 		item(
 			'canvas',
@@ -261,6 +276,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		gitRepository,
 		likelyAttachmentFolders,
 		obsidianAppConfig,
+		obsidianDailyNotes,
 		obsidianPluginFolders,
 		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),

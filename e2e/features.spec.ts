@@ -141,6 +141,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Templates'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		attachmentFolderPath: 'Attachments',
 		newFileLocation: 'folder',
@@ -150,6 +151,12 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		newLinkFormat: 'relative',
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'daily-notes.json'), JSON.stringify({
+		folder: 'Journal',
+		template: 'Templates/Daily Template',
+		format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
+		privateDailySetting: 'do-not-render-this-daily-config-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['dataview']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'manifest.json'), JSON.stringify({
@@ -187,6 +194,18 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			attachmentFolderStatus: string;
 			newFileFolderPath?: string;
 			newFileFolderStatus: string;
+			settings: { id: string; label: string; value: string; level: string; detail: string }[];
+			warnings: string[];
+		};
+		obsidianDailyNotes: {
+			status: string;
+			folderPath?: string | null;
+			folderStatus: string;
+			templatePath?: string;
+			templateStatus: string;
+			format?: string;
+			formatStatus: string;
+			plannedPath: string;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
@@ -237,6 +256,18 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor shortcuts still favor wikilinks');
 	expect(JSON.stringify(body.obsidianAppConfig)).not.toContain('do-not-render-this-app-config-value');
+	expect(body.obsidianDailyNotes).toMatchObject({
+		status: 'present',
+		folderPath: 'Journal',
+		folderStatus: 'safe',
+		templatePath: 'Templates/Daily Template.md',
+		templateStatus: 'safe',
+		format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
+		formatStatus: 'safe'
+	});
+	expect(body.obsidianDailyNotes.settings.map((setting) => setting.id)).toEqual(['folder', 'template', 'format']);
+	expect(body.obsidianDailyNotes.plannedPath).toMatch(/^Journal\/\d{4}\/[A-Za-z]+\/\d{4}-\d{2}-\d{2}-[A-Za-z]{3}\.md$/);
+	expect(JSON.stringify(body.obsidianDailyNotes)).not.toContain('do-not-render-this-daily-config-value');
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
 	expect(body.obsidianPlugins[0]).toMatchObject({
 		id: 'dataview',
@@ -272,6 +303,12 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		newLinkFormat: 'relative',
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'daily-notes.json'), JSON.stringify({
+		folder: 'Journal',
+		template: 'Templates/Daily Template',
+		format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
+		privateDailySetting: 'do-not-render-this-daily-config-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['obsidian-kanban']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), JSON.stringify({
@@ -314,6 +351,16 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Update links on rename');
 	await expect(page.locator('.import-card')).toContainText('Disabled in Obsidian');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-app-config-value');
+	await expect(page.locator('.import-card')).toContainText('Daily Notes settings');
+	await expect(page.locator('.import-card')).toContainText('3 Daily Notes settings found');
+	await expect(page.locator('.import-card')).toContainText('Obsidian Daily Notes');
+	await expect(page.locator('.import-card')).toContainText('Daily note folder');
+	await expect(page.locator('.import-card')).toContainText('Journal');
+	await expect(page.locator('.import-card')).toContainText('Daily note template');
+	await expect(page.locator('.import-card')).toContainText('Templates/Daily Template.md');
+	await expect(page.locator('.import-card')).toContainText('Daily note date format');
+	await expect(page.locator('.import-card')).toContainText('YYYY/MMMM/YYYY-MM-DD-ddd');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-daily-config-value');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
@@ -1186,10 +1233,14 @@ export function activate(api) {
 
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-editor] worker editor ready'))).toBe(true);
+	await expect.poll(
+		() => logs.some((line) => line.includes('[plugin:worker-editor] worker editor ready')),
+		{ timeout: 10_000 }
+	).toBe(true);
 	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
+	await expect.poll(() => page.url(), { timeout: 10_000 }).toContain('/note/Home.md');
 	const editor = page.locator('.cm-content').first();
-	await expect(editor).toBeVisible();
+	await expect(editor).toBeVisible({ timeout: 10_000 });
 
 	await page.keyboard.press('Meta+P');
 	await page.locator('input[placeholder="Run a command…"]').fill('Worker Editor Insert');

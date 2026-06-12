@@ -50,6 +50,29 @@ export interface ObsidianAppConfigInfo {
 	warnings: string[];
 }
 
+export interface ObsidianDailyNotesSetting {
+	id: string;
+	label: string;
+	value: string;
+	detail: string;
+	level: VaultImportCheckLevel;
+}
+
+export interface ObsidianDailyNotesInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	folderPath?: string | null;
+	folderStatus: 'safe' | 'vault-root' | 'unsafe' | 'missing';
+	templatePath?: string;
+	templateStatus: 'safe' | 'unsafe' | 'missing';
+	format?: string;
+	formatStatus: 'safe' | 'unsafe' | 'missing';
+	plannedPath: string;
+	settings: ObsidianDailyNotesSetting[];
+	warnings: string[];
+}
+
 export interface NewNoteLocation {
 	folder: string | null;
 	source: 'obsidian-app-config' | 'vault-root';
@@ -81,6 +104,7 @@ export interface VaultImportAnalysis {
 	gitRepository: boolean;
 	likelyAttachmentFolders: string[];
 	obsidianAppConfig: ObsidianAppConfigInfo;
+	obsidianDailyNotes: ObsidianDailyNotesInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];
 	recommendedExcludedFolders: string[];

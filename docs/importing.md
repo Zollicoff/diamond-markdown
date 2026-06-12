@@ -14,6 +14,7 @@ an existing Obsidian vault. The preflight reports:
 - supported `.obsidian/app.json` settings, including safe attachment folder,
   new-note folder, link style, link-update preference, link format, and trash
   preference
+- safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - Obsidian plugin folders plus read-only manifest/settings migration guidance
 - Obsidian Canvas files that will be preserved and opened with visual editing
 - whether the folder already has `.git`
@@ -35,6 +36,8 @@ When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 Moment-style token subset used by Diamond templates, including `YYYY`, `MM`,
 `DD`, `ddd`, `dddd`, `MMM`, and `MMMM`; unsafe paths fall back to Diamond's
 default `Daily Notes/YYYY-MM-DD.md` and `Daily Notes/Template.md` behavior.
+The import preview surfaces those supported Daily Notes settings and the note
+path Diamond would create today without exposing unknown raw config values.
 
 Diamond will not execute Obsidian community plugins. The import preview reads
 plugin manifests plus the top-level keys in each plugin `data.json`, then shows
