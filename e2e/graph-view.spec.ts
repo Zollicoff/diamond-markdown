@@ -15,6 +15,7 @@ import {
 	resetGraphForceSettings
 } from '../src/lib/graph/settings';
 import {
+	buildGraphCanvasEdges,
 	buildGraphProjection,
 	screenToGraph,
 	selectNodesInBox,
@@ -101,6 +102,33 @@ test.describe('graph view helpers', () => {
 		expect(projection.visibleEdges).toEqual([{ from: 'Alpha.md', to: 'Beta.md' }]);
 		expect(projection.filtersActive).toBe(true);
 		expect(projection.selectedCount).toBe(1);
+	});
+
+	test('resolves graph canvas edge endpoints without template lookups', () => {
+		const nodes = [
+			node('Alpha.md', 'Alpha', 2, 10, 20),
+			node('Beta.md', 'Beta', 1, 30, 40)
+		];
+		const edges: GEdge[] = [
+			{ from: 'Alpha.md', to: 'Beta.md' },
+			{ from: 'Alpha.md', to: 'Missing.md' },
+			{ from: 'Alpha.md', to: 'Beta.md' }
+		];
+
+		expect(buildGraphCanvasEdges(nodes, edges)).toEqual([
+			{
+				key: 'Alpha.md->Beta.md:0',
+				edge: edges[0],
+				from: nodes[0],
+				to: nodes[1]
+			},
+			{
+				key: 'Alpha.md->Beta.md:1',
+				edge: edges[2],
+				from: nodes[0],
+				to: nodes[1]
+			}
+		]);
 	});
 
 	test('normalizes selection boxes and converts screen coordinates', () => {

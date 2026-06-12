@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { nodeRadius, type GEdge, type GNode } from '$lib/graph/sim';
-	import type { GraphSelectionBox } from '$lib/graph/view';
+	import { buildGraphCanvasEdges, type GraphSelectionBox } from '$lib/graph/view';
 
 	interface Props {
 		nodes: GNode[];
@@ -52,6 +52,7 @@
 	}: Props = $props();
 
 	let svgEl: SVGSVGElement | null = $state(null);
+	const canvasEdges = $derived(buildGraphCanvasEdges(nodes, visibleEdges));
 
 	onMount(() => {
 		if (svgEl) onSvgMount(svgEl);
@@ -71,17 +72,13 @@
 	onpointercancel={onPointerUpGraph}
 >
 	<g transform={`translate(${viewX}, ${viewY}) scale(${viewScale})`}>
-		{#each visibleEdges as edge, i (i)}
-			{@const a = nodes.find((node) => node.path === edge.from)}
-			{@const b = nodes.find((node) => node.path === edge.to)}
-			{#if a && b}
-				<line
-					x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-					class="edge"
-					class:hl={hoverPath === edge.from || hoverPath === edge.to}
-					class:selected={selectedPaths.includes(edge.from) && selectedPaths.includes(edge.to)}
-				/>
-			{/if}
+		{#each canvasEdges as canvasEdge (canvasEdge.key)}
+			<line
+				x1={canvasEdge.from.x} y1={canvasEdge.from.y} x2={canvasEdge.to.x} y2={canvasEdge.to.y}
+				class="edge"
+				class:hl={hoverPath === canvasEdge.edge.from || hoverPath === canvasEdge.edge.to}
+				class:selected={selectedPaths.includes(canvasEdge.edge.from) && selectedPaths.includes(canvasEdge.edge.to)}
+			/>
 		{/each}
 		{#each visibleNodes as node (node.path)}
 			<g

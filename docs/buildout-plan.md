@@ -258,6 +258,9 @@ Use small, pushable slices:
 - **Canvas edge-side compatibility.** Respect imported Obsidian Canvas
    `fromSide` and `toSide` anchors when drawing board and SVG export
    connections, while keeping center anchors as the fallback.
+- **Graph canvas edge helper extraction.** Resolve graph canvas edge endpoints
+   in a pure helper so `GraphCanvas` renders prepared edge view data instead
+   of doing repeated template lookups.
 
 ## Next Implementation Slices
 

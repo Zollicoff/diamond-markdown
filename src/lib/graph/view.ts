@@ -13,6 +13,13 @@ export interface GraphProjection {
 	selectedCount: number;
 }
 
+export interface GraphCanvasEdge {
+	key: string;
+	edge: GEdge;
+	from: GNode;
+	to: GNode;
+}
+
 export interface GraphSelectionBox {
 	x: number;
 	y: number;
@@ -59,6 +66,25 @@ export function buildGraphProjection(
 		filtersActive: graphFiltersActive(filters),
 		selectedCount: selectedPaths.filter((path) => visiblePaths.has(path)).length
 	};
+}
+
+export function buildGraphCanvasEdges(nodes: GNode[], edges: GEdge[]): GraphCanvasEdge[] {
+	const byPath = new Map(nodes.map((node) => [node.path, node]));
+	const canvasEdges: GraphCanvasEdge[] = [];
+
+	for (const edge of edges) {
+		const from = byPath.get(edge.from);
+		const to = byPath.get(edge.to);
+		if (!from || !to) continue;
+		canvasEdges.push({
+			key: `${edge.from}->${edge.to}:${canvasEdges.length}`,
+			edge,
+			from,
+			to
+		});
+	}
+
+	return canvasEdges;
 }
 
 export function selectionBoxFromPoints(
