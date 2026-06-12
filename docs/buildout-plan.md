@@ -112,13 +112,15 @@ Use small, pushable slices:
 - **Graph interaction helper extraction.** Move zoom, pan, drag-threshold,
    selection-toggle, and node-open title logic out of `GraphView` into pure
    graph helpers with focused tests.
+- **Canvas SVG export.** Export read-only Obsidian Canvas boards as sanitized
+   SVG snapshots from the server and expose the download action in Canvas tabs.
 
 ## Next Implementation Slices
 
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as Canvas editing/export, richer attachment metadata, and
+   import edges such as Canvas editing, richer attachment metadata, and
    plugin-settings visibility without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.

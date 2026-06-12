@@ -35,8 +35,8 @@ you should verify embeds after opening it.
 
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
 disk. Diamond Markdown opens Canvas files as read-only boards and can rename,
-move, or delete the `.canvas` files from the file tree, but does not edit Canvas
-nodes or execute Obsidian plugins yet.
+move, delete, or export the `.canvas` files as SVG snapshots, but does not edit
+Canvas nodes or execute Obsidian plugins yet.
 
 ## GitHub Sync
 

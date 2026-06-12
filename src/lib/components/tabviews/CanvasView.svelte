@@ -23,6 +23,8 @@
 
 	const bounds = $derived(canvasBounds(doc?.nodes ?? []));
 	const lines = $derived(doc ? edgeLines(doc, bounds) : []);
+	const exportHref = $derived(`/api/vaults/${vaultId}/canvas/export?path=${encodeURIComponent(path)}`);
+	const exportName = $derived(`${path.split('/').pop()?.replace(/\.canvas$/i, '') || 'canvas'}.svg`);
 
 	function nodeClass(node: CanvasNode): string {
 		return `canvas-node canvas-node-${node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown'}`;
@@ -58,7 +60,10 @@
 			<p class="mono">{path}</p>
 		</div>
 		{#if doc}
-			<div class="canvas-stats mono">{canvasSummary(doc)} · read-only</div>
+			<div class="canvas-actions">
+				<div class="canvas-stats mono">{canvasSummary(doc)} · read-only</div>
+				<a class="mini" href={exportHref} download={exportName}>Download SVG</a>
+			</div>
 		{/if}
 	</header>
 
@@ -143,6 +148,25 @@
 		color: var(--fg-dim);
 		font-size: 0.72rem;
 		white-space: nowrap;
+	}
+	.canvas-actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.mini {
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 3px 9px;
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.76rem;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.mini:hover {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	.canvas-scroll {
 		flex: 1;

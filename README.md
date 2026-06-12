@@ -95,7 +95,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Touch swipes switch adjacent tabs first, then adjacent panes at tab boundaries
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
-- Read-only Obsidian Canvas previews for `.canvas` boards
+- Read-only Obsidian Canvas previews for `.canvas` boards, with SVG export
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)

@@ -81,6 +81,45 @@ test('canvas API and file tree open a read-only Obsidian Canvas preview', async 
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · read-only');
 	await expect(page.locator('.canvas-view')).toContainText('Canvas text card');
 	await expect(page.locator('.canvas-view')).toContainText('Home.md');
+	await expect(page.getByRole('link', { name: 'Download SVG' })).toHaveAttribute(
+		'href',
+		`/api/vaults/${vault.id}/canvas/export?path=Board.canvas`
+	);
+});
+
+test('canvas API exports a safe SVG snapshot', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-export-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Export.canvas'), JSON.stringify({
+		nodes: [
+			{ id: 'a', type: 'text', x: 0, y: 0, width: 260, height: 140, text: 'Canvas <script>alert(1)</script> & text' },
+			{ id: 'b', type: 'file', x: 340, y: 50, width: 220, height: 100, file: 'Home.md' }
+		],
+		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens <bad>' }]
+	}, null, 2));
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Export Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const exported = await request.get(`/api/vaults/${vault.id}/canvas/export?path=${encodeURIComponent('Export.canvas')}`);
+	expect(exported.ok()).toBe(true);
+	expect(exported.headers()['content-type']).toContain('image/svg+xml');
+	expect(exported.headers()['content-disposition']).toContain('Export.svg');
+	const svg = await exported.text();
+	expect(svg).toContain('<svg');
+	expect(svg).toContain('Canvas export');
+	expect(svg).toContain('Home.md');
+	expect(svg).toContain('opens &lt;bad&gt;');
+	expect(svg).toContain('Canvas &lt;script&gt;alert(1)&lt;/script&gt;');
+	expect(svg).toContain('&amp; text');
+	expect(svg).not.toContain('<script>');
+	expect(fs.existsSync(path.join(vaultDir, '.git'))).toBe(false);
+	expect(fs.existsSync(path.join(vaultDir, 'Export.canvas'))).toBe(true);
 });
 
 test('canvas API renames, moves, and deletes Canvas files with clean git commits', async ({ request }) => {

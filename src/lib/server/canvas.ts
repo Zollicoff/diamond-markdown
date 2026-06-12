@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasNode } from '$lib/types';
+import { canvasBounds, canvasNodeBody, canvasNodeTitle, edgeLines } from '$lib/canvas/view';
+import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
 import { commitChange } from './git';
@@ -29,6 +31,11 @@ export interface DeleteCanvasResult {
 	ok: true;
 	path: string;
 	sha: string | null;
+}
+
+export interface CanvasSvgExport {
+	filename: string;
+	svg: string;
 }
 
 function contentRevision(content: string): string {
@@ -154,6 +161,102 @@ export function loadCanvas(vault: Vault, inputPath: string): CanvasDoc {
 		nodes,
 		edges,
 		warnings
+	};
+}
+
+function wrapSvgText(textValue: string, maxChars: number, maxLines: number): string[] {
+	const words = textValue.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+	const lines: string[] = [];
+	let current = '';
+	for (const word of words) {
+		const next = current ? `${current} ${word}` : word;
+		if (next.length > maxChars && current) {
+			lines.push(current);
+			current = word;
+		} else {
+			current = next;
+		}
+		if (lines.length >= maxLines) break;
+	}
+	if (current && lines.length < maxLines) lines.push(current);
+	if (lines.length === 0 && textValue.trim()) lines.push(textValue.trim().slice(0, maxChars));
+	if (lines.length === maxLines && words.join(' ').length > lines.join(' ').length) {
+		lines[lines.length - 1] = `${lines[lines.length - 1].replace(/\s+$/, '')}...`;
+	}
+	return lines;
+}
+
+function nodeClassColor(node: CanvasNode): { fill: string; stroke: string } {
+	if (node.type === 'file') return { fill: '#f8fafc', stroke: '#64748b' };
+	if (node.type === 'link') return { fill: '#ecfeff', stroke: '#0891b2' };
+	if (node.type === 'text') return { fill: '#fffbeb', stroke: '#d97706' };
+	return { fill: '#f1f5f9', stroke: '#94a3b8' };
+}
+
+function svgNodeClass(node: CanvasNode): string {
+	return node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown';
+}
+
+export function canvasToSvg(doc: CanvasDoc): string {
+	const bounds = canvasBounds(doc.nodes);
+	const lines = edgeLines(doc, bounds);
+	const width = Math.ceil(bounds.width);
+	const height = Math.ceil(bounds.height);
+
+	const edgeMarkup = lines.map((line) => {
+		const label = line.edge.label
+			? `<text class="edge-label" x="${(line.x1 + line.x2) / 2}" y="${(line.y1 + line.y2) / 2 - 8}">${escHtml(line.edge.label)}</text>`
+			: '';
+		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}"></line>${label}`;
+	}).join('');
+
+	const nodeMarkup = doc.nodes.map((node) => {
+		const colors = nodeClassColor(node);
+		const x = node.x - bounds.minX;
+		const y = node.y - bounds.minY;
+		const title = canvasNodeTitle(node);
+		const body = canvasNodeBody(node);
+		const titleLines = wrapSvgText(title, Math.max(12, Math.floor((node.width - 24) / 8)), 2);
+		const bodyLines = wrapSvgText(body, Math.max(14, Math.floor((node.width - 24) / 7)), 4);
+		const titleMarkup = titleLines.map((line, index) => (
+			`<tspan x="${x + 12}" dy="${index === 0 ? 0 : 16}">${escHtml(line)}</tspan>`
+		)).join('');
+		const bodyMarkup = bodyLines.map((line, index) => (
+			`<tspan x="${x + 12}" dy="${index === 0 ? 24 : 15}">${escHtml(line)}</tspan>`
+		)).join('');
+		return [
+			`<g class="node node-${svgNodeClass(node)}">`,
+			`<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="8" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2"></rect>`,
+			`<text class="node-type" x="${x + 12}" y="${y + 18}">${escHtml(node.type.toUpperCase())}</text>`,
+			`<text class="node-title" x="${x + 12}" y="${y + 42}">${titleMarkup}</text>`,
+			bodyMarkup ? `<text class="node-body" x="${x + 12}" y="${y + 62}">${bodyMarkup}</text>` : '',
+			'</g>'
+		].join('');
+	}).join('');
+
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escAttr(doc.title)} Canvas export">
+<style>
+svg { background: #f8fafc; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.edge { stroke: #94a3b8; stroke-width: 2; stroke-linecap: round; }
+.edge-label { fill: #475569; font-size: 12px; paint-order: stroke; stroke: #f8fafc; stroke-width: 4px; stroke-linejoin: round; }
+.node-type { fill: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+.node-title { fill: #0f172a; font-size: 14px; font-weight: 700; }
+.node-body { fill: #475569; font-size: 12px; }
+</style>
+<title>${escHtml(doc.title)} Canvas export</title>
+<desc>${doc.nodes.length} nodes and ${doc.edges.length} edges exported from Diamond Markdown.</desc>
+${edgeMarkup}
+${nodeMarkup}
+</svg>`;
+}
+
+export function exportCanvasSvg(vault: Vault, inputPath: string): CanvasSvgExport {
+	const doc = loadCanvas(vault, inputPath);
+	const base = path.basename(doc.path, '.canvas').replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'canvas';
+	return {
+		filename: `${base}.svg`,
+		svg: canvasToSvg(doc)
 	};
 }
 
