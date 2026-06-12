@@ -122,6 +122,10 @@ Use small, pushable slices:
    delete, and insert orchestration in `AttachmentPicker` while moving the
    list, empty/error states, row metadata, and responsive row styling into a
    focused presentational component.
+- **Markdown preview presentation split.** Keep markdown navigation,
+   postprocessing, Mermaid rendering, and hover-preview state in `Preview`
+   while moving the rendered markdown surface and hover-card DOM/CSS into
+   focused presentational components.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
