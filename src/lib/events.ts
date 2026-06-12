@@ -27,6 +27,7 @@ export interface VaultEventMap {
 	'outline:jump':  { vaultId: string; path: string; headingId: string; };
 	'template:insert': { vaultId: string; content: string; };
 	'searches:changed': { vaultId: string; };
+	'bookmarks:changed': { vaultId: string; };
 	'note:rename-request': { vaultId: string; path: string; };
 	'dialog:prompt': {
 		title: string;

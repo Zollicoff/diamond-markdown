@@ -1,4 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { FIXTURE_PATHS } from './setup-fixture';
 
 /**
  * Hotkey spec — every shortcut in the global keymap fires its actual
@@ -93,36 +96,15 @@ test('⌘⇧L cycles theme', async ({ page }) => {
 test('⌘⇧B toggles bookmark on the active note', async ({ page }) => {
 	await openVault(page);
 	await openFirstNote(page);
-	const path = page.url().split('/note/')[1];
-	const before = await page.evaluate(
-		(args: { vaultId: string; path: string }) => {
-			const raw = localStorage.getItem(`diamond.bookmarks.${args.vaultId}`);
-			if (!raw) return false;
-			try {
-				const list = JSON.parse(raw) as { path: string }[];
-				return list.some((b) => b.path === decodeURIComponent(args.path));
-			} catch {
-				return false;
-			}
-		},
-		{ vaultId: 'default', path }
-	);
+	const notePath = decodeURIComponent(page.url().split('/note/')[1] ?? '');
+	const bookmarksFile = path.join(FIXTURE_PATHS.VAULT_DIR, '.diamondmd', 'bookmarks.json');
 	await page.keyboard.press(`${MOD}+Shift+KeyB`);
-	await page.waitForTimeout(200);
-	const after = await page.evaluate(
-		(args: { vaultId: string; path: string }) => {
-			const raw = localStorage.getItem(`diamond.bookmarks.${args.vaultId}`);
-			if (!raw) return false;
-			try {
-				const list = JSON.parse(raw) as { path: string }[];
-				return list.some((b) => b.path === decodeURIComponent(args.path));
-			} catch {
-				return false;
-			}
-		},
-		{ vaultId: 'default', path }
-	);
-	expect(after).not.toBe(before);
+	await expect.poll(() => fs.existsSync(bookmarksFile), { timeout: 5_000 }).toBe(true);
+	await expect.poll(() => {
+		const body = JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8')) as { bookmarks: { path: string }[] };
+		return body.bookmarks.some((b) => b.path === notePath);
+	}).toBe(true);
+	await expect(page.locator('.bookmarks')).toContainText(notePath.replace(/\.md$/i, '').split('/').pop() ?? notePath);
 });
 
 test('⌘W closes the active tab', async ({ page }) => {

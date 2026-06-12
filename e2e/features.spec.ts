@@ -487,6 +487,62 @@ test('search tab saves, restores, and deletes vault-local saved searches', async
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 });
 
+test('bookmarks are vault-local and follow git-backed note and folder moves', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'bookmarks-sync-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, 'Notes', 'Archive'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Notes', 'Solar.md'), '# Solar\n\nIllinois Shines survey.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Notes', 'Archive', 'Old.md'), '# Old\n\nArchive note.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Bookmarks Sync Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const saved = await request.post(`/api/vaults/${vault.id}/bookmarks`, {
+		data: { path: 'Notes/Solar.md', title: 'Solar' }
+	});
+	expect(saved.ok(), await saved.text()).toBe(true);
+	expect(await saved.json()).toMatchObject({
+		created: true,
+		bookmark: { path: 'Notes/Solar.md', title: 'Solar' }
+	});
+	const bookmarksFile = path.join(vaultDir, '.diamondmd', 'bookmarks.json');
+	await expect.poll(() => fs.existsSync(bookmarksFile)).toBe(true);
+	expect(JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8'))).toMatchObject({
+		bookmarks: [expect.objectContaining({ path: 'Notes/Solar.md', title: 'Solar' })]
+	});
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+
+	const renamedNote = await request.patch(`/api/vaults/${vault.id}/note`, {
+		data: { from: 'Notes/Solar.md', to: 'Notes/Solar Visit.md' }
+	});
+	expect(renamedNote.ok(), await renamedNote.text()).toBe(true);
+	expect(JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8'))).toMatchObject({
+		bookmarks: [expect.objectContaining({ path: 'Notes/Solar Visit.md', title: 'Solar Visit' })]
+	});
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+
+	const savedNested = await request.post(`/api/vaults/${vault.id}/bookmarks`, {
+		data: { path: 'Notes/Archive/Old.md', title: 'Old' }
+	});
+	expect(savedNested.ok(), await savedNested.text()).toBe(true);
+	const renamedFolder = await request.patch(`/api/vaults/${vault.id}/folder`, {
+		data: { from: 'Notes/Archive', to: 'Projects/Archive' }
+	});
+	expect(renamedFolder.ok(), await renamedFolder.text()).toBe(true);
+	const afterFolderRename = JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8')) as { bookmarks: { path: string }[] };
+	expect(afterFolderRename.bookmarks.map((bookmark) => bookmark.path)).toContain('Projects/Archive/Old.md');
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+
+	const deletedNote = await request.delete(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Notes/Solar Visit.md')}`);
+	expect(deletedNote.ok(), await deletedNote.text()).toBe(true);
+	const afterDelete = JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8')) as { bookmarks: { path: string }[] };
+	expect(afterDelete.bookmarks.map((bookmark) => bookmark.path)).toEqual(['Projects/Archive/Old.md']);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
 test('search tab virtualizes large full-text result sets while preserving scroll access', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'search-virtual-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });

@@ -207,12 +207,16 @@ export function registerFsCommands(): void {
 		title: 'Toggle bookmark',
 		icon: '★',
 		category: 'file',
-		exec(ctx: CommandContext) {
+		async exec(ctx: CommandContext) {
 			if (ctx.node && !markdownNode(ctx)) return;
 			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
 			if (!path || !ctx.vaultId) return;
 			const title = (ctx.node?.name ?? path.split('/').pop() ?? path).replace(/\.md$/, '');
-			bookmarks.toggle(ctx.vaultId, path, title);
+			try {
+				await bookmarks.toggle(ctx.vaultId, path, title);
+			} catch (e) {
+				await alertDialog({ title: 'Could not update bookmark', message: (e as Error).message, tone: 'danger' });
+			}
 		}
 	});
 

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { NoteDoc } from '$lib/types';
+import { BOOKMARKS_REL_PATH, removeBookmarksForPath } from './bookmarks';
 import { commitChange } from './git';
 import { splitFrontmatter } from './frontmatter';
 import { getIndex, removeNote, upsertNote } from './indexer';
@@ -119,6 +120,8 @@ export async function deleteNote(vault: Vault, inputPath: string): Promise<Delet
 	const abs = resolveInVault(vault, rel);
 	if (fs.existsSync(abs)) fs.unlinkSync(abs);
 	removeNote(vault, rel);
-	const res = await commitChange(vault, [rel], 'delete', rel);
+	const bookmarks = removeBookmarksForPath(vault, rel);
+	const files = bookmarks.changed ? [rel, BOOKMARKS_REL_PATH] : [rel];
+	const res = await commitChange(vault, files, 'delete', rel);
 	return { ok: true, sha: res?.sha ?? null, path: rel };
 }

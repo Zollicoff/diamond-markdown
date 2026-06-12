@@ -10,7 +10,7 @@ Diamond Markdown already has the right foundation:
 - SvelteKit app shell with server-only filesystem and git code.
 - Vault registry, file tree, editor, live preview, read mode, backlinks,
   outgoing links, tags, graph view, templates, daily notes, history, publishing,
-  bookmarks, recent notes, and mobile sidebar behavior.
+  git-backed bookmarks, recent notes, and mobile sidebar behavior.
 - Per-vault git history plus explicit GitHub sync status, fetch, pull, push,
   remote setup, remote health checks, and remote-behind write guards.
 - Basic Auth and read-only modes for safer single-user self-hosting.
@@ -337,6 +337,10 @@ Use small, pushable slices:
    `.diamondmd/searches.json`, commit changes with the vault, and expose compact
    restore/delete controls in the Search tab so recurring searches follow
    GitHub sync.
+- **Git-backed bookmarks.** Persist per-vault bookmarks in
+  `.diamondmd/bookmarks.json`, commit user bookmark changes, and update stored
+  bookmark paths during note/folder rename and delete operations so bookmarks
+  follow GitHub sync with the vault.
 - **Unlinked mentions.** Surface notes that mention the active note title,
    stem, or aliases without already wikilinking it, using the existing index
    and right-panel link list instead of a new vault scan.

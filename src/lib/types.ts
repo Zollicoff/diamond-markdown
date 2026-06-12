@@ -281,6 +281,21 @@ export interface SearchResponse {
 	results: SearchHit[];
 }
 
+export interface Bookmark {
+	path: string;
+	title: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface BookmarkMutationResult {
+	bookmark?: Bookmark;
+	bookmarks: Bookmark[];
+	created?: boolean;
+	deleted?: boolean;
+	sha: string | null;
+}
+
 export type SavedSearchMode = 'title' | 'full';
 
 export interface SavedSearch {

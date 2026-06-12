@@ -50,7 +50,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Code highlighting (highlight.js)
 - [x] Footnotes
 - [x] General templates (`Templates/` folder + ⌘⇧T)
-- [x] Bookmarks (⌘⇧B, sidebar panel)
+- [x] Git-backed bookmarks (⌘⇧B, sidebar panel)
 - [x] Recent notes panel
 - [x] Light / Dark / Auto theme (⌘⇧L)
 - [x] PWA manifest + theme-color + icons (home-screen install)

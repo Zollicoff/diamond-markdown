@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Vault } from './vault';
+import { BOOKMARKS_REL_PATH, removeBookmarksForPath } from './bookmarks';
 import { commitChange } from './git';
 import { getIndex, removeNote } from './indexer';
 import { normalizeVaultPath, resolveInVault } from './paths';
@@ -110,10 +111,12 @@ export async function deleteFolder(vault: Vault, inputPath: string, force = fals
 
 	fs.rmSync(abs, { recursive: true, force: true });
 	for (const note of removedNotes) removeNote(vault, note);
+	const bookmarks = removeBookmarksForPath(vault, rel, { folder: true });
 
 	const summary = `${rel}/ (${removedNotes.length} note${removedNotes.length === 1 ? '' : 's'})`;
-	const commit = deletedFiles.length > 0
-		? await commitChange(vault, deletedFiles, 'delete', summary)
+	const files = bookmarks.changed ? [...deletedFiles, BOOKMARKS_REL_PATH] : deletedFiles;
+	const commit = files.length > 0
+		? await commitChange(vault, files, 'delete', summary)
 		: null;
 
 	return { ok: true, path: rel, removedNotes: removedNotes.length, sha: commit?.sha ?? null };

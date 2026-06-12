@@ -103,7 +103,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
 - Obsidian import support that preserves `.obsidian`, surfaces plugin settings as manual migration guidance, and honors safe attachment/new-note/daily-note settings plus link-update preferences
 - Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
-- Bookmarks panel (per-vault, ⌘⇧B to toggle)
+- Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)
 
@@ -127,6 +127,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 ### Versioning
 - Git auto-commit on save (debounced, per-vault repo)
 - Per-note history viewer with diff, snapshot copy, and git-backed restore
+- Vault-local bookmarks and saved searches are stored under `.diamondmd/` so
+  they follow ordinary GitHub sync with the vault
 - GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, and push local commits
 
 ### Daily notes

@@ -8,8 +8,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { simpleGit } from 'simple-git';
+import { simpleGit, type SimpleGit } from 'simple-git';
 import type { Vault } from './vault';
+import { BOOKMARKS_REL_PATH, renameBookmarksForPath } from './bookmarks';
 import { getIndex, upsertNote, removeNote } from './indexer';
 import { shouldUpdateLinksOnRename } from './obsidian-config';
 import { resolveInVault } from './paths';
@@ -29,6 +30,12 @@ const stem = (p: string): string => path.basename(p, path.extname(p));
 
 /** Escape a string for use inside a regex. */
 const reEsc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+async function stagePaths(g: SimpleGit, files: string[]): Promise<void> {
+	for (const file of [...new Set(files)]) {
+		await g.raw(['add', '-A', '--', file]).catch(() => { /* stale pathspecs are harmless here */ });
+	}
+}
 
 /**
  * Rewrite wikilinks across the vault after a note moves from `oldPath`
@@ -185,10 +192,13 @@ export async function renameNoteAtomically(
 	const newContent = fs.readFileSync(absNew, 'utf-8');
 	removeNote(vault, oldPath);
 	upsertNote(vault, newPath, newContent);
+	const bookmarkUpdates = renameBookmarksForPath(vault, oldPath, newPath);
 
 	// Commit everything as one.
-	const filesToAdd = [oldPath, newPath, ...touched];
-	await g.add(filesToAdd).catch(() => { /* may race; simple-git is forgiving */ });
+	const filesToAdd = bookmarkUpdates.changed
+		? [oldPath, newPath, ...touched, BOOKMARKS_REL_PATH]
+		: [oldPath, newPath, ...touched];
+	await stagePaths(g, filesToAdd);
 	const summary = linksUpdated > 0
 		? `${oldPath} → ${newPath} (+${linksUpdated} link${linksUpdated === 1 ? '' : 's'} updated)`
 		: `${oldPath} → ${newPath}`;
@@ -251,10 +261,13 @@ export async function renameFolderAtomically(
 			upsertNote(vault, m.to, fs.readFileSync(absMoved, 'utf-8'));
 		}
 	}
+	const bookmarkUpdates = renameBookmarksForPath(vault, oldFolder, newFolder, { folder: true });
 
 	// Commit.
-	const filesToAdd = [oldFolder, newFolder, ...touched];
-	await g.add(filesToAdd).catch(() => { /* ok */ });
+	const filesToAdd = bookmarkUpdates.changed
+		? [oldFolder, newFolder, ...touched, BOOKMARKS_REL_PATH]
+		: [oldFolder, newFolder, ...touched];
+	await stagePaths(g, filesToAdd);
 	const summary = linksUpdated > 0
 		? `${oldFolder}/ → ${newFolder}/ (+${linksUpdated} link${linksUpdated === 1 ? '' : 's'} updated)`
 		: `${oldFolder}/ → ${newFolder}/`;

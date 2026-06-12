@@ -3,6 +3,7 @@
 	import { openNote } from '$lib/workspace/actions';
 	import { bookmarks } from '$lib/bookmarks.svelte';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { alertDialog } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -15,6 +16,14 @@
 
 	function open(e: MouseEvent, path: string, title: string): void {
 		openNote(vaultId, path, title, openModeForPointer(e));
+	}
+
+	async function removeBookmark(path: string): Promise<void> {
+		try {
+			await remove(vaultId, path);
+		} catch (e) {
+			await alertDialog({ title: 'Could not remove bookmark', message: (e as Error).message, tone: 'danger' });
+		}
 	}
 
 	// Make sure the snapshot has populated.
@@ -45,7 +54,7 @@
 					<button
 						class="x"
 						title="Remove bookmark"
-						onclick={(e) => { e.stopPropagation(); remove(vaultId, b.path); }}
+						onclick={(e) => { e.stopPropagation(); void removeBookmark(b.path); }}
 					>×</button>
 				</li>
 			{/each}

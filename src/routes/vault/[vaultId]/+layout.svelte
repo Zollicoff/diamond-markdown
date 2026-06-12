@@ -37,7 +37,7 @@
 	onMount(() => {
 		// Boot: hydrate workspace, wire event listeners, register commands.
 		hydrateWorkspace(vaultId);
-		hydrateBookmarks(vaultId);
+		void hydrateBookmarks(vaultId);
 		registerBuiltinCommands();
 		let disposePlugins: (() => void) | null = null;
 		let pluginReloadSeq = 0;

@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
@@ -538,6 +538,30 @@ export const api = {
 			{ method: 'DELETE' }
 		);
 		emit('searches:changed', { vaultId });
+		return res;
+	},
+
+	async bookmarks(vaultId: string): Promise<Bookmark[]> {
+		const res = await json<{ bookmarks: Bookmark[] }>(`/api/vaults/${vaultId}/bookmarks`);
+		return res.bookmarks ?? [];
+	},
+
+	async saveBookmark(vaultId: string, input: { path: string; title: string }): Promise<BookmarkMutationResult> {
+		const res = await json<BookmarkMutationResult>(`/api/vaults/${vaultId}/bookmarks`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(input)
+		});
+		emit('bookmarks:changed', { vaultId });
+		return res;
+	},
+
+	async deleteBookmark(vaultId: string, path: string): Promise<BookmarkMutationResult> {
+		const res = await json<BookmarkMutationResult>(
+			`/api/vaults/${vaultId}/bookmarks?path=${encodeURIComponent(path)}`,
+			{ method: 'DELETE' }
+		);
+		emit('bookmarks:changed', { vaultId });
 		return res;
 	},
 
