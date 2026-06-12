@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasMutationResult, CanvasNode } from '$lib/types';
-import { canvasBounds, canvasNodeBody, canvasNodeTitle, edgeLines } from '$lib/canvas/view';
+import { canvasBounds, canvasNodeBody, canvasNodeTitle, canvasSvgEdgeStroke, canvasSvgNodeColors, edgeLines } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -225,13 +225,6 @@ function wrapSvgText(textValue: string, maxChars: number, maxLines: number): str
 	return lines;
 }
 
-function nodeClassColor(node: CanvasNode): { fill: string; stroke: string } {
-	if (node.type === 'file') return { fill: '#f8fafc', stroke: '#64748b' };
-	if (node.type === 'link') return { fill: '#ecfeff', stroke: '#0891b2' };
-	if (node.type === 'text') return { fill: '#fffbeb', stroke: '#d97706' };
-	return { fill: '#f1f5f9', stroke: '#94a3b8' };
-}
-
 function svgNodeClass(node: CanvasNode): string {
 	return node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown';
 }
@@ -246,11 +239,11 @@ export function canvasToSvg(doc: CanvasDoc): string {
 		const label = line.edge.label
 			? `<text class="edge-label" x="${(line.x1 + line.x2) / 2}" y="${(line.y1 + line.y2) / 2 - 8}">${escHtml(line.edge.label)}</text>`
 			: '';
-		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}"></line>${label}`;
+		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${canvasSvgEdgeStroke(line.edge)}"></line>${label}`;
 	}).join('');
 
 	const nodeMarkup = doc.nodes.map((node) => {
-		const colors = nodeClassColor(node);
+		const colors = canvasSvgNodeColors(node);
 		const x = node.x - bounds.minX;
 		const y = node.y - bounds.minY;
 		const title = canvasNodeTitle(node);

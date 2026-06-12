@@ -11,6 +11,8 @@ import {
 	canvasDraftFor,
 	canvasAddNodeButtonLabel,
 	canvasAddNodePlaceholder,
+	canvasDisplayColor,
+	canvasEdgeStyle,
 	canvasEdgeLabelChanged,
 	canvasEdgeLabelDraftFor,
 	canvasEdgeLabelDrafts,
@@ -20,6 +22,7 @@ import {
 	canvasEdgeSummaries,
 	canvasNodeClass,
 	canvasNodeBody,
+	canvasNodeColorStyle,
 	canvasNodeOptions,
 	canvasNodePositionChanged,
 	canvasNodeRefDraftChanged,
@@ -28,19 +31,22 @@ import {
 	canvasNodeRefValue,
 	canvasNodeTitle,
 	canvasNodesWithPosition,
+	canvasSvgEdgeStroke,
+	canvasSvgNodeColors,
 	canvasSummary,
 	canvasTextDrafts,
 	edgeLines,
+	canvasNodeStyle,
 	nodeStyle
 } from '../src/lib/canvas/view';
 
 const canvasJson = JSON.stringify({
 	nodes: [
-		{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Canvas text card' },
-		{ id: 'b', type: 'file', x: 320, y: 40, width: 220, height: 100, file: 'Home.md' }
+		{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Canvas text card', color: '1' },
+		{ id: 'b', type: 'file', x: 320, y: 40, width: 220, height: 100, file: 'Home.md', color: '#22c55e' }
 	],
 	edges: [
-		{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens' }
+		{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens', color: '6' }
 	]
 }, null, 2);
 
@@ -56,10 +62,10 @@ test.describe('canvas view helpers', () => {
 			revision: 'rev',
 			mtime: 0,
 			nodes: [
-				{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Hello canvas' },
-				{ id: 'b', type: 'file', x: 320, y: 40, width: 220, height: 100, file: 'Home.md' }
+				{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Hello canvas', color: 'red' },
+				{ id: 'b', type: 'file', x: 320, y: 40, width: 220, height: 100, file: 'Home.md', color: '#2dd4bf' }
 			],
-			edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens' }],
+			edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens', color: '5' }],
 			warnings: []
 		} satisfies CanvasDoc;
 		const bounds = canvasBounds(doc.nodes);
@@ -70,6 +76,17 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
 		expect(canvasNodeBody({ ...doc.nodes[1], label: 'Home note' })).toBe('Home.md');
 		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
+		expect(canvasDisplayColor('1')).toEqual({ accent: '#dc2626', fill: '#fee2e2', text: '#7f1d1d', label: 'red' });
+		expect(canvasDisplayColor('purple')?.accent).toBe('#9333ea');
+		expect(canvasDisplayColor('#ABC')).toMatchObject({ accent: '#aabbcc', fill: '#aabbcc22', label: 'custom' });
+		expect(canvasDisplayColor('url(javascript:alert(1))')).toBeNull();
+		expect(canvasNodeColorStyle(doc.nodes[0])).toContain('--canvas-node-border: #dc2626');
+		expect(canvasNodeStyle(doc.nodes[0], bounds)).toContain('--canvas-node-bg: #fee2e2');
+		expect(canvasSvgNodeColors(doc.nodes[0])).toEqual({ fill: '#fee2e2', stroke: '#dc2626' });
+		expect(canvasSvgNodeColors({ ...doc.nodes[0], color: undefined })).toEqual({ fill: '#fffbeb', stroke: '#d97706' });
+		expect(canvasEdgeStyle(doc.edges[0])).toBe('stroke: #0891b2;');
+		expect(canvasSvgEdgeStroke(doc.edges[0])).toBe('#0891b2');
+		expect(canvasSvgEdgeStroke({ ...doc.edges[0], color: 'bad' })).toBe('#94a3b8');
 		expect(canvasSummary(doc)).toBe('2 nodes · 1 edge');
 		expect(nodeStyle(doc.nodes[0], bounds)).toContain('left: 80px');
 		expect(edgeLines(doc, bounds)).toEqual([
@@ -139,6 +156,8 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	const body = await loaded.json() as CanvasDoc;
 	expect(body.nodes).toHaveLength(2);
 	expect(body.edges).toHaveLength(1);
+	expect(body.nodes.find((node) => node.id === 'a')?.color).toBe('1');
+	expect(body.edges[0].color).toBe('6');
 
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
@@ -149,6 +168,8 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await expect(page.locator('.canvas-view')).toContainText('Board');
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
 	await expect(page.locator('.canvas-node-text textarea').first()).toHaveValue('Canvas text card');
+	await expect(page.locator('.canvas-node-text').first()).toHaveAttribute('style', /--canvas-node-border: #dc2626/);
+	await expect(page.locator('.canvas-view .edge').first()).toHaveAttribute('style', /stroke: rgb\(147, 51, 234\)/);
 	await expect(page.locator('.canvas-view')).toContainText('Home.md');
 	await expect(page.getByRole('button', { name: 'Add text' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Download SVG' })).toHaveAttribute(
@@ -165,9 +186,9 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	fs.writeFileSync(path.join(vaultDir, 'Export.canvas'), JSON.stringify({
 		nodes: [
 			{ id: 'a', type: 'text', x: 0, y: 0, width: 260, height: 140, text: 'Canvas <script>alert(1)</script> & text' },
-			{ id: 'b', type: 'file', x: 340, y: 50, width: 220, height: 100, file: 'Home.md' }
+			{ id: 'b', type: 'file', x: 340, y: 50, width: 220, height: 100, file: 'Home.md', color: '4' }
 		],
-		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens <bad>' }]
+		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens <bad>', color: '#0ea5e9' }]
 	}, null, 2));
 
 	const created = await request.post('/api/vaults', {
@@ -184,6 +205,9 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	expect(svg).toContain('<svg');
 	expect(svg).toContain('Canvas export');
 	expect(svg).toContain('Home.md');
+	expect(svg).toContain('fill="#dcfce7"');
+	expect(svg).toContain('stroke="#16a34a"');
+	expect(svg).toContain('stroke="#0ea5e9"');
 	expect(svg).toContain('opens &lt;bad&gt;');
 	expect(svg).toContain('Canvas &lt;script&gt;alert(1)&lt;/script&gt;');
 	expect(svg).toContain('&amp; text');

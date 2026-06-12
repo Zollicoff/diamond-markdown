@@ -12,7 +12,7 @@ an existing Obsidian vault. The preflight reports:
 - likely attachment folders
 - whether `.obsidian` exists
 - Obsidian plugin folders plus read-only manifest/settings visibility
-- Obsidian Canvas files that will be preserved and opened with partial editing
+- Obsidian Canvas files that will be preserved and opened with visual editing
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
@@ -46,8 +46,10 @@ you should verify embeds after opening it.
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
 disk. Diamond Markdown opens Canvas files as visual boards and can rename,
 move, delete, export the `.canvas` files as SVG snapshots, and add or edit text
-cards or move nodes with git-backed commits. Full Canvas edge editing and
-Obsidian plugin execution are not implemented yet.
+cards, file cards, URL cards, node positions, edge connections, edge labels, and
+node or edge deletion with git-backed commits. Canvas node and edge colors are
+preserved and rendered in the board and SVG export. Obsidian plugin execution is
+not implemented yet.
 
 ## GitHub Sync
 

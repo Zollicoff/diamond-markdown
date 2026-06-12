@@ -3,6 +3,7 @@
 	import {
 		canvasDraftChanged,
 		canvasDraftFor,
+		canvasEdgeStyle,
 		canvasNodeRefDraftChanged,
 		canvasNodeRefDraftFor,
 		canSaveCanvasNodeRefDraft,
@@ -74,6 +75,7 @@
 					x2={line.x2}
 					y2={line.y2}
 					class="edge"
+					style={canvasEdgeStyle(line.edge)}
 				/>
 				{#if line.edge.label}
 					<text

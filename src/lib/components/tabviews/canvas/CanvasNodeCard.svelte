@@ -3,8 +3,8 @@
 	import {
 		canvasNodeBody,
 		canvasNodeClass,
+		canvasNodeStyle,
 		canvasNodeTitle,
-		nodeStyle,
 		type CanvasBounds,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
@@ -63,7 +63,7 @@
 	}
 </script>
 
-<article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={nodeStyle(node, bounds)}>
+<article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={canvasNodeStyle(node, bounds)}>
 	<div class="node-topline">
 		<button
 			type="button"
@@ -177,10 +177,11 @@
 		border: 1px solid var(--border-strong);
 		border-radius: 7px;
 		background: color-mix(in srgb, var(--bg-elev), var(--bg) 20%);
+		background: var(--canvas-node-bg, color-mix(in srgb, var(--bg-elev), var(--bg) 20%));
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
 	}
 	.canvas-node-text {
-		border-color: color-mix(in srgb, var(--accent), var(--border-strong) 70%);
+		border-color: var(--canvas-node-border, color-mix(in srgb, var(--accent), var(--border-strong) 70%));
 	}
 	.canvas-node.moving {
 		z-index: 3;
@@ -188,10 +189,15 @@
 		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--accent), transparent 50%);
 	}
 	.canvas-node-file {
+		border-color: var(--canvas-node-border, var(--border-strong));
 		border-style: dashed;
 	}
 	.canvas-node-link {
-		border-color: color-mix(in srgb, var(--brand-cyan), var(--border-strong) 60%);
+		border-color: var(--canvas-node-border, color-mix(in srgb, var(--brand-cyan), var(--border-strong) 60%));
+	}
+	.canvas-node-group {
+		border-color: var(--canvas-node-border, color-mix(in srgb, var(--accent), var(--border-strong) 75%));
+		background: var(--canvas-node-bg, color-mix(in srgb, var(--bg-elev), transparent 22%));
 	}
 	.node-topline {
 		display: flex;
@@ -238,9 +244,10 @@
 	.node-type {
 		align-self: flex-start;
 		border: 1px solid var(--border);
+		border-color: color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 35%);
 		border-radius: 999px;
 		padding: 1px 7px;
-		color: var(--fg-dim);
+		color: var(--canvas-node-type-color, var(--fg-dim));
 		font-family: var(--mono);
 		font-size: 0.65rem;
 		text-transform: uppercase;

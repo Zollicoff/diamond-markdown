@@ -142,6 +142,9 @@ Use small, pushable slices:
 - **File tree panel state extraction.** Move sort/auto-reveal preferences and
    expansion persistence out of `FileTreePanel` into focused tree state modules
    with deterministic parsing coverage.
+- **Canvas color compatibility.** Render preserved Obsidian Canvas node and
+   edge color metadata in the board and SVG export without rewriting the
+   original `.canvas` file.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
