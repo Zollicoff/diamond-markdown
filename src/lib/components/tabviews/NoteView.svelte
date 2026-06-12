@@ -8,6 +8,7 @@
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
 	import { openNote } from '$lib/workspace/actions';
+	import { currentLocationHashId, replaceLocationHash } from '$lib/workspace/hash';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
@@ -24,10 +25,11 @@
 		ensureMarkdownPath,
 		isStaleRevisionError,
 		markdownWordCount,
-		notePathFromVaultHref,
+		noteTargetFromVaultHref,
 		noteTitleFromPath,
 		readingTimeLabel,
-		resolveNoteLink
+		resolveNoteLink,
+		type NoteHrefTarget
 	} from '$lib/note/view';
 	import NoteBody from './note/NoteBody.svelte';
 
@@ -152,12 +154,19 @@
 		return true;
 	}
 
-	function jumpToHeading(id: string): void {
+	function jumpToHeading(id: string): boolean {
 		if (mode === 'read') {
-			scrollReadHeading(id);
-			return;
+			return scrollReadHeading(id);
 		}
-		editorApi?.scrollToHeading(id);
+		return editorApi?.scrollToHeading(id) ?? false;
+	}
+
+	function openLinkedNote(target: NoteHrefTarget, openMode: ReturnType<typeof openModeForPointer>): void {
+		replaceLocationHash(target.hash);
+		openNote(vaultId, target.path, noteTitleFromPath(target.path), openMode);
+		if (target.hash && target.path === path) {
+			setTimeout(() => jumpToHeading(target.hash!), 0);
+		}
 	}
 
 	let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -205,9 +214,9 @@
 
 	async function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): Promise<void> {
 		if (resolved && href) {
-			const notePath = notePathFromVaultHref(vaultId, href);
-			if (!notePath) return;
-			openNote(vaultId, notePath, noteTitleFromPath(notePath), modeFor(e));
+			const noteTarget = noteTargetFromVaultHref(vaultId, href);
+			if (!noteTarget) return;
+			openLinkedNote(noteTarget, modeFor(e));
 			return;
 		}
 		const createPath = await confirmDialog({
@@ -227,16 +236,15 @@
 
 	function handleWikilinkContext(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
 		if (!resolved || !href) return;
-		const notePath = notePathFromVaultHref(vaultId, href);
-		if (!notePath) return;
-		const noteTitle = noteTitleFromPath(notePath);
+		const noteTarget = noteTargetFromVaultHref(vaultId, href);
+		if (!noteTarget) return;
 		menuPos = { x: e.clientX, y: e.clientY };
 		menuItems = [
-			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, notePath, noteTitle, 'replace') },
-			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, notePath, noteTitle, 'new-tab') },
-			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, notePath, noteTitle, 'new-pane') },
+			{ label: 'Open',             icon: '→', action: () => openLinkedNote(noteTarget, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openLinkedNote(noteTarget, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openLinkedNote(noteTarget, 'new-pane') },
 			{ separator: true, label: '' },
-			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(notePath).catch(() => {}); } }
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(noteTarget.path).catch(() => {}); } }
 		];
 		menuOpen = true;
 	}
@@ -281,6 +289,19 @@
 			doc,
 			editor: editorApi
 		});
+	});
+
+	let lastAnchorJumpKey = $state('');
+	$effect(() => {
+		if (!doc) return;
+		const hash = currentLocationHashId();
+		if (!hash) return;
+		if (mode !== 'read' && !editorApi) return;
+		const key = `${vaultId}:${path}:${mode}:${hash}:${editorApi ? 'editor' : 'preview'}`;
+		if (key === lastAnchorJumpKey) return;
+		setTimeout(() => {
+			if (jumpToHeading(hash)) lastAnchorJumpKey = key;
+		}, 0);
 	});
 
 </script>

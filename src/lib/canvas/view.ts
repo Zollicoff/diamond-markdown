@@ -66,6 +66,7 @@ export interface CanvasFileOpenTarget {
 }
 
 export type CanvasTextDrafts = Record<string, string>;
+export type CanvasGroupLabelDrafts = Record<string, string>;
 export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
 export type CanvasAddNodeType = 'text' | 'file' | 'link' | 'group';
@@ -373,6 +374,26 @@ export function canvasDraftFor(node: CanvasNode, drafts: CanvasTextDrafts): stri
 
 export function canvasDraftChanged(node: CanvasNode, drafts: CanvasTextDrafts): boolean {
 	return canvasDraftFor(node, drafts) !== (node.text ?? '');
+}
+
+export function canvasGroupLabelDrafts(nodes: CanvasNode[]): CanvasGroupLabelDrafts {
+	return Object.fromEntries(
+		nodes
+			.filter((node) => node.type === 'group')
+			.map((node) => [node.id, node.label ?? ''])
+	);
+}
+
+export function canvasGroupLabelDraftFor(node: CanvasNode, drafts: CanvasGroupLabelDrafts): string {
+	return drafts[node.id] ?? node.label ?? '';
+}
+
+export function canvasGroupLabelChanged(node: CanvasNode, drafts: CanvasGroupLabelDrafts): boolean {
+	return canvasGroupLabelDraftFor(node, drafts).trim() !== (node.label ?? '');
+}
+
+export function canSaveCanvasGroupLabel(node: CanvasNode, drafts: CanvasGroupLabelDrafts): boolean {
+	return node.type === 'group' && canvasGroupLabelChanged(node, drafts);
 }
 
 export function canvasNodeRefValue(node: CanvasNode): string {

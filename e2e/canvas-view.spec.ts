@@ -22,6 +22,10 @@ import {
 	canvasEdgeMarkerUrl,
 	canvasEdgeEndpoint,
 	canvasEdgeSide,
+	canvasGroupLabelChanged,
+	canvasGroupLabelDraftFor,
+	canvasGroupLabelDrafts,
+	canSaveCanvasGroupLabel,
 	canSubmitCanvasAddNode,
 	canConnectCanvasNodes,
 	canOpenCanvasNode,
@@ -101,6 +105,12 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
 		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
 		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
+		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
+		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
+		expect(canvasGroupLabelChanged(groupNode, groupDrafts)).toBe(false);
+		expect(canvasGroupLabelChanged(groupNode, { ...groupDrafts, group: 'Follow-up cluster' })).toBe(true);
+		expect(canSaveCanvasGroupLabel(groupNode, { ...groupDrafts, group: '' })).toBe(true);
+		expect(canSaveCanvasGroupLabel(doc.nodes[0], groupDrafts)).toBe(false);
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
 		expect(canvasNodeBody({ ...doc.nodes[1], label: 'Home note' })).toBe('Home.md');
 		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
@@ -341,11 +351,21 @@ test('canvas view renders and creates Obsidian Canvas groups', async ({ page, re
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue('Inside the group');
 	await expect(page.getByLabel('Canvas edge source')).not.toContainText('Research cluster');
 
+	const groupCard = page.locator('.canvas-node-group').filter({ hasText: 'Research cluster' }).first();
+	await groupCard.getByLabel('Canvas group label for Research cluster').fill('Renamed research cluster');
+	await groupCard.getByRole('button', { name: 'Save label' }).click();
+	await expect(page.locator('.canvas-node-group').filter({ hasText: 'Renamed research cluster' })).toBeVisible();
+	await expect.poll(async () => {
+		const saved = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await saved.json() as CanvasDoc;
+		return body.nodes.find((node) => node.id === 'group-a')?.label;
+	}).toBe('Renamed research cluster');
+
 	const exported = await request.get(`/api/vaults/${vault.id}/canvas/export?path=${encodeURIComponent('Board.canvas')}`);
 	expect(exported.ok()).toBe(true);
 	const svg = await exported.text();
 	expect(svg).toContain('node-group');
-	expect(svg).toContain('Research cluster');
+	expect(svg).toContain('Renamed research cluster');
 	expect(svg).toContain('stroke-dasharray');
 
 	await page.getByLabel('Canvas node type').selectOption('group');
@@ -537,7 +557,41 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(linkAddedBody.doc.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/research')).toBe(true);
 	expect(gitStatus(vaultDir)).toBe('');
 
-	const addedFileNode = linkAddedBody.doc.nodes.find((node) => node.type === 'file' && node.id !== 'b' && node.file === 'Home.md');
+	const groupAdded = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'add-node',
+			nodeType: 'group',
+			label: 'API group',
+			expectedRevision: linkAddedBody.doc.revision
+		}
+	});
+	expect(groupAdded.ok(), await groupAdded.text()).toBe(true);
+	const groupAddedBody = await groupAdded.json() as { sha: string | null; doc: CanvasDoc };
+	expect(groupAddedBody.sha).toBeTruthy();
+	const addedGroupNode = groupAddedBody.doc.nodes.find((node) => node.type === 'group' && node.label === 'API group');
+	expect(addedGroupNode).toBeTruthy();
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const groupUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-group-label',
+			nodeId: addedGroupNode?.id,
+			label: 'Renamed API group',
+			expectedRevision: groupAddedBody.doc.revision
+		}
+	});
+	expect(groupUpdated.ok(), await groupUpdated.text()).toBe(true);
+	const groupUpdatedBody = await groupUpdated.json() as { sha: string | null; doc: CanvasDoc };
+	expect(groupUpdatedBody.sha).toBeTruthy();
+	expect(groupUpdatedBody.doc.nodes.find((node) => node.id === addedGroupNode?.id)).toMatchObject({
+		type: 'group',
+		label: 'Renamed API group'
+	});
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const addedFileNode = groupUpdatedBody.doc.nodes.find((node) => node.type === 'file' && node.id !== 'b' && node.file === 'Home.md');
 	expect(addedFileNode).toBeTruthy();
 	const fileUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
@@ -546,7 +600,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			nodeId: addedFileNode?.id,
 			file: 'References/Home.md',
 			label: 'Home reference',
-			expectedRevision: linkAddedBody.doc.revision
+			expectedRevision: groupUpdatedBody.doc.revision
 		}
 	});
 	expect(fileUpdated.ok(), await fileUpdated.text()).toBe(true);
@@ -681,11 +735,12 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(gitStatus(vaultDir)).toBe('');
 
 	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as {
-		nodes: { id?: string; text?: string; file?: string; url?: string; label?: string; x?: number; y?: number }[];
+		nodes: { id?: string; type?: string; text?: string; file?: string; url?: string; label?: string; x?: number; y?: number }[];
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
 	};
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
+	expect(raw.nodes.some((node) => node.type === 'group' && node.label === 'Renamed API group')).toBe(true);
 	expect(raw.nodes.some((node) => node.file === 'References/Home.md' && node.label === 'Home reference')).toBe(true);
 	expect(raw.nodes.some((node) => node.url === 'https://example.com/updated' && node.label === 'Updated research')).toBe(true);
 	expect(raw.nodes.some((node) => node.id === 'b')).toBe(false);

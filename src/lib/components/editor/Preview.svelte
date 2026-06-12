@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { openNote, openTab } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { replaceLocationHash } from '$lib/workspace/hash';
+	import { noteTargetFromVaultHref, noteTitleFromPath, type NoteHrefTarget } from '$lib/note/view';
 	import { listMarkdownPostprocessors } from '$lib/plugins/extensions.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import type { NoteDoc } from '$lib/types';
@@ -33,9 +35,18 @@
 		host = element;
 	}
 
-	function pathFromHref(href: string): string | null {
-		const m = /^\/vault\/[^/]+\/note\/(.+)$/.exec(href);
-		return m ? decodeURIComponent(m[1]) : null;
+	function scrollToHashTarget(hash: string | null): void {
+		if (!hash || !host) return;
+		const el = host.querySelector(`#${CSS.escape(hash)}`) as HTMLElement | null;
+		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	function openLinkedNote(target: NoteHrefTarget, mode: ReturnType<typeof openModeForPointer>): void {
+		replaceLocationHash(target.hash);
+		openNote(vaultId!, target.path, noteTitleFromPath(target.path), mode);
+		if (target.hash && doc?.path === target.path) {
+			queueMicrotask(() => scrollToHashTarget(target.hash));
+		}
 	}
 
 	function onClick(e: MouseEvent): void {
@@ -58,11 +69,10 @@
 
 		// Wikilink → modifier-aware open through the workspace store.
 		if (a.classList.contains('wikilink') && vaultId) {
-			const path = pathFromHref(href);
-			if (path) {
+			const target = noteTargetFromVaultHref(vaultId, href);
+			if (target) {
 				e.preventDefault();
-				const title = path.split('/').pop()!.replace(/\.md$/, '');
-				openNote(vaultId, path, title, openModeForPointer(e));
+				openLinkedNote(target, openModeForPointer(e));
 				return;
 			}
 		}
@@ -87,11 +97,10 @@
 		if (!a || !vaultId) return;
 		const href = a.getAttribute('href');
 		if (!href || !a.classList.contains('wikilink')) return;
-		const path = pathFromHref(href);
-		if (!path) return;
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return;
 		e.preventDefault();
-		const title = path.split('/').pop()!.replace(/\.md$/, '');
-		openNote(vaultId, path, title, 'new-tab');
+		openLinkedNote(target, 'new-tab');
 	}
 
 	function onContext(e: MouseEvent): void {
@@ -99,17 +108,16 @@
 		if (!a || !vaultId) return;
 		const href = a.getAttribute('href');
 		if (!href || !a.classList.contains('wikilink')) return;
-		const path = pathFromHref(href);
-		if (!path) return;
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return;
 		e.preventDefault();
-		const title = path.split('/').pop()!.replace(/\.md$/, '');
 		menuPos = { x: e.clientX, y: e.clientY };
 		menuItems = [
-			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, path, title, 'replace') },
-			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, path, title, 'new-tab') },
-			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, path, title, 'new-pane') },
+			{ label: 'Open',             icon: '→', action: () => openLinkedNote(target, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openLinkedNote(target, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openLinkedNote(target, 'new-pane') },
 			{ separator: true, label: '' },
-			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(path).catch(() => {}); } }
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(target.path).catch(() => {}); } }
 		];
 		menuOpen = true;
 	}
@@ -127,8 +135,8 @@
 		if (!a || !a.classList.contains('wikilink')) { clearHover(); return; }
 		const href = a.getAttribute('href');
 		if (!href) return;
-		const path = pathFromHref(href);
-		if (!path) return; // broken wikilink — no preview to show
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return; // broken wikilink — no preview to show
 		// Position card just above the link so it doesn't cover what you're reading.
 		const rect = a.getBoundingClientRect();
 		const x = rect.left;
@@ -136,7 +144,7 @@
 
 		if (hoverTimer) clearTimeout(hoverTimer);
 		hoverTimer = setTimeout(async () => {
-			const cached = previewCache.get(path);
+			const cached = previewCache.get(target.path);
 			if (cached) {
 				hoverCard = { x, y, html: cached };
 				return;
@@ -144,10 +152,10 @@
 			hoverFetchAbort?.abort();
 			hoverFetchAbort = new AbortController();
 			try {
-				const res = await fetch(`/api/vaults/${vaultId}/preview?path=${encodeURIComponent(path)}`, { signal: hoverFetchAbort.signal });
+				const res = await fetch(`/api/vaults/${vaultId}/preview?path=${encodeURIComponent(target.path)}`, { signal: hoverFetchAbort.signal });
 				if (!res.ok) return;
 				const data = await res.json() as { html: string };
-				previewCache.set(path, data.html);
+				previewCache.set(target.path, data.html);
 				hoverCard = { x, y, html: data.html };
 			} catch { /* ignore aborts */ }
 		}, 280);
@@ -236,8 +244,8 @@
 				const hash = window.location.hash;
 				if (hash && hash.length > 1) {
 					const id = decodeURIComponent(hash.slice(1));
-					const target = currentHost.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
-					target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					const el = currentHost.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+					el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 				}
 			})();
 		});

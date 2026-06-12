@@ -44,7 +44,8 @@ without client-only JavaScript.
 Obsidian block IDs on paragraphs and list items, such as
 `Important install step ^install-steps`, render as linkable anchors in read mode
 and static publish. Wikilinks like `[[Target#^install-steps]]` preserve the
-block-reference fragment instead of treating it as a heading link.
+block-reference fragment in Live Preview, Read mode, and static publish instead
+of treating it as a heading link.
 
 Frontmatter `tags` and `aliases` are read from either flow arrays
 (`tags: [project/foo, review]`) or Obsidian-style block lists, so imported
@@ -64,10 +65,10 @@ you should verify embeds after opening it.
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
 disk. Diamond Markdown opens Canvas files as visual boards and can rename,
 move, delete, export the `.canvas` files as SVG snapshots, and add or edit text
-cards, file cards, URL cards, node positions, edge connections, edge labels, and
-node or edge deletion with git-backed commits. Canvas group nodes are rendered
-behind cards and can be created from the Canvas toolbar. Canvas node and edge
-colors are preserved and rendered in the board and SVG export. Canvas edge
+cards, file cards, URL cards, group labels, node positions, edge connections,
+edge labels, and node or edge deletion with git-backed commits. Canvas group
+nodes are rendered behind cards and can be created from the Canvas toolbar.
+Canvas node and edge colors are preserved and rendered in the board and SVG export. Canvas edge
 side anchors (`fromSide`/`toSide`) and endpoint arrows (`fromEnd`/`toEnd`) are
 respected when drawing board and SVG connections. Canvas file cards can open
 their referenced Markdown notes or Canvas files in workspace tabs, unsupported

@@ -7,12 +7,16 @@
 		canvasEdgeMarkerStyle,
 		canvasEdgeMarkerUrl,
 		canvasEdgeStyle,
+		canvasGroupLabelChanged,
+		canvasGroupLabelDraftFor,
 		canvasLayeredNodes,
 		canvasNodeRefDraftChanged,
 		canvasNodeRefDraftFor,
+		canSaveCanvasGroupLabel,
 		canSaveCanvasNodeRefDraft,
 		type CanvasBounds,
 		type CanvasEdgeLine,
+		type CanvasGroupLabelDrafts,
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
 		type CanvasTextDrafts
@@ -24,6 +28,7 @@
 		bounds: CanvasBounds;
 		lines: CanvasEdgeLine[];
 		textDrafts: CanvasTextDrafts;
+		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
 		savingNodeId: string | null;
 		movingNodeId: string | null;
@@ -32,8 +37,10 @@
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
 		onDraftChange: (node: CanvasNode, value: string) => void;
+		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
+		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
@@ -45,6 +52,7 @@
 		bounds,
 		lines,
 		textDrafts,
+		groupLabelDrafts,
 		refDrafts,
 		savingNodeId,
 		movingNodeId,
@@ -53,8 +61,10 @@
 		savingEdgeId,
 		deletingEdgeId,
 		onDraftChange,
+		onGroupLabelDraftChange,
 		onRefDraftChange,
 		onSave,
+		onSaveGroupLabel,
 		onSaveRef,
 		onOpenRef,
 		onDelete,
@@ -134,6 +144,9 @@
 				{bounds}
 				draft={canvasDraftFor(node, textDrafts)}
 				changed={canvasDraftChanged(node, textDrafts)}
+				groupLabelDraft={canvasGroupLabelDraftFor(node, groupLabelDrafts)}
+				groupLabelChanged={canvasGroupLabelChanged(node, groupLabelDrafts)}
+				groupLabelCanSave={canSaveCanvasGroupLabel(node, groupLabelDrafts)}
 				refDraft={canvasNodeRefDraftFor(node, refDrafts)}
 				refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
@@ -142,8 +155,10 @@
 				deleting={deletingNodeId === node.id}
 				disableDelete={disableNodeDelete}
 				onDraftChange={onDraftChange}
+				onGroupLabelDraftChange={onGroupLabelDraftChange}
 				onRefDraftChange={onRefDraftChange}
 				onSave={onSave}
+				onSaveGroupLabel={onSaveGroupLabel}
 				onSaveRef={onSaveRef}
 				onOpenRef={onOpenRef}
 				onDelete={onDelete}

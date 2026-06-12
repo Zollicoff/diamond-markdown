@@ -80,7 +80,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Right-click any wikilink for a context menu (Open / Open in new tab / Open in new pane / Copy path)
 - Hover preview — mouseover a wikilink for a floating card with the target's first ~800 chars rendered through the same pipeline
 - Heading anchors — every heading gets a stable id so `[[Note#Heading]]` deep-links work
-- Obsidian block anchors — paragraph/list block IDs such as `^install-steps` become stable anchors for `[[Note#^install-steps]]`
+- Obsidian block anchors — paragraph/list block IDs such as `^install-steps` become stable anchors for `[[Note#^install-steps]]` in Live Preview, Read mode, and static publish
 - Backlinks panel — every note linking to the open note
 - Outgoing links panel
 - Outline panel — headings of the active note, click to scroll
@@ -98,7 +98,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Touch swipes switch adjacent tabs first, then adjacent panes at tab boundaries
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
-- Obsidian Canvas previews for `.canvas` boards, with SVG export, group rendering/creation, git-backed text-card editing, and node positioning
+- Obsidian Canvas previews for `.canvas` boards, with SVG export, group rendering/label editing/creation, git-backed text-card editing, and node positioning
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)

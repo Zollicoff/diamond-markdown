@@ -11,7 +11,10 @@
 		canvasEdgeLabelChanged,
 		canvasEdgeLabelDraftFor,
 		canvasEdgeLabelDrafts,
+		canvasGroupLabelDraftFor,
+		canvasGroupLabelDrafts,
 		canConnectCanvasNodes,
+		canSaveCanvasGroupLabel,
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
@@ -24,6 +27,7 @@
 		edgeLines,
 		type CanvasAddNodeType,
 		type CanvasEdgeLabelDrafts,
+		type CanvasGroupLabelDrafts,
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
 		type CanvasEdgeSummary,
@@ -50,6 +54,7 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let textDrafts = $state<CanvasTextDrafts>({});
+	let groupLabelDrafts = $state<CanvasGroupLabelDrafts>({});
 	let refDrafts = $state<CanvasNodeRefDrafts>({});
 	let addingNode = $state(false);
 	let addingEdge = $state(false);
@@ -86,6 +91,7 @@
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
 		textDrafts = canvasTextDrafts(next.nodes);
+		groupLabelDrafts = canvasGroupLabelDrafts(next.nodes);
 		refDrafts = canvasNodeRefDrafts(next.nodes);
 		edgeLabelDrafts = canvasEdgeLabelDrafts(canvasEdgeSummaries(next));
 		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
@@ -95,6 +101,10 @@
 
 	function setDraft(node: CanvasNode, value: string): void {
 		textDrafts = { ...textDrafts, [node.id]: value };
+	}
+
+	function setGroupLabelDraft(node: CanvasNode, value: string): void {
+		groupLabelDrafts = { ...groupLabelDrafts, [node.id]: value };
 	}
 
 	function setRefDraft(node: CanvasNode, draft: CanvasNodeRefDraft): void {
@@ -150,6 +160,27 @@
 			const res = await api.updateCanvasTextNode(vaultId, path, node.id, canvasDraftFor(node, textDrafts), doc.revision);
 			setDoc(res.doc);
 			emit('toast:show', { title: 'Text card saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingNodeId = null;
+		}
+	}
+
+	async function saveGroupLabel(node: CanvasNode): Promise<void> {
+		if (!doc || savingNodeId || !canSaveCanvasGroupLabel(node, groupLabelDrafts)) return;
+		savingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasGroupLabel(
+				vaultId,
+				path,
+				node.id,
+				canvasGroupLabelDraftFor(node, groupLabelDrafts),
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Group label saved', tone: 'success' });
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -375,6 +406,7 @@
 		{lines}
 		{edgeSummaries}
 		{textDrafts}
+		{groupLabelDrafts}
 		{refDrafts}
 		{edgeLabelDrafts}
 		{savingNodeId}
@@ -387,8 +419,10 @@
 		onSaveEdgeLabel={saveEdgeLabel}
 		onDeleteEdge={deleteEdge}
 		onDraftChange={setDraft}
+		onGroupLabelDraftChange={setGroupLabelDraft}
 		onRefDraftChange={setRefDraft}
 		onSaveNode={saveTextNode}
+		onSaveGroupLabel={saveGroupLabel}
 		onSaveRefNode={saveRefNode}
 		onOpenRefNode={openRefNode}
 		onDeleteNode={deleteNode}

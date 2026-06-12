@@ -4,6 +4,7 @@ import {
 	formatSavedAt,
 	markdownWordCount,
 	notePathFromVaultHref,
+	noteTargetFromVaultHref,
 	noteTitleFromPath,
 	readingTimeLabel
 } from '../src/lib/note/view';
@@ -17,6 +18,14 @@ test.describe('note view helpers', () => {
 		expect(noteTitleFromPath('Projects/Daily Plan.md')).toBe('Daily Plan');
 		expect(notePathFromVaultHref('default', '/vault/default/note/Projects%2FDaily%20Plan.md')).toBe('Projects/Daily Plan.md');
 		expect(notePathFromVaultHref('default', '/vault/other/note/Projects%2FDaily%20Plan.md')).toBeNull();
+		expect(noteTargetFromVaultHref('default', '/vault/default/note/Projects%2FDaily%20Plan.md#%5Einstall-steps')).toEqual({
+			path: 'Projects/Daily Plan.md',
+			hash: '^install-steps'
+		});
+		expect(noteTargetFromVaultHref('default', 'https://example.test/vault/default/note/Target.md#details')).toEqual({
+			path: 'Target.md',
+			hash: 'details'
+		});
 		expect(openModeForPointer({ button: 0 })).toBe('replace');
 		expect(openModeForPointer({ button: 1 })).toBe('new-tab');
 		expect(openModeForPointer({ button: 0, metaKey: true })).toBe('new-tab');

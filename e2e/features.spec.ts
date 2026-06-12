@@ -305,6 +305,8 @@ test('broken wikilinks use an in-app create confirmation dialog', async ({ page,
 	expect(saved.ok()).toBe(true);
 
 	await page.goto(`/vault/default/note/${encodeURIComponent(sourcePath)}`);
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await page.locator('.cm-line').filter({ hasText: 'Broken Wikilink Dialog' }).first().click();
 	const link = page.locator('.cm-wikilink--broken').filter({ hasText: target }).first();
 	await expect(link).toBeVisible();
 	await link.click();
@@ -991,6 +993,49 @@ test('wikilinks render as just the link text, not [Note]', async ({ page }) => {
 	// Must NOT contain literal brackets — the bug was rendering `[Note]`.
 	expect(text).not.toMatch(/[\[\]]/);
 	expect(text.length).toBeGreaterThan(0);
+});
+
+test('wikilink fragments render cleanly from live preview and navigate in read mode', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'live-block-fragment-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(vaultDir, 'Source.md'),
+		'# Source\n\nJump to [[Target#^install-steps|install steps]] and [[Target#Details|details heading]].\n'
+	);
+	fs.writeFileSync(
+		path.join(vaultDir, 'Target.md'),
+		'# Target\n\nImportant install step ^install-steps\n\n## Details\n\nMore target text.\n'
+	);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Live Block Fragment Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Source' }).click();
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await page.locator('.cm-line').filter({ hasText: 'Source' }).first().click();
+
+	const pill = page.locator('a.cm-wikilink').filter({ hasText: 'install steps' }).first();
+	await expect(pill).toBeVisible({ timeout: 6_000 });
+	const href = await pill.evaluate((node) => (node as HTMLAnchorElement).href);
+	const url = new URL(href);
+	expect(url.pathname).toBe(`/vault/${vault.id}/note/Target.md`);
+	expect(decodeURIComponent(url.hash)).toBe('#^install-steps');
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Source.md')}`);
+	await page.getByRole('tab', { name: 'Read' }).click();
+	const readLink = page.locator('.preview a.wikilink').filter({ hasText: 'details heading' }).first();
+	await expect(readLink).toHaveAttribute('href', /\/vault\/.+\/note\/Target\.md#details$/);
+	await readLink.click();
+	await expect.poll(() => page.evaluate(() => window.location.pathname)).toContain(`/vault/${vault.id}/note/Target.md`);
+	await expect.poll(() => page.evaluate(() => window.location.pathname)).not.toContain('%23');
+	await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('#details');
+	await expect(page.locator('.preview h2#details')).toHaveText('Details');
 });
 
 test('search rail icon dedupes — clicking twice activates the same tab', async ({ page }) => {

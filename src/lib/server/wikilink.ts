@@ -12,9 +12,14 @@
  * Resolution lives in indexer.ts — this file is just the syntax parser.
  */
 
-import { WIKILINK_RE, slugifyHeading } from '$lib/util/strings';
+import { WIKILINK_RE } from '$lib/util/strings';
 import { parseObsidianEmbedMeta, splitAssetReference } from './embed';
-import { isObsidianBlockId, blockReferenceId } from './block-ids';
+import {
+	parseWikilinkSubpath,
+	wikilinkFragment
+} from '$lib/markdown/wikilinks';
+
+export { parseWikilinkSubpath, wikilinkFragment };
 
 export interface ParsedWikilink {
 	/** Exact substring from the source, including `[[` and `]]`. */
@@ -27,21 +32,6 @@ export interface ParsedWikilink {
 	blockId: string | null;
 	/** Display text (after `|`), or null to fall back to target. */
 	display: string | null;
-}
-
-export function parseWikilinkSubpath(value: string | undefined): Pick<ParsedWikilink, 'heading' | 'blockId'> {
-	const subpath = value?.trim() ?? '';
-	if (!subpath) return { heading: null, blockId: null };
-	if (subpath.startsWith('^')) {
-		const blockId = subpath.slice(1).trim();
-		if (isObsidianBlockId(blockId)) return { heading: null, blockId };
-	}
-	return { heading: subpath, blockId: null };
-}
-
-export function wikilinkFragment(link: Pick<ParsedWikilink, 'heading' | 'blockId'>): string {
-	if (link.blockId) return `#${blockReferenceId(link.blockId)}`;
-	return link.heading ? `#${slugifyHeading(link.heading)}` : '';
 }
 
 /**

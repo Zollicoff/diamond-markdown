@@ -5,6 +5,7 @@
 		CanvasEdgeLabelDrafts,
 		CanvasEdgeLine,
 		CanvasEdgeSummary,
+		CanvasGroupLabelDrafts,
 		CanvasNodeRefDraft,
 		CanvasNodeRefDrafts,
 		CanvasTextDrafts
@@ -21,6 +22,7 @@
 		lines: CanvasEdgeLine[];
 		edgeSummaries: CanvasEdgeSummary[];
 		textDrafts: CanvasTextDrafts;
+		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
 		savingNodeId: string | null;
@@ -33,8 +35,10 @@
 		onSaveEdgeLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onDeleteEdge: (edgeId: string) => void | Promise<void>;
 		onDraftChange: (node: CanvasNode, value: string) => void;
+		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSaveNode: (node: CanvasNode) => void | Promise<void>;
+		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRefNode: (node: CanvasNode) => void | Promise<void>;
 		onOpenRefNode: (node: CanvasNode) => void;
 		onDeleteNode: (node: CanvasNode) => void | Promise<void>;
@@ -50,6 +54,7 @@
 		lines,
 		edgeSummaries,
 		textDrafts,
+		groupLabelDrafts,
 		refDrafts,
 		edgeLabelDrafts,
 		savingNodeId,
@@ -62,8 +67,10 @@
 		onSaveEdgeLabel,
 		onDeleteEdge,
 		onDraftChange,
+		onGroupLabelDraftChange,
 		onRefDraftChange,
 		onSaveNode,
+		onSaveGroupLabel,
 		onSaveRefNode,
 		onOpenRefNode,
 		onDeleteNode,
@@ -99,6 +106,7 @@
 		{bounds}
 		{lines}
 		{textDrafts}
+		{groupLabelDrafts}
 		{refDrafts}
 		{savingNodeId}
 		{movingNodeId}
@@ -107,8 +115,10 @@
 		{savingEdgeId}
 		{deletingEdgeId}
 		onDraftChange={onDraftChange}
+		onGroupLabelDraftChange={onGroupLabelDraftChange}
 		onRefDraftChange={onRefDraftChange}
 		onSave={onSaveNode}
+		onSaveGroupLabel={onSaveGroupLabel}
 		onSaveRef={onSaveRefNode}
 		onOpenRef={onOpenRefNode}
 		onDelete={onDeleteNode}

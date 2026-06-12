@@ -53,6 +53,7 @@ export type CanvasEditAction =
 	| 'add-node'
 	| 'add-text-node'
 	| 'update-node-text'
+	| 'update-group-label'
 	| 'update-node-reference'
 	| 'move-node'
 	| 'delete-node'
@@ -471,6 +472,15 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		if (node.type !== 'text') throw new CanvasFileError('only text canvas nodes can be edited inline');
 		node.text = input.text;
+	} else if (input.action === 'update-group-label') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		if (typeof input.label !== 'string') throw new CanvasFileError('label is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		if (node.type !== 'group') throw new CanvasFileError('only group canvas nodes can edit labels inline');
+		const label = cleanOptionalLabel(input.label);
+		if (label) node.label = label;
+		else delete node.label;
 	} else if (input.action === 'update-node-reference') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);

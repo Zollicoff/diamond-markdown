@@ -16,6 +16,9 @@
 		bounds: CanvasBounds;
 		draft: string;
 		changed: boolean;
+		groupLabelDraft: string;
+		groupLabelChanged: boolean;
+		groupLabelCanSave: boolean;
 		refDraft: CanvasNodeRefDraft;
 		refChanged: boolean;
 		refCanSave: boolean;
@@ -24,8 +27,10 @@
 		deleting: boolean;
 		disableDelete: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
+		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
+		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
@@ -37,6 +42,9 @@
 		bounds,
 		draft,
 		changed,
+		groupLabelDraft,
+		groupLabelChanged,
+		groupLabelCanSave,
 		refDraft,
 		refChanged,
 		refCanSave,
@@ -45,8 +53,10 @@
 		deleting,
 		disableDelete,
 		onDraftChange,
+		onGroupLabelDraftChange,
 		onRefDraftChange,
 		onSave,
+		onSaveGroupLabel,
 		onSaveRef,
 		onOpenRef,
 		onDelete,
@@ -69,8 +79,22 @@
 	</div>
 	<h3 title={title}>{title}</h3>
 	{#if isCanvasGroupNode(node)}
+		<input
+			class="group-label-input"
+			aria-label={`Canvas group label for ${title}`}
+			value={groupLabelDraft}
+			placeholder="Group label"
+			oninput={(event) => onGroupLabelDraftChange(node, (event.currentTarget as HTMLInputElement).value)}
+		/>
 		<div class="group-fill"></div>
 		<div class="node-actions group-actions">
+			<button
+				class="mini node-save"
+				disabled={saving || !groupLabelCanSave}
+				onclick={() => void onSaveGroupLabel(node)}
+			>
+				{saving ? 'Saving...' : groupLabelChanged ? 'Save label' : 'Saved'}
+			</button>
 			<button
 				class="mini node-remove"
 				aria-label={`Remove canvas node ${title}`}
@@ -270,6 +294,21 @@
 	}
 	.node-editor:focus {
 		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
+		border-color: var(--accent);
+	}
+	.group-label-input {
+		width: 100%;
+		border: 1px solid var(--border);
+		border-color: color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 25%);
+		border-radius: 6px;
+		padding: 5px 7px;
+		background: color-mix(in srgb, var(--bg), transparent 18%);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.76rem;
+	}
+	.group-label-input:focus {
+		outline: 2px solid color-mix(in srgb, var(--accent), transparent 60%);
 		border-color: var(--accent);
 	}
 	.node-actions {

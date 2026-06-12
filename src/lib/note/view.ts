@@ -24,11 +24,29 @@ export function ensureMarkdownPath(target: string): string {
 	return /\.md$/i.test(target) ? target : `${target}.md`;
 }
 
-export function notePathFromVaultHref(vaultId: string, href: string): string | null {
+export interface NoteHrefTarget {
+	path: string;
+	hash: string | null;
+}
+
+export function noteTargetFromVaultHref(vaultId: string, href: string): NoteHrefTarget | null {
+	let url: URL;
+	try {
+		url = new URL(href, 'http://diamond.local');
+	} catch {
+		return null;
+	}
 	const prefix = `/vault/${vaultId}/note/`;
-	if (!href.startsWith(prefix)) return null;
-	const raw = href.slice(prefix.length).split(/[?#]/, 1)[0];
-	return decodeURIComponent(raw);
+	if (!url.pathname.startsWith(prefix)) return null;
+	const raw = url.pathname.slice(prefix.length);
+	return {
+		path: decodeURIComponent(raw),
+		hash: url.hash ? decodeURIComponent(url.hash.slice(1)) : null
+	};
+}
+
+export function notePathFromVaultHref(vaultId: string, href: string): string | null {
+	return noteTargetFromVaultHref(vaultId, href)?.path ?? null;
 }
 
 export function resolveNoteLink(doc: NoteDoc | null, vaultId: string, target: string): ReturnType<LinkResolver> {

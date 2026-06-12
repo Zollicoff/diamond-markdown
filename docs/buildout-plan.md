@@ -240,12 +240,19 @@ Use small, pushable slices:
 - **Canvas group node compatibility.** Render imported Obsidian Canvas group
    nodes behind cards, include groups in SVG export, and create new group
    nodes through the git-backed Canvas toolbar.
+- **Canvas group label editing.** Rename or clear imported Obsidian Canvas
+   group labels inline through the same git-backed stale-revision mutation
+   path as other Canvas card edits.
 - **Obsidian callout rendering.** Render `> [!TYPE]` callouts, including
    collapsed and expanded fold markers, in both read mode and static publish
    while preserving markdown inside the callout body.
 - **Obsidian block-reference compatibility.** Render paragraph/list block IDs
    such as `^install-steps` as linkable anchors and preserve
-   `[[Note#^block-id]]` fragments in read mode and static publish.
+   `[[Note#^block-id]]` fragments in Live Preview, read mode, and static
+   publish.
+- **Obsidian block-reference navigation.** Preserve `[[Note#^block-id]]`
+   fragments in live preview links, read-mode routing, context menus, and
+   editor/source scrolling.
 - **Obsidian block-list frontmatter.** Parse block-list `tags` and `aliases`
    from imported vaults so tag indexes, search, and alias wikilinks match
    common Obsidian frontmatter without rewriting note files.

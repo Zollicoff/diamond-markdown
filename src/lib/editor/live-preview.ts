@@ -22,6 +22,7 @@ import {
 import { syntaxTree } from '@codemirror/language';
 import { type Range } from '@codemirror/state';
 import { WIKILINK_RE } from '$lib/util/strings';
+import { parseWikilinkSubpath, wikilinkFragment } from '$lib/markdown/wikilinks';
 
 /** Called for every [[target]] to tell us whether that note exists. */
 export type LinkResolver = (target: string) => { resolved: boolean; href?: string };
@@ -42,8 +43,33 @@ class WikilinkWidget extends WidgetType {
 		a.textContent = this.display;
 		if (this.href) a.href = this.href;
 		a.dataset.target = this.target;
-		// Let CodeMirror ignore the mouse so the link click propagates.
+		a.contentEditable = 'false';
 		a.setAttribute('data-diamond-wikilink', '1');
+		const dispatch = (event: MouseEvent, name: 'diamond-wikilink-click' | 'diamond-wikilink-context') => {
+			event.preventDefault();
+			event.stopPropagation();
+			a.dispatchEvent(new CustomEvent(name, {
+				bubbles: true,
+				composed: true,
+				detail: {
+					target: this.target,
+					href: this.href,
+					resolved: this.resolved,
+					mouseEvent: event
+				}
+			}));
+		};
+		a.addEventListener('mousedown', (event) => {
+			if (event.button === 0) dispatch(event, 'diamond-wikilink-click');
+		});
+		a.addEventListener('click', (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+		});
+		a.addEventListener('auxclick', (event) => {
+			if (event.button === 1) dispatch(event, 'diamond-wikilink-click');
+		});
+		a.addEventListener('contextmenu', (event) => dispatch(event, 'diamond-wikilink-context'));
 		return a;
 	}
 
@@ -52,13 +78,15 @@ class WikilinkWidget extends WidgetType {
 			other instanceof WikilinkWidget &&
 			other.target === this.target &&
 			other.display === this.display &&
-			other.resolved === this.resolved
+			other.resolved === this.resolved &&
+			other.href === this.href
 		);
 	}
 
 	ignoreEvent(): boolean {
-		// false = CodeMirror does NOT eat the event; the click reaches the <a>.
-		return false;
+		// Keep CodeMirror from moving the caret into the raw wikilink before
+		// the delegated link handler can route the click.
+		return true;
 	}
 }
 
@@ -76,7 +104,7 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 	// + literal `]`, so the LinkMark/URL handlers below would hide the inner
 	// brackets — leaving the outer pair visible as `[Note]`. We need to know
 	// the wikilink spans first so those passes can skip anything inside them.
-	const wikilinkSpans: Array<{ from: number; to: number; target: string; display: string }> = [];
+	const wikilinkSpans: Array<{ from: number; to: number; target: string; display: string; fragment: string }> = [];
 	for (const { from: vFrom, to: vTo } of view.visibleRanges) {
 		const text = doc.sliceString(vFrom, vTo);
 		let m: RegExpExecArray | null;
@@ -85,8 +113,10 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 			const start = vFrom + m.index;
 			const end = start + m[0].length;
 			const target = m[1].trim();
+			const subpath = parseWikilinkSubpath(m[2]);
 			const display = (m[3]?.trim() || target);
-			wikilinkSpans.push({ from: start, to: end, target, display });
+			const fragment = wikilinkFragment(subpath);
+			wikilinkSpans.push({ from: start, to: end, target, display, fragment });
 		}
 	}
 	const insideWikilink = (from: number, to: number): boolean => {
@@ -174,9 +204,10 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 	for (const w of wikilinkSpans) {
 		if (cursor >= w.from && cursor <= w.to) continue;
 		const { resolved, href } = resolveLink(w.target);
+		const hrefWithFragment = href ? `${href}${w.fragment}` : null;
 		ranges.push(
 			Decoration.replace({
-				widget: new WikilinkWidget(w.target, w.display, resolved, href ?? null)
+				widget: new WikilinkWidget(w.target, w.display, resolved, hrefWithFragment)
 			}).range(w.from, w.to)
 		);
 	}

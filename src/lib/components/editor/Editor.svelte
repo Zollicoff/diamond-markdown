@@ -43,7 +43,15 @@
 	let view: EditorView | null = null;
 	let lastExternal = $state('');
 	let dragDepth = $state(0);
+	let suppressNextWikilinkClick = false;
 	const previewCompartment = new Compartment();
+
+	interface WikilinkWidgetEventDetail {
+		target: string;
+		href: string | null;
+		resolved: boolean;
+		mouseEvent: MouseEvent;
+	}
 
 	const highlightStyle = HighlightStyle.define([
 		{ tag: tags.heading1, fontSize: '1.8em', fontWeight: '800', color: 'var(--fg)' },
@@ -112,7 +120,27 @@
 		handleFiles(files);
 	}
 
+	function readWikilinkWidgetEvent(event: Event): WikilinkWidgetEventDetail | null {
+		const detail = (event as CustomEvent<WikilinkWidgetEventDetail>).detail;
+		if (!detail || typeof detail.target !== 'string') return null;
+		return detail;
+	}
+
+	function handleWikilinkWidgetClick(event: Event): void {
+		const detail = readWikilinkWidgetEvent(event);
+		if (!detail) return;
+		onWikilinkClick?.(detail.target, detail.href, detail.resolved, detail.mouseEvent);
+	}
+
+	function handleWikilinkWidgetContext(event: Event): void {
+		const detail = readWikilinkWidgetEvent(event);
+		if (!detail) return;
+		onWikilinkContext?.(detail.target, detail.href, detail.resolved, detail.mouseEvent);
+	}
+
 	onMount(() => {
+		host.addEventListener('diamond-wikilink-click', handleWikilinkWidgetClick);
+		host.addEventListener('diamond-wikilink-context', handleWikilinkWidgetContext);
 		const extensions: Extension[] = [
 			lineNumbers(),
 			history(),
@@ -145,11 +173,12 @@
 					const target = event.target as HTMLElement | null;
 					if (!target) return false;
 					const link = target.closest<HTMLAnchorElement>('[data-diamond-wikilink]');
-					if (!link?.classList.contains('cm-wikilink--broken')) return false;
+					if (!link) return false;
 					event.preventDefault();
+					suppressNextWikilinkClick = true;
 					const href = link.getAttribute('href');
 					const tgt = link.dataset.target ?? '';
-					onWikilinkClick?.(tgt, href, false, event);
+					onWikilinkClick?.(tgt, href, !link.classList.contains('cm-wikilink--broken'), event);
 					return true;
 				},
 				click(event) {
@@ -158,6 +187,10 @@
 					const link = target.closest<HTMLAnchorElement>('[data-diamond-wikilink]');
 					if (!link) return false;
 					event.preventDefault();
+					if (suppressNextWikilinkClick) {
+						suppressNextWikilinkClick = false;
+						return true;
+					}
 					const href = link.getAttribute('href');
 					const tgt = link.dataset.target ?? '';
 					onWikilinkClick?.(tgt, href, !link.classList.contains('cm-wikilink--broken'), event);
@@ -226,6 +259,8 @@
 	});
 
 	onDestroy(() => {
+		host?.removeEventListener('diamond-wikilink-click', handleWikilinkWidgetClick);
+		host?.removeEventListener('diamond-wikilink-context', handleWikilinkWidgetContext);
 		view?.destroy();
 		view = null;
 	});

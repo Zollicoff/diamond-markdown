@@ -8,6 +8,7 @@
 
 import { EditorView } from '@codemirror/view';
 import { slugifyHeading } from '$lib/util/strings';
+import { blockReferenceId } from '$lib/markdown/wikilinks';
 
 export interface EditorApi {
 	/** Wrap the current selection in prefix/suffix (e.g. '**' / '**'). */
@@ -26,7 +27,7 @@ export interface EditorApi {
 	insertWikilink(): void;
 	/** Insert a fenced code block, preserving the selection as the body. */
 	insertCodeBlock(lang?: string): void;
-	/** Scroll the editor to the markdown heading with this renderer/outline id. */
+	/** Scroll the editor to a markdown heading or Obsidian block id anchor. */
 	scrollToHeading(id: string): boolean;
 	focus(): void;
 }
@@ -182,6 +183,15 @@ export function makeEditorApi(getView: () => EditorView | null): EditorApi {
 					continue;
 				}
 				if (inFence) continue;
+				const block = /(?:^|\s)\^([A-Za-z0-9_-]+)\s*$/.exec(line.text);
+				if (block && blockReferenceId(block[1]) === id) {
+					view.dispatch({
+						selection: { anchor: line.from },
+						effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 })
+					});
+					view.focus();
+					return true;
+				}
 				const match = /^(#{1,6})\s+(.+?)\s*$/.exec(line.text);
 				if (!match) continue;
 				const text = match[2].replace(/[#*_`]+/g, '').trim();

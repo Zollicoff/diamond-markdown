@@ -1,14 +1,5 @@
 import { escAttr } from '$lib/util/strings';
-
-export const OBSIDIAN_BLOCK_ID_RE = /^[A-Za-z0-9_-]+$/;
-
-export function blockReferenceId(blockId: string): string {
-	return `^${blockId}`;
-}
-
-export function isObsidianBlockId(value: string): boolean {
-	return OBSIDIAN_BLOCK_ID_RE.test(value);
-}
+import { blockReferenceId } from '$lib/markdown/wikilinks';
 
 export function addObsidianBlockIds(html: string): string {
 	return html.replace(
