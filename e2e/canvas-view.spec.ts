@@ -342,9 +342,7 @@ test('canvas view renders and creates Obsidian Canvas groups', async ({ page, re
 		color: '5'
 	});
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.locator('.canvas-node-group').filter({ hasText: 'Research cluster' })).toBeVisible();
 	await expect(page.locator('.canvas-node-group').first()).toHaveAttribute('style', /--canvas-node-border: #0891b2/);
@@ -408,9 +406,7 @@ test('canvas file cards route notes, Canvas files, and unsupported assets explic
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
 	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
@@ -762,9 +758,7 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await page.getByRole('button', { name: 'Add text' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('3 nodes · 1 edge · editable text cards');
@@ -842,9 +836,7 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await page.getByLabel('Canvas edge source').selectOption('b');
 	await page.getByLabel('Canvas edge target').selectOption('a');
@@ -895,9 +887,7 @@ test('canvas view removes nodes and connected edges from the board', async ({ pa
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
 	await expect(page.getByLabel('Canvas edges')).toContainText('Home.md');
@@ -936,9 +926,7 @@ test('canvas view drags nodes and saves positions to the Canvas file', async ({ 
 	const original = before.nodes.find((node) => node.id === 'b');
 	expect(original).toBeTruthy();
 
-	await page.goto(`/vault/${vault.id}`);
-	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const moveHandle = page.getByRole('button', { name: 'Move canvas node Home.md', exact: true });
 	await expect(moveHandle).toBeVisible();
