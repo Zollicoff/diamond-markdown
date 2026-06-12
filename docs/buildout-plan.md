@@ -100,9 +100,9 @@ Use small, pushable slices:
 - **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
    and file embeds from vault-local assets and copy non-image attachments into
    static publish output.
-- **Release verifier port isolation.** Run release Playwright verification on a
-   fresh local port to avoid stale immutable chunk requests from previous
-   production builds.
+- **Release verifier isolation.** Run release Playwright verification on a fresh
+   local port and serve production static assets through an e2e preview wrapper
+   that returns clean 404s instead of crashing on stale immutable chunk requests.
 - **Dirty sync recovery state.** Surface local uncommitted vault changes as a
    distinct warning/review state with file visibility and commit/stash recovery
    commands.

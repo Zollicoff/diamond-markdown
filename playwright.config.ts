@@ -13,8 +13,8 @@ const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 if (!process.env.TEST_WORKER_INDEX) buildFixture();
 
 /**
- * Isolated test runtime. The `webServer` boots `npm run preview` (the
- * production-ish adapter-node build) with `DIAMOND_CONFIG_DIR` and
+ * Isolated test runtime. The `webServer` boots the production adapter-node
+ * build through a static-safe test preview server with `DIAMOND_CONFIG_DIR` and
  * `DIAMOND_DEFAULT_VAULT_DIR` pointed at e2e-only paths, so smoke runs
  * never touch the user's real config or vault.
  */
@@ -41,7 +41,7 @@ export default defineConfig({
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }
 	],
 	webServer: {
-		command: `node build`,
+		command: `npm run preview:e2e`,
 		url: `http://127.0.0.1:${PORT}/`,
 		reuseExistingServer: false,
 		timeout: 60_000,
