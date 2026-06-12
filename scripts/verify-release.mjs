@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
 const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const e2ePort = String(4300 + Math.floor(Math.random() * 2000));
 
 function run(label, command, args, env = {}) {
 	console.log(`\n==> ${label}`);
@@ -25,7 +26,7 @@ function playwrightEnv() {
 
 function cleanProductionBuildOutput() {
 	console.log('\n==> Clean production build output');
-	for (const target of ['build', '.svelte-kit/output']) {
+	for (const target of ['build', '.svelte-kit']) {
 		fs.rmSync(target, { recursive: true, force: true });
 		console.log(`removed ${target}`);
 	}
@@ -41,6 +42,7 @@ run('Full Playwright e2e suite', 'npm', ['run', 'test:e2e'], {
 	CI: '1',
 	DIAMOND_BASIC_AUTH: '',
 	DIAMOND_READ_ONLY: '',
+	PLAYWRIGHT_PORT: e2ePort,
 	...playwrightEnv()
 });
 

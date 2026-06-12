@@ -55,7 +55,7 @@ export function loadNote(vault: Vault, inputPath: string): NoteDoc {
 	const stat = fs.statSync(abs);
 	const { frontmatter, body } = splitFrontmatter(content);
 	const idx = getIndex(vault);
-	const { html, outgoingLinks } = renderMarkdown(vault, idx, body);
+	const { html, outgoingLinks } = renderMarkdown(vault, idx, body, rel);
 	const meta = idx.notes.get(rel);
 	const backlinks = [...(idx.backlinks.get(rel) ?? [])].map((p) => ({
 		path: p,

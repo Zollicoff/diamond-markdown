@@ -215,6 +215,7 @@ export const api = {
 		totalNotes: number;
 		publicNotes: number;
 		imagesCopied: number;
+		attachmentsCopied: number;
 		skipped: { path: string; reason: string }[];
 	}> {
 		return json(`/api/vaults/${vaultId}/publish`, { method: 'POST' });

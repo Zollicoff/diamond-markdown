@@ -18,9 +18,21 @@ const MIME: Record<string, string> = {
 	'.pdf': 'application/pdf',
 	'.mp4': 'video/mp4',
 	'.webm': 'video/webm',
+	'.ogv': 'video/ogg',
+	'.mov': 'video/quicktime',
+	'.m4v': 'video/x-m4v',
 	'.mp3': 'audio/mpeg',
 	'.wav': 'audio/wav',
-	'.ogg': 'audio/ogg'
+	'.ogg': 'audio/ogg',
+	'.oga': 'audio/ogg',
+	'.m4a': 'audio/mp4',
+	'.flac': 'audio/flac',
+	'.aac': 'audio/aac',
+	'.opus': 'audio/opus',
+	'.txt': 'text/plain; charset=utf-8',
+	'.csv': 'text/csv; charset=utf-8',
+	'.json': 'application/json',
+	'.zip': 'application/zip'
 };
 
 export const GET: RequestHandler = async ({ params }) => {

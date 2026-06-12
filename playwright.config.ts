@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 import { buildFixture, FIXTURE_PATHS } from './e2e/setup-fixture';
 
-const PORT = 4173;
+const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '4173', 10);
+const PORT = Number.isFinite(configuredPort) ? configuredPort : 4173;
 const FIXTURE_ROOT = FIXTURE_PATHS.FIXTURE_ROOT;
 const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 

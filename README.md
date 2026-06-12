@@ -60,7 +60,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Note** — a `.md` file inside a vault. The file's path within the vault is its identity.
 - **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading. Broken links render visibly so you can create missing notes.
 - **Note embed** — `![[Note]]` renders the target note inline (cycle-safe).
-- **Image embed** — `![[image.png]]` for images stored in the vault.
+- **Attachment embed** — `![[image.png]]`, `![[audio.mp3]]`, `![[video.mp4]]`, `![[packet.pdf]]`, and other vault files render from local vault assets.
 - **Backlink** — automatically computed index of every note that wikilinks *to* the note you're viewing.
 - **Tag** — `#hashtag` in body text or `tags:` in frontmatter. Tag index lists every tag and the notes that use it.
 - **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized.
@@ -135,7 +135,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ### Publishing
 - `public: true` frontmatter opts a note in
-- One-shot static-site export to `<vault>/.diamond-publish/` — deploy-ready HTML + CSS, public-to-public wikilinks rewritten, private-target links broken intentionally
+- One-shot static-site export to `<vault>/.diamond-publish/` — deploy-ready HTML + CSS, public-to-public wikilinks rewritten, private-target links broken intentionally, local images copied to `images/`, and non-image attachments copied to `assets/`
 
 ### PWA
 - Installable on mobile / desktop, offline manifest, theme-color, custom icons

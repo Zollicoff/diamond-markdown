@@ -119,7 +119,7 @@ export function registerViewCommands(): void {
 		async exec(ctx: CommandContext) {
 			try {
 				const res = await api.publish(ctx.vaultId!);
-				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
+				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.\n${res.attachmentsCopied} attachment(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
 				await alertDialog({ title: 'Publish complete', message: msg, tone: 'success' });
 			} catch (e) {
 				await alertDialog({ title: 'Publish failed', message: (e as Error).message, tone: 'danger' });

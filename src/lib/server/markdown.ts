@@ -15,12 +15,18 @@
  */
 
 import fs from 'node:fs';
-import { marked } from 'marked';
+import { marked, Renderer, type Tokens } from 'marked';
 import markedFootnote from 'marked-footnote';
 import katex from 'katex';
 import hljs from 'highlight.js';
 import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
-import { embedImageAttrs } from './embed';
+import {
+	attachmentEmbedKind,
+	embedImageAttrs,
+	parseMarkdownImageText,
+	renderAttachmentEmbedHtml,
+	resolveMarkdownImagePath
+} from './embed';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
@@ -33,38 +39,12 @@ marked.setOptions({ gfm: true, breaks: false });
 marked.use(markedFootnote());
 
 // Custom renderer: highlight code blocks + flag mermaid blocks for client.
-marked.use({
-	renderer: {
-		code({ text, lang }: { text: string; lang?: string; escaped?: boolean }) {
-			const language = (lang ?? '').trim().toLowerCase();
-			if (language === 'mermaid') {
-				// Encode the source so the client can pull it back out and feed it to mermaid.
-				const encoded = Buffer.from(text, 'utf-8').toString('base64');
-				return `<div class="mermaid-block" data-mermaid-source="${encoded}"><pre class="mermaid-fallback">${escHtml(text)}</pre></div>\n`;
-			}
-			let highlighted = '';
-			if (language && hljs.getLanguage(language)) {
-				try {
-					highlighted = hljs.highlight(text, { language, ignoreIllegals: true }).value;
-				} catch {
-					highlighted = escHtml(text);
-				}
-			} else {
-				try {
-					highlighted = hljs.highlightAuto(text).value;
-				} catch {
-					highlighted = escHtml(text);
-				}
-			}
-			const cls = language ? `hljs language-${language}` : 'hljs';
-			return `<pre><code class="${cls}">${highlighted}</code></pre>\n`;
-		}
-	}
-});
+marked.use({ renderer: { code: renderCodeBlock } });
 
 const ALLOWED_ATTR = [
 	'href', 'class', 'data-target', 'data-mermaid-source', 'title', 'src', 'alt',
 	'id', 'target', 'rel', 'loading', 'width', 'height', 'role', 'aria-hidden',
+	'aria-label', 'controls', 'preload', 'download',
 	'style' // KaTeX emits a few inline styles; safe under DOMPurify's CSS sanitization
 ];
 
@@ -76,9 +56,9 @@ export interface RenderResult {
 /**
  * Render `body` (markdown without frontmatter) to sanitized HTML.
  */
-export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string): RenderResult {
+export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string, sourcePath: string | null = null): RenderResult {
 	const outgoing: { target: string; resolved: string | null }[] = [];
-	const html = renderInner(vault, idx, body, outgoing, new Set());
+	const html = renderInner(vault, idx, body, outgoing, new Set(), sourcePath);
 	return { html, outgoingLinks: outgoing };
 }
 
@@ -89,7 +69,8 @@ function renderInner(
 	idx: VaultIndex,
 	body: string,
 	outgoing: { target: string; resolved: string | null }[],
-	visited: Set<string>
+	visited: Set<string>,
+	sourcePath: string | null
 ): string {
 	// 1. Math first — replace $...$ and $$...$$ with rendered HTML so marked
 	//    passes them through unchanged. Done outside code regions only.
@@ -100,7 +81,19 @@ function renderInner(
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
 				const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
-				return `<img src="${src}" ${embedImageAttrs(e)}>`;
+				return `<img src="${escAttr(src)}" ${embedImageAttrs(e)}>`;
+			}
+			const attachmentKind = attachmentEmbedKind(e.target);
+			if (attachmentKind) {
+				try {
+					const abs = resolveInVault(vault, e.target);
+					if (fs.statSync(abs).isFile()) {
+						const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
+						return renderAttachmentEmbedHtml(e, src, attachmentKind);
+					}
+				} catch {
+					// Fall through to note resolution / broken embed display.
+				}
 			}
 			// Note embed — try to resolve to a markdown note + inline its body.
 			const resolved = resolveTarget(idx, e.target);
@@ -114,7 +107,7 @@ function renderInner(
 					const { body: childBody } = splitFrontmatter(raw);
 					const nextVisited = new Set(visited);
 					nextVisited.add(resolved);
-					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited);
+					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited, resolved);
 					const title = e.alt ?? resolved.split('/').pop()!.replace(/\.md$/, '');
 					return `<div class="embed-note" data-target="${escAttr(resolved)}"><div class="embed-note-head"><a class="wikilink" href="/vault/${vault.id}/note/${encodeURI(resolved)}">${escHtml(title)}</a></div><div class="embed-note-body">${childHtml}</div></div>`;
 				} catch {
@@ -142,7 +135,10 @@ function renderInner(
 	});
 
 	// 3. Marked → HTML (with our custom code renderer + footnotes ext + GFM).
-	const raw = marked.parse(processed, { async: false }) as string;
+	const raw = marked.parse(processed, {
+		async: false,
+		renderer: createMarkdownRenderer(vault, sourcePath)
+	}) as string;
 
 	// 4. Add id attributes to headings so `[[Note#Heading]]` deep-links work.
 	const withHeadingIds = addHeadingIds(raw);
@@ -152,6 +148,44 @@ function renderInner(
 		ALLOWED_ATTR,
 		ADD_ATTR: ['target']
 	});
+}
+
+function renderCodeBlock({ text, lang }: Tokens.Code): string {
+	const language = (lang ?? '').trim().toLowerCase();
+	if (language === 'mermaid') {
+		// Encode the source so the client can pull it back out and feed it to mermaid.
+		const encoded = Buffer.from(text, 'utf-8').toString('base64');
+		return `<div class="mermaid-block" data-mermaid-source="${encoded}"><pre class="mermaid-fallback">${escHtml(text)}</pre></div>\n`;
+	}
+	let highlighted = '';
+	if (language && hljs.getLanguage(language)) {
+		try {
+			highlighted = hljs.highlight(text, { language, ignoreIllegals: true }).value;
+		} catch {
+			highlighted = escHtml(text);
+		}
+	} else {
+		try {
+			highlighted = hljs.highlightAuto(text).value;
+		} catch {
+			highlighted = escHtml(text);
+		}
+	}
+	const cls = language ? `hljs language-${language}` : 'hljs';
+	return `<pre><code class="${cls}">${highlighted}</code></pre>\n`;
+}
+
+function createMarkdownRenderer(vault: Vault, sourcePath: string | null): Renderer<string, string> {
+	const renderer = new Renderer();
+	renderer.code = renderCodeBlock;
+	renderer.image = ({ href, title, text }: Tokens.Image) => {
+		const localPath = resolveMarkdownImagePath(href, sourcePath);
+		const src = localPath ? `/api/vaults/${vault.id}/raw/${encodeURI(localPath)}` : href;
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		const meta = parseMarkdownImageText(text);
+		return `<img src="${escAttr(src)}" ${embedImageAttrs({ target: localPath ?? href, ...meta })}${titleAttr}>`;
+	};
+	return renderer;
 }
 
 /** Replace `$$...$$` (block) and `$...$` (inline) with KaTeX-rendered HTML.

@@ -94,6 +94,15 @@ Use small, pushable slices:
 - **Obsidian image embed sizing.** Support image embed pipe metadata such as
    `![[image.png|300]]` and `![[image.png|300x200]]` in read mode and static
    publish output.
+- **Markdown image asset compatibility.** Resolve standard Markdown image links
+   relative to their source note, preserve Obsidian-style alt/size metadata, and
+   copy local image assets during static publish.
+- **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
+   and file embeds from vault-local assets and copy non-image attachments into
+   static publish output.
+- **Release verifier port isolation.** Run release Playwright verification on a
+   fresh local port to avoid stale immutable chunk requests from previous
+   production builds.
 - **Dirty sync recovery state.** Surface local uncommitted vault changes as a
    distinct warning/review state with file visibility and commit/stash recovery
    commands.
@@ -106,7 +115,7 @@ Use small, pushable slices:
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as attachment embed variants, Canvas editing/export, and
+   import edges such as Canvas editing/export, richer attachment metadata, and
    plugin-settings visibility without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.

@@ -21,6 +21,14 @@ Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
 the vault.
 
+Image embeds using Obsidian wikilink syntax (`![[image.png|300x200]]`) and
+standard Markdown image syntax (`![Alt|300x200](Attachments/image.png)`) render
+from vault assets. Markdown image paths are resolved relative to the source note,
+and static publish copies local image assets into the exported `images/` folder.
+Audio, video, PDF, and generic file embeds using Obsidian wikilink syntax render
+as vault-local attachments in read mode; static publish copies those non-image
+attachments into the exported `assets/` folder.
+
 If media files are present outside a named attachment folder, the preflight
 marks that as a review item. Diamond still registers the vault in place, but
 you should verify embeds after opening it.
