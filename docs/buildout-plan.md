@@ -261,6 +261,9 @@ Use small, pushable slices:
 - **Graph canvas edge helper extraction.** Resolve graph canvas edge endpoints
    in a pure helper so `GraphCanvas` renders prepared edge view data instead
    of doing repeated template lookups.
+- **Graph canvas layer split.** Move SVG edge and node rendering out of
+   `GraphCanvas` into focused `GraphEdgeLayer` and `GraphNodeLayer`
+   components so the canvas wrapper owns only the SVG shell.
 
 ## Next Implementation Slices
 

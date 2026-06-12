@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { nodeRadius, type GEdge, type GNode } from '$lib/graph/sim';
+	import type { GEdge, GNode } from '$lib/graph/sim';
 	import { buildGraphCanvasEdges, type GraphSelectionBox } from '$lib/graph/view';
+	import GraphEdgeLayer from './GraphEdgeLayer.svelte';
+	import GraphNodeLayer from './GraphNodeLayer.svelte';
 
 	interface Props {
 		nodes: GNode[];
@@ -72,36 +74,19 @@
 	onpointercancel={onPointerUpGraph}
 >
 	<g transform={`translate(${viewX}, ${viewY}) scale(${viewScale})`}>
-		{#each canvasEdges as canvasEdge (canvasEdge.key)}
-			<line
-				x1={canvasEdge.from.x} y1={canvasEdge.from.y} x2={canvasEdge.to.x} y2={canvasEdge.to.y}
-				class="edge"
-				class:hl={hoverPath === canvasEdge.edge.from || hoverPath === canvasEdge.edge.to}
-				class:selected={selectedPaths.includes(canvasEdge.edge.from) && selectedPaths.includes(canvasEdge.edge.to)}
-			/>
-		{/each}
-		{#each visibleNodes as node (node.path)}
-			<g
-				class="node"
-				class:hl={hoverPath === node.path}
-				class:selected={selectedPaths.includes(node.path)}
-				transform={`translate(${node.x}, ${node.y})`}
-				onpointerdown={(event) => onNodePointerDown(event, node)}
-				onpointermove={onNodePointerMove}
-				onpointerup={(event) => onNodePointerUp(event, node)}
-				onpointercancel={(event) => onNodePointerUp(event, node)}
-				onclick={(event) => onNodeClick(event, node)}
-				onkeydown={(event) => onNodeKeydown(event, node)}
-				onmouseenter={() => onHoverPath(node.path)}
-				onmouseleave={() => onHoverPath(null)}
-				role="button"
-				tabindex="0"
-				aria-pressed={selectedPaths.includes(node.path)}
-			>
-				<circle r={nodeRadius(node, nodeScale)} />
-				<text dy="-8">{node.title}</text>
-			</g>
-		{/each}
+		<GraphEdgeLayer {canvasEdges} {hoverPath} {selectedPaths} />
+		<GraphNodeLayer
+			{visibleNodes}
+			{nodeScale}
+			{hoverPath}
+			{selectedPaths}
+			{onNodePointerDown}
+			{onNodePointerMove}
+			{onNodePointerUp}
+			{onNodeClick}
+			{onNodeKeydown}
+			{onHoverPath}
+		/>
 	</g>
 	{#if selectionBox}
 		<rect
@@ -125,44 +110,6 @@
 		touch-action: none;
 	}
 	.canvas:active { cursor: grabbing; }
-
-	.edge {
-		stroke: var(--border-strong);
-		stroke-width: 1;
-		opacity: 0.55;
-		pointer-events: none;
-	}
-	.edge.hl { stroke: var(--brand-cyan); opacity: 1; stroke-width: 1.4; }
-	.edge.selected { stroke: var(--accent); opacity: 0.9; stroke-width: 1.5; }
-
-	.node circle {
-		fill: var(--fg-muted);
-		stroke: var(--bg);
-		stroke-width: 1.5;
-		transition: fill 0.15s;
-	}
-	.node text {
-		font-family: var(--sans);
-		font-size: 11px;
-		fill: var(--fg-dim);
-		text-anchor: middle;
-		pointer-events: none;
-		paint-order: stroke;
-		stroke: var(--bg);
-		stroke-width: 3px;
-		stroke-linejoin: round;
-	}
-	.node:hover circle, .node.hl circle {
-		fill: var(--brand-cyan);
-		cursor: pointer;
-	}
-	.node.selected circle {
-		fill: var(--accent);
-		stroke: var(--fg);
-		stroke-width: 2;
-	}
-	.node:hover text, .node.hl text { fill: var(--fg); }
-	.node.selected text { fill: var(--fg); }
 
 	.selection-box {
 		fill: var(--accent-soft);
