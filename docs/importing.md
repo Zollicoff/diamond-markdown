@@ -11,12 +11,22 @@ an existing Obsidian vault. The preflight reports:
 - markdown file count
 - likely attachment folders
 - whether `.obsidian` exists
+- supported `.obsidian/app.json` settings, including safe attachment folder,
+  new-note folder, link style, link-update preference, link format, and trash
+  preference
 - Obsidian plugin folders plus read-only manifest/settings migration guidance
 - Obsidian Canvas files that will be preserved and opened with visual editing
 - whether the folder already has `.git`
 - folders Diamond skips from note indexing
 
 The `.obsidian` folder is preserved on disk but skipped from note indexing.
+Diamond reads known-safe `.obsidian/app.json` settings during preflight and
+shows them as migration notes instead of dumping the raw JSON. It currently
+honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
+attachments. Other app settings such as `newFileLocation`, `newFileFolderPath`,
+`useMarkdownLinks`, `alwaysUpdateLinks`, `newLinkFormat`, and `trashOption` are
+reported so migration mismatches are visible before opening the vault.
+
 Diamond will not execute Obsidian community plugins. The import preview reads
 plugin manifests plus the top-level keys in each plugin `data.json`, then shows
 per-plugin migration notes for enabled state, manifest health, settings-file
@@ -91,6 +101,7 @@ initial state of the imported vault is captured explicitly.
 
 - It does not import or execute Obsidian plugins.
 - It does not automatically migrate Obsidian plugin settings into Diamond plugins.
+- It does not automatically apply every `.obsidian/app.json` UI preference.
 - It does not rewrite wikilinks or embeds.
 - It does not move attachments during import.
 - It does not delete or modify `.obsidian`.

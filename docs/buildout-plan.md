@@ -18,8 +18,9 @@ Diamond Markdown already has the right foundation:
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
   `.obsidian`, attachment folders, media outside named attachment folders,
-  Obsidian plugin folders with manual settings-migration guidance, Canvas
-  files, and Git readiness before registration.
+  supported Obsidian app settings, Obsidian plugin folders with manual
+  settings-migration guidance, Canvas files, and Git readiness before
+  registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and Playwright e2e.
 
@@ -328,6 +329,10 @@ Use small, pushable slices:
 - **Unlinked mentions.** Surface notes that mention the active note title,
    stem, or aliases without already wikilinking it, using the existing index
    and right-panel link list instead of a new vault scan.
+- **Obsidian app config guidance.** Parse supported `.obsidian/app.json`
+   settings during import preflight, surface safe attachment-folder behavior
+   and migration notes for new-note/link/delete preferences, and reuse the same
+   safe folder parser for attachment uploads and attachment organization.
 
 ## Next Implementation Slices
 
@@ -336,7 +341,7 @@ Use small, pushable slices:
    scope is available; the local release verifier no longer depends on Unix
    shell syntax.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as deeper Canvas formatting support and additional
+   import edges such as deeper Canvas formatting support and remaining
    Obsidian config interpretation without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.

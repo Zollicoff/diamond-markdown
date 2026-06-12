@@ -3,9 +3,11 @@ import {
 	compactPathList,
 	importReadiness,
 	importSummary,
+	obsidianAppConfigSummary,
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
+import { safeVaultFolder } from '../src/lib/server/obsidian-config';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
 function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnalysis {
@@ -19,6 +21,13 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 		diamondConfig: false,
 		gitRepository: true,
 		likelyAttachmentFolders: [],
+		obsidianAppConfig: {
+			status: 'missing',
+			attachmentFolderStatus: 'missing',
+			newFileFolderStatus: 'not-configured',
+			settings: [],
+			warnings: []
+		},
 		obsidianPluginFolders: [],
 		obsidianPlugins: [],
 		recommendedExcludedFolders: [],
@@ -47,6 +56,56 @@ test.describe('import checklist helpers', () => {
 	test('compacts long folder lists for dense import cards', () => {
 		expect(compactPathList(['.obsidian', 'assets'])).toBe('.obsidian, assets');
 		expect(compactPathList(['a', 'b', 'c', 'd', 'e'], 3)).toBe('a, b, c +2 more');
+	});
+
+	test('summarizes Obsidian app config without exposing raw JSON', () => {
+		expect(obsidianAppConfigSummary(analysis().obsidianAppConfig)).toBe('No .obsidian/app.json file was found.');
+		expect(obsidianAppConfigSummary({
+			path: '.obsidian/app.json',
+			status: 'invalid',
+			bytes: 12,
+			attachmentFolderStatus: 'missing',
+			newFileFolderStatus: 'not-configured',
+			settings: [],
+			warnings: ['invalid']
+		})).toBe('.obsidian/app.json is present but invalid.');
+		expect(obsidianAppConfigSummary({
+			path: '.obsidian/app.json',
+			status: 'present',
+			bytes: 64,
+			attachmentFolderStatus: 'safe',
+			attachmentFolderPath: 'Media/Uploads',
+			newFileFolderStatus: 'safe',
+			newFileFolderPath: 'Notes/Inbox',
+			settings: [
+				{
+					id: 'attachmentFolderPath',
+					label: 'Attachment folder',
+					value: 'Media/Uploads',
+					detail: 'Diamond uses this safe Obsidian folder for dropped, pasted, and uploaded attachments.',
+					level: 'info'
+				},
+				{
+					id: 'newFileFolderPath',
+					label: 'Configured new-note folder',
+					value: 'Notes/Inbox',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				}
+			],
+			warnings: []
+		})).toBe('2 supported app settings found.');
+	});
+
+	test('guards Obsidian configured vault folders before reuse', () => {
+		expect(safeVaultFolder('Media/Uploads')).toBe('Media/Uploads');
+		expect(safeVaultFolder('./Media/Uploads')).toBe('Media/Uploads');
+		expect(safeVaultFolder('../outside')).toBeNull();
+		expect(safeVaultFolder('/tmp/uploads')).toBeNull();
+		expect(safeVaultFolder('Media\\Uploads')).toBeNull();
+		expect(safeVaultFolder('.obsidian/plugins')).toBeNull();
+		expect(safeVaultFolder('node_modules/cache')).toBeNull();
+		expect(safeVaultFolder('')).toBeNull();
 	});
 
 	test('summarizes Obsidian plugin metadata without implying execution', () => {

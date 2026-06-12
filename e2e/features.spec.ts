@@ -140,7 +140,16 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ legacyEditor: false }));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		attachmentFolderPath: 'Attachments',
+		newFileLocation: 'folder',
+		newFileFolderPath: 'Notes/Inbox',
+		useMarkdownLinks: true,
+		alwaysUpdateLinks: true,
+		newLinkFormat: 'relative',
+		trashOption: 'local',
+		privateSetting: 'do-not-render-this-app-config-value'
+	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['dataview']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'manifest.json'), JSON.stringify({
 		id: 'dataview',
@@ -171,6 +180,15 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		obsidianConfig: boolean;
 		gitRepository: boolean;
 		likelyAttachmentFolders: string[];
+		obsidianAppConfig: {
+			status: string;
+			attachmentFolderPath?: string;
+			attachmentFolderStatus: string;
+			newFileFolderPath?: string;
+			newFileFolderStatus: string;
+			settings: { id: string; label: string; value: string; level: string; detail: string }[];
+			warnings: string[];
+		};
 		obsidianPluginFolders: string[];
 		obsidianPlugins: {
 			id: string;
@@ -195,6 +213,29 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianConfig).toBe(true);
 	expect(body.gitRepository).toBe(true);
 	expect(body.likelyAttachmentFolders).toContain('Attachments');
+	expect(body.obsidianAppConfig).toMatchObject({
+		status: 'present',
+		attachmentFolderPath: 'Attachments',
+		attachmentFolderStatus: 'safe',
+		newFileFolderPath: 'Notes/Inbox',
+		newFileFolderStatus: 'safe'
+	});
+	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
+		'attachmentFolderPath',
+		'newFileLocation',
+		'newFileFolderPath',
+		'useMarkdownLinks',
+		'alwaysUpdateLinks',
+		'newLinkFormat',
+		'trashOption'
+	]);
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'attachmentFolderPath')).toMatchObject({
+		label: 'Attachment folder',
+		value: 'Attachments',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor shortcuts still favor wikilinks');
+	expect(JSON.stringify(body.obsidianAppConfig)).not.toContain('do-not-render-this-app-config-value');
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
 	expect(body.obsidianPlugins[0]).toMatchObject({
 		id: 'dataview',
@@ -221,7 +262,16 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-ui-import-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban'), { recursive: true });
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), '{}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		attachmentFolderPath: 'Media/Uploads',
+		newFileLocation: 'folder',
+		newFileFolderPath: 'Notes/Inbox',
+		useMarkdownLinks: true,
+		alwaysUpdateLinks: false,
+		newLinkFormat: 'relative',
+		trashOption: 'local',
+		privateSetting: 'do-not-render-this-app-config-value'
+	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['obsidian-kanban']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), JSON.stringify({
 		id: 'obsidian-kanban',
@@ -252,6 +302,17 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Board.canvas');
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
+	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
+	await expect(page.locator('.import-card')).toContainText('7 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('Attachment folder');
+	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
+	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
+	await expect(page.locator('.import-card')).toContainText('Notes/Inbox');
+	await expect(page.locator('.import-card')).toContainText('Link style');
+	await expect(page.locator('.import-card')).toContainText('Markdown links');
+	await expect(page.locator('.import-card')).toContainText('Update links on rename');
+	await expect(page.locator('.import-card')).toContainText('Disabled in Obsidian');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-app-config-value');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');

@@ -1,4 +1,5 @@
 import type {
+	ObsidianAppConfigInfo,
 	ObsidianPluginInfo,
 	ObsidianPluginJsonStatus,
 	VaultImportAnalysis,
@@ -83,6 +84,13 @@ export function obsidianPluginSummary(plugins: ObsidianPluginInfo[], max = 4): s
 	));
 	if (plugins.length > max) visible.push(`+${plugins.length - max} more`);
 	return visible.join('; ');
+}
+
+export function obsidianAppConfigSummary(config: ObsidianAppConfigInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/app.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/app.json is present but invalid.';
+	if (config.settings.length === 0) return '.obsidian/app.json found; no supported app settings were recognized.';
+	return `${config.settings.length} supported app setting${config.settings.length === 1 ? '' : 's'} found.`;
 }
 
 function formatBytes(bytes: number | undefined): string {

@@ -25,7 +25,28 @@ export interface VaultImportCheckItem {
 	level: VaultImportCheckLevel;
 }
 
-export type ObsidianPluginJsonStatus = 'present' | 'missing' | 'invalid';
+export type JsonFileStatus = 'present' | 'missing' | 'invalid';
+export type ObsidianPluginJsonStatus = JsonFileStatus;
+
+export interface ObsidianAppConfigSetting {
+	id: string;
+	label: string;
+	value: string;
+	detail: string;
+	level: VaultImportCheckLevel;
+}
+
+export interface ObsidianAppConfigInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	attachmentFolderPath?: string;
+	attachmentFolderStatus: 'safe' | 'unsafe' | 'missing';
+	newFileFolderPath?: string;
+	newFileFolderStatus: 'safe' | 'unsafe' | 'missing' | 'not-configured';
+	settings: ObsidianAppConfigSetting[];
+	warnings: string[];
+}
 
 export interface ObsidianPluginInfo {
 	folder: string;
@@ -52,6 +73,7 @@ export interface VaultImportAnalysis {
 	diamondConfig: boolean;
 	gitRepository: boolean;
 	likelyAttachmentFolders: string[];
+	obsidianAppConfig: ObsidianAppConfigInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];
 	recommendedExcludedFolders: string[];

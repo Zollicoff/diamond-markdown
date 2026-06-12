@@ -7,6 +7,7 @@ import type {
 	VaultImportAnalysis,
 	VaultImportCheckItem
 } from '$lib/types';
+import { readObsidianAppConfig } from './obsidian-config';
 
 const CONFIG_FOLDERS = new Set(['.obsidian', '.diamondmd']);
 const IGNORED_FOLDERS = new Set(['.git', '.diamond-publish', 'node_modules']);
@@ -84,6 +85,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const gitRepository = fs.existsSync(path.join(root, '.git'));
 	let obsidianConfig = fs.existsSync(path.join(root, '.obsidian'));
 	let diamondConfig = fs.existsSync(path.join(root, '.diamondmd'));
+	const obsidianAppConfig = readObsidianAppConfig(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
@@ -179,6 +181,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (hiddenMarkdownRisk) warnings.push('Hidden folders contain markdown files; Diamond skips hidden folders by default.');
 	if (unreadableEntries > 0) warnings.push(`${unreadableEntries} folder${unreadableEntries === 1 ? '' : 's'} could not be read.`);
 	if (skippedSymlinks > 0) warnings.push(`${skippedSymlinks} symlink${skippedSymlinks === 1 ? '' : 's'} skipped during inspection.`);
+	warnings.push(...obsidianAppConfig.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
 	const attachmentDetail = likelyAttachmentFolders.length > 0
@@ -199,9 +202,15 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			'obsidian-config',
 			'Obsidian config',
 			obsidianConfig
-				? '.obsidian was found and will be preserved but skipped from note indexing.'
+				? obsidianAppConfig.status === 'present'
+					? `.obsidian was found; ${obsidianAppConfig.settings.length} app setting${obsidianAppConfig.settings.length === 1 ? '' : 's'} surfaced read-only for migration.`
+					: obsidianAppConfig.status === 'invalid'
+						? '.obsidian/app.json is invalid; .obsidian will still be preserved and skipped from note indexing.'
+						: '.obsidian was found and will be preserved but skipped from note indexing.'
 				: 'No .obsidian folder was found.',
-			obsidianConfig ? 'info' : 'ok'
+			obsidianAppConfig.status === 'invalid' || obsidianAppConfig.settings.some((setting) => setting.level === 'warn')
+				? 'warn'
+				: obsidianConfig ? 'info' : 'ok'
 		),
 		item(
 			'obsidian-plugins',
@@ -251,6 +260,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		diamondConfig,
 		gitRepository,
 		likelyAttachmentFolders,
+		obsidianAppConfig,
 		obsidianPluginFolders,
 		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),

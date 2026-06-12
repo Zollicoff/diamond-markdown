@@ -6,6 +6,7 @@
 		compactPathList,
 		importReadiness,
 		importSummary,
+		obsidianAppConfigSummary,
 		obsidianPluginMigrationNotes,
 		obsidianPluginSummary
 	} from '$lib/import/checklist';
@@ -62,6 +63,31 @@
 			<span class="note-label">Canvas files</span>
 			<span class="mono">{compactPathList(analysis.canvasExamples, 3)}</span>
 		</div>
+	{/if}
+
+	{#if analysis.obsidianAppConfig.status !== 'missing'}
+		<div class="note">
+			<span class="note-label">Obsidian app config</span>
+			<span>{obsidianAppConfigSummary(analysis.obsidianAppConfig)}</span>
+			{#if analysis.obsidianAppConfig.path}
+				<span class="mono">{analysis.obsidianAppConfig.path}</span>
+			{/if}
+		</div>
+		{#if analysis.obsidianAppConfig.settings.length > 0}
+			<ul class="config-settings" aria-label="Obsidian app config settings">
+				{#each analysis.obsidianAppConfig.settings as setting (setting.id)}
+					<li class={`config-row ${setting.level}`}>
+						<div class="config-main">
+							<div>
+								<div class="config-name">{setting.label}</div>
+								<div class="config-detail">{setting.detail}</div>
+							</div>
+							<span class="config-value mono">{setting.value}</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	{/if}
 
 	{#if analysis.obsidianPlugins.length > 0}
@@ -202,6 +228,51 @@
 		gap: 0;
 		border-top: 1px solid color-mix(in srgb, var(--border), transparent 35%);
 	}
+	.config-settings {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		gap: 0;
+		border-top: 1px solid color-mix(in srgb, var(--border), transparent 35%);
+	}
+	.config-row {
+		display: grid;
+		gap: 5px;
+		padding: 8px 0;
+		border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 35%);
+	}
+	.config-row.warn {
+		color: var(--danger);
+	}
+	.config-main {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		align-items: flex-start;
+	}
+	.config-name {
+		color: var(--fg);
+		font-size: 0.78rem;
+		font-weight: 700;
+	}
+	.config-row.warn .config-name,
+	.config-row.warn .config-detail {
+		color: var(--danger);
+	}
+	.config-detail,
+	.config-value {
+		color: var(--fg-dim);
+		font-size: 0.72rem;
+		line-height: 1.35;
+	}
+	.config-value {
+		max-width: 220px;
+		overflow: hidden;
+		text-align: right;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.plugin-row {
 		display: grid;
 		gap: 5px;
@@ -273,6 +344,13 @@
 		.plugin-states {
 			justify-content: flex-start;
 			min-width: 0;
+		}
+		.config-main {
+			display: grid;
+		}
+		.config-value {
+			max-width: 100%;
+			text-align: left;
 		}
 	}
 </style>

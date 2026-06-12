@@ -9,6 +9,7 @@ import { splitAssetReference } from './embed';
 import { replaceEmbeds } from './wikilink';
 import { resolveMarkdownImagePath } from './embed';
 import type { AttachmentKind, AttachmentRef } from '$lib/types';
+import { readObsidianAppConfig, safeVaultFolder } from './obsidian-config';
 
 export interface AttachmentUploadResult {
 	ok: true;
@@ -56,12 +57,6 @@ const VIDEO_EXT_RE = /\.(?:mp4|webm|ogv|mov|m4v)$/i;
 const PDF_EXT_RE = /\.pdf$/i;
 const EXCLUDED_DIRS = new Set(['.git', '.diamondmd', '.obsidian', '.diamond-publish', 'node_modules']);
 
-function record(value: unknown): Record<string, unknown> | null {
-	return value && typeof value === 'object' && !Array.isArray(value)
-		? value as Record<string, unknown>
-		: null;
-}
-
 export function sanitizeAttachmentFilename(input: string): string {
 	const basename = path.basename((input || 'attachment').replace(/\\/g, '/'));
 	const cleaned = basename
@@ -80,32 +75,8 @@ function candidateFilename(filename: string, index: number): string {
 	return `${stem} ${index}${parsed.ext}`;
 }
 
-function safeAttachmentFolder(input: unknown): string | null {
-	if (typeof input !== 'string') return null;
-	const trimmed = input.trim().replace(/^\.\/+/, '');
-	if (!trimmed || trimmed === '.' || trimmed === '/') return null;
-
-	let rel: string;
-	try {
-		rel = normalizeVaultPath(trimmed);
-	} catch {
-		return null;
-	}
-
-	const segments = rel.split('/');
-	if (segments.some((segment) => segment.startsWith('.') || EXCLUDED_DIRS.has(segment))) return null;
-	return rel;
-}
-
 function obsidianAttachmentFolder(vault: Vault): string | null {
-	const appConfig = path.join(vault.path, '.obsidian', 'app.json');
-	if (!fs.existsSync(appConfig)) return null;
-	try {
-		const parsed = record(JSON.parse(fs.readFileSync(appConfig, 'utf-8')) as unknown);
-		return safeAttachmentFolder(parsed?.attachmentFolderPath);
-	} catch {
-		return null;
-	}
+	return readObsidianAppConfig(vault.path).attachmentFolderPath ?? null;
 }
 
 export function preferredAttachmentFolder(vault: Vault): string {
@@ -356,7 +327,7 @@ export async function moveAttachments(
 	folderInput: unknown
 ): Promise<AttachmentMoveResult> {
 	if (!Array.isArray(inputPaths) || inputPaths.length === 0) throw new Error('attachment paths required');
-	const folder = safeAttachmentFolder(folderInput);
+	const folder = safeVaultFolder(folderInput);
 	if (!folder) throw new Error('destination folder required');
 
 	const sourceKeys = new Set<string>();
