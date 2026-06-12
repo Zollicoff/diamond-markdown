@@ -130,6 +130,9 @@ Use small, pushable slices:
    drag orchestration in `CanvasView` while moving body states, warning
    display, edge-list mounting, and board mounting into a focused
    presentational component.
+- **Canvas drag helper extraction.** Move Canvas node drag-state creation,
+   pointer matching, position projection, and rounded movement math into a
+   pure helper with deterministic coverage.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through

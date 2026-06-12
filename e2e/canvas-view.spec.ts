@@ -45,6 +45,12 @@ import {
 	canvasNodeStyle,
 	nodeStyle
 } from '../src/lib/canvas/view';
+import {
+	canvasNodeDragPosition,
+	createCanvasNodeDragState,
+	isCanvasNodeDragPointer,
+	updateCanvasNodeDragState
+} from '../src/lib/canvas/drag';
 
 const canvasJson = JSON.stringify({
 	nodes: [
@@ -155,6 +161,24 @@ test.describe('canvas view helpers', () => {
 		const moved = canvasNodesWithPosition(doc.nodes, { nodeId: 'b', x: 360, y: 90 });
 		expect(moved.find((node) => node.id === 'b')).toMatchObject({ x: 360, y: 90 });
 		expect(doc.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 320, y: 40 });
+		const dragStart = createCanvasNodeDragState(doc.nodes[1], {
+			pointerId: 7,
+			clientX: 100,
+			clientY: 120
+		});
+		expect(canvasNodeDragPosition(dragStart)).toEqual({ nodeId: 'b', x: 320, y: 40 });
+		expect(isCanvasNodeDragPointer(dragStart, { pointerId: 99 })).toBe(false);
+		expect(updateCanvasNodeDragState(dragStart, {
+			pointerId: 99,
+			clientX: 300,
+			clientY: 300
+		})).toBe(dragStart);
+		const dragMoved = updateCanvasNodeDragState(dragStart, {
+			pointerId: 7,
+			clientX: 160.4,
+			clientY: 150.6
+		});
+		expect(canvasNodeDragPosition(dragMoved)).toEqual({ nodeId: 'b', x: 380, y: 71 });
 		expect(canvasNodeOptions(doc.nodes)).toEqual([
 			{ id: 'a', label: 'text (text)' },
 			{ id: 'b', label: 'Home.md (file)' }

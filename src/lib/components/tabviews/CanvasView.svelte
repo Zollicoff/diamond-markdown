@@ -29,6 +29,13 @@
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import {
+		canvasNodeDragPosition,
+		createCanvasNodeDragState,
+		isCanvasNodeDragPointer,
+		updateCanvasNodeDragState,
+		type CanvasNodeDragState
+	} from '$lib/canvas/drag';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
 
@@ -56,20 +63,11 @@
 	let edgeFromNodeId = $state('');
 	let edgeToNodeId = $state('');
 	let edgeLabel = $state('');
-	let dragState = $state<{
-		nodeId: string;
-		pointerId: number;
-		startClientX: number;
-		startClientY: number;
-		originX: number;
-		originY: number;
-		currentX: number;
-		currentY: number;
-	} | null>(null);
+	let dragState = $state<CanvasNodeDragState | null>(null);
 
 	const displayNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
-		dragState ? { nodeId: dragState.nodeId, x: dragState.currentX, y: dragState.currentY } : null
+		dragState ? canvasNodeDragPosition(dragState) : null
 	));
 	const displayDoc = $derived(doc ? { ...doc, nodes: displayNodes } : null);
 	const bounds = $derived(canvasBounds(displayNodes));
@@ -265,16 +263,12 @@
 	}
 
 	function moveNodePointer(event: PointerEvent): void {
-		if (!dragState || event.pointerId !== dragState.pointerId) return;
-		dragState = {
-			...dragState,
-			currentX: Math.round(dragState.originX + event.clientX - dragState.startClientX),
-			currentY: Math.round(dragState.originY + event.clientY - dragState.startClientY)
-		};
+		if (!isCanvasNodeDragPointer(dragState, event)) return;
+		dragState = updateCanvasNodeDragState(dragState, event);
 	}
 
 	async function finishMovePointer(event: PointerEvent): Promise<void> {
-		if (!dragState || event.pointerId !== dragState.pointerId) return;
+		if (!isCanvasNodeDragPointer(dragState, event)) return;
 		const finished = dragState;
 		cleanupDragListeners();
 		dragState = null;
@@ -308,7 +302,7 @@
 	}
 
 	function handleMovePointerCancel(event: PointerEvent): void {
-		if (!dragState || event.pointerId !== dragState.pointerId) return;
+		if (!isCanvasNodeDragPointer(dragState, event)) return;
 		cleanupDragListeners();
 		dragState = null;
 		movingNodeId = null;
@@ -318,16 +312,7 @@
 		if (!doc || moveSavingNodeId) return;
 		event.preventDefault();
 		movingNodeId = node.id;
-		dragState = {
-			nodeId: node.id,
-			pointerId: event.pointerId,
-			startClientX: event.clientX,
-			startClientY: event.clientY,
-			originX: node.x,
-			originY: node.y,
-			currentX: node.x,
-			currentY: node.y
-		};
+		dragState = createCanvasNodeDragState(node, event);
 		window.addEventListener('pointermove', moveNodePointer);
 		window.addEventListener('pointerup', handleMovePointerUp);
 		window.addEventListener('pointercancel', handleMovePointerCancel);
