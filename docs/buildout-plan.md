@@ -134,6 +134,8 @@ Use small, pushable slices:
 - **Canvas file and URL node editing.** Edit Canvas file paths, URL targets,
    and optional display labels inline through git-backed commits with
    stale-revision protection.
+- **Canvas file and URL node navigation.** Open Canvas file cards as vault note
+   tabs and expose safe `http`/`https` URL-card links directly from the board.
 - **Canvas board split.** Move Canvas SVG edge rendering and node-card layout
    out of `CanvasView` into a focused presentational board component.
 - **Graph settings state extraction.** Move graph setting hydration,

@@ -18,11 +18,16 @@ import {
 	canvasEdgeLabelDrafts,
 	canSubmitCanvasAddNode,
 	canConnectCanvasNodes,
+	canOpenCanvasNode,
 	canSaveCanvasNodeRefDraft,
 	canvasEdgeSummaries,
+	canvasFileNodePath,
+	canvasFileNodeTitle,
+	canvasLinkNodeHref,
 	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeColorStyle,
+	canvasOpenNodeLabel,
 	canvasNodeOptions,
 	canvasNodePositionChanged,
 	canvasNodeRefDraftChanged,
@@ -103,6 +108,25 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeRefDraftChanged(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
 		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: '', label: 'Home note' } })).toBe(false);
 		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
+		expect(canvasFileNodePath(doc.nodes[1])).toBe('Home.md');
+		expect(canvasFileNodeTitle(doc.nodes[1])).toBe('Home');
+		expect(canvasFileNodeTitle({ ...doc.nodes[1], label: 'Home note' })).toBe('Home note');
+		expect(canvasOpenNodeLabel(doc.nodes[1])).toBe('Open canvas file node Home.md');
+		expect(canOpenCanvasNode(doc.nodes[1])).toBe(true);
+		const linkNode = {
+			id: 'c',
+			type: 'link',
+			x: 0,
+			y: 0,
+			width: 220,
+			height: 100,
+			url: 'https://example.com/research'
+		} satisfies CanvasDoc['nodes'][number];
+		expect(canvasLinkNodeHref(linkNode)).toBe('https://example.com/research');
+		expect(canvasOpenNodeLabel(linkNode)).toBe('Open canvas URL node https://example.com/research');
+		expect(canOpenCanvasNode(linkNode)).toBe(true);
+		expect(canvasLinkNodeHref({ ...linkNode, url: 'javascript:alert(1)' })).toBeNull();
+		expect(canOpenCanvasNode({ ...linkNode, url: 'ftp://example.com/file' })).toBe(false);
 		expect(canvasAddNodePlaceholder('file')).toBe('Note.md');
 		expect(canvasAddNodeButtonLabel('link')).toBe('Add URL');
 		expect(canSubmitCanvasAddNode('text', '')).toBe(true);
@@ -176,6 +200,9 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 		'href',
 		`/api/vaults/${vault.id}/canvas/export?path=Board.canvas`
 	);
+	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
+	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.locator('.note-view')).toContainText('Home');
 });
 
 test('canvas API exports a safe SVG snapshot', async ({ request }) => {
@@ -491,6 +518,10 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	await page.getByRole('button', { name: 'Add URL' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('5 nodes · 1 edge · editable text cards');
 	await expect(page.locator('.canvas-node-link').filter({ hasText: 'https://example.com/research' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Open canvas URL node https://example.com/research' })).toHaveAttribute(
+		'href',
+		'https://example.com/research'
+	);
 
 	const addedFileCard = page.locator('.canvas-node-file').filter({ hasText: 'Home.md' }).last();
 	await addedFileCard.getByLabel('Canvas file path for Home.md').fill('References/Home.md');
@@ -499,6 +530,7 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	await expect(saveFileButton).toBeEnabled();
 	await saveFileButton.click();
 	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home reference' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Open canvas file node Home reference' })).toBeVisible();
 
 	const linkCard = page.locator('.canvas-node-link').filter({ hasText: 'https://example.com/research' });
 	await linkCard.getByLabel('Canvas URL target for https://example.com/research').fill('https://example.com/updated');
@@ -507,6 +539,10 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	await expect(saveUrlButton).toBeEnabled();
 	await saveUrlButton.click();
 	await expect(page.locator('.canvas-node-link').filter({ hasText: 'Updated research' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Open canvas URL node Updated research' })).toHaveAttribute(
+		'href',
+		'https://example.com/updated'
+	);
 
 	const firstCard = page.locator('.canvas-node-text').first();
 	const editor = firstCard.locator('textarea');

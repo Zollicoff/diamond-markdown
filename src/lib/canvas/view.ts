@@ -226,6 +226,40 @@ export function canvasNodeBody(node: CanvasNode): string {
 	return '';
 }
 
+export function canvasFileNodePath(node: CanvasNode): string | null {
+	if (node.type !== 'file') return null;
+	const filePath = node.file?.trim() ?? '';
+	return filePath || null;
+}
+
+export function canvasFileNodeTitle(node: CanvasNode): string {
+	const filePath = canvasFileNodePath(node) ?? '';
+	return node.label?.trim() || filePath.split('/').pop()?.replace(/\.(md|markdown)$/i, '') || filePath;
+}
+
+export function canvasLinkNodeHref(node: CanvasNode): string | null {
+	if (node.type !== 'link') return null;
+	const rawUrl = node.url?.trim();
+	if (!rawUrl) return null;
+	try {
+		const url = new URL(rawUrl);
+		return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+	} catch {
+		return null;
+	}
+}
+
+export function canOpenCanvasNode(node: CanvasNode): boolean {
+	return Boolean(canvasFileNodePath(node) || canvasLinkNodeHref(node));
+}
+
+export function canvasOpenNodeLabel(node: CanvasNode): string {
+	const title = canvasNodeTitle(node);
+	if (node.type === 'file') return `Open canvas file node ${title}`;
+	if (node.type === 'link') return `Open canvas URL node ${title}`;
+	return `Open canvas node ${title}`;
+}
+
 export function canvasTextDrafts(nodes: CanvasNode[]): CanvasTextDrafts {
 	return Object.fromEntries(
 		nodes

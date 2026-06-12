@@ -31,6 +31,7 @@
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
+		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
@@ -51,6 +52,7 @@
 		onRefDraftChange,
 		onSave,
 		onSaveRef,
+		onOpenRef,
 		onDelete,
 		onMovePointerDown
 	}: Props = $props();
@@ -104,6 +106,7 @@
 				onRefDraftChange={onRefDraftChange}
 				onSave={onSave}
 				onSaveRef={onSaveRef}
+				onOpenRef={onOpenRef}
 				onDelete={onDelete}
 				onMovePointerDown={onMovePointerDown}
 			/>

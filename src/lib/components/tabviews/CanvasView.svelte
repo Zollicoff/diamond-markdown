@@ -2,6 +2,7 @@
 	import { api } from '$lib/vault-api';
 	import type { CanvasDoc, CanvasNode } from '$lib/types';
 	import { emit } from '$lib/events';
+	import { openNote } from '$lib/workspace/actions';
 	import {
 		canvasBounds,
 		canvasConnectionDraft,
@@ -14,6 +15,8 @@
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
+		canvasFileNodePath,
+		canvasFileNodeTitle,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
@@ -105,6 +108,12 @@
 
 	function setEdgeLabelDraft(edge: CanvasEdgeSummary, value: string): void {
 		edgeLabelDrafts = { ...edgeLabelDrafts, [edge.id]: value };
+	}
+
+	function openRefNode(node: CanvasNode): void {
+		const filePath = canvasFileNodePath(node);
+		if (!filePath) return;
+		openNote(vaultId, filePath, canvasFileNodeTitle(node), 'new-tab');
 	}
 
 	async function addNode(type: CanvasAddNodeType, value: string): Promise<void> {
@@ -420,6 +429,7 @@
 			onRefDraftChange={setRefDraft}
 			onSave={saveTextNode}
 			onSaveRef={saveRefNode}
+			onOpenRef={openRefNode}
 			onDelete={deleteNode}
 			onMovePointerDown={startMoveNode}
 		/>

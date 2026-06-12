@@ -1,8 +1,11 @@
 <script lang="ts">
 	import type { CanvasNode } from '$lib/types';
 	import {
+		canOpenCanvasNode,
+		canvasLinkNodeHref,
 		canvasNodeBody,
 		canvasNodeClass,
+		canvasOpenNodeLabel,
 		canvasNodeStyle,
 		canvasNodeTitle,
 		type CanvasBounds,
@@ -25,6 +28,7 @@
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
+		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
@@ -45,11 +49,15 @@
 		onRefDraftChange,
 		onSave,
 		onSaveRef,
+		onOpenRef,
 		onDelete,
 		onMovePointerDown
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
+	const openNodeLabel = $derived(canvasOpenNodeLabel(node));
+	const linkHref = $derived(canvasLinkNodeHref(node));
+	const canOpenReference = $derived(canOpenCanvasNode(node));
 	const refKind = $derived(node.type === 'file' ? 'file' : 'URL');
 	const refValueLabel = $derived(`Canvas ${refKind} ${node.type === 'file' ? 'path' : 'target'} for ${title}`);
 	const refSaveLabel = $derived(`Save canvas ${refKind} node ${title}`);
@@ -122,6 +130,26 @@
 			</label>
 		</div>
 		<div class="node-actions">
+			{#if node.type === 'file'}
+				<button
+					class="mini node-open"
+					aria-label={openNodeLabel}
+					disabled={!canOpenReference}
+					onclick={() => onOpenRef(node)}
+				>
+					Open note
+				</button>
+			{:else if linkHref}
+				<a
+					class="mini node-open"
+					aria-label={openNodeLabel}
+					href={linkHref}
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					Open URL
+				</a>
+			{/if}
 			<button
 				class="mini node-save"
 				aria-label={refSaveLabel}
@@ -318,13 +346,12 @@
 	}
 	.node-actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
 	}
-	.node-save {
-		padding: 2px 7px;
-		font-size: 0.7rem;
-	}
+	.node-open,
+	.node-save,
 	.node-remove {
 		padding: 2px 7px;
 		font-size: 0.7rem;
