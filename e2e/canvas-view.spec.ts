@@ -53,6 +53,8 @@ import {
 	canvasSvgEdgeStroke,
 	canvasSvgNodeColors,
 	canvasSummary,
+	canvasTextPreviewBlocks,
+	canvasTextPreviewInlines,
 	canvasTextDrafts,
 	edgeLines,
 	canvasNodeStyle,
@@ -105,6 +107,38 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
 		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
 		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
+		expect(canvasTextPreviewInlines('Use **bill** with *roof* `photo` [[Home|label]] [site](https://example.com)')).toEqual([
+			{ kind: 'text', text: 'Use ' },
+			{ kind: 'strong', text: 'bill' },
+			{ kind: 'text', text: ' with ' },
+			{ kind: 'emphasis', text: 'roof' },
+			{ kind: 'text', text: ' ' },
+			{ kind: 'code', text: 'photo' },
+			{ kind: 'text', text: ' ' },
+			{ kind: 'wikilink', text: 'label' },
+			{ kind: 'text', text: ' ' },
+			{ kind: 'link', text: 'site', href: 'https://example.com' }
+		]);
+		const previewBlocks = canvasTextPreviewBlocks([
+			'# Launch plan',
+			'',
+			'- [x] Capture **utility bill**',
+			'- [ ] Upload [[Roof Photos]]',
+			'> Refer questions',
+			'```txt',
+			'main panel',
+			'```'
+		].join('\n'));
+		expect(previewBlocks[0]).toMatchObject({ type: 'heading', level: 1 });
+		expect(previewBlocks[1]).toMatchObject({
+			type: 'unordered-list',
+			items: [
+				{ checked: true, inline: [{ kind: 'text', text: 'Capture ' }, { kind: 'strong', text: 'utility bill' }] },
+				{ checked: false, inline: [{ kind: 'text', text: 'Upload ' }, { kind: 'wikilink', text: 'Roof Photos' }] }
+			]
+		});
+		expect(previewBlocks[2]).toMatchObject({ type: 'quote', inline: [{ kind: 'text', text: 'Refer questions' }] });
+		expect(previewBlocks[3]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
 		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
 		expect(canvasGroupLabelChanged(groupNode, groupDrafts)).toBe(false);
@@ -313,6 +347,50 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
 	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
 	await expect(page.locator('.note-view')).toContainText('Home');
+});
+
+test('canvas text cards render a safe markdown preview while remaining editable', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-markdown-preview-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
+		nodes: [
+			{
+				id: 'a',
+				type: 'text',
+				x: 0,
+				y: 0,
+				width: 340,
+				height: 260,
+				text: [
+					'# Launch plan',
+					'- [x] Capture **utility bill**',
+					'- [ ] Upload [[Roof Photos]]',
+					'> Refer homeowner questions',
+					'```txt',
+					'main panel',
+					'```'
+				].join('\n')
+			}
+		],
+		edges: []
+	}, null, 2));
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Markdown Preview Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	const preview = page.locator('.canvas-text-preview').first();
+	await expect(preview).toContainText('Launch plan');
+	await expect(preview.locator('strong')).toHaveText('utility bill');
+	await expect(preview.locator('.wikilink')).toHaveText('[[Roof Photos]]');
+	await expect(preview.locator('blockquote')).toContainText('Refer homeowner questions');
+	await expect(preview.locator('pre')).toContainText('main panel');
+	await expect(page.locator('.canvas-node-text textarea')).toHaveValue(/# Launch plan/);
 });
 
 test('canvas view renders and creates Obsidian Canvas groups', async ({ page, request }) => {

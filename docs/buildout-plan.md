@@ -147,6 +147,10 @@ Use small, pushable slices:
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
    git-backed server mutations with stale-revision protection.
+- **Canvas text-card markdown preview.** Render Canvas text cards through a
+   safe, lightweight markdown preview for headings, lists, tasks, quotes,
+   inline emphasis, links, wikilinks, and fenced code while keeping the raw
+   text editor available.
 - **Canvas node positioning.** Drag Canvas cards to update node coordinates in
    `.canvas` files through git-backed commits with stale-revision protection.
 - **Canvas edge creation.** Connect existing Canvas nodes from the board with

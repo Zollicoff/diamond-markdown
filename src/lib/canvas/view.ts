@@ -65,6 +65,27 @@ export interface CanvasFileOpenTarget {
 	actionLabel: string;
 }
 
+export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'code' | 'wikilink' | 'link';
+
+export interface CanvasTextPreviewInline {
+	kind: CanvasTextPreviewInlineKind;
+	text: string;
+	href?: string;
+}
+
+export interface CanvasTextPreviewListItem {
+	inline: CanvasTextPreviewInline[];
+	checked?: boolean;
+}
+
+export type CanvasTextPreviewBlock =
+	| { type: 'heading'; level: 1 | 2 | 3; inline: CanvasTextPreviewInline[] }
+	| { type: 'paragraph'; inline: CanvasTextPreviewInline[] }
+	| { type: 'quote'; inline: CanvasTextPreviewInline[] }
+	| { type: 'unordered-list'; items: CanvasTextPreviewListItem[] }
+	| { type: 'ordered-list'; items: CanvasTextPreviewListItem[] }
+	| { type: 'code'; language: string; code: string };
+
 export type CanvasTextDrafts = Record<string, string>;
 export type CanvasGroupLabelDrafts = Record<string, string>;
 export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
@@ -313,6 +334,121 @@ export function canvasNodeBody(node: CanvasNode): string {
 	return '';
 }
 
+export function canvasTextPreviewInlines(value: string): CanvasTextPreviewInline[] {
+	const inlines: CanvasTextPreviewInline[] = [];
+	let remaining = value;
+	while (remaining.length > 0) {
+		const match = firstInlineMatch(remaining);
+		if (!match) {
+			inlines.push({ kind: 'text', text: remaining });
+			break;
+		}
+		if (match.index > 0) {
+			inlines.push({ kind: 'text', text: remaining.slice(0, match.index) });
+		}
+		inlines.push(match.inline);
+		remaining = remaining.slice(match.index + match.raw.length);
+	}
+	return inlines.filter((inline) => inline.text.length > 0);
+}
+
+export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] {
+	const lines = text.replace(/\r\n?/g, '\n').split('\n');
+	const blocks: CanvasTextPreviewBlock[] = [];
+	let paragraphLines: string[] = [];
+	let currentList: Extract<CanvasTextPreviewBlock, { type: 'ordered-list' | 'unordered-list' }> | null = null;
+	let codeLanguage: string | null = null;
+	let codeLines: string[] = [];
+
+	function flushParagraph(): void {
+		const paragraph = paragraphLines.join(' ').trim();
+		if (paragraph) blocks.push({ type: 'paragraph', inline: canvasTextPreviewInlines(paragraph) });
+		paragraphLines = [];
+	}
+
+	function flushList(): void {
+		if (currentList && currentList.items.length > 0) blocks.push(currentList);
+		currentList = null;
+	}
+
+	function flushCode(): void {
+		blocks.push({ type: 'code', language: codeLanguage ?? '', code: codeLines.join('\n') });
+		codeLanguage = null;
+		codeLines = [];
+	}
+
+	for (const line of lines) {
+		if (codeLanguage !== null) {
+			if (/^\s*```/.test(line)) {
+				flushCode();
+			} else {
+				codeLines.push(line);
+			}
+			continue;
+		}
+
+		const fence = line.match(/^\s*```([a-z0-9_-]*)\s*$/i);
+		if (fence) {
+			flushParagraph();
+			flushList();
+			codeLanguage = fence[1] ?? '';
+			codeLines = [];
+			continue;
+		}
+
+		if (!line.trim()) {
+			flushParagraph();
+			flushList();
+			continue;
+		}
+
+		const heading = line.match(/^\s{0,3}(#{1,3})\s+(.+)$/);
+		if (heading) {
+			flushParagraph();
+			flushList();
+			blocks.push({
+				type: 'heading',
+				level: heading[1].length as 1 | 2 | 3,
+				inline: canvasTextPreviewInlines(heading[2].trim())
+			});
+			continue;
+		}
+
+		const quote = line.match(/^\s{0,3}>\s?(.*)$/);
+		if (quote) {
+			flushParagraph();
+			flushList();
+			blocks.push({ type: 'quote', inline: canvasTextPreviewInlines(quote[1].trim()) });
+			continue;
+		}
+
+		const task = line.match(/^\s*[-*]\s+\[([ xX])]\s+(.+)$/);
+		const unordered = task ? null : line.match(/^\s*[-*]\s+(.+)$/);
+		const ordered = task || unordered ? null : line.match(/^\s*\d+[.)]\s+(.+)$/);
+		if (task || unordered || ordered) {
+			const type = ordered ? 'ordered-list' : 'unordered-list';
+			flushParagraph();
+			if (!currentList || currentList.type !== type) {
+				flushList();
+				currentList = { type, items: [] };
+			}
+			currentList!.items.push({
+				inline: canvasTextPreviewInlines((task?.[2] ?? unordered?.[1] ?? ordered?.[1] ?? '').trim()),
+				checked: task ? task[1].toLowerCase() === 'x' : undefined
+			});
+			continue;
+		}
+
+		flushList();
+		paragraphLines.push(line.trim());
+	}
+
+	if (codeLanguage !== null) flushCode();
+	flushParagraph();
+	flushList();
+	return blocks;
+}
+
 export function canvasFileNodePath(node: CanvasNode): string | null {
 	if (node.type !== 'file') return null;
 	const filePath = node.file?.trim() ?? '';
@@ -499,4 +635,45 @@ export function canvasEdgeLabelChanged(edge: CanvasEdgeSummary, drafts: CanvasEd
 
 function plural(count: number, singular: string): string {
 	return count === 1 ? singular : `${singular}s`;
+}
+
+function firstInlineMatch(value: string): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
+	const candidates = [
+		inlineCandidate(value, /`([^`]+)`/, (match) => ({ kind: 'code', text: match[1] })),
+		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
+		inlineCandidate(value, /\[([^\]\n]+)]\((https?:\/\/[^)\s]+)\)/i, (match) => ({
+			kind: 'link',
+			text: match[1],
+			href: match[2]
+		})),
+		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => ({
+			kind: 'wikilink',
+			text: match[2] ?? match[1]
+		})),
+		inlineCandidate(value, /\*([^*\n]+)\*/, (match) => ({ kind: 'emphasis', text: match[1] }))
+	].filter((candidate): candidate is { index: number; raw: string; inline: CanvasTextPreviewInline } => Boolean(candidate));
+
+	return candidates.sort((a, b) => a.index - b.index || inlinePriority(a.inline.kind) - inlinePriority(b.inline.kind))[0] ?? null;
+}
+
+function inlineCandidate(
+	value: string,
+	pattern: RegExp,
+	createInline: (match: RegExpMatchArray) => CanvasTextPreviewInline
+): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
+	const match = value.match(pattern);
+	if (!match || match.index === undefined || !match[0]) return null;
+	return { index: match.index, raw: match[0], inline: createInline(match) };
+}
+
+function inlinePriority(kind: CanvasTextPreviewInlineKind): number {
+	const priorities: Record<CanvasTextPreviewInlineKind, number> = {
+		code: 0,
+		strong: 1,
+		link: 2,
+		wikilink: 3,
+		emphasis: 4,
+		text: 5
+	};
+	return priorities[kind];
 }

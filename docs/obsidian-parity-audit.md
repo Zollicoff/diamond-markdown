@@ -46,7 +46,7 @@ The main remaining product risks are:
 | Tags/frontmatter | Done | Inline tags plus Obsidian block-list `tags` and `aliases` | Broader YAML compatibility can remain incremental |
 | Render pipeline | Done | KaTeX, Mermaid, code highlighting, footnotes, embeds, callouts, block IDs | Continue adding edge cases only when imported vaults expose them |
 | Attachments | Done | Upload/drop/paste, picker, multi-select insert, delete, rename/move with reference rewrites, Obsidian folder config | Deeper gallery/library polish can remain incremental |
-| Canvas | Partial | Read/render/edit many nodes and edges, groups, colors, SVG export, git-backed mutations | Deeper visual editing/formatting parity is not full Obsidian Canvas |
+| Canvas | Partial | Read/render/edit many nodes and edges, markdown-aware text-card previews, groups, colors, SVG export, git-backed mutations | Deeper visual editing parity is not full Obsidian Canvas |
 | Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with quoted phrases, field filters, exclusions, paged loading, virtualized results, and capped-result metadata | Richer boolean/regex syntax remains basic |
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
@@ -67,7 +67,7 @@ The main remaining product risks are:
 2. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,
    plugins, offline, and desktop are explicitly scoped.
 3. **Canvas/import polish.** Continue daily-driver compatibility work around
-   deeper Canvas formatting and clearer plugin-settings migration guidance
+   deeper Canvas interaction parity and clearer plugin-settings migration guidance
    without executing Obsidian plugins.
 
 ## Current Product Line

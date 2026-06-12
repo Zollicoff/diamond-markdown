@@ -10,6 +10,7 @@
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
 	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';
+	import CanvasTextNodeEditor from './CanvasTextNodeEditor.svelte';
 
 	interface Props {
 		node: CanvasNode;
@@ -105,29 +106,17 @@
 			</button>
 		</div>
 	{:else if node.type === 'text'}
-		<textarea
-			class="node-editor"
-			aria-label={`Canvas text for ${node.id}`}
-			value={draft}
-			oninput={(event) => onDraftChange(node, (event.currentTarget as HTMLTextAreaElement).value)}
-		></textarea>
-		<div class="node-actions">
-			<button
-				class="mini node-save"
-				disabled={saving || !changed}
-				onclick={() => void onSave(node)}
-			>
-				{saving ? 'Saving...' : 'Save text'}
-			</button>
-			<button
-				class="mini node-remove"
-				aria-label={`Remove canvas node ${title}`}
-				disabled={disableDelete}
-				onclick={() => void onDelete(node)}
-			>
-				{deleting ? 'Removing...' : 'Remove'}
-			</button>
-		</div>
+		<CanvasTextNodeEditor
+			{node}
+			{draft}
+			{changed}
+			{saving}
+			{deleting}
+			{disableDelete}
+			{onDraftChange}
+			{onSave}
+			{onDelete}
+		/>
 	{:else if node.type === 'file' || node.type === 'link'}
 		<CanvasNodeReferenceEditor
 			{node}
@@ -277,24 +266,6 @@
 		font-size: 0.78rem;
 		line-height: 1.35;
 		white-space: pre-wrap;
-	}
-	.node-editor {
-		flex: 1;
-		min-height: 0;
-		width: 100%;
-		resize: none;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 7px 8px;
-		background: color-mix(in srgb, var(--bg), transparent 8%);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.78rem;
-		line-height: 1.35;
-	}
-	.node-editor:focus {
-		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
-		border-color: var(--accent);
 	}
 	.group-label-input {
 		width: 100%;
