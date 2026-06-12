@@ -126,6 +126,9 @@ Use small, pushable slices:
 - **Shared pointer open-mode helper.** Move modifier-click and middle-click
    open-mode rules into a workspace helper used by note preview, search,
    file tree, bookmarks, and recent notes.
+- **File tree virtualization helper extraction.** Move expanded-row flattening,
+   viewport windowing, row styling, and drag/drop path ancestry helpers out of
+   `FileTree` into pure tree helpers with focused tests.
 
 ## Next Implementation Slices
 

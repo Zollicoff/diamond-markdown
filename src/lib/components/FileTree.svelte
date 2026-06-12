@@ -13,8 +13,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
+		flattenVisibleTreeRows,
 		isCanvasTreeFile,
-		treeFileDisplayName
+		treeFileDisplayName,
+		treePathIsDescendant,
+		treePathParent,
+		treeRowStyle,
+		visibleTreeWindow
 	} from '$lib/tree/view';
 
 	interface Props {
@@ -36,15 +41,6 @@
 		onFileClick?: (e: MouseEvent, node: TreeNode) => void;
 	}
 
-	interface FlatRow {
-		node: TreeNode;
-		depth: number;
-	}
-
-	interface VisibleRow extends FlatRow {
-		index: number;
-	}
-
 	let {
 		nodes,
 		vaultId,
@@ -60,10 +56,6 @@
 		onFileClick
 	}: Props = $props();
 
-	const ROW_HEIGHT = 26;
-	const OVERSCAN = 12;
-	const DEFAULT_VIEWPORT_HEIGHT = 520;
-
 	let dragOverPath = $state<string | null>(null);
 	let rootDragOver = $state(false);
 	let scrollTop = $state(0);
@@ -71,28 +63,10 @@
 	let viewportEl = $state<HTMLDivElement | null>(null);
 
 	const expand = $derived(expanded);
-	const flatRows = $derived(flattenVisible(nodes, expand));
-	const totalHeight = $derived(flatRows.length * ROW_HEIGHT);
-	const measuredHeight = $derived(viewportHeight || DEFAULT_VIEWPORT_HEIGHT);
-	const startIndex = $derived(Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN));
-	const visibleCount = $derived(Math.ceil(measuredHeight / ROW_HEIGHT) + OVERSCAN * 2);
-	const endIndex = $derived(Math.min(flatRows.length, startIndex + visibleCount));
-	const visibleRows = $derived(
-		flatRows.slice(startIndex, endIndex).map((row, offset): VisibleRow => ({
-			...row,
-			index: startIndex + offset
-		}))
-	);
-
-	function flattenVisible(items: TreeNode[], opened: Set<string>, depth = 0, out: FlatRow[] = []): FlatRow[] {
-		for (const node of items) {
-			out.push({ node, depth });
-			if (node.type === 'directory' && opened.has(node.path) && node.children?.length) {
-				flattenVisible(node.children, opened, depth + 1, out);
-			}
-		}
-		return out;
-	}
+	const flatRows = $derived(flattenVisibleTreeRows(nodes, expand));
+	const treeWindow = $derived(visibleTreeWindow(flatRows, scrollTop, viewportHeight));
+	const totalHeight = $derived(treeWindow.totalHeight);
+	const visibleRows = $derived(treeWindow.visibleRows);
 
 	function focusOnMount(node: HTMLInputElement): void {
 		requestAnimationFrame(() => {
@@ -105,10 +79,6 @@
 		onToggleDir?.(p);
 	}
 
-	function isDescendant(parent: string, maybeChild: string): boolean {
-		return maybeChild === parent || maybeChild.startsWith(parent + '/');
-	}
-
 	function handleDragStart(e: DragEvent, node: TreeNode): void {
 		if (!e.dataTransfer) return;
 		e.dataTransfer.setData('application/x-diamond-path', node.path);
@@ -119,7 +89,7 @@
 	function handleDragOver(e: DragEvent, destNode: TreeNode): void {
 		if (destNode.type !== 'directory') return;
 		const src = e.dataTransfer?.getData('application/x-diamond-path');
-		if (src && isDescendant(src, destNode.path)) return;
+		if (src && treePathIsDescendant(src, destNode.path)) return;
 		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 		dragOverPath = destNode.path;
@@ -135,8 +105,8 @@
 		if (destNode.type !== 'directory') return;
 		const src = e.dataTransfer?.getData('application/x-diamond-path');
 		if (!src) return;
-		if (isDescendant(src, destNode.path)) return;
-		const srcParent = src.split('/').slice(0, -1).join('/');
+		if (treePathIsDescendant(src, destNode.path)) return;
+		const srcParent = treePathParent(src);
 		if (srcParent === destNode.path) return;
 		onDropMove?.(src, destNode.path);
 	}
@@ -151,7 +121,7 @@
 		rootDragOver = false;
 		const src = e.dataTransfer?.getData('application/x-diamond-path');
 		if (!src) return;
-		const srcParent = src.split('/').slice(0, -1).join('/');
+		const srcParent = treePathParent(src);
 		if (srcParent === '') return;
 		onDropMove?.(src, '');
 	}
@@ -193,10 +163,6 @@
 		return treeFileDisplayName(node);
 	}
 
-	function rowStyle(row: VisibleRow): string {
-		return `--tree-depth: ${row.depth}; transform: translateY(${row.index * ROW_HEIGHT}px);`;
-	}
-
 	function updateViewportHeight(): void {
 		viewportHeight = viewportEl?.clientHeight ?? 0;
 	}
@@ -225,7 +191,7 @@
 	<ul class="tree" role="tree" style={`height: ${totalHeight}px;`}>
 		{#each visibleRows as row (row.node.path)}
 			{@const n = row.node}
-			<li class="tree-row" style={rowStyle(row)}>
+			<li class="tree-row" style={treeRowStyle(row)}>
 				{#if n.type === 'directory'}
 					<div
 						class="node dir"

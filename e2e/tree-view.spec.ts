@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { TreeNode } from '../src/lib/types';
 import {
 	collectDirectoryPaths,
+	flattenVisibleTreeRows,
 	isCanvasTreeFile,
 	isMarkdownTreeFile,
 	isTreeSortMode,
@@ -11,6 +12,10 @@ import {
 	sortMenuPositionFromRect,
 	sortTreeNodes,
 	treeFileDisplayName,
+	treePathIsDescendant,
+	treePathParent,
+	treeRowStyle,
+	visibleTreeWindow,
 	topLevelDirectoryPaths
 } from '../src/lib/tree/view';
 
@@ -73,6 +78,39 @@ test.describe('tree view helpers', () => {
 		expect([...collectDirectoryPaths(nodes)].sort()).toEqual(['Archive', 'Projects', 'Projects/Active']);
 	});
 
+	test('flattens expanded tree rows and windows the virtualized viewport', () => {
+		const nodes = [
+			dir('Projects', [
+				dir('Projects/Active', [file('Projects/Active/Plan.md')]),
+				file('Projects/Readme.md')
+			]),
+			file('Home.md')
+		];
+		const rows = flattenVisibleTreeRows(nodes, new Set(['Projects', 'Projects/Active']));
+
+		expect(rows.map((row) => [row.node.path, row.depth])).toEqual([
+			['Projects', 0],
+			['Projects/Active', 1],
+			['Projects/Active/Plan.md', 2],
+			['Projects/Readme.md', 1],
+			['Home.md', 0]
+		]);
+
+		const windowed = visibleTreeWindow(rows, 20, 25, 10, 1);
+		expect(windowed.totalHeight).toBe(50);
+		expect(windowed.startIndex).toBe(1);
+		expect(windowed.endIndex).toBe(5);
+		expect(windowed.visibleRows.map((row) => [row.node.path, row.index])).toEqual([
+			['Projects/Active', 1],
+			['Projects/Active/Plan.md', 2],
+			['Projects/Readme.md', 3],
+			['Home.md', 4]
+		]);
+		expect(treeRowStyle({ node: file('Nested.md'), depth: 3, index: 2 }, 10)).toBe(
+			'--tree-depth: 3; transform: translateY(20px);'
+		);
+	});
+
 	test('reveals active note parents without changing already-open sets', () => {
 		expect(parentDirectoriesForPath('Projects/Active/Plan.md')).toEqual(['Projects', 'Projects/Active']);
 
@@ -84,6 +122,14 @@ test.describe('tree view helpers', () => {
 		expect(revealParentDirectories(revealed, 'Projects/Active/Plan.md')).toBe(revealed);
 		expect(revealParentDirectories(revealed, 'Home.md')).toBe(revealed);
 		expect(revealParentDirectories(revealed, null)).toBe(revealed);
+	});
+
+	test('classifies tree path parentage for drag and drop guards', () => {
+		expect(treePathParent('Projects/Active/Plan.md')).toBe('Projects/Active');
+		expect(treePathParent('Home.md')).toBe('');
+		expect(treePathIsDescendant('Projects', 'Projects/Active/Plan.md')).toBe(true);
+		expect(treePathIsDescendant('Projects', 'Projects')).toBe(true);
+		expect(treePathIsDescendant('Projects', 'Projector/Note.md')).toBe(false);
 	});
 
 	test('guards persisted sort modes and positions the fixed sort menu', () => {

@@ -16,8 +16,28 @@ export interface SortMenuPosition {
 	left: number;
 }
 
+export interface FlatTreeRow {
+	node: TreeNode;
+	depth: number;
+}
+
+export interface VisibleTreeRow extends FlatTreeRow {
+	index: number;
+}
+
+export interface VisibleTreeWindow {
+	totalHeight: number;
+	startIndex: number;
+	visibleCount: number;
+	endIndex: number;
+	visibleRows: VisibleTreeRow[];
+}
+
 const COLLATOR_OPTIONS: Intl.CollatorOptions = { sensitivity: 'base', numeric: true };
 export const TREE_SORT_MENU_WIDTH = 220;
+export const TREE_ROW_HEIGHT = 26;
+export const TREE_OVERSCAN = 12;
+export const TREE_DEFAULT_VIEWPORT_HEIGHT = 520;
 
 export function isTreeSortMode(value: unknown): value is TreeSortMode {
 	return typeof value === 'string' && value in TREE_SORT_LABELS;
@@ -55,6 +75,45 @@ export function topLevelDirectoryPaths(nodes: TreeNode[]): Set<string> {
 	return new Set(nodes.filter((node) => node.type === 'directory').map((node) => node.path));
 }
 
+export function flattenVisibleTreeRows(
+	nodes: TreeNode[],
+	expanded: Set<string>,
+	depth = 0,
+	out: FlatTreeRow[] = []
+): FlatTreeRow[] {
+	for (const node of nodes) {
+		out.push({ node, depth });
+		if (node.type === 'directory' && expanded.has(node.path) && node.children?.length) {
+			flattenVisibleTreeRows(node.children, expanded, depth + 1, out);
+		}
+	}
+	return out;
+}
+
+export function visibleTreeWindow(
+	flatRows: FlatTreeRow[],
+	scrollTop: number,
+	viewportHeight: number,
+	rowHeight = TREE_ROW_HEIGHT,
+	overscan = TREE_OVERSCAN,
+	defaultViewportHeight = TREE_DEFAULT_VIEWPORT_HEIGHT
+): VisibleTreeWindow {
+	const totalHeight = flatRows.length * rowHeight;
+	const measuredHeight = viewportHeight || defaultViewportHeight;
+	const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+	const visibleCount = Math.ceil(measuredHeight / rowHeight) + overscan * 2;
+	const endIndex = Math.min(flatRows.length, startIndex + visibleCount);
+	const visibleRows = flatRows.slice(startIndex, endIndex).map((row, offset) => ({
+		...row,
+		index: startIndex + offset
+	}));
+	return { totalHeight, startIndex, visibleCount, endIndex, visibleRows };
+}
+
+export function treeRowStyle(row: VisibleTreeRow, rowHeight = TREE_ROW_HEIGHT): string {
+	return `--tree-depth: ${row.depth}; transform: translateY(${row.index * rowHeight}px);`;
+}
+
 export function parentDirectoriesForPath(path: string): string[] {
 	const parts = path.split('/').filter(Boolean).slice(0, -1);
 	const parents: string[] = [];
@@ -79,6 +138,14 @@ export function revealParentDirectories(expanded: Set<string>, path: string | nu
 		changed = true;
 	}
 	return changed ? next : expanded;
+}
+
+export function treePathParent(path: string): string {
+	return path.split('/').slice(0, -1).join('/');
+}
+
+export function treePathIsDescendant(parent: string, maybeChild: string): boolean {
+	return maybeChild === parent || maybeChild.startsWith(parent + '/');
 }
 
 export function sortMenuPositionFromRect(rect: Pick<DOMRect, 'bottom' | 'right'>, width = TREE_SORT_MENU_WIDTH): SortMenuPosition {
