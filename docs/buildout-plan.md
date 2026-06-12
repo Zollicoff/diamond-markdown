@@ -201,6 +201,9 @@ Use small, pushable slices:
 - **File tree virtualization helper extraction.** Move expanded-row flattening,
    viewport windowing, row styling, and drag/drop path ancestry helpers out of
    `FileTree` into pure tree helpers with focused tests.
+- **File tree row split.** Keep virtualization, root drag/drop, and tree window
+   state in `FileTree` while moving directory/file row rendering and rename
+   input behavior into a focused presentational row component.
 - **Attachment reference suffix preservation.** Resolve and publish asset
    embeds from clean vault paths while preserving `#fragment` and `?query`
    suffixes for images, PDFs, video, audio, and generic files.

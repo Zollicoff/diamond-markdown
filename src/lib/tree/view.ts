@@ -219,6 +219,15 @@ export function treeFileDisplayName(node: TreeNode): string {
 	return node.name.replace(/\.(md|markdown|canvas)$/i, '');
 }
 
+export function treeInitialRenameValue(node: TreeNode): string {
+	return node.type === 'file' ? treeFileDisplayName(node) : node.name;
+}
+
+export function treeFileHref(vaultId: string, node: TreeNode): string {
+	const route = isCanvasTreeFile(node) ? 'canvas' : 'note';
+	return `/vault/${vaultId}/${route}/${encodeURI(node.path)}`;
+}
+
 export function renamedTreeNodePath(node: TreeNode, newName: string): string {
 	const parent = node.path.split('/').slice(0, -1).join('/');
 	const trimmed = newName.trim().replace(/^\/+|\/+$/g, '');

@@ -16,6 +16,8 @@ import {
 	sortTreeNodes,
 	treeExpansionStorageKey,
 	treeFileDisplayName,
+	treeFileHref,
+	treeInitialRenameValue,
 	treePanelPreferencesSnapshot,
 	treePathIsDescendant,
 	treePathParent,
@@ -183,6 +185,12 @@ test.describe('tree view helpers', () => {
 		expect(isCanvasTreeFile(markdown)).toBe(false);
 		expect(isMarkdownTreeFile(markdown)).toBe(true);
 		expect(isMarkdownTreeFile(canvas)).toBe(false);
+		expect(treeInitialRenameValue(canvas)).toBe('Plan');
+		expect(treeInitialRenameValue(dir('Boards'))).toBe('Boards');
+		expect(treeFileHref('vault-1', { ...canvas, path: 'Boards/Space Plan.canvas' })).toBe(
+			'/vault/vault-1/canvas/Boards/Space%20Plan.canvas'
+		);
+		expect(treeFileHref('vault-1', markdown)).toBe('/vault/vault-1/note/Notes/Daily.markdown');
 		expect(renamedTreeNodePath(canvas, 'Roadmap')).toBe('Boards/Roadmap.canvas');
 		expect(renamedTreeNodePath(markdown, 'Weekly')).toBe('Notes/Weekly.markdown');
 		expect(renamedTreeNodePath(dir('Boards'), 'Canvases')).toBe('Canvases');
