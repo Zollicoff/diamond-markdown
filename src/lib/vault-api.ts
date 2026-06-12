@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType } from './canvas/view';
 import { emit } from './events';
@@ -332,6 +332,19 @@ export const api = {
 				body: JSON.stringify({ from, to })
 			}
 		);
+		for (const path of res.touched) {
+			emit('note:saved', { vaultId, path, sha: res.sha });
+		}
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
+	async moveAttachments(vaultId: string, paths: string[], folder: string): Promise<AttachmentMoveResult> {
+		const res = await json<AttachmentMoveResult>(`/api/vaults/${vaultId}/attachment`, {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ paths, folder })
+		});
 		for (const path of res.touched) {
 			emit('note:saved', { vaultId, path, sha: res.sha });
 		}

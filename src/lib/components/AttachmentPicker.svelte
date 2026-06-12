@@ -18,6 +18,7 @@
 	let loading = $state(true);
 	let deleting = $state(false);
 	let renaming = $state(false);
+	let moving = $state(false);
 	let error = $state<string | null>(null);
 
 	const visible = $derived(filterAttachments(attachments, query));
@@ -65,7 +66,7 @@
 	}
 
 	async function deleteSelected(): Promise<void> {
-		if (selected.length === 0 || deleting || renaming) return;
+		if (selected.length === 0 || deleting || renaming || moving) return;
 		const count = selected.length;
 		const confirmed = await confirmDialog({
 			title: count === 1 ? 'Delete attachment' : `Delete ${count} attachments`,
@@ -97,7 +98,7 @@
 	}
 
 	async function renameSelected(): Promise<void> {
-		if (selected.length !== 1 || deleting || renaming) return;
+		if (selected.length !== 1 || deleting || renaming || moving) return;
 		const attachment = selected[0];
 		const nextPath = await promptText({
 			title: 'Rename attachment',
@@ -110,8 +111,8 @@
 		error = null;
 		try {
 			const res = await api.renameAttachment(vaultId, attachment.path, nextPath);
-			selectedPaths = [res.to];
 			await load();
+			selectedPaths = [res.to];
 			notify({
 				title: 'Attachment renamed',
 				message: res.linksUpdated > 0
@@ -123,6 +124,42 @@
 			error = (e as Error).message;
 		} finally {
 			renaming = false;
+		}
+	}
+
+	async function moveSelected(): Promise<void> {
+		if (selected.length === 0 || deleting || renaming || moving) return;
+		const count = selected.length;
+		const folder = await promptText({
+			title: count === 1 ? 'Move attachment' : `Move ${count} attachments`,
+			label: 'Destination folder',
+			value: 'Attachments',
+			confirmLabel: 'Move'
+		});
+		if (!folder) return;
+		const paths = selected.map((attachment) => attachment.path);
+		moving = true;
+		error = null;
+		try {
+			const res = await api.moveAttachments(vaultId, paths, folder);
+			await load();
+			selectedPaths = res.moved.map((move) => move.to);
+			const movedCount = res.moved.length;
+			notify({
+				title: movedCount === 0
+					? 'Attachments already organized'
+					: movedCount === 1 ? 'Attachment moved' : `${movedCount} attachments moved`,
+				message: movedCount === 0
+					? `Selected attachment${count === 1 ? '' : 's'} already in ${res.folder}.`
+					: res.linksUpdated > 0
+						? `${res.linksUpdated} markdown reference${res.linksUpdated === 1 ? '' : 's'} updated.`
+						: 'No markdown references needed updating.',
+				tone: 'success'
+			});
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			moving = false;
 		}
 	}
 
@@ -165,12 +202,15 @@
 		<div class="selection-bar">
 			<span>{selected.length} selected</span>
 			<div>
-				<button class="secondary" disabled={visible.length === 0} onclick={selectVisible}>Select visible</button>
+				<button class="secondary" disabled={visible.length === 0 || deleting || renaming || moving} onclick={selectVisible}>Select visible</button>
 				<button class="secondary" disabled={selected.length === 0} onclick={clearSelection}>Clear</button>
-				<button class="secondary" disabled={selected.length !== 1 || deleting || renaming} onclick={() => void renameSelected()}>
+				<button class="secondary" disabled={selected.length !== 1 || deleting || renaming || moving} onclick={() => void renameSelected()}>
 					{renaming ? 'Renaming...' : 'Rename'}
 				</button>
-				<button class="danger" disabled={selected.length === 0 || deleting || renaming} onclick={() => void deleteSelected()}>
+				<button class="secondary" disabled={selected.length === 0 || deleting || renaming || moving} onclick={() => void moveSelected()}>
+					{moving ? 'Moving...' : 'Move'}
+				</button>
+				<button class="danger" disabled={selected.length === 0 || deleting || renaming || moving} onclick={() => void deleteSelected()}>
 					{deleting ? 'Deleting...' : 'Delete selected'}
 				</button>
 			</div>
@@ -187,7 +227,7 @@
 
 		<footer>
 			<button class="secondary" onclick={onClose}>Cancel</button>
-			<button class="primary" disabled={selected.length === 0} onclick={() => void insertSelected()}>
+			<button class="primary" disabled={selected.length === 0 || deleting || renaming || moving} onclick={() => void insertSelected()}>
 				{insertLabel}
 			</button>
 		</footer>
@@ -302,6 +342,8 @@
 	}
 	.selection-bar div {
 		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: 6px;
 	}
 	.selection-bar .secondary,

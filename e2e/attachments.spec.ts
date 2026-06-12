@@ -15,6 +15,10 @@ function rawPath(relPath: string): string {
 	return relPath.split('/').map((part) => encodeURIComponent(part)).join('/');
 }
 
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function testOrigin(): string {
 	return `http://127.0.0.1:${process.env.PLAYWRIGHT_PORT ?? '4173'}`;
 }
@@ -203,6 +207,68 @@ test.describe('attachment uploads', () => {
 		expect(git(vaultDir, ['log', '--oneline', '-1'])).toContain('rename: Files/packet.pdf → Files/renamed packet.pdf (+2 references updated)');
 	});
 
+	test('moves attachments into a folder and rewrites markdown references in one commit', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'attachment-move-api-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, 'Files', 'Site'), { recursive: true });
+		fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
+		fs.mkdirSync(path.join(vaultDir, 'Organized Assets'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, 'Files', 'Site', 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+		fs.writeFileSync(path.join(vaultDir, 'Files', 'Site', 'site spec.pdf'), '%PDF-1.4\n');
+		fs.writeFileSync(path.join(vaultDir, 'Organized Assets', 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x99]));
+		fs.writeFileSync(
+			path.join(vaultDir, 'Notes', 'Refs.md'),
+			[
+				'# Refs',
+				'',
+				'![[Files/Site/roof.png|Roof]]',
+				'',
+				'![Spec](<../Files/Site/site spec.pdf#page=2> "Spec")'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Attachment Move API Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const moved = await request.patch(`/api/vaults/${vault.id}/attachment`, {
+			data: {
+				paths: ['Files/Site/roof.png', 'Files/Site/site spec.pdf'],
+				folder: 'Organized Assets'
+			}
+		});
+		expect(moved.ok()).toBe(true);
+		const body = await moved.json() as {
+			folder: string;
+			moved: { from: string; to: string }[];
+			linksUpdated: number;
+			touched: string[];
+			sha: string | null;
+		};
+		expect(body).toMatchObject({
+			folder: 'Organized Assets',
+			moved: [
+				{ from: 'Files/Site/roof.png', to: 'Organized Assets/roof 2.png' },
+				{ from: 'Files/Site/site spec.pdf', to: 'Organized Assets/site spec.pdf' }
+			],
+			linksUpdated: 2,
+			touched: ['Notes/Refs.md']
+		});
+		expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, 'Files', 'Site', 'roof.png'))).toBe(false);
+		expect(fs.existsSync(path.join(vaultDir, 'Files', 'Site', 'site spec.pdf'))).toBe(false);
+		expect(fs.existsSync(path.join(vaultDir, 'Organized Assets', 'roof.png'))).toBe(true);
+		expect(fs.existsSync(path.join(vaultDir, 'Organized Assets', 'roof 2.png'))).toBe(true);
+		expect(fs.existsSync(path.join(vaultDir, 'Organized Assets', 'site spec.pdf'))).toBe(true);
+		const note = fs.readFileSync(path.join(vaultDir, 'Notes', 'Refs.md'), 'utf-8');
+		expect(note).toContain('![[Organized Assets/roof 2.png|Roof]]');
+		expect(note).toContain('![Spec](<../Organized Assets/site spec.pdf#page=2> "Spec")');
+		expect(git(vaultDir, ['status', '--short'])).toBe('');
+		expect(git(vaultDir, ['log', '--oneline', '-1'])).toContain('move: 2 attachments to Organized Assets (+2 references updated)');
+	});
+
 	test('picks an existing vault attachment from the editor toolbar and inserts an embed', async ({ page, request }) => {
 		const notePath = 'Attachment Picker Test.md';
 		const attachmentDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments');
@@ -353,6 +419,61 @@ test.describe('attachment uploads', () => {
 		await expect(page.getByText('Attachment renamed')).toBeVisible();
 		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
 		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments', 'renamed sample.pdf'))).toBe(true);
+		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
+	});
+
+	test('moves selected vault attachments from the picker', async ({ page, request }, testInfo) => {
+		const slug = `organize-move-${testInfo.workerIndex}-${Date.now()}`;
+		const folder = `Organized Move ${testInfo.workerIndex} ${Date.now()}`;
+		const roofName = `${slug}-roof.png`;
+		const specName = `${slug}-spec.pdf`;
+		const roof = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: roofName,
+					mimeType: 'image/png',
+					buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47])
+				}
+			}
+		});
+		expect(roof.ok()).toBe(true);
+		const roofBody = await roof.json() as { path: string };
+		const spec = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: specName,
+					mimeType: 'application/pdf',
+					buffer: Buffer.from('%PDF-1.4\n')
+				}
+			}
+		});
+		expect(spec.ok()).toBe(true);
+		const specBody = await spec.json() as { path: string };
+
+		await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByRole('button', { name: 'Insert attachment' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
+		await dialog.getByLabel('Filter attachments').fill(slug);
+		await expect(dialog.getByRole('option', { name: new RegExp(escapeRegExp(roofName)) })).toBeVisible();
+		await expect(dialog.getByRole('option', { name: new RegExp(escapeRegExp(specName)) })).toBeVisible();
+		await dialog.getByRole('button', { name: 'Select visible' }).click();
+		await expect(dialog.getByText('2 selected')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Move' }).click();
+		const prompt = page.getByRole('dialog', { name: 'Move 2 attachments' });
+		await prompt.getByLabel('Destination folder').fill(folder);
+		await prompt.getByRole('button', { name: 'Move' }).click();
+
+		await expect(page.getByText('2 attachments moved')).toBeVisible();
+		await expect(dialog.getByText(`${folder}/${roofName}`)).toBeVisible();
+		await expect(dialog.getByText(`${folder}/${specName}`)).toBeVisible();
+		await expect(dialog.getByText('2 selected')).toBeVisible();
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, roofBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, specBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, folder, roofName))).toBe(true);
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, folder, specName))).toBe(true);
 		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
 	});
 

@@ -225,6 +225,10 @@ Use small, pushable slices:
 - **Attachment rename with reference rewrite.** Rename one vault-local asset
    from the attachment picker and rewrite Obsidian embeds plus source-relative
    Markdown image links in the same git-backed commit.
+- **Attachment organization.** Bulk-move selected vault-local assets from the
+   attachment picker into a safe destination folder, avoid filename collisions,
+   and rewrite Obsidian embeds plus source-relative Markdown image links in one
+   git-backed commit.
 - **Git sync recovery view split.** Move recovery headers, command blocks,
    file lists, and diverged-change view models out of the recovery panel so
    future GitHub conflict flows can stay small and testable.
@@ -317,9 +321,8 @@ Use small, pushable slices:
    preflight/build/artifact upload once a GitHub credential with `workflow`
    scope is available.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as deeper Canvas formatting support, attachment folder
-   organization, and deeper plugin-settings migration guidance without
-   executing Obsidian plugins.
+   import edges such as deeper Canvas formatting support and deeper
+   plugin-settings migration guidance without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 4. **Component diet.** Continue extracting large views only when the split

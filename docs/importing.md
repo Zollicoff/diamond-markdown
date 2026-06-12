@@ -58,6 +58,10 @@ a safe relative `attachmentFolderPath`; otherwise Diamond uses `Attachments/`.
 Uploads receive non-overwriting filenames, are committed to the vault git
 history, and insert Obsidian-style embed links.
 
+After import, the attachment picker can move selected vault assets into a safe
+destination folder. Moves pick non-overwriting filenames and rewrite Obsidian
+embeds plus source-relative Markdown image links in the same git-backed commit.
+
 If media files are present outside a named attachment folder, the preflight
 marks that as a review item. Diamond still registers the vault in place, but
 you should verify embeds after opening it.
@@ -85,6 +89,6 @@ initial state of the imported vault is captured explicitly.
 
 - It does not import Obsidian plugins.
 - It does not rewrite wikilinks or embeds.
-- It does not move attachments.
+- It does not move attachments during import.
 - It does not delete or modify `.obsidian`.
 - It does not automatically push anything to GitHub.

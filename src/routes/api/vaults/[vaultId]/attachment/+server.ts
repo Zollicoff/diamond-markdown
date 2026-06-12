@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { assertVaultCanWrite, isVaultWriteBlockedError } from '$lib/server/git';
-import { deleteAttachment, listAttachments, renameAttachment, saveAttachment } from '$lib/server/attachment-service';
+import { deleteAttachment, listAttachments, moveAttachments, renameAttachment, saveAttachment } from '$lib/server/attachment-service';
 import { getVault } from '$lib/server/vault';
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
@@ -55,12 +55,19 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	const vault = getVault(params.vaultId);
 	if (!vault) throw error(404, 'vault not found');
 
-	const body = await request.json().catch(() => ({})) as { from?: string; to?: string };
-	if (!body.from || !body.to) throw error(400, 'from and to required');
+	const body = await request.json().catch(() => ({})) as {
+		from?: string;
+		to?: string;
+		paths?: unknown;
+		folder?: unknown;
+	};
+	const isMoveRequest = 'paths' in body || 'folder' in body;
+	if (!isMoveRequest && (!body.from || !body.to)) throw error(400, 'from and to required');
 
 	try {
 		await assertVaultCanWrite(vault);
-		return json(await renameAttachment(vault, body.from, body.to));
+		if (isMoveRequest) return json(await moveAttachments(vault, body.paths, body.folder));
+		return json(await renameAttachment(vault, body.from as string, body.to as string));
 	} catch (e) {
 		throw error(mutationStatus(e), (e as Error).message);
 	}

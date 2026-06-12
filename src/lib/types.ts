@@ -119,6 +119,20 @@ export interface AttachmentUploadResult {
 	sha: string | null;
 }
 
+export interface AttachmentMoveItem {
+	from: string;
+	to: string;
+}
+
+export interface AttachmentMoveResult {
+	ok: true;
+	folder: string;
+	moved: AttachmentMoveItem[];
+	linksUpdated: number;
+	touched: string[];
+	sha: string | null;
+}
+
 export type AttachmentKind = 'image' | 'audio' | 'video' | 'pdf' | 'file';
 
 export interface AttachmentRef {

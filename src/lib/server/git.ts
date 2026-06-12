@@ -153,7 +153,7 @@ export function isVaultWriteBlockedError(e: unknown): boolean {
 	return e instanceof Error && VAULT_WRITE_BLOCKED_MESSAGES.has(e.message);
 }
 
-type Verb = 'create' | 'edit' | 'rename' | 'delete';
+type Verb = 'create' | 'edit' | 'rename' | 'move' | 'delete';
 
 export async function commitChange(
 	vault: Vault,

@@ -33,6 +33,20 @@ export interface AttachmentRenameResult {
 	sha: string | null;
 }
 
+export interface AttachmentMoveItem {
+	from: string;
+	to: string;
+}
+
+export interface AttachmentMoveResult {
+	ok: true;
+	folder: string;
+	moved: AttachmentMoveItem[];
+	linksUpdated: number;
+	touched: string[];
+	sha: string | null;
+}
+
 const DEFAULT_ATTACHMENT_FOLDER = 'Attachments';
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const MAX_LISTED_ATTACHMENTS = 1_000;
@@ -104,6 +118,26 @@ function nextAvailableAttachmentPath(vault: Vault, filename: string): { rel: str
 		const rel = normalizeVaultPath(`${folder}/${candidateFilename(filename, index)}`);
 		const abs = resolveInVault(vault, rel);
 		if (!fs.existsSync(abs)) return { rel, abs };
+	}
+	throw new Error('could not find an available attachment filename');
+}
+
+function nextAvailableMovePath(
+	vault: Vault,
+	folder: string,
+	filename: string,
+	reserved: Set<string>
+): string {
+	for (let index = 1; index <= 999; index += 1) {
+		const rel = normalizeVaultPath(`${folder}/${candidateFilename(filename, index)}`);
+		const key = rel.toLowerCase();
+		if (reserved.has(key)) continue;
+		if (fs.existsSync(resolveInVault(vault, rel))) {
+			reserved.add(key);
+			continue;
+		}
+		reserved.add(key);
+		return rel;
 	}
 	throw new Error('could not find an available attachment filename');
 }
@@ -314,4 +348,74 @@ export async function renameAttachment(vault: Vault, fromInput: string, toInput:
 	const res = await commitChange(vault, [from, to, ...touched], 'rename', summary);
 
 	return { ok: true, from, to, touched, linksUpdated, sha: res?.sha ?? null };
+}
+
+export async function moveAttachments(
+	vault: Vault,
+	inputPaths: unknown,
+	folderInput: unknown
+): Promise<AttachmentMoveResult> {
+	if (!Array.isArray(inputPaths) || inputPaths.length === 0) throw new Error('attachment paths required');
+	const folder = safeAttachmentFolder(folderInput);
+	if (!folder) throw new Error('destination folder required');
+
+	const sourceKeys = new Set<string>();
+	const sources: string[] = [];
+	for (const inputPath of inputPaths) {
+		if (typeof inputPath !== 'string') throw new Error('attachment path required');
+		const rel = assertAttachmentPath(inputPath);
+		const key = rel.toLowerCase();
+		if (sourceKeys.has(key)) continue;
+		const abs = resolveInVault(vault, rel);
+		if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new Error('attachment not found');
+		sourceKeys.add(key);
+		sources.push(rel);
+	}
+
+	const reserved = new Set<string>();
+	for (const attachment of listAttachments(vault)) {
+		const key = attachment.path.toLowerCase();
+		if (!sourceKeys.has(key)) reserved.add(key);
+	}
+
+	const moves: AttachmentMoveItem[] = [];
+	for (const from of sources) {
+		const currentFolder = path.posix.dirname(from);
+		if (currentFolder.toLowerCase() === folder.toLowerCase()) {
+			reserved.add(from.toLowerCase());
+			continue;
+		}
+		const to = nextAvailableMovePath(vault, folder, path.posix.basename(from), reserved);
+		moves.push({ from, to });
+	}
+
+	if (moves.length === 0) {
+		return { ok: true, folder, moved: [], touched: [], linksUpdated: 0, sha: null };
+	}
+
+	for (const move of moves) {
+		if (fs.existsSync(resolveInVault(vault, move.to))) throw new Error('destination already exists');
+	}
+
+	const touchedSet = new Set<string>();
+	let linksUpdated = 0;
+	for (const move of moves) {
+		const rewrite = rewriteAttachmentReferences(vault, move.from, move.to);
+		for (const touched of rewrite.touched) touchedSet.add(touched);
+		linksUpdated += rewrite.linksUpdated;
+
+		const fromAbs = resolveInVault(vault, move.from);
+		const toAbs = resolveInVault(vault, move.to);
+		fs.mkdirSync(path.dirname(toAbs), { recursive: true });
+		fs.renameSync(fromAbs, toAbs);
+	}
+
+	const touched = [...touchedSet];
+	const paths = [...new Set([...moves.flatMap((move) => [move.from, move.to]), ...touched])];
+	const summary = linksUpdated > 0
+		? `${moves.length} attachment${moves.length === 1 ? '' : 's'} to ${folder} (+${linksUpdated} reference${linksUpdated === 1 ? '' : 's'} updated)`
+		: `${moves.length} attachment${moves.length === 1 ? '' : 's'} to ${folder}`;
+	const res = await commitChange(vault, paths, 'move', summary);
+
+	return { ok: true, folder, moved: moves, touched, linksUpdated, sha: res?.sha ?? null };
 }
