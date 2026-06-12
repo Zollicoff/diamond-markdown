@@ -118,6 +118,10 @@ Use small, pushable slices:
 - **Graph stage split.** Move graph status, canvas staging, settings-panel
    mounting, and footer legend markup out of `GraphView` into a focused
    presentational component.
+- **Attachment picker list split.** Keep attachment loading, selection, rename,
+   delete, and insert orchestration in `AttachmentPicker` while moving the
+   list, empty/error states, row metadata, and responsive row styling into a
+   focused presentational component.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
