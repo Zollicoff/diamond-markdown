@@ -153,6 +153,23 @@ export const api = {
 		return res;
 	},
 
+	async updateCanvasNodeColor(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		color: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'update-node-color', nodeId, color, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async moveCanvasNode(
 		vaultId: string,
 		path: string,
@@ -234,6 +251,23 @@ export const api = {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ path, action: 'update-edge-label', edgeId, label, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
+	async updateCanvasEdgeColor(
+		vaultId: string,
+		path: string,
+		edgeId: string,
+		color: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'update-edge-color', edgeId, color, expectedRevision })
 		});
 		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
 		emit('tree:invalidate', { vaultId });

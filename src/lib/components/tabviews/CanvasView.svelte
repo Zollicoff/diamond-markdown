@@ -227,6 +227,21 @@
 		}
 	}
 
+	async function saveNodeColor(node: CanvasNode, color: string): Promise<void> {
+		if (!doc || savingNodeId || deletingNodeId || movingNodeId || moveSavingNodeId || resizingNodeId || resizeSavingNodeId) return;
+		savingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasNodeColor(vaultId, path, node.id, color, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas node color saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingNodeId = null;
+		}
+	}
+
 	async function deleteNode(node: CanvasNode): Promise<void> {
 		if (!doc || deletingNodeId || savingNodeId || movingNodeId || moveSavingNodeId || resizingNodeId || resizeSavingNodeId || savingEdgeId || deletingEdgeId) return;
 		deletingNodeId = node.id;
@@ -294,6 +309,21 @@
 			);
 			setDoc(res.doc);
 			emit('toast:show', { title: 'Canvas edge saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingEdgeId = null;
+		}
+	}
+
+	async function saveEdgeColor(edge: CanvasEdgeSummary, color: string): Promise<void> {
+		if (!doc || savingEdgeId || deletingEdgeId) return;
+		savingEdgeId = edge.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasEdgeColor(vaultId, path, edge.id, color, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas edge color saved', tone: 'success' });
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -450,7 +480,7 @@
 			.finally(() => {
 				if (!alive || currentPath !== path) return;
 				loading = false;
-		});
+			});
 		return () => { alive = false; };
 	});
 
@@ -502,6 +532,7 @@
 		{deletingEdgeId}
 		onEdgeLabelDraftChange={setEdgeLabelDraft}
 		onSaveEdgeLabel={saveEdgeLabel}
+		onSaveEdgeColor={saveEdgeColor}
 		onDeleteEdge={deleteEdge}
 		onDraftChange={setDraft}
 		onGroupLabelDraftChange={setGroupLabelDraft}
@@ -510,6 +541,7 @@
 		onSaveGroupLabel={saveGroupLabel}
 		onSaveRefNode={saveRefNode}
 		onOpenRefNode={openRefNode}
+		onSaveNodeColor={saveNodeColor}
 		onDeleteNode={deleteNode}
 		onMovePointerDown={startMoveNode}
 		onResizePointerDown={startResizeNode}

@@ -35,6 +35,7 @@
 		deletingEdgeId: string | null;
 		onEdgeLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
 		onSaveEdgeLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
+		onSaveEdgeColor: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
 		onDeleteEdge: (edgeId: string) => void | Promise<void>;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
@@ -43,6 +44,7 @@
 		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRefNode: (node: CanvasNode) => void | Promise<void>;
 		onOpenRefNode: (node: CanvasNode) => void;
+		onSaveNodeColor: (node: CanvasNode, color: string) => void | Promise<void>;
 		onDeleteNode: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -70,6 +72,7 @@
 		deletingEdgeId,
 		onEdgeLabelDraftChange,
 		onSaveEdgeLabel,
+		onSaveEdgeColor,
 		onDeleteEdge,
 		onDraftChange,
 		onGroupLabelDraftChange,
@@ -78,6 +81,7 @@
 		onSaveGroupLabel,
 		onSaveRefNode,
 		onOpenRefNode,
+		onSaveNodeColor,
 		onDeleteNode,
 		onMovePointerDown,
 		onResizePointerDown
@@ -105,6 +109,7 @@
 		{deletingEdgeId}
 		onLabelDraftChange={onEdgeLabelDraftChange}
 		onSaveLabel={onSaveEdgeLabel}
+		onColorChange={onSaveEdgeColor}
 		onDelete={onDeleteEdge}
 	/>
 	<CanvasBoard
@@ -129,6 +134,7 @@
 		onSaveGroupLabel={onSaveGroupLabel}
 		onSaveRef={onSaveRefNode}
 		onOpenRef={onOpenRefNode}
+		onColorChange={onSaveNodeColor}
 		onDelete={onDeleteNode}
 		{onMovePointerDown}
 		{onResizePointerDown}

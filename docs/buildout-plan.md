@@ -188,7 +188,8 @@ Use small, pushable slices:
    with deterministic parsing coverage.
 - **Canvas color compatibility.** Render preserved Obsidian Canvas node and
    edge color metadata in the board and SVG export without rewriting the
-   original `.canvas` file.
+   original `.canvas` file, and edit node/edge colors through validated
+   git-backed Canvas mutations.
 - **Obsidian attachment-folder uploads.** Honor a safe
    `.obsidian/app.json` `attachmentFolderPath` for new uploads, falling back to
    `Attachments/` when the setting is missing or unsafe.

@@ -50,6 +50,7 @@ export interface CanvasEdgeSummary {
 	fromLabel: string;
 	toLabel: string;
 	description: string;
+	color?: string;
 }
 
 export interface CanvasNodeRefDraft {
@@ -62,6 +63,12 @@ export interface CanvasDisplayColor {
 	fill: string;
 	text: string;
 	label: string;
+}
+
+export interface CanvasColorOption {
+	value: string;
+	label: string;
+	swatch: string;
 }
 
 export interface CanvasFileOpenTarget {
@@ -113,6 +120,24 @@ const OBSIDIAN_CANVAS_COLORS: Record<string, CanvasDisplayColor> = {
 	'6': { accent: '#9333ea', fill: '#f3e8ff', text: '#581c87', label: 'purple' },
 	purple: { accent: '#9333ea', fill: '#f3e8ff', text: '#581c87', label: 'purple' }
 };
+const OBSIDIAN_CANVAS_COLOR_VALUES: Record<string, string> = {
+	red: '1',
+	orange: '2',
+	yellow: '3',
+	green: '4',
+	cyan: '5',
+	purple: '6'
+};
+
+export const CANVAS_COLOR_OPTIONS: CanvasColorOption[] = [
+	{ value: '', label: 'default', swatch: '#94a3b8' },
+	{ value: '1', label: 'red', swatch: OBSIDIAN_CANVAS_COLORS['1'].accent },
+	{ value: '2', label: 'orange', swatch: OBSIDIAN_CANVAS_COLORS['2'].accent },
+	{ value: '3', label: 'yellow', swatch: OBSIDIAN_CANVAS_COLORS['3'].accent },
+	{ value: '4', label: 'green', swatch: OBSIDIAN_CANVAS_COLORS['4'].accent },
+	{ value: '5', label: 'cyan', swatch: OBSIDIAN_CANVAS_COLORS['5'].accent },
+	{ value: '6', label: 'purple', swatch: OBSIDIAN_CANVAS_COLORS['6'].accent }
+];
 
 export function canvasAddNodePlaceholder(type: CanvasAddNodeType): string {
 	if (type === 'file') return 'Note.md';
@@ -179,6 +204,19 @@ function normalizedHexColor(value: string): string | null {
 	}
 	const long = trimmed.match(/^#([0-9a-f]{6})$/i);
 	return long ? `#${long[1].toLowerCase()}` : null;
+}
+
+export function normalizeCanvasColor(value: string): string | null {
+	const key = value.trim().toLowerCase();
+	if (/^[1-6]$/.test(key)) return key;
+	if (OBSIDIAN_CANVAS_COLOR_VALUES[key]) return OBSIDIAN_CANVAS_COLOR_VALUES[key];
+	return normalizedHexColor(value);
+}
+
+export function canvasPaletteColorValue(value: string | undefined): string {
+	if (!value) return '';
+	const normalized = normalizeCanvasColor(value);
+	return normalized ?? '';
 }
 
 export function canvasDisplayColor(value: string | undefined): CanvasDisplayColor | null {
@@ -637,7 +675,8 @@ export function canvasEdgeSummaries(doc: Pick<CanvasDoc, 'nodes' | 'edges'>): Ca
 			editableLabel,
 			fromLabel,
 			toLabel,
-			description: `${fromLabel} to ${toLabel}${label !== 'unlabeled' ? `: ${label}` : ''}`
+			description: `${fromLabel} to ${toLabel}${label !== 'unlabeled' ? `: ${label}` : ''}`,
+			color: edge.color
 		};
 	});
 }

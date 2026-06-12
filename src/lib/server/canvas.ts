@@ -11,7 +11,8 @@ import {
 	canvasNodeTitle,
 	canvasSvgEdgeStroke,
 	canvasSvgNodeColors,
-	edgeLines
+	edgeLines,
+	normalizeCanvasColor
 } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
@@ -55,11 +56,13 @@ export type CanvasEditAction =
 	| 'update-node-text'
 	| 'update-group-label'
 	| 'update-node-reference'
+	| 'update-node-color'
 	| 'move-node'
 	| 'resize-node'
 	| 'delete-node'
 	| 'add-edge'
 	| 'update-edge-label'
+	| 'update-edge-color'
 	| 'delete-edge';
 
 export interface MutateCanvasInput {
@@ -75,6 +78,7 @@ export interface MutateCanvasInput {
 	text?: string;
 	file?: string;
 	url?: string;
+	color?: string;
 	x?: number;
 	y?: number;
 	width?: number;
@@ -398,6 +402,18 @@ function cleanOptionalLabel(value: unknown): string {
 	return typeof value === 'string' ? value.trim().slice(0, 200) : '';
 }
 
+function cleanCanvasColor(value: unknown): string | null {
+	if (typeof value !== 'string') throw new CanvasFileError('color is required');
+	const trimmed = value.trim();
+	const lowered = trimmed.toLowerCase();
+	if (!trimmed || lowered === 'default' || lowered === 'none') return null;
+	const normalized = normalizeCanvasColor(trimmed);
+	if (!normalized) {
+		throw new CanvasFileError('color must be default, 1-6, red/orange/yellow/green/cyan/purple, or #rgb/#rrggbb');
+	}
+	return normalized;
+}
+
 function requiredText(value: unknown, name: string, maxLength: number): string {
 	const cleaned = typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 	if (!cleaned) throw new CanvasFileError(`${name} is required`);
@@ -504,6 +520,13 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		const label = cleanOptionalLabel(input.label);
 		if (label) node.label = label;
 		else delete node.label;
+	} else if (input.action === 'update-node-color') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		const color = cleanCanvasColor(input.color);
+		if (color) node.color = color;
+		else delete node.color;
 	} else if (input.action === 'move-node') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
@@ -557,6 +580,16 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		const label = input.label.trim().slice(0, 200);
 		if (label) edge.label = label;
 		else delete edge.label;
+	} else if (input.action === 'update-edge-color') {
+		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
+		const edge = edges.map((candidate, edgeIndex) => ({
+			id: rawEdgeId(candidate, edgeIndex),
+			record: record(candidate)
+		})).find((candidate) => candidate.id === input.edgeId)?.record;
+		if (!edge) throw new CanvasFileError('canvas edge not found', 404);
+		const color = cleanCanvasColor(input.color);
+		if (color) edge.color = color;
+		else delete edge.color;
 	} else if (input.action === 'delete-edge') {
 		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
 		const index = edges.findIndex((edge, edgeIndex) => rawEdgeId(edge, edgeIndex) === input.edgeId);

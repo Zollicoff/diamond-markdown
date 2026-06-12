@@ -5,6 +5,7 @@ import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { CanvasDoc } from '../src/lib/types';
 import {
+	CANVAS_COLOR_OPTIONS,
 	canvasBounds,
 	canvasConnectionDraft,
 	canvasDraftChanged,
@@ -60,6 +61,8 @@ import {
 	canvasTextDrafts,
 	edgeLines,
 	canvasNodeStyle,
+	canvasPaletteColorValue,
+	normalizeCanvasColor,
 	nodeStyle
 } from '../src/lib/canvas/view';
 import {
@@ -159,6 +162,21 @@ test.describe('canvas view helpers', () => {
 		expect(canvasDisplayColor('purple')?.accent).toBe('#9333ea');
 		expect(canvasDisplayColor('#ABC')).toMatchObject({ accent: '#aabbcc', fill: '#aabbcc22', label: 'custom' });
 		expect(canvasDisplayColor('url(javascript:alert(1))')).toBeNull();
+		expect(normalizeCanvasColor('green')).toBe('4');
+		expect(normalizeCanvasColor('#ABC')).toBe('#aabbcc');
+		expect(normalizeCanvasColor('bad')).toBeNull();
+		expect(canvasPaletteColorValue('purple')).toBe('6');
+		expect(canvasPaletteColorValue('#aabbcc')).toBe('#aabbcc');
+		expect(canvasPaletteColorValue('bad')).toBe('');
+		expect(CANVAS_COLOR_OPTIONS.map((option) => option.label)).toEqual([
+			'default',
+			'red',
+			'orange',
+			'yellow',
+			'green',
+			'cyan',
+			'purple'
+		]);
 		expect(canvasNodeColorStyle(doc.nodes[0])).toContain('--canvas-node-border: #dc2626');
 		expect(canvasNodeStyle(doc.nodes[0], bounds)).toContain('--canvas-node-bg: #fee2e2');
 		expect(canvasSvgNodeColors(doc.nodes[0])).toEqual({ fill: '#fee2e2', stroke: '#dc2626' });
@@ -328,7 +346,8 @@ test.describe('canvas view helpers', () => {
 				editableLabel: 'opens',
 				fromLabel: 'text',
 				toLabel: 'Home.md',
-				description: 'text to Home.md: opens'
+				description: 'text to Home.md: opens',
+				color: '5'
 			}
 		]);
 		const edgeDrafts = canvasEdgeLabelDrafts(edgeSummaries);
@@ -792,6 +811,48 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(clampedBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ width: 140, height: 150 });
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const coloredNode = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-color',
+			nodeId: 'b',
+			color: 'green',
+			expectedRevision: clampedBody.doc.revision
+		}
+	});
+	expect(coloredNode.ok(), await coloredNode.text()).toBe(true);
+	const coloredNodeBody = await coloredNode.json() as { sha: string | null; doc: CanvasDoc };
+	expect(coloredNodeBody.sha).toBeTruthy();
+	expect(coloredNodeBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ color: '4' });
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const clearedNodeColor = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-color',
+			nodeId: 'b',
+			color: 'default',
+			expectedRevision: coloredNodeBody.doc.revision
+		}
+	});
+	expect(clearedNodeColor.ok(), await clearedNodeColor.text()).toBe(true);
+	const clearedNodeColorBody = await clearedNodeColor.json() as { sha: string | null; doc: CanvasDoc };
+	expect(clearedNodeColorBody.sha).toBeTruthy();
+	expect(clearedNodeColorBody.doc.nodes.find((node) => node.id === 'b')?.color).toBeUndefined();
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const invalidNodeColor = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-color',
+			nodeId: 'b',
+			color: 'url(javascript:alert(1))',
+			expectedRevision: clearedNodeColorBody.doc.revision
+		}
+	});
+	expect(invalidNodeColor.status()).toBe(400);
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const edgeAdded = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
@@ -799,7 +860,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			fromNode: 'b',
 			toNode: 'a',
 			label: 'returns',
-			expectedRevision: clampedBody.doc.revision
+			expectedRevision: clearedNodeColorBody.doc.revision
 		}
 	});
 	expect(edgeAdded.ok(), await edgeAdded.text()).toBe(true);
@@ -830,13 +891,55 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(updatedEdgeBody.doc.edges.at(-1)).toMatchObject({ label: 'routes back' });
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const coloredEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-color',
+			edgeId: updatedEdgeBody.doc.edges.at(-1)?.id,
+			color: '#ABC',
+			expectedRevision: updatedEdgeBody.doc.revision
+		}
+	});
+	expect(coloredEdge.ok(), await coloredEdge.text()).toBe(true);
+	const coloredEdgeBody = await coloredEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(coloredEdgeBody.sha).toBeTruthy();
+	expect(coloredEdgeBody.doc.edges.at(-1)).toMatchObject({ color: '#aabbcc' });
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const clearedEdgeColor = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-color',
+			edgeId: coloredEdgeBody.doc.edges.at(-1)?.id,
+			color: 'none',
+			expectedRevision: coloredEdgeBody.doc.revision
+		}
+	});
+	expect(clearedEdgeColor.ok(), await clearedEdgeColor.text()).toBe(true);
+	const clearedEdgeColorBody = await clearedEdgeColor.json() as { sha: string | null; doc: CanvasDoc };
+	expect(clearedEdgeColorBody.sha).toBeTruthy();
+	expect(clearedEdgeColorBody.doc.edges.at(-1)?.color).toBeUndefined();
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const invalidEdgeColor = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-color',
+			edgeId: clearedEdgeColorBody.doc.edges.at(-1)?.id,
+			color: 'url(javascript:alert(1))',
+			expectedRevision: clearedEdgeColorBody.doc.revision
+		}
+	});
+	expect(invalidEdgeColor.status()).toBe(400);
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const clearedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
 			action: 'update-edge-label',
-			edgeId: updatedEdgeBody.doc.edges.at(-1)?.id,
+			edgeId: clearedEdgeColorBody.doc.edges.at(-1)?.id,
 			label: '   ',
-			expectedRevision: updatedEdgeBody.doc.revision
+			expectedRevision: clearedEdgeColorBody.doc.revision
 		}
 	});
 	expect(clearedEdge.ok(), await clearedEdge.text()).toBe(true);
@@ -905,6 +1008,14 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 
 	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await page.getByRole('button', { name: 'Set canvas node Home.md color cyan' }).click();
+	await expect(page.getByText('Canvas node color saved')).toBeVisible({ timeout: 10_000 });
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return body.nodes.find((node) => node.id === 'b')?.color;
+	}).toBe('5');
+
 	await page.getByRole('button', { name: 'Add text' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('3 nodes · 1 edge · editable text cards');
 
@@ -960,11 +1071,12 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 		const body = await loaded.json() as CanvasDoc;
 		return {
 			text: body.nodes.find((node) => node.id === 'a')?.text,
+			homeColor: body.nodes.find((node) => node.id === 'b')?.color,
 			hasFile: body.nodes.some((node) => node.type === 'file' && node.file === 'Home.md'),
 			hasEditedFile: body.nodes.some((node) => node.type === 'file' && node.file === 'References/Home.md' && node.label === 'Home reference'),
 			hasEditedLink: body.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/updated' && node.label === 'Updated research')
 		};
-	}).toEqual({ text: 'Edited through UI', hasFile: true, hasEditedFile: true, hasEditedLink: true });
+	}).toEqual({ text: 'Edited through UI', homeColor: '5', hasFile: true, hasEditedFile: true, hasEditedLink: true });
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
@@ -983,6 +1095,14 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 
 	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await page.getByRole('button', { name: 'Set canvas edge text to Home.md: opens color green' }).click();
+	await expect(page.getByText('Canvas edge color saved')).toBeVisible({ timeout: 10_000 });
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return body.edges.find((edge) => edge.id === 'edge-a-b')?.color;
+	}).toBe('4');
+
 	await page.getByLabel('Canvas edge source').selectOption('b');
 	await page.getByLabel('Canvas edge target').selectOption('a');
 	await page.getByLabel('Canvas edge label').fill('returns');

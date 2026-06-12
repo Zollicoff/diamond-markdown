@@ -9,6 +9,7 @@
 		type CanvasBounds,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
+	import CanvasColorPalette from './CanvasColorPalette.svelte';
 	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';
 	import CanvasTextNodeEditor from './CanvasTextNodeEditor.svelte';
 
@@ -35,6 +36,7 @@
 		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
+		onColorChange: (node: CanvasNode, color: string) => void | Promise<void>;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -63,6 +65,7 @@
 		onSaveGroupLabel,
 		onSaveRef,
 		onOpenRef,
+		onColorChange,
 		onDelete,
 		onMovePointerDown,
 		onResizePointerDown
@@ -81,6 +84,14 @@
 			onpointerdown={(event) => onMovePointerDown(node, event)}
 		></button>
 		<div class="node-type">{node.type}</div>
+		<CanvasColorPalette
+			kind="node"
+			label={title}
+			color={node.color}
+			disabled={saving || moving || resizing || deleting || disableDelete}
+			{saving}
+			onColorChange={(color) => onColorChange(node, color)}
+		/>
 	</div>
 	<h3 title={title}>{title}</h3>
 	{#if isCanvasGroupNode(node)}
@@ -220,6 +231,10 @@
 		align-items: center;
 		gap: 7px;
 		min-width: 0;
+		flex-wrap: wrap;
+	}
+	.node-topline :global(.color-palette) {
+		margin-left: auto;
 	}
 	.node-drag-handle {
 		position: relative;

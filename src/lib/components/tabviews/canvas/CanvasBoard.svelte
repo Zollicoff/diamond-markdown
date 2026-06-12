@@ -45,6 +45,7 @@
 		onSaveGroupLabel: (node: CanvasNode) => void | Promise<void>;
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
+		onColorChange: (node: CanvasNode, color: string) => void | Promise<void>;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -72,6 +73,7 @@
 		onSaveGroupLabel,
 		onSaveRef,
 		onOpenRef,
+		onColorChange,
 		onDelete,
 		onMovePointerDown,
 		onResizePointerDown
@@ -170,6 +172,7 @@
 				onSaveGroupLabel={onSaveGroupLabel}
 				onSaveRef={onSaveRef}
 				onOpenRef={onOpenRef}
+				onColorChange={onColorChange}
 				onDelete={onDelete}
 				onMovePointerDown={onMovePointerDown}
 				onResizePointerDown={onResizePointerDown}

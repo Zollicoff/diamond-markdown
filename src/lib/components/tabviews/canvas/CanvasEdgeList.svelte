@@ -5,6 +5,7 @@
 		type CanvasEdgeLabelDrafts,
 		type CanvasEdgeSummary
 	} from '$lib/canvas/view';
+	import CanvasColorPalette from './CanvasColorPalette.svelte';
 
 	interface Props {
 		edges: CanvasEdgeSummary[];
@@ -13,6 +14,7 @@
 		deletingEdgeId: string | null;
 		onLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
 		onSaveLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
+		onColorChange: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
 		onDelete: (edgeId: string) => void | Promise<void>;
 	}
 
@@ -23,6 +25,7 @@
 		deletingEdgeId,
 		onLabelDraftChange,
 		onSaveLabel,
+		onColorChange,
 		onDelete
 	}: Props = $props();
 </script>
@@ -41,6 +44,14 @@
 							<span class="label">({edge.label})</span>
 						{/if}
 					</span>
+					<CanvasColorPalette
+						kind="edge"
+						label={edge.description}
+						color={edge.color}
+						saving={savingEdgeId === edge.id}
+						disabled={savingEdgeId !== null || deletingEdgeId !== null}
+						onColorChange={(color) => onColorChange(edge, color)}
+					/>
 					<form
 						class="edge-edit"
 						onsubmit={(event) => {
