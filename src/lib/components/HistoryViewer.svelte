@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import HistoryContentPanel from './history/HistoryContentPanel.svelte';
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
+	import { buildHistoryLineDiff, summarizeHistoryDiff } from '$lib/history/diff';
 
 	interface Props {
 		vaultId: string;
 	}
+
+	type HistoryViewMode = 'snapshot' | 'diff';
 
 	let { vaultId }: Props = $props();
 
@@ -26,6 +30,16 @@
 	let selectedSha = $state<string | null>(null);
 	let selectedContent = $state<string | null>(null);
 	let loadingContent = $state(false);
+	let currentContent = $state<string | null>(null);
+	let loadingCurrent = $state(false);
+	let viewMode = $state<HistoryViewMode>('diff');
+
+	const diffRows = $derived(
+		selectedContent != null && currentContent != null
+			? buildHistoryLineDiff(selectedContent, currentContent)
+			: []
+	);
+	const diffSummary = $derived(summarizeHistoryDiff(diffRows));
 
 	function close(): void {
 		open = false;
@@ -33,13 +47,20 @@
 		log = [];
 		selectedSha = null;
 		selectedContent = null;
+		currentContent = null;
 	}
 
 	async function loadLog(p: string): Promise<void> {
 		loadingLog = true;
+		loadingCurrent = true;
 		err = null;
 		try {
-			log = await api.history(vaultId, p);
+			const [nextLog, note] = await Promise.all([
+				api.history(vaultId, p),
+				api.note(vaultId, p)
+			]);
+			log = nextLog;
+			currentContent = note.content;
 			if (log.length > 0) {
 				selectedSha = log[0].sha;
 				await loadContent(p, log[0].sha);
@@ -48,6 +69,7 @@
 			err = (e as Error).message;
 		} finally {
 			loadingLog = false;
+			loadingCurrent = false;
 		}
 	}
 
@@ -102,6 +124,8 @@
 			log = [];
 			selectedSha = null;
 			selectedContent = null;
+			currentContent = null;
+			viewMode = 'diff';
 			void loadLog(e.path);
 		});
 		window.addEventListener('keydown', handleKey);
@@ -156,16 +180,21 @@
 						</ul>
 					{/if}
 				</aside>
-				<section class="content">
-					<header class="content-head">
-						<span class="mono">{selectedSha ? selectedSha.slice(0, 7) : '—'}</span>
-						<button class="mini" onclick={copyToClipboard} disabled={!selectedContent}>Copy</button>
-					</header>
-					<pre class="viewer">{#if loadingContent}Loading…{:else if selectedContent != null}{selectedContent}{:else}—{/if}</pre>
-				</section>
+				<HistoryContentPanel
+					{selectedSha}
+					{selectedContent}
+					{currentContent}
+					{loadingContent}
+					{loadingCurrent}
+					{viewMode}
+					{diffRows}
+					{diffSummary}
+					onViewModeChange={(mode) => (viewMode = mode)}
+					onCopy={copyToClipboard}
+				/>
 			</div>
 			<footer class="hint">
-				<kbd>Esc</kbd> close · read-only viewer · use Copy to restore content manually
+				<kbd>Esc</kbd> close · diff compares the selected commit to the current saved note
 			</footer>
 		</div>
 	</div>
@@ -251,40 +280,6 @@
 	.commit.active { background: var(--bg-hover); outline: 1px solid var(--border-strong); }
 	.msg { font-size: 0.86rem; color: var(--fg); }
 	.meta { font-size: 0.72rem; color: var(--fg-dim); }
-
-	.content {
-		display: flex; flex-direction: column; min-width: 0;
-	}
-	.content-head {
-		display: flex; align-items: center; justify-content: space-between;
-		padding: 8px 12px;
-		border-bottom: 1px solid var(--border);
-		font-size: 0.78rem;
-		color: var(--fg-dim);
-	}
-	.mini {
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 3px 9px;
-		color: var(--fg);
-		cursor: pointer;
-		font: inherit;
-		font-size: 0.76rem;
-	}
-	.mini:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-	.mini:disabled { opacity: 0.4; cursor: default; }
-	.viewer {
-		flex: 1;
-		margin: 0;
-		padding: 16px 20px;
-		overflow: auto;
-		font-family: var(--mono);
-		font-size: 0.86rem;
-		color: var(--fg);
-		white-space: pre-wrap;
-		word-wrap: break-word;
-	}
 
 	.hint {
 		display: flex; gap: 10px;

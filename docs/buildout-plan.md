@@ -230,6 +230,9 @@ Use small, pushable slices:
 - **App dialog presentation split.** Keep event-bus subscriptions and promise
    resolution in `AppDialogs` while moving modal and toast DOM/CSS into focused
    presentation components backed by small dialog helper tests.
+- **History diff viewer.** Compare a selected git-history snapshot against the
+   current saved note with tested line-level added/removed/unchanged rows while
+   preserving the raw snapshot view and copy affordance.
 
 ## Next Implementation Slices
 
