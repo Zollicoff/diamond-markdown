@@ -60,7 +60,8 @@ test.describe('import checklist helpers', () => {
 				manifestStatus: 'present',
 				settingsPath: '.obsidian/plugins/dataview/data.json',
 				settingsStatus: 'present',
-				settingsBytes: 12
+				settingsBytes: 12,
+				settingsKeys: ['queries', 'views', 'widgets', 'zIndex']
 			},
 			{
 				folder: '.obsidian/plugins/broken',
@@ -71,6 +72,6 @@ test.describe('import checklist helpers', () => {
 				manifestStatus: 'invalid',
 				settingsStatus: 'missing'
 			}
-		])).toBe('Dataview (dataview): enabled, settings; broken: invalid manifest, no settings');
+		])).toBe('Dataview (dataview): enabled, settings: queries, views, widgets +1; broken: invalid manifest, no settings');
 	});
 });

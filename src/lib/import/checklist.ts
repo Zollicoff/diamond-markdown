@@ -57,7 +57,10 @@ function obsidianManifestLabel(plugin: ObsidianPluginInfo): string {
 function obsidianSettingsLabel(plugin: ObsidianPluginInfo): string {
 	if (plugin.settingsStatus === 'invalid') return 'invalid settings';
 	if (plugin.settingsStatus === 'missing') return 'no settings';
-	return 'settings';
+	if (!plugin.settingsKeys?.length) return 'settings';
+	const visible = plugin.settingsKeys.slice(0, 3).join(', ');
+	const overflow = plugin.settingsKeys.length > 3 ? ` +${plugin.settingsKeys.length - 3}` : '';
+	return `settings: ${visible}${overflow}`;
 }
 
 export function obsidianPluginSummary(plugins: ObsidianPluginInfo[], max = 4): string {

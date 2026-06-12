@@ -124,7 +124,10 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		version: '0.5.0',
 		author: 'Blacksmith'
 	}));
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'data.json'), '{"queries":true}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'data.json'), JSON.stringify({
+		queries: true,
+		refreshInterval: 5000
+	}));
 	fs.writeFileSync(notePath, '# Home\n\nObsidian note with ![[roof.png]].\n');
 	fs.writeFileSync(path.join(vaultDir, 'Daily.md'), '# Daily\n\nLog.\n');
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
@@ -154,6 +157,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			manifestStatus: string;
 			settingsStatus: string;
 			settingsPath?: string;
+			settingsKeys?: string[];
 		}[];
 		recommendedExcludedFolders: string[];
 		checklist: { id: string; detail: string; level: string }[];
@@ -176,13 +180,14 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		enabled: true,
 		manifestStatus: 'present',
 		settingsStatus: 'present',
-		settingsPath: '.obsidian/plugins/dataview/data.json'
+		settingsPath: '.obsidian/plugins/dataview/data.json',
+		settingsKeys: ['queries', 'refreshInterval']
 	});
 	expect(body.recommendedExcludedFolders).toContain('.obsidian');
 	expect(body.markdownExamples).toContain('Daily.md');
 	expect(body.canvasExamples).toContain('Board.canvas');
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
-	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed text-card editing');
+	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
 	expect(fs.readFileSync(notePath, 'utf-8')).toBe(before);
@@ -199,7 +204,10 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		name: 'Kanban',
 		version: '2.0.0'
 	}));
-	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'data.json'), '{"laneWidth":280}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'data.json'), JSON.stringify({
+		laneWidth: 280,
+		showCheckboxes: true
+	}));
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n![[roof.png]]\n');
 	fs.writeFileSync(path.join(vaultDir, 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -222,7 +230,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
-	await expect(page.locator('.import-card')).toContainText('Kanban (obsidian-kanban): enabled, settings');
+	await expect(page.locator('.import-card')).toContainText('Kanban (obsidian-kanban): enabled, settings: laneWidth, showCheckboxes');
 
 	await page.getByRole('button', { name: 'Add vault', exact: true }).click();
 	await expect(page).toHaveURL(/\/vault\/obsidian-ui-import$/);

@@ -18,8 +18,9 @@ an existing Obsidian vault. The preflight reports:
 
 The `.obsidian` folder is preserved on disk but skipped from note indexing.
 Diamond will not execute Obsidian community plugins. The import preview reads
-plugin manifests and `data.json` presence so you can see which settings will be
-preserved before registering the vault.
+plugin manifests plus the top-level keys in each plugin `data.json`, so you can
+see which settings files will be preserved before registering the vault without
+exposing full plugin setting values in the preview.
 
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening

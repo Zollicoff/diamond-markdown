@@ -215,7 +215,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 			'canvas',
 			'Canvas files',
 			canvasFiles > 0
-				? `${canvasFiles} Canvas file${canvasFiles === 1 ? '' : 's'} found; Diamond preserves them and opens Canvas previews with git-backed text-card editing.`
+				? `${canvasFiles} Canvas file${canvasFiles === 1 ? '' : 's'} found; Diamond preserves them and opens visual boards with git-backed node and edge editing.`
 				: 'No Obsidian Canvas files were found.',
 			canvasFiles > 0 ? 'info' : 'ok'
 		),
@@ -283,6 +283,14 @@ function jsonString(value: unknown): string | undefined {
 	return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function jsonSettingKeys(value: unknown): string[] {
+	const body = jsonRecord(value);
+	if (!body) return [];
+	return Object.keys(body)
+		.filter((key) => key.trim().length > 0)
+		.sort((a, b) => a.localeCompare(b));
+}
+
 function readEnabledObsidianPluginIds(root: string): Set<string> {
 	const plugins = readJsonFile(path.join(root, '.obsidian', 'community-plugins.json'));
 	if (plugins.status !== 'present' || !Array.isArray(plugins.value)) return new Set();
@@ -323,6 +331,8 @@ function listObsidianPlugins(root: string): ObsidianPluginInfo[] {
 			if (author) plugin.author = author;
 			if (settings.status !== 'missing') plugin.settingsPath = settingsPath;
 			if (settings.bytes !== undefined) plugin.settingsBytes = settings.bytes;
+			const settingsKeys = settings.status === 'present' ? jsonSettingKeys(settings.value) : [];
+			if (settingsKeys.length > 0) plugin.settingsKeys = settingsKeys;
 			return plugin;
 		})
 		.sort((a, b) => a.folder.localeCompare(b.folder));

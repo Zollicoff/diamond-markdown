@@ -39,6 +39,7 @@ export interface ObsidianPluginInfo {
 	settingsPath?: string;
 	settingsStatus: ObsidianPluginJsonStatus;
 	settingsBytes?: number;
+	settingsKeys?: string[];
 }
 
 export interface VaultImportAnalysis {

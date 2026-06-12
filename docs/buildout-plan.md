@@ -148,6 +148,9 @@ Use small, pushable slices:
 - **Obsidian attachment-folder uploads.** Honor a safe
    `.obsidian/app.json` `attachmentFolderPath` for new uploads, falling back to
    `Attachments/` when the setting is missing or unsafe.
+- **Obsidian plugin settings guidance.** Surface top-level keys from preserved
+   plugin `data.json` files during import preview without executing plugins or
+   dumping full settings values into the UI.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
