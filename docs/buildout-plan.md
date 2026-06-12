@@ -333,6 +333,10 @@ Use small, pushable slices:
    as a page size instead of a hard stop, expose `offset`/`nextOffset`
    metadata, and let the Search tab load more ranked matches without
    over-rendering.
+- **Saved searches.** Persist named title/full-text searches in
+   `.diamondmd/searches.json`, commit changes with the vault, and expose compact
+   restore/delete controls in the Search tab so recurring searches follow
+   GitHub sync.
 - **Unlinked mentions.** Surface notes that mention the active note title,
    stem, or aliases without already wikilinking it, using the existing index
    and right-panel link list instead of a new vault scan.

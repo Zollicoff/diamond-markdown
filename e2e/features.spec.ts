@@ -334,10 +334,63 @@ test('search rail icon opens a search tab; results fire on input', async ({ page
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();
 	const search = page.locator('.search-view');
 	await expect(search).toBeVisible({ timeout: 3_000 });
-	await search.locator('input[type="text"]').fill('Frontmatter');
+	await search.locator('input[type="text"]').first().fill('Frontmatter');
 	// Wait out the 120ms debounce + network round trip.
 	await expect(search.locator('.result').first()).toBeVisible({ timeout: 4_000 });
 	await expect(search.locator('.result').first()).toContainText(/Frontmatter/i);
+});
+
+test('search tab saves, restores, and deletes vault-local saved searches', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'saved-search-ui-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Solar.md'), '# Solar\n\nIllinois Shines roof survey steps.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Water.md'), '# Water\n\nWater quality survey archive.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Saved Search UI Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.rail .r-btn[aria-label="Search"]').click();
+	const search = page.locator('.search-view');
+	await expect(search).toBeVisible({ timeout: 3_000 });
+
+	await search.getByRole('button', { name: 'Title' }).click();
+	await search.locator('input[type="text"]').first().fill('Illinois Shines');
+	await expect(search.locator('.result').first()).toBeVisible({ timeout: 4_000 });
+	await search.getByLabel('Saved search name').fill('Solar followups');
+	await search.getByRole('button', { name: 'Save current search' }).click();
+	await expect(page.getByText('Saved search saved')).toBeVisible({ timeout: 5_000 });
+	const saved = search.getByRole('button', { name: 'Run saved search Notes Solar followups' });
+	await expect(saved).toBeVisible();
+	await expect(search.locator('.result').first()).toContainText('Solar');
+
+	const savedFile = path.join(vaultDir, '.diamondmd', 'searches.json');
+	await expect.poll(() => fs.existsSync(savedFile)).toBe(true);
+	const savedBody = JSON.parse(fs.readFileSync(savedFile, 'utf-8')) as { searches: { name: string; query: string; mode: string }[] };
+	expect(savedBody.searches).toEqual([
+		expect.objectContaining({ name: 'Solar followups', query: 'Illinois Shines', mode: 'full' })
+	]);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+
+	await search.locator('input[type="text"]').first().fill('Water');
+	await expect(search.locator('.result').first()).toContainText('Water');
+	await saved.click();
+	await expect(search.locator('input[type="text"]').first()).toHaveValue('Illinois Shines');
+	await expect(search.getByRole('button', { name: 'Notes', exact: true })).toBeVisible();
+	await expect(search.locator('.result').first()).toContainText('Solar');
+
+	await search.getByRole('button', { name: 'Delete saved search Solar followups' }).click();
+	await expect(saved).toHaveCount(0);
+	await expect.poll(() => {
+		const body = JSON.parse(fs.readFileSync(savedFile, 'utf-8')) as { searches: unknown[] };
+		return body.searches.length;
+	}).toBe(0);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 });
 
 test('search tab virtualizes large full-text result sets while preserving scroll access', async ({ page, request }) => {
@@ -363,7 +416,7 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();
 	const search = page.locator('.search-view');
 	await search.getByRole('button', { name: 'Title' }).click();
-	await search.locator('input[type="text"]').fill('virtualneedle');
+	await search.locator('input[type="text"]').first().fill('virtualneedle');
 	await expect(search.locator('.hint')).toContainText('Showing 200 of 240 matches', { timeout: 5_000 });
 	await expect(search.locator('.result').first()).toContainText('Virtual 000');
 

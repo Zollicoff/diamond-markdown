@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+	deleteSavedSearch,
+	listSavedSearches,
+	SAVED_SEARCHES_REL_PATH,
+	saveSavedSearch
+} from '../src/lib/server/saved-searches';
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
 import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src/lib/server/search';
+import { isActiveSavedSearch, savedSearchButtonLabel, savedSearchModeLabel, savedSearchName, searchModeFromFullText } from '../src/lib/search/saved';
 import { searchResultRowStyle, visibleSearchWindow } from '../src/lib/search/view';
 
 function emptyIndex(): VaultIndex {
@@ -159,4 +169,47 @@ test('search result view helpers virtualize large returned result sets', () => {
 	expect(searchResultRowStyle(middle.visibleResults[0], 30)).toBe(
 		'--search-result-row-height: 30px; transform: translateY(840px);'
 	);
+});
+
+test('saved search helpers persist sanitized vault-local search groups', () => {
+	const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-saved-searches-'));
+	const vault = { id: 'saved-search-test', name: 'Saved Search Test', path: vaultDir };
+
+	const created = saveSavedSearch(vault, {
+		name: 'Client Solar',
+		query: '  tag:client   content:"Illinois Shines"  ',
+		mode: 'full'
+	});
+	expect(created.created).toBe(true);
+	expect(created.search).toMatchObject({
+		id: 'client-solar',
+		name: 'Client Solar',
+		query: 'tag:client content:"Illinois Shines"',
+		mode: 'full'
+	});
+	expect(fs.existsSync(path.join(vaultDir, SAVED_SEARCHES_REL_PATH))).toBe(true);
+	expect(listSavedSearches(vault).map((search) => search.name)).toEqual(['Client Solar']);
+
+	const updated = saveSavedSearch(vault, {
+		name: 'Client Solar',
+		query: 'tag:client/solar -archive',
+		mode: 'title'
+	});
+	expect(updated.created).toBe(false);
+	expect(updated.searches).toHaveLength(1);
+	expect(updated.searches[0]).toMatchObject({
+		id: 'client-solar',
+		query: 'tag:client/solar -archive',
+		mode: 'title'
+	});
+	expect(savedSearchName('  long   search phrase  ')).toBe('long search phrase');
+	expect(savedSearchModeLabel('full')).toBe('Notes');
+	expect(savedSearchModeLabel('title')).toBe('Title');
+	expect(searchModeFromFullText(true)).toBe('full');
+	expect(savedSearchButtonLabel(updated.search)).toBe('Title Client Solar');
+	expect(isActiveSavedSearch(updated.search, 'tag:client/solar -archive', 'title')).toBe(true);
+
+	const removed = deleteSavedSearch(vault, 'client-solar');
+	expect(removed.deleted).toBe(true);
+	expect(removed.searches).toEqual([]);
 });

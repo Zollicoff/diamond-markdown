@@ -227,6 +227,25 @@ export interface SearchResponse {
 	results: SearchHit[];
 }
 
+export type SavedSearchMode = 'title' | 'full';
+
+export interface SavedSearch {
+	id: string;
+	name: string;
+	query: string;
+	mode: SavedSearchMode;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface SavedSearchMutationResult {
+	search?: SavedSearch;
+	searches: SavedSearch[];
+	created?: boolean;
+	deleted?: boolean;
+	sha: string | null;
+}
+
 export interface GitFileStatus {
 	path: string;
 	index: string;

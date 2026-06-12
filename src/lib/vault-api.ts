@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
@@ -508,6 +508,33 @@ export const api = {
 			nextOffset,
 			results
 		};
+	},
+
+	async savedSearches(vaultId: string): Promise<SavedSearch[]> {
+		const res = await json<{ searches: SavedSearch[] }>(`/api/vaults/${vaultId}/searches`);
+		return res.searches ?? [];
+	},
+
+	async saveSavedSearch(
+		vaultId: string,
+		input: { id?: string; name: string; query: string; mode: SavedSearchMode }
+	): Promise<SavedSearchMutationResult> {
+		const res = await json<SavedSearchMutationResult>(`/api/vaults/${vaultId}/searches`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(input)
+		});
+		emit('searches:changed', { vaultId });
+		return res;
+	},
+
+	async deleteSavedSearch(vaultId: string, id: string): Promise<SavedSearchMutationResult> {
+		const res = await json<SavedSearchMutationResult>(
+			`/api/vaults/${vaultId}/searches?id=${encodeURIComponent(id)}`,
+			{ method: 'DELETE' }
+		);
+		emit('searches:changed', { vaultId });
+		return res;
 	},
 
 	async tags(vaultId: string): Promise<{ tag: string; count: number }[]> {

@@ -26,6 +26,7 @@ export interface VaultEventMap {
 	'history:open':  { vaultId: string; path: string; };
 	'outline:jump':  { vaultId: string; path: string; headingId: string; };
 	'template:insert': { vaultId: string; content: string; };
+	'searches:changed': { vaultId: string; };
 	'note:rename-request': { vaultId: string; path: string; };
 	'dialog:prompt': {
 		title: string;

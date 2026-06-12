@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +21,45 @@ function escapeRegExp(value: string): string {
 
 function testOrigin(): string {
 	return `http://127.0.0.1:${process.env.PLAYWRIGHT_PORT ?? '4173'}`;
+}
+
+async function createRegisteredVault(
+	request: APIRequestContext,
+	slug: string,
+	files: Record<string, string | Buffer>
+): Promise<{ id: string; dir: string }> {
+	const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, `${slug}-${suffix}`);
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	for (const [relPath, content] of Object.entries(files)) {
+		const absPath = path.join(vaultDir, relPath);
+		fs.mkdirSync(path.dirname(absPath), { recursive: true });
+		fs.writeFileSync(absPath, content);
+	}
+
+	const created = await request.post('/api/vaults', {
+		data: { name: `${slug}-${suffix}`, path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+	return { id: vault.id, dir: vaultDir };
+}
+
+async function uploadAttachment(
+	request: APIRequestContext,
+	vaultId: string,
+	name: string,
+	mimeType: string,
+	buffer: Buffer
+): Promise<{ path: string }> {
+	const uploaded = await request.post(`/api/vaults/${vaultId}/attachment`, {
+		headers: { origin: testOrigin() },
+		multipart: {
+			file: { name, mimeType, buffer }
+		}
+	});
+	expect(uploaded.ok()).toBe(true);
+	return await uploaded.json() as { path: string };
 }
 
 test.describe('attachment uploads', () => {
@@ -271,15 +310,15 @@ test.describe('attachment uploads', () => {
 
 	test('picks an existing vault attachment from the editor toolbar and inserts an embed', async ({ page, request }) => {
 		const notePath = 'Attachment Picker Test.md';
-		const attachmentDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments');
-		const attachmentPath = path.join(attachmentDir, 'picker packet.pdf');
-		fs.mkdirSync(attachmentDir, { recursive: true });
-		fs.writeFileSync(attachmentPath, Buffer.from('%PDF-1.4\n'));
-		await request.post('/api/vaults/default/note', {
-			data: { path: notePath, content: '# Attachment Picker Test\n\n', commitNow: false }
+		const vault = await createRegisteredVault(request, 'attachment-picker-vault', {
+			[notePath]: '# Attachment Picker Test\n\n'
 		});
+		await uploadAttachment(request, vault.id, 'picker packet.pdf', 'application/pdf', Buffer.from('%PDF-1.4\n'));
+		const listed = await request.get(`/api/vaults/${vault.id}/attachment`);
+		const listBody = await listed.json() as { attachments: AttachmentRef[] };
+		expect(listBody.attachments.map((attachment) => attachment.path)).toContain('Attachments/picker packet.pdf');
 
-		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByRole('button', { name: 'Insert attachment' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
@@ -292,41 +331,27 @@ test.describe('attachment uploads', () => {
 
 		await page.keyboard.press('Meta+S');
 		await expect.poll(async () => {
-			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 			const note = await loaded.json() as { content: string };
 			return note.content;
 		}).toContain('![[Attachments/picker packet.pdf]]');
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
 	test('selects multiple existing vault attachments and inserts embeds together', async ({ page, request }) => {
 		const notePath = 'Attachment Bulk Picker Test.md';
-		const roof = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: 'bulk sample roof.png',
-					mimeType: 'image/png',
-					buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47])
-				}
-			}
+		const vault = await createRegisteredVault(request, 'attachment-bulk-picker-vault', {
+			[notePath]: '# Attachment Bulk Picker Test\n\n'
 		});
-		expect(roof.ok()).toBe(true);
-		const spec = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: 'bulk sample spec.pdf',
-					mimeType: 'application/pdf',
-					buffer: Buffer.from('%PDF-1.4\n')
-				}
-			}
-		});
-		expect(spec.ok()).toBe(true);
-		await request.post('/api/vaults/default/note', {
-			data: { path: notePath, content: '# Attachment Bulk Picker Test\n\n', commitNow: false }
-		});
+		await uploadAttachment(request, vault.id, 'bulk sample roof.png', 'image/png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+		await uploadAttachment(request, vault.id, 'bulk sample spec.pdf', 'application/pdf', Buffer.from('%PDF-1.4\n'));
+		const listed = await request.get(`/api/vaults/${vault.id}/attachment`);
+		const listBody = await listed.json() as { attachments: AttachmentRef[] };
+		expect(listBody.attachments.map((attachment) => attachment.path)).toEqual(
+			expect.arrayContaining(['Attachments/bulk sample roof.png', 'Attachments/bulk sample spec.pdf'])
+		);
 
-		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByRole('button', { name: 'Insert attachment' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
@@ -343,15 +368,16 @@ test.describe('attachment uploads', () => {
 
 		await page.keyboard.press('Meta+S');
 		await expect.poll(async () => {
-			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 			const note = await loaded.json() as { content: string };
 			return note.content;
 		}).toContain('![[Attachments/bulk sample roof.png]]');
 		await expect.poll(async () => {
-			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 			const note = await loaded.json() as { content: string };
 			return note.content;
 		}).toContain('![[Attachments/bulk sample spec.pdf]]');
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
 	test('deletes selected vault attachments from the picker with confirmation', async ({ page, request }) => {

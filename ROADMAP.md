@@ -114,9 +114,9 @@ runtime compatibility is a non-goal.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
 - **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
-- **Saved searches / search grouping.** Search now has ranked indexed results,
-  operators, regex, pagination, and virtualization; saved/grouped search views
-  can stay incremental.
+- **Search grouping.** Search now has ranked indexed results, operators,
+  regex, pagination, virtualization, and git-backed saved searches; grouped
+  search dashboards can stay incremental.
 
 ## Non-goals
 

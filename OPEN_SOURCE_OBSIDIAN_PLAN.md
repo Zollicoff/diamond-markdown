@@ -25,7 +25,8 @@ Risks:
   needs Basic Auth, read-only mode, Tailscale, or an authenticated reverse proxy
   before it is safe.
 - Large-vault work has improved through index caching, virtualized file/search
-  views, and graph scale paths, but saved/grouped search polish is still basic.
+  views, vault-local saved searches, and graph scale paths, but grouped search
+  polish is still basic.
 - File/path safety must remain centralized; any new disk-touching route should
   go through `src/lib/server/paths.ts`.
 - The plugin system is intentionally small. Expanding it toward full Obsidian
@@ -82,8 +83,8 @@ Risks:
 - Keep the persisted vault index cache warm across restarts.
 - File tree and search result virtualization are present; preserve coverage as
   rendering changes.
-- Keep improving advanced search ergonomics, especially saved searches and
-  grouping, and consider a token/inverted index only if real-world vaults
+- Keep improving advanced search ergonomics, especially grouping, and consider
+  a token/inverted index only if real-world vaults
   outgrow the current ranked indexed body corpus.
 - Graph scale paths exist; keep cosmetic graph parity secondary to correctness
   and responsiveness.
