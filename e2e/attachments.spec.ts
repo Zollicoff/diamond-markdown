@@ -11,6 +11,14 @@ function git(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
 }
 
+function initGitRepo(cwd: string): void {
+	execFileSync('git', ['init'], { cwd, stdio: 'ignore' });
+	execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd, stdio: 'ignore' });
+	execFileSync('git', ['config', 'user.name', 'Diamond Test'], { cwd, stdio: 'ignore' });
+	execFileSync('git', ['add', '.'], { cwd, stdio: 'ignore' });
+	execFileSync('git', ['commit', '-m', 'init fixture'], { cwd, stdio: 'ignore' });
+}
+
 function rawPath(relPath: string): string {
 	return relPath.split('/').map((part) => encodeURIComponent(part)).join('/');
 }
@@ -36,6 +44,7 @@ async function createRegisteredVault(
 		fs.mkdirSync(path.dirname(absPath), { recursive: true });
 		fs.writeFileSync(absPath, content);
 	}
+	initGitRepo(vaultDir);
 
 	const created = await request.post('/api/vaults', {
 		data: { name: `${slug}-${suffix}`, path: vaultDir }
@@ -382,20 +391,12 @@ test.describe('attachment uploads', () => {
 
 	test('deletes selected vault attachments from the picker with confirmation', async ({ page, request }) => {
 		const notePath = 'Getting Started.md';
-		const uploaded = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: 'delete sample.pdf',
-					mimeType: 'application/pdf',
-					buffer: Buffer.from('%PDF-1.4\n')
-				}
-			}
+		const vault = await createRegisteredVault(request, 'attachment-delete-picker-vault', {
+			[notePath]: '# Getting Started\n\n'
 		});
-		expect(uploaded.ok()).toBe(true);
-		const uploadedBody = await uploaded.json() as { path: string };
+		const uploadedBody = await uploadAttachment(request, vault.id, 'delete sample.pdf', 'application/pdf', Buffer.from('%PDF-1.4\n'));
 
-		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByRole('button', { name: 'Insert attachment' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
@@ -410,25 +411,18 @@ test.describe('attachment uploads', () => {
 		await expect(dialog.getByRole('option', { name: /delete sample\.pdf/ })).toHaveCount(0);
 		await expect(dialog.getByText('0 selected')).toBeVisible();
 		await expect(page.getByText('Attachment deleted')).toBeVisible();
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
-		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, uploadedBody.path))).toBe(false);
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
 	test('renames a selected vault attachment from the picker', async ({ page, request }) => {
-		const uploaded = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: 'rename sample.pdf',
-					mimeType: 'application/pdf',
-					buffer: Buffer.from('%PDF-1.4\n')
-				}
-			}
+		const notePath = 'Getting Started.md';
+		const vault = await createRegisteredVault(request, 'attachment-rename-picker-vault', {
+			[notePath]: '# Getting Started\n\n'
 		});
-		expect(uploaded.ok()).toBe(true);
-		const uploadedBody = await uploaded.json() as { path: string };
+		const uploadedBody = await uploadAttachment(request, vault.id, 'rename sample.pdf', 'application/pdf', Buffer.from('%PDF-1.4\n'));
 
-		await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByRole('button', { name: 'Insert attachment' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
@@ -443,42 +437,24 @@ test.describe('attachment uploads', () => {
 		await dialog.getByLabel('Filter attachments').fill('renamed sample');
 		await expect(dialog.getByRole('option', { name: /renamed sample\.pdf/ })).toBeVisible();
 		await expect(page.getByText('Attachment renamed')).toBeVisible();
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments', 'renamed sample.pdf'))).toBe(true);
-		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, uploadedBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, 'Attachments', 'renamed sample.pdf'))).toBe(true);
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
 	test('moves selected vault attachments from the picker', async ({ page, request }, testInfo) => {
+		const notePath = 'Getting Started.md';
+		const vault = await createRegisteredVault(request, 'attachment-move-picker-vault', {
+			[notePath]: '# Getting Started\n\n'
+		});
 		const slug = `organize-move-${testInfo.workerIndex}-${Date.now()}`;
 		const folder = `Organized Move ${testInfo.workerIndex} ${Date.now()}`;
 		const roofName = `${slug}-roof.png`;
 		const specName = `${slug}-spec.pdf`;
-		const roof = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: roofName,
-					mimeType: 'image/png',
-					buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47])
-				}
-			}
-		});
-		expect(roof.ok()).toBe(true);
-		const roofBody = await roof.json() as { path: string };
-		const spec = await request.post('/api/vaults/default/attachment', {
-			headers: { origin: testOrigin() },
-			multipart: {
-				file: {
-					name: specName,
-					mimeType: 'application/pdf',
-					buffer: Buffer.from('%PDF-1.4\n')
-				}
-			}
-		});
-		expect(spec.ok()).toBe(true);
-		const specBody = await spec.json() as { path: string };
+		const roofBody = await uploadAttachment(request, vault.id, roofName, 'image/png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+		const specBody = await uploadAttachment(request, vault.id, specName, 'application/pdf', Buffer.from('%PDF-1.4\n'));
 
-		await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByRole('button', { name: 'Insert attachment' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
@@ -496,22 +472,22 @@ test.describe('attachment uploads', () => {
 		await expect(dialog.getByText(`${folder}/${roofName}`)).toBeVisible();
 		await expect(dialog.getByText(`${folder}/${specName}`)).toBeVisible();
 		await expect(dialog.getByText('2 selected')).toBeVisible();
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, roofBody.path))).toBe(false);
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, specBody.path))).toBe(false);
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, folder, roofName))).toBe(true);
-		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, folder, specName))).toBe(true);
-		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, roofBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, specBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, folder, roofName))).toBe(true);
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, folder, specName))).toBe(true);
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
 	test('drops a local file into the editor and inserts an Obsidian embed', async ({ page, request }) => {
 		const notePath = 'Attachment Drop Test.md';
-		const attachmentPath = path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments', 'dropped diagram.svg');
-		if (fs.existsSync(attachmentPath)) fs.rmSync(attachmentPath, { force: true });
-		await request.post('/api/vaults/default/note', {
-			data: { path: notePath, content: '# Attachment Drop Test\n\n', commitNow: false }
+		const vault = await createRegisteredVault(request, 'attachment-drop-vault', {
+			[notePath]: '# Attachment Drop Test\n\n'
 		});
+		const attachmentPath = path.join(vault.dir, 'Attachments', 'dropped diagram.svg');
+		if (fs.existsSync(attachmentPath)) fs.rmSync(attachmentPath, { force: true });
 
-		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
 		const editor = page.locator('.cm-editor').first();
 		await expect(editor).toBeVisible({ timeout: 10_000 });
 
@@ -544,7 +520,7 @@ test.describe('attachment uploads', () => {
 		await expect.poll(() => fs.existsSync(attachmentPath)).toBe(true);
 		await page.keyboard.press('Meta+S');
 		await expect.poll(async () => {
-			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 			const note = await loaded.json() as { content: string };
 			return note.content;
 		}).toContain('![[Attachments/dropped diagram.svg]]');

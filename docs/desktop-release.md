@@ -78,8 +78,10 @@ the release notes.
 ## GitHub Actions Plan
 
 The release verifier is runner-shell neutral: Playwright fixture setup and the
-preview server are launched through `scripts/playwright-webserver.mjs`, and
-`scripts/verify-release.mjs` resolves `npm.cmd` on Windows.
+preview server are launched through `scripts/playwright-webserver.mjs`,
+full-suite Playwright runs are batched through
+`scripts/verify-playwright-batches.mjs`, and `scripts/verify-release.mjs`
+resolves `npm.cmd` on Windows.
 
 A publish workflow should run this sequence per matrix entry:
 

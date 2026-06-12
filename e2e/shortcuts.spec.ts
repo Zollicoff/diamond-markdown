@@ -17,10 +17,8 @@ async function openVault(page: Page): Promise<void> {
 }
 
 async function openFirstNote(page: Page): Promise<void> {
-	const fileLink = page.locator('.tree .file-link').first();
-	await expect(fileLink).toBeVisible({ timeout: 5_000 });
-	await fileLink.click();
-	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 10_000 });
 }
 
 test('⌘\\ toggles the left sidebar', async ({ page }) => {

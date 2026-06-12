@@ -22,7 +22,7 @@ Diamond Markdown already has the right foundation:
   settings-migration guidance, Canvas files, and Git readiness before
   registration.
 - Release verification that covers audit, type checking, build, auth smoke,
-  read-only smoke, and Playwright e2e.
+  read-only smoke, and batched full-suite Playwright e2e.
 
 The app is past prototype status. The remaining work is about making the
 architecture honest, boring, and durable while filling daily-driver gaps.
@@ -111,6 +111,10 @@ Use small, pushable slices:
 - **Release build-output hardening.** Bound production build hangs with a
    timeout/retry in `verify:release`, and make the Playwright webserver verify
    required adapter-node output before importing the production handler.
+- **Batched release Playwright verification.** Run full-suite Playwright
+   release checks through deterministic file/test batches, each on its own
+   local port, so release verification keeps exact coverage without one long
+   fragile browser process.
 - **Dirty sync recovery state.** Surface local uncommitted vault changes as a
    distinct warning/review state with file visibility and commit/stash recovery
    commands.
@@ -409,7 +413,8 @@ Use small, pushable slices:
    import edges such as deeper Canvas formatting support and remaining
    Obsidian config interpretation without executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
-   destructive actions and sync recovery flows before expanding automation.
+   destructive actions and sync recovery flows, and keep release checks
+   batched when the full suite grows.
 4. **Component diet.** Continue extracting large views only when the split
    directly supports a product-facing feature or verification gap.
 

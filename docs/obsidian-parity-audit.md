@@ -59,7 +59,7 @@ The main remaining product risks are:
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
 | Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, and documented release matrix | Cross-platform workflow run, signing/notarization, and artifact upload are not done |
 | Plugins | Partial | Manifest/catalog install, workers, iframes, command/editor/markdown/settings hooks | Full Obsidian plugin API parity is deferred/non-goal |
-| Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, full Playwright | Keep expanding targeted coverage as features land |
+| Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, and batched full-suite Playwright | Keep expanding targeted coverage as features land |
 
 ## Highest-Value Next Slices
 
@@ -71,7 +71,7 @@ The main remaining product risks are:
    without executing Obsidian plugins.
 3. **Verification hardening.** Keep expanding targeted coverage around
    dialog-driven destructive actions, sync recovery flows, and release-facing
-   claim changes.
+   claim changes while keeping the release suite batchable.
 
 ## Current Product Line
 

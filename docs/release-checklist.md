@@ -10,9 +10,10 @@ npm run verify:release
 ```
 
 It runs the dependency audit, Svelte diagnostics, production build, automated
-Basic Auth smoke, automated read-only smoke, and full Playwright e2e suite. On
-macOS, it uses an installed Google Chrome executable as a fallback when
-Playwright's managed Chromium cache is unavailable.
+Basic Auth smoke, automated read-only smoke, and the full Playwright e2e suite
+through deterministic batches. On macOS, it uses an installed Google Chrome
+executable as a fallback when Playwright's managed Chromium cache is
+unavailable.
 
 ## 1. Repository State
 
@@ -60,6 +61,13 @@ Use Playwright's managed browser when available:
 npm run test:e2e
 ```
 
+For release-shaped local verification, run the same batched suite used by
+`verify:release`:
+
+```sh
+npm run test:e2e:batches
+```
+
 If the managed browser is unavailable on the host, use an installed Chrome:
 
 ```sh
@@ -68,8 +76,10 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/Ma
 
 Required:
 
-- Full e2e suite passes.
-- Test output states the exact number of passed tests.
+- Full e2e suite passes, whether run monolithically or through the release
+  batches.
+- Test output states the exact number of passed tests or the exact batch
+  count used for release verification.
 - The isolated fixture uses `DIAMOND_CONFIG_DIR` and `DIAMOND_DEFAULT_VAULT_DIR`; tests must not touch a real user vault.
 
 ## 5. Manual Smoke
@@ -167,8 +177,9 @@ Required:
 For the full desktop release plan, see `docs/desktop-release.md`.
 
 The Playwright webServer must remain launched through
-`scripts/playwright-webserver.mjs` instead of inline shell syntax so the full
-release verifier can run on Windows, macOS, and Linux CI runners.
+`scripts/playwright-webserver.mjs` instead of inline shell syntax, and release
+Playwright should stay routed through `scripts/verify-playwright-batches.mjs`
+so the full release verifier can run on Windows, macOS, and Linux CI runners.
 
 ## 11. Tag Or Deploy
 
