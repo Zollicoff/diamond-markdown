@@ -107,6 +107,34 @@ export const api = {
 		return res;
 	},
 
+	async updateCanvasNodeReference(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		nodeType: 'file' | 'link',
+		value: string,
+		label: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const payload: Record<string, unknown> = {
+			path,
+			action: 'update-node-reference',
+			nodeId,
+			label,
+			expectedRevision
+		};
+		if (nodeType === 'file') payload.file = value;
+		else payload.url = value;
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async moveCanvasNode(
 		vaultId: string,
 		path: string,

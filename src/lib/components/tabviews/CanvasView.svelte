@@ -14,12 +14,18 @@
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
+		canvasNodeRefDraftChanged,
+		canvasNodeRefDraftFor,
+		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
 		canvasSummary,
 		canvasTextDrafts,
+		canSaveCanvasNodeRefDraft,
 		edgeLines,
 		type CanvasAddNodeType,
 		type CanvasEdgeLabelDrafts,
+		type CanvasNodeRefDraft,
+		type CanvasNodeRefDrafts,
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
@@ -38,6 +44,7 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let textDrafts = $state<CanvasTextDrafts>({});
+	let refDrafts = $state<CanvasNodeRefDrafts>({});
 	let addingNode = $state(false);
 	let addingEdge = $state(false);
 	let savingNodeId = $state<string | null>(null);
@@ -82,6 +89,7 @@
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
 		textDrafts = canvasTextDrafts(next.nodes);
+		refDrafts = canvasNodeRefDrafts(next.nodes);
 		edgeLabelDrafts = canvasEdgeLabelDrafts(canvasEdgeSummaries(next));
 		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
 		edgeFromNodeId = edgeDraft.fromNodeId;
@@ -90,6 +98,10 @@
 
 	function setDraft(node: CanvasNode, value: string): void {
 		textDrafts = { ...textDrafts, [node.id]: value };
+	}
+
+	function setRefDraft(node: CanvasNode, draft: CanvasNodeRefDraft): void {
+		refDrafts = { ...refDrafts, [node.id]: draft };
 	}
 
 	function setEdgeLabelDraft(edge: CanvasEdgeSummary, value: string): void {
@@ -119,6 +131,31 @@
 			const res = await api.updateCanvasTextNode(vaultId, path, node.id, canvasDraftFor(node, textDrafts), doc.revision);
 			setDoc(res.doc);
 			emit('toast:show', { title: 'Text card saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingNodeId = null;
+		}
+	}
+
+	async function saveRefNode(node: CanvasNode): Promise<void> {
+		if (!doc || savingNodeId || !canSaveCanvasNodeRefDraft(node, refDrafts)) return;
+		if (node.type !== 'file' && node.type !== 'link') return;
+		const draft = canvasNodeRefDraftFor(node, refDrafts);
+		savingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasNodeReference(
+				vaultId,
+				path,
+				node.id,
+				node.type,
+				draft.value,
+				draft.label,
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: `${node.type === 'file' ? 'File' : 'URL'} card saved`, tone: 'success' });
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -395,12 +432,17 @@
 						{bounds}
 						draft={canvasDraftFor(node, textDrafts)}
 						changed={canvasDraftChanged(node, textDrafts)}
+						refDraft={canvasNodeRefDraftFor(node, refDrafts)}
+						refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
+						refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
 						saving={savingNodeId === node.id}
 						moving={movingNodeId === node.id || moveSavingNodeId === node.id}
 						deleting={deletingNodeId === node.id}
 						disableDelete={deletingNodeId !== null || savingNodeId !== null || movingNodeId !== null || moveSavingNodeId !== null || savingEdgeId !== null || deletingEdgeId !== null}
 						onDraftChange={setDraft}
+						onRefDraftChange={setRefDraft}
 						onSave={saveTextNode}
+						onSaveRef={saveRefNode}
 						onDelete={deleteNode}
 						onMovePointerDown={startMoveNode}
 					/>

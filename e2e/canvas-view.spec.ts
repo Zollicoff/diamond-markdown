@@ -16,11 +16,16 @@ import {
 	canvasEdgeLabelDrafts,
 	canSubmitCanvasAddNode,
 	canConnectCanvasNodes,
+	canSaveCanvasNodeRefDraft,
 	canvasEdgeSummaries,
 	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeOptions,
 	canvasNodePositionChanged,
+	canvasNodeRefDraftChanged,
+	canvasNodeRefDraftFor,
+	canvasNodeRefDrafts,
+	canvasNodeRefValue,
 	canvasNodeTitle,
 	canvasNodesWithPosition,
 	canvasSummary,
@@ -61,7 +66,9 @@ test.describe('canvas view helpers', () => {
 
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');
+		expect(canvasNodeTitle({ ...doc.nodes[1], label: 'Home note' })).toBe('Home note');
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
+		expect(canvasNodeBody({ ...doc.nodes[1], label: 'Home note' })).toBe('Home.md');
 		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
 		expect(canvasSummary(doc)).toBe('2 nodes · 1 edge');
 		expect(nodeStyle(doc.nodes[0], bounds)).toContain('left: 80px');
@@ -72,6 +79,13 @@ test.describe('canvas view helpers', () => {
 		expect(canvasDraftFor(doc.nodes[0], drafts)).toBe('Hello canvas');
 		expect(canvasDraftChanged(doc.nodes[0], drafts)).toBe(false);
 		expect(canvasDraftChanged(doc.nodes[0], { ...drafts, a: 'Edited' })).toBe(true);
+		const refDrafts = canvasNodeRefDrafts(doc.nodes);
+		expect(canvasNodeRefValue(doc.nodes[1])).toBe('Home.md');
+		expect(canvasNodeRefDraftFor(doc.nodes[1], refDrafts)).toEqual({ value: 'Home.md', label: '' });
+		expect(canvasNodeRefDraftChanged(doc.nodes[1], refDrafts)).toBe(false);
+		expect(canvasNodeRefDraftChanged(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
+		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: '', label: 'Home note' } })).toBe(false);
+		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
 		expect(canvasAddNodePlaceholder('file')).toBe('Note.md');
 		expect(canvasAddNodeButtonLabel('link')).toBe('Add URL');
 		expect(canSubmitCanvasAddNode('text', '')).toBe(true);
@@ -265,6 +279,50 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(linkAddedBody.doc.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/research')).toBe(true);
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const addedFileNode = linkAddedBody.doc.nodes.find((node) => node.type === 'file' && node.id !== 'b' && node.file === 'Home.md');
+	expect(addedFileNode).toBeTruthy();
+	const fileUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-reference',
+			nodeId: addedFileNode?.id,
+			file: 'References/Home.md',
+			label: 'Home reference',
+			expectedRevision: linkAddedBody.doc.revision
+		}
+	});
+	expect(fileUpdated.ok(), await fileUpdated.text()).toBe(true);
+	const fileUpdatedBody = await fileUpdated.json() as { sha: string | null; doc: CanvasDoc };
+	expect(fileUpdatedBody.sha).toBeTruthy();
+	expect(fileUpdatedBody.doc.nodes.find((node) => node.id === addedFileNode?.id)).toMatchObject({
+		type: 'file',
+		file: 'References/Home.md',
+		label: 'Home reference'
+	});
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const addedLinkNode = fileUpdatedBody.doc.nodes.find((node) => node.type === 'link' && node.url === 'https://example.com/research');
+	expect(addedLinkNode).toBeTruthy();
+	const linkUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-reference',
+			nodeId: addedLinkNode?.id,
+			url: 'https://example.com/updated',
+			label: 'Updated research',
+			expectedRevision: fileUpdatedBody.doc.revision
+		}
+	});
+	expect(linkUpdated.ok(), await linkUpdated.text()).toBe(true);
+	const linkUpdatedBody = await linkUpdated.json() as { sha: string | null; doc: CanvasDoc };
+	expect(linkUpdatedBody.sha).toBeTruthy();
+	expect(linkUpdatedBody.doc.nodes.find((node) => node.id === addedLinkNode?.id)).toMatchObject({
+		type: 'link',
+		url: 'https://example.com/updated',
+		label: 'Updated research'
+	});
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const moved = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
@@ -272,7 +330,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			nodeId: 'b',
 			x: 440,
 			y: 120,
-			expectedRevision: linkAddedBody.doc.revision
+			expectedRevision: linkUpdatedBody.doc.revision
 		}
 	});
 	expect(moved.ok()).toBe(true);
@@ -365,13 +423,13 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(gitStatus(vaultDir)).toBe('');
 
 	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as {
-		nodes: { id?: string; text?: string; file?: string; url?: string; x?: number; y?: number }[];
+		nodes: { id?: string; text?: string; file?: string; url?: string; label?: string; x?: number; y?: number }[];
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
 	};
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
-	expect(raw.nodes.some((node) => node.file === 'Home.md')).toBe(true);
-	expect(raw.nodes.some((node) => node.url === 'https://example.com/research')).toBe(true);
+	expect(raw.nodes.some((node) => node.file === 'References/Home.md' && node.label === 'Home reference')).toBe(true);
+	expect(raw.nodes.some((node) => node.url === 'https://example.com/updated' && node.label === 'Updated research')).toBe(true);
 	expect(raw.nodes.some((node) => node.id === 'b')).toBe(false);
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' || edge.toNode === 'b')).toBe(false);
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns')).toBe(false);
@@ -410,6 +468,22 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	await expect(page.locator('.canvas-view')).toContainText('5 nodes · 1 edge · editable text cards');
 	await expect(page.locator('.canvas-node-link').filter({ hasText: 'https://example.com/research' })).toBeVisible();
 
+	const addedFileCard = page.locator('.canvas-node-file').filter({ hasText: 'Home.md' }).last();
+	await addedFileCard.getByLabel('Canvas file path for Home.md').fill('References/Home.md');
+	await addedFileCard.getByLabel('Canvas label for Home.md').fill('Home reference');
+	const saveFileButton = addedFileCard.getByRole('button', { name: 'Save canvas file node Home.md' });
+	await expect(saveFileButton).toBeEnabled();
+	await saveFileButton.click();
+	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home reference' })).toBeVisible();
+
+	const linkCard = page.locator('.canvas-node-link').filter({ hasText: 'https://example.com/research' });
+	await linkCard.getByLabel('Canvas URL target for https://example.com/research').fill('https://example.com/updated');
+	await linkCard.getByLabel('Canvas label for https://example.com/research').fill('Updated research');
+	const saveUrlButton = linkCard.getByRole('button', { name: 'Save canvas URL node https://example.com/research' });
+	await expect(saveUrlButton).toBeEnabled();
+	await saveUrlButton.click();
+	await expect(page.locator('.canvas-node-link').filter({ hasText: 'Updated research' })).toBeVisible();
+
 	const firstCard = page.locator('.canvas-node-text').first();
 	const editor = firstCard.locator('textarea');
 	await expect(editor).toBeVisible();
@@ -426,9 +500,10 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 		return {
 			text: body.nodes.find((node) => node.id === 'a')?.text,
 			hasFile: body.nodes.some((node) => node.type === 'file' && node.file === 'Home.md'),
-			hasLink: body.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/research')
+			hasEditedFile: body.nodes.some((node) => node.type === 'file' && node.file === 'References/Home.md' && node.label === 'Home reference'),
+			hasEditedLink: body.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/updated' && node.label === 'Updated research')
 		};
-	}).toEqual({ text: 'Edited through UI', hasFile: true, hasLink: true });
+	}).toEqual({ text: 'Edited through UI', hasFile: true, hasEditedFile: true, hasEditedLink: true });
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 

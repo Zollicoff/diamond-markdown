@@ -42,7 +42,13 @@ export interface CanvasEdgeSummary {
 	description: string;
 }
 
+export interface CanvasNodeRefDraft {
+	value: string;
+	label: string;
+}
+
 export type CanvasTextDrafts = Record<string, string>;
+export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
 export type CanvasAddNodeType = 'text' | 'file' | 'link';
 
@@ -133,6 +139,7 @@ export function canvasSummary(doc: Pick<CanvasDoc, 'nodes' | 'edges'>): string {
 }
 
 export function canvasNodeTitle(node: CanvasNode): string {
+	if (node.label) return node.label;
 	if (node.type === 'file' && node.file) return node.file;
 	if (node.type === 'link' && node.url) return node.url;
 	return node.label ?? node.type;
@@ -159,6 +166,35 @@ export function canvasDraftFor(node: CanvasNode, drafts: CanvasTextDrafts): stri
 
 export function canvasDraftChanged(node: CanvasNode, drafts: CanvasTextDrafts): boolean {
 	return canvasDraftFor(node, drafts) !== (node.text ?? '');
+}
+
+export function canvasNodeRefValue(node: CanvasNode): string {
+	if (node.type === 'file') return node.file ?? '';
+	if (node.type === 'link') return node.url ?? '';
+	return '';
+}
+
+export function canvasNodeRefDrafts(nodes: CanvasNode[]): CanvasNodeRefDrafts {
+	return Object.fromEntries(
+		nodes
+			.filter((node) => node.type === 'file' || node.type === 'link')
+			.map((node) => [node.id, { value: canvasNodeRefValue(node), label: node.label ?? '' }])
+	);
+}
+
+export function canvasNodeRefDraftFor(node: CanvasNode, drafts: CanvasNodeRefDrafts): CanvasNodeRefDraft {
+	return drafts[node.id] ?? { value: canvasNodeRefValue(node), label: node.label ?? '' };
+}
+
+export function canvasNodeRefDraftChanged(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
+	const draft = canvasNodeRefDraftFor(node, drafts);
+	return draft.value.trim() !== canvasNodeRefValue(node) || draft.label.trim() !== (node.label ?? '');
+}
+
+export function canSaveCanvasNodeRefDraft(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
+	return (node.type === 'file' || node.type === 'link') &&
+		canvasNodeRefDraftChanged(node, drafts) &&
+		canvasNodeRefDraftFor(node, drafts).value.trim().length > 0;
 }
 
 export function canvasNodePositionChanged(node: CanvasNode, x: number, y: number): boolean {

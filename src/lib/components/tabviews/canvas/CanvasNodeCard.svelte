@@ -5,7 +5,8 @@
 		canvasNodeClass,
 		canvasNodeTitle,
 		nodeStyle,
-		type CanvasBounds
+		type CanvasBounds,
+		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
 
 	interface Props {
@@ -13,12 +14,17 @@
 		bounds: CanvasBounds;
 		draft: string;
 		changed: boolean;
+		refDraft: CanvasNodeRefDraft;
+		refChanged: boolean;
+		refCanSave: boolean;
 		saving: boolean;
 		moving: boolean;
 		deleting: boolean;
 		disableDelete: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
+		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
+		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
@@ -28,17 +34,33 @@
 		bounds,
 		draft,
 		changed,
+		refDraft,
+		refChanged,
+		refCanSave,
 		saving,
 		moving,
 		deleting,
 		disableDelete,
 		onDraftChange,
+		onRefDraftChange,
 		onSave,
+		onSaveRef,
 		onDelete,
 		onMovePointerDown
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
+	const refKind = $derived(node.type === 'file' ? 'file' : 'URL');
+	const refValueLabel = $derived(`Canvas ${refKind} ${node.type === 'file' ? 'path' : 'target'} for ${title}`);
+	const refSaveLabel = $derived(`Save canvas ${refKind} node ${title}`);
+
+	function updateRefValue(value: string): void {
+		onRefDraftChange(node, { ...refDraft, value });
+	}
+
+	function updateRefLabel(label: string): void {
+		onRefDraftChange(node, { ...refDraft, label });
+	}
 </script>
 
 <article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={nodeStyle(node, bounds)}>
@@ -67,6 +89,46 @@
 				onclick={() => void onSave(node)}
 			>
 				{saving ? 'Saving...' : 'Save text'}
+			</button>
+			<button
+				class="mini node-remove"
+				aria-label={`Remove canvas node ${title}`}
+				disabled={disableDelete}
+				onclick={() => void onDelete(node)}
+			>
+				{deleting ? 'Removing...' : 'Remove'}
+			</button>
+		</div>
+	{:else if node.type === 'file' || node.type === 'link'}
+		<div class="node-ref-fields">
+			<label>
+				<span>{node.type === 'file' ? 'Path' : 'URL'}</span>
+				<input
+					class="node-input"
+					aria-label={refValueLabel}
+					value={refDraft.value}
+					oninput={(event) => updateRefValue((event.currentTarget as HTMLInputElement).value)}
+				/>
+			</label>
+			<label>
+				<span>Label</span>
+				<input
+					class="node-input"
+					aria-label={`Canvas label for ${title}`}
+					placeholder="optional"
+					value={refDraft.label}
+					oninput={(event) => updateRefLabel((event.currentTarget as HTMLInputElement).value)}
+				/>
+			</label>
+		</div>
+		<div class="node-actions">
+			<button
+				class="mini node-save"
+				aria-label={refSaveLabel}
+				disabled={saving || !refChanged || !refCanSave}
+				onclick={() => void onSaveRef(node)}
+			>
+				{saving ? 'Saving...' : `Save ${node.type === 'file' ? 'file' : 'URL'}`}
 			</button>
 			<button
 				class="mini node-remove"
@@ -213,6 +275,37 @@
 		line-height: 1.35;
 	}
 	.node-editor:focus {
+		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
+		border-color: var(--accent);
+	}
+	.node-ref-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-height: 0;
+	}
+	label {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		min-width: 0;
+		color: var(--fg-dim);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+	}
+	.node-input {
+		width: 100%;
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 5px 7px;
+		background: color-mix(in srgb, var(--bg), transparent 8%);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.74rem;
+		text-transform: none;
+	}
+	.node-input:focus {
 		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
 		border-color: var(--accent);
 	}

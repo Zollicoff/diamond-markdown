@@ -131,6 +131,9 @@ Use small, pushable slices:
    stale-revision protection.
 - **Canvas node deletion.** Remove Canvas cards from the board view and prune
    connected edges through git-backed commits with stale-revision protection.
+- **Canvas file and URL node editing.** Edit Canvas file paths, URL targets,
+   and optional display labels inline through git-backed commits with
+   stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
@@ -166,8 +169,8 @@ Use small, pushable slices:
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as richer Canvas file/link card editing, bulk attachment
-   operations, and deeper plugin-settings migration guidance without executing
+   import edges such as bulk attachment operations, deeper Canvas formatting
+   support, and deeper plugin-settings migration guidance without executing
    Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.

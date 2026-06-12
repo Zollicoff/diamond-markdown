@@ -43,6 +43,7 @@ export type CanvasEditAction =
 	| 'add-node'
 	| 'add-text-node'
 	| 'update-node-text'
+	| 'update-node-reference'
 	| 'move-node'
 	| 'delete-node'
 	| 'add-edge'
@@ -118,13 +119,14 @@ function normalizeNode(value: unknown, index: number, warnings: string[]): Canva
 		return null;
 	}
 	const type = text(node.type) ?? 'unknown';
+	const minHeight = type === 'file' || type === 'link' ? 150 : 60;
 	return {
 		id,
 		type,
 		x: number(node.x),
 		y: number(node.y),
 		width: Math.max(80, number(node.width, 240)),
-		height: Math.max(60, number(node.height, 120)),
+		height: Math.max(minHeight, number(node.height, type === 'text' ? 120 : minHeight)),
 		text: text(node.text),
 		file: text(node.file),
 		url: text(node.url),
@@ -419,13 +421,14 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 	if (input.action === 'add-node' || input.action === 'add-text-node') {
 		const type = input.action === 'add-text-node' ? 'text' : canvasNodeType(input.nodeType);
 		const position = nextNodePosition(nodes);
+		const minHeight = type === 'text' ? 80 : 150;
 		const node: Record<string, unknown> = {
 			id: createCanvasNodeId(nodes, type),
 			type,
 			x: boundedNumber(input.x, position.x, -100_000, 100_000),
 			y: boundedNumber(input.y, position.y, -100_000, 100_000),
 			width: boundedNumber(input.width, 260, 120, 1200),
-			height: boundedNumber(input.height, type === 'text' ? 140 : 120, 80, 900)
+			height: boundedNumber(input.height, type === 'text' ? 140 : 160, minHeight, 900)
 		};
 		if (type === 'text') {
 			node.text = typeof input.text === 'string' && input.text.trim() ? input.text : 'New text card';
@@ -446,6 +449,20 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		if (node.type !== 'text') throw new CanvasFileError('only text canvas nodes can be edited inline');
 		node.text = input.text;
+	} else if (input.action === 'update-node-reference') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		if (node.type === 'file') {
+			node.file = normalizeVaultPath(requiredText(input.file, 'file', 500));
+		} else if (node.type === 'link') {
+			node.url = cleanCanvasUrl(input.url);
+		} else {
+			throw new CanvasFileError('only file and link canvas nodes can edit references inline');
+		}
+		const label = cleanOptionalLabel(input.label);
+		if (label) node.label = label;
+		else delete node.label;
 	} else if (input.action === 'move-node') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
