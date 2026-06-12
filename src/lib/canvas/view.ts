@@ -54,6 +54,13 @@ export interface CanvasDisplayColor {
 	label: string;
 }
 
+export interface CanvasFileOpenTarget {
+	kind: 'note' | 'canvas';
+	path: string;
+	title: string;
+	actionLabel: string;
+}
+
 export type CanvasTextDrafts = Record<string, string>;
 export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
@@ -234,7 +241,20 @@ export function canvasFileNodePath(node: CanvasNode): string | null {
 
 export function canvasFileNodeTitle(node: CanvasNode): string {
 	const filePath = canvasFileNodePath(node) ?? '';
-	return node.label?.trim() || filePath.split('/').pop()?.replace(/\.(md|markdown)$/i, '') || filePath;
+	return node.label?.trim() || filePath.split('/').pop()?.replace(/\.(md|markdown|canvas)$/i, '') || filePath;
+}
+
+export function canvasFileOpenTarget(node: CanvasNode): CanvasFileOpenTarget | null {
+	const filePath = canvasFileNodePath(node);
+	if (!filePath) return null;
+	const title = canvasFileNodeTitle(node);
+	if (/\.(md|markdown)$/i.test(filePath)) {
+		return { kind: 'note', path: filePath, title, actionLabel: 'Open note' };
+	}
+	if (/\.canvas$/i.test(filePath)) {
+		return { kind: 'canvas', path: filePath, title, actionLabel: 'Open Canvas' };
+	}
+	return null;
 }
 
 export function canvasLinkNodeHref(node: CanvasNode): string | null {
@@ -250,7 +270,7 @@ export function canvasLinkNodeHref(node: CanvasNode): string | null {
 }
 
 export function canOpenCanvasNode(node: CanvasNode): boolean {
-	return Boolean(canvasFileNodePath(node) || canvasLinkNodeHref(node));
+	return Boolean(canvasFileOpenTarget(node) || canvasLinkNodeHref(node));
 }
 
 export function canvasOpenNodeLabel(node: CanvasNode): string {

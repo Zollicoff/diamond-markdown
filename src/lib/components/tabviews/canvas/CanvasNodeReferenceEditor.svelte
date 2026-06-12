@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { CanvasNode } from '$lib/types';
 	import {
-		canOpenCanvasNode,
+		canvasFileOpenTarget,
 		canvasLinkNodeHref,
 		canvasNodeTitle,
 		canvasOpenNodeLabel,
@@ -38,8 +38,8 @@
 
 	const title = $derived(canvasNodeTitle(node));
 	const openNodeLabel = $derived(canvasOpenNodeLabel(node));
+	const fileOpenTarget = $derived(canvasFileOpenTarget(node));
 	const linkHref = $derived(canvasLinkNodeHref(node));
-	const canOpenReference = $derived(canOpenCanvasNode(node));
 	const refKind = $derived(node.type === 'file' ? 'file' : 'URL');
 	const refValueLabel = $derived(`Canvas ${refKind} ${node.type === 'file' ? 'path' : 'target'} for ${title}`);
 	const refSaveLabel = $derived(`Save canvas ${refKind} node ${title}`);
@@ -79,10 +79,10 @@
 		<button
 			class="mini node-open"
 			aria-label={openNodeLabel}
-			disabled={!canOpenReference}
+			disabled={!fileOpenTarget}
 			onclick={() => onOpenRef(node)}
 		>
-			Open note
+			{fileOpenTarget?.actionLabel ?? 'Open file'}
 		</button>
 	{:else if linkHref}
 		<a

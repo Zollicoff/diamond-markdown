@@ -2,7 +2,7 @@
 	import { api } from '$lib/vault-api';
 	import type { CanvasDoc, CanvasNode } from '$lib/types';
 	import { emit } from '$lib/events';
-	import { openNote } from '$lib/workspace/actions';
+	import { openCanvas, openNote } from '$lib/workspace/actions';
 	import {
 		canvasBounds,
 		canvasConnectionDraft,
@@ -15,8 +15,7 @@
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
-		canvasFileNodePath,
-		canvasFileNodeTitle,
+		canvasFileOpenTarget,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
@@ -111,9 +110,13 @@
 	}
 
 	function openRefNode(node: CanvasNode): void {
-		const filePath = canvasFileNodePath(node);
-		if (!filePath) return;
-		openNote(vaultId, filePath, canvasFileNodeTitle(node), 'new-tab');
+		const target = canvasFileOpenTarget(node);
+		if (!target) return;
+		if (target.kind === 'canvas') {
+			openCanvas(vaultId, target.path, target.title, 'new-tab');
+		} else {
+			openNote(vaultId, target.path, target.title, 'new-tab');
+		}
 	}
 
 	async function addNode(type: CanvasAddNodeType, value: string): Promise<void> {

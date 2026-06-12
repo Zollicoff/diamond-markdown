@@ -21,6 +21,7 @@ import {
 	canOpenCanvasNode,
 	canSaveCanvasNodeRefDraft,
 	canvasEdgeSummaries,
+	canvasFileOpenTarget,
 	canvasFileNodePath,
 	canvasFileNodeTitle,
 	canvasLinkNodeHref,
@@ -111,8 +112,26 @@ test.describe('canvas view helpers', () => {
 		expect(canvasFileNodePath(doc.nodes[1])).toBe('Home.md');
 		expect(canvasFileNodeTitle(doc.nodes[1])).toBe('Home');
 		expect(canvasFileNodeTitle({ ...doc.nodes[1], label: 'Home note' })).toBe('Home note');
+		expect(canvasFileOpenTarget(doc.nodes[1])).toEqual({
+			kind: 'note',
+			path: 'Home.md',
+			title: 'Home',
+			actionLabel: 'Open note'
+		});
 		expect(canvasOpenNodeLabel(doc.nodes[1])).toBe('Open canvas file node Home.md');
 		expect(canOpenCanvasNode(doc.nodes[1])).toBe(true);
+		const canvasFileNode = { ...doc.nodes[1], id: 'canvas-file', file: 'Boards/Ideas.canvas' };
+		expect(canvasFileNodeTitle(canvasFileNode)).toBe('Ideas');
+		expect(canvasFileOpenTarget(canvasFileNode)).toEqual({
+			kind: 'canvas',
+			path: 'Boards/Ideas.canvas',
+			title: 'Ideas',
+			actionLabel: 'Open Canvas'
+		});
+		expect(canOpenCanvasNode(canvasFileNode)).toBe(true);
+		const assetFileNode = { ...doc.nodes[1], id: 'asset-file', file: 'Images/roof.png' };
+		expect(canvasFileOpenTarget(assetFileNode)).toBeNull();
+		expect(canOpenCanvasNode(assetFileNode)).toBe(false);
 		const linkNode = {
 			id: 'c',
 			type: 'link',
@@ -203,6 +222,51 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
 	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
 	await expect(page.locator('.note-view')).toContainText('Home');
+});
+
+test('canvas file cards route notes, Canvas files, and unsupported assets explicitly', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-file-routing-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nMarkdown target\n');
+	fs.writeFileSync(path.join(vaultDir, 'Nested.canvas'), JSON.stringify({
+		nodes: [{ id: 'nested-a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Nested Canvas card' }],
+		edges: []
+	}, null, 2));
+	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof.png'), 'fake png');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
+		nodes: [
+			{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Routing board' },
+			{ id: 'b', type: 'file', x: 280, y: 0, width: 220, height: 110, file: 'Home.md' },
+			{ id: 'c', type: 'file', x: 560, y: 0, width: 220, height: 110, file: 'Nested.canvas' },
+			{ id: 'd', type: 'file', x: 840, y: 0, width: 220, height: 110, file: 'Images/roof.png' }
+		],
+		edges: []
+	}, null, 2));
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas File Routing Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
+	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
+	await expect(page.getByRole('button', { name: 'Open canvas file node Images/roof.png' })).toBeDisabled();
+
+	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
+	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.locator('.note-view')).toContainText('Markdown target');
+
+	await page.getByRole('tab', { name: /Board/ }).click();
+	await expect(page.locator('.canvas-node-text textarea')).toHaveValue('Routing board');
+	await page.getByRole('button', { name: 'Open canvas file node Nested.canvas' }).click();
+	await expect(page.getByRole('tab', { name: /Nested/ })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.locator('.canvas-node-text textarea')).toHaveValue('Nested Canvas card');
 });
 
 test('canvas API exports a safe SVG snapshot', async ({ request }) => {
