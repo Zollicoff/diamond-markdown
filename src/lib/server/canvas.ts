@@ -39,7 +39,7 @@ export interface CanvasSvgExport {
 	svg: string;
 }
 
-export type CanvasEditAction = 'add-text-node' | 'update-node-text';
+export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node';
 
 export interface MutateCanvasInput {
 	path: string;
@@ -293,6 +293,13 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 		: fallback;
 }
 
+function requiredBoundedNumber(value: unknown, name: string, min: number, max: number): number {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		throw new CanvasFileError(`${name} is required`);
+	}
+	return boundedNumber(value, value, min, max);
+}
+
 function createCanvasNodeId(nodes: unknown[], prefix: string): string {
 	const used = new Set(nodes.map((node) => nodeRecord(node)?.id).filter((id): id is string => Boolean(id)));
 	for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -357,6 +364,12 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		if (node.type !== 'text') throw new CanvasFileError('only text canvas nodes can be edited inline');
 		node.text = input.text;
+	} else if (input.action === 'move-node') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		node.x = requiredBoundedNumber(input.x, 'x', -100_000, 100_000);
+		node.y = requiredBoundedNumber(input.y, 'y', -100_000, 100_000);
 	} else {
 		throw new CanvasFileError('unsupported canvas edit action');
 	}

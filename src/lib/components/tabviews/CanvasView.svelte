@@ -6,6 +6,8 @@
 		canvasBounds,
 		canvasDraftChanged,
 		canvasDraftFor,
+		canvasNodePositionChanged,
+		canvasNodesWithPosition,
 		canvasSummary,
 		canvasTextDrafts,
 		edgeLines,
@@ -26,9 +28,26 @@
 	let textDrafts = $state<CanvasTextDrafts>({});
 	let addingText = $state(false);
 	let savingNodeId = $state<string | null>(null);
+	let movingNodeId = $state<string | null>(null);
+	let moveSavingNodeId = $state<string | null>(null);
+	let dragState = $state<{
+		nodeId: string;
+		pointerId: number;
+		startClientX: number;
+		startClientY: number;
+		originX: number;
+		originY: number;
+		currentX: number;
+		currentY: number;
+	} | null>(null);
 
-	const bounds = $derived(canvasBounds(doc?.nodes ?? []));
-	const lines = $derived(doc ? edgeLines(doc, bounds) : []);
+	const displayNodes = $derived(canvasNodesWithPosition(
+		doc?.nodes ?? [],
+		dragState ? { nodeId: dragState.nodeId, x: dragState.currentX, y: dragState.currentY } : null
+	));
+	const displayDoc = $derived(doc ? { ...doc, nodes: displayNodes } : null);
+	const bounds = $derived(canvasBounds(displayNodes));
+	const lines = $derived(displayDoc ? edgeLines(displayDoc, bounds) : []);
 	const exportHref = $derived(`/api/vaults/${vaultId}/canvas/export?path=${encodeURIComponent(path)}`);
 	const exportName = $derived(`${path.split('/').pop()?.replace(/\.canvas$/i, '') || 'canvas'}.svg`);
 
@@ -71,9 +90,87 @@
 		}
 	}
 
+	function cleanupDragListeners(): void {
+		window.removeEventListener('pointermove', moveNodePointer);
+		window.removeEventListener('pointerup', handleMovePointerUp);
+		window.removeEventListener('pointercancel', handleMovePointerCancel);
+	}
+
+	function moveNodePointer(event: PointerEvent): void {
+		if (!dragState || event.pointerId !== dragState.pointerId) return;
+		dragState = {
+			...dragState,
+			currentX: Math.round(dragState.originX + event.clientX - dragState.startClientX),
+			currentY: Math.round(dragState.originY + event.clientY - dragState.startClientY)
+		};
+	}
+
+	async function finishMovePointer(event: PointerEvent): Promise<void> {
+		if (!dragState || event.pointerId !== dragState.pointerId) return;
+		const finished = dragState;
+		cleanupDragListeners();
+		dragState = null;
+		movingNodeId = null;
+
+		const node = doc?.nodes.find((candidate) => candidate.id === finished.nodeId);
+		if (!doc || !node || !canvasNodePositionChanged(node, finished.currentX, finished.currentY)) return;
+
+		moveSavingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.moveCanvasNode(
+				vaultId,
+				path,
+				node.id,
+				finished.currentX,
+				finished.currentY,
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas node moved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			moveSavingNodeId = null;
+		}
+	}
+
+	function handleMovePointerUp(event: PointerEvent): void {
+		void finishMovePointer(event);
+	}
+
+	function handleMovePointerCancel(event: PointerEvent): void {
+		if (!dragState || event.pointerId !== dragState.pointerId) return;
+		cleanupDragListeners();
+		dragState = null;
+		movingNodeId = null;
+	}
+
+	function startMoveNode(node: CanvasNode, event: PointerEvent): void {
+		if (!doc || moveSavingNodeId) return;
+		event.preventDefault();
+		movingNodeId = node.id;
+		dragState = {
+			nodeId: node.id,
+			pointerId: event.pointerId,
+			startClientX: event.clientX,
+			startClientY: event.clientY,
+			originX: node.x,
+			originY: node.y,
+			currentX: node.x,
+			currentY: node.y
+		};
+		window.addEventListener('pointermove', moveNodePointer);
+		window.addEventListener('pointerup', handleMovePointerUp);
+		window.addEventListener('pointercancel', handleMovePointerCancel);
+	}
+
 	$effect(() => {
 		const currentPath = path;
 		let alive = true;
+		cleanupDragListeners();
+		dragState = null;
+		movingNodeId = null;
 		loading = true;
 		error = null;
 		doc = null;
@@ -92,6 +189,8 @@
 			});
 		return () => { alive = false; };
 	});
+
+	$effect(() => cleanupDragListeners);
 </script>
 
 <section class="canvas-view">
@@ -146,15 +245,17 @@
 					{/each}
 				</svg>
 
-				{#each doc.nodes as node (node.id)}
+				{#each displayNodes as node (node.id)}
 					<CanvasNodeCard
 						{node}
 						{bounds}
 						draft={canvasDraftFor(node, textDrafts)}
 						changed={canvasDraftChanged(node, textDrafts)}
 						saving={savingNodeId === node.id}
+						moving={movingNodeId === node.id || moveSavingNodeId === node.id}
 						onDraftChange={setDraft}
 						onSave={saveTextNode}
+						onMovePointerDown={startMoveNode}
 					/>
 				{/each}
 			</div>

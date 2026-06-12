@@ -116,6 +116,8 @@ Use small, pushable slices:
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
    git-backed server mutations with stale-revision protection.
+- **Canvas node positioning.** Drag Canvas cards to update node coordinates in
+   `.canvas` files through git-backed commits with stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
@@ -143,7 +145,8 @@ Use small, pushable slices:
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as deeper Canvas node/edge editing, deeper attachment
+   import edges such as deeper Canvas edge editing, richer node creation,
+   deeper attachment
    management, and deeper plugin-settings migration guidance without executing
    Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven

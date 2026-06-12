@@ -14,15 +14,36 @@
 		draft: string;
 		changed: boolean;
 		saving: boolean;
+		moving: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
+		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
 
-	let { node, bounds, draft, changed, saving, onDraftChange, onSave }: Props = $props();
+	let {
+		node,
+		bounds,
+		draft,
+		changed,
+		saving,
+		moving,
+		onDraftChange,
+		onSave,
+		onMovePointerDown
+	}: Props = $props();
 </script>
 
-<article class={canvasNodeClass(node)} style={nodeStyle(node, bounds)}>
-	<div class="node-type">{node.type}</div>
+<article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={nodeStyle(node, bounds)}>
+	<div class="node-topline">
+		<button
+			type="button"
+			class="node-drag-handle"
+			aria-label={`Move canvas node ${canvasNodeTitle(node)}`}
+			title="Move canvas node"
+			onpointerdown={(event) => onMovePointerDown(node, event)}
+		></button>
+		<div class="node-type">{node.type}</div>
+	</div>
 	<h3 title={canvasNodeTitle(node)}>{canvasNodeTitle(node)}</h3>
 	{#if node.type === 'text'}
 		<textarea
@@ -63,11 +84,58 @@
 	.canvas-node-text {
 		border-color: color-mix(in srgb, var(--accent), var(--border-strong) 70%);
 	}
+	.canvas-node.moving {
+		z-index: 3;
+		border-color: var(--accent);
+		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--accent), transparent 50%);
+	}
 	.canvas-node-file {
 		border-style: dashed;
 	}
 	.canvas-node-link {
 		border-color: color-mix(in srgb, var(--brand-cyan), var(--border-strong) 60%);
+	}
+	.node-topline {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		min-width: 0;
+	}
+	.node-drag-handle {
+		position: relative;
+		display: inline-grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		flex: 0 0 auto;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: color-mix(in srgb, var(--bg), transparent 10%);
+		cursor: grab;
+	}
+	.node-drag-handle::before {
+		content: '';
+		width: 3px;
+		height: 3px;
+		border-radius: 999px;
+		background: var(--fg-dim);
+		box-shadow:
+			6px 0 0 var(--fg-dim),
+			0 6px 0 var(--fg-dim),
+			6px 6px 0 var(--fg-dim);
+	}
+	.node-drag-handle:hover {
+		border-color: var(--accent);
+	}
+	.node-drag-handle:hover::before {
+		background: var(--accent);
+		box-shadow:
+			6px 0 0 var(--accent),
+			0 6px 0 var(--accent),
+			6px 6px 0 var(--accent);
+	}
+	.node-drag-handle:active {
+		cursor: grabbing;
 	}
 	.node-type {
 		align-self: flex-start;

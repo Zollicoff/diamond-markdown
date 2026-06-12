@@ -82,6 +82,24 @@ export const api = {
 		return res;
 	},
 
+	async moveCanvasNode(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		x: number,
+		y: number,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'move-node', nodeId, x, y, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async renameCanvas(vaultId: string, from: string, to: string): Promise<{ sha: string | null }> {
 		const res = await json<{ from: string; to: string; sha: string | null }>(
 			`/api/vaults/${vaultId}/canvas`,

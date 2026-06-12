@@ -10,7 +10,9 @@ import {
 	canvasDraftFor,
 	canvasNodeClass,
 	canvasNodeBody,
+	canvasNodePositionChanged,
 	canvasNodeTitle,
+	canvasNodesWithPosition,
 	canvasSummary,
 	canvasTextDrafts,
 	edgeLines,
@@ -60,6 +62,10 @@ test.describe('canvas view helpers', () => {
 		expect(canvasDraftFor(doc.nodes[0], drafts)).toBe('Hello canvas');
 		expect(canvasDraftChanged(doc.nodes[0], drafts)).toBe(false);
 		expect(canvasDraftChanged(doc.nodes[0], { ...drafts, a: 'Edited' })).toBe(true);
+		expect(canvasNodePositionChanged(doc.nodes[1], 360, 90)).toBe(true);
+		const moved = canvasNodesWithPosition(doc.nodes, { nodeId: 'b', x: 360, y: 90 });
+		expect(moved.find((node) => node.id === 'b')).toMatchObject({ x: 360, y: 90 });
+		expect(doc.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 320, y: 40 });
 	});
 });
 
@@ -191,9 +197,26 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	expect(addedBody.doc.nodes.some((node) => node.type === 'text' && node.text === 'Follow-up idea')).toBe(true);
 	expect(gitStatus(vaultDir)).toBe('');
 
-	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as { nodes: { text?: string }[] };
+	const moved = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'move-node',
+			nodeId: 'b',
+			x: 440,
+			y: 120,
+			expectedRevision: addedBody.doc.revision
+		}
+	});
+	expect(moved.ok()).toBe(true);
+	const movedBody = await moved.json() as { sha: string | null; doc: CanvasDoc };
+	expect(movedBody.sha).toBeTruthy();
+	expect(movedBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as { nodes: { id?: string; text?: string; x?: number; y?: number }[] };
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
+	expect(raw.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
 });
 
 test('canvas view adds and saves text cards from the board', async ({ page, request }) => {
@@ -231,6 +254,48 @@ test('canvas view adds and saves text cards from the board', async ({ page, requ
 		const body = await loaded.json() as CanvasDoc;
 		return body.nodes.find((node) => node.id === 'a')?.text;
 	}).toBe('Edited through UI');
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
+});
+
+test('canvas view drags nodes and saves positions to the Canvas file', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-move-ui-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), canvasJson);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Move UI Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+	const before = await loaded.json() as CanvasDoc;
+	const original = before.nodes.find((node) => node.id === 'b');
+	expect(original).toBeTruthy();
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	const moveHandle = page.getByLabel('Move canvas node Home.md');
+	await expect(moveHandle).toBeVisible();
+	const box = await moveHandle.boundingBox();
+	expect(box).toBeTruthy();
+	if (!box || !original) throw new Error('move handle or original node missing');
+
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 4 });
+	await page.mouse.up();
+
+	await expect.poll(async () => {
+		const saved = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await saved.json() as CanvasDoc;
+		const moved = body.nodes.find((node) => node.id === 'b');
+		return moved ? { x: moved.x, y: moved.y } : null;
+	}).toEqual({ x: original.x + 60, y: original.y + 30 });
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 

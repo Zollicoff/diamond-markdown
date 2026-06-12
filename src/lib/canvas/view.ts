@@ -17,6 +17,12 @@ export interface CanvasEdgeLine {
 	y2: number;
 }
 
+export interface CanvasNodePosition {
+	nodeId: string;
+	x: number;
+	y: number;
+}
+
 export type CanvasTextDrafts = Record<string, string>;
 
 const PADDING = 80;
@@ -116,6 +122,21 @@ export function canvasDraftFor(node: CanvasNode, drafts: CanvasTextDrafts): stri
 
 export function canvasDraftChanged(node: CanvasNode, drafts: CanvasTextDrafts): boolean {
 	return canvasDraftFor(node, drafts) !== (node.text ?? '');
+}
+
+export function canvasNodePositionChanged(node: CanvasNode, x: number, y: number): boolean {
+	return Math.round(node.x) !== Math.round(x) || Math.round(node.y) !== Math.round(y);
+}
+
+export function canvasNodesWithPosition(nodes: CanvasNode[], position: CanvasNodePosition | null): CanvasNode[] {
+	if (!position) return nodes;
+	let changed = false;
+	const next = nodes.map((node) => {
+		if (node.id !== position.nodeId) return node;
+		changed = true;
+		return { ...node, x: Math.round(position.x), y: Math.round(position.y) };
+	});
+	return changed ? next : nodes;
 }
 
 function plural(count: number, singular: string): string {
