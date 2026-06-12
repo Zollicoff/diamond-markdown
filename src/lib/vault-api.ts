@@ -505,6 +505,14 @@ export const api = {
 		});
 	},
 
+	async syncNow(vaultId: string): Promise<GitSyncResult> {
+		return json(`/api/vaults/${vaultId}/sync`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'sync' })
+		});
+	},
+
 	async plugins(vaultId: string): Promise<PluginListResponse> {
 		return json(`/api/vaults/${vaultId}/plugins`);
 	},

@@ -194,7 +194,7 @@ test('settings tab opens with theme + vault info', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 	await expect(page.getByText('Theme', { exact: true })).toBeVisible();
 	await expect(page.getByText('Excluded folders')).toBeVisible();
-	await page.getByRole('button', { name: 'Sync' }).click();
+	await page.getByRole('button', { name: 'Sync', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 });
 

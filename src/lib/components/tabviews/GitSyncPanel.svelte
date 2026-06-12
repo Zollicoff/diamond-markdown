@@ -83,12 +83,14 @@
 	<GitSyncStatusCard {status} indicator={ui.indicator} />
 
 	<GitSyncActionBar
+		canSync={ui.canSync}
 		canCheck={ui.canCheck}
 		canFetch={ui.canFetch}
 		canPull={ui.canPull}
 		canPush={ui.canPush}
 		isBusy={ui.isBusy}
 		onRefresh={loadStatus}
+		onSync={() => run('sync', () => api.syncNow(vaultId))}
 		onCheck={() => run('check', () => api.checkSync(vaultId))}
 		onFetch={() => run('fetch', () => api.fetchSync(vaultId))}
 		onPull={() => run('pull', () => api.pullSync(vaultId))}

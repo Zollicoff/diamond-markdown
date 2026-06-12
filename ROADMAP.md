@@ -68,7 +68,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.4 — Performance & scale
 
-- [x] Git sync status / pull / push UI with divergence warnings
+- [x] Git sync status / safe one-click sync / pull / push UI with divergence warnings
 - [x] Indexer warm-cache on disk for fast startup
 - [x] Diverged-history resolution UI with local/remote/overlap file lists
 - [x] Virtualized file tree for very large vaults
@@ -97,8 +97,8 @@ Deliberately smaller plugin surface than Obsidian's — too much API = too much 
 
 ## Open ideas (maybe, maybe not)
 
-- **Editable Canvas.** Read-only Canvas previews exist; full visual editing,
-  export, and Obsidian Canvas parity would need its own focused track.
+- **Deeper Canvas parity.** Canvas previews, SVG export, and git-backed editing
+  exist; full visual whiteboard parity would need its own focused track.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
@@ -106,7 +106,7 @@ Deliberately smaller plugin surface than Obsidian's — too much API = too much 
 
 ## Non-goals
 
-- **Full Canvas parity as core.** Diamond opens `.canvas` boards read-only and supports file-tree operations; full visual whiteboarding remains out of core unless the project explicitly takes on that track.
+- **Full Canvas parity as core.** Diamond opens and edits `.canvas` boards for core node/edge workflows; full visual whiteboarding remains out of core unless the project explicitly takes on that track.
 - **Hosted publish service.** We provide the static-site exporter; you bring the host (gh-pages, Cloudflare Pages, Vercel, Netlify, your own box). No proprietary hosting.
 - **Native mobile apps.** Responsive web is the target. PWA install, yes. App Store listings, no.
 - **Plugin runtime parity with Obsidian.** Their plugin API is huge. We keep ours small on purpose.

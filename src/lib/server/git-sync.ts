@@ -322,3 +322,36 @@ export async function pushGitHubRemote(vault: Vault): Promise<GitSyncResult> {
 		message: 'Pushed vault to GitHub.'
 	};
 }
+
+export async function syncGitHubRemote(vault: Vault): Promise<GitSyncResult> {
+	await fetchGitHubRemote(vault);
+	let status = await getGitSyncStatus(vault);
+	if (!status.remoteUrl) throw new Error('GitHub remote is not configured');
+	if (!status.branch) throw new Error('cannot sync while HEAD is detached');
+	if (!status.clean) throw new Error('commit or discard local vault changes before syncing');
+	if (status.conflicted.length > 0) throw new Error('resolve merge conflicts before syncing');
+	if (status.ahead > 0 && status.behind > 0) throw new Error('local and remote histories diverged; manual merge required');
+
+	const steps: string[] = ['Fetched origin'];
+	if (status.behind > 0) {
+		const pulled = await pullGitHubRemote(vault);
+		steps.push(pulled.message);
+		status = pulled.status;
+		if (!status.clean) throw new Error('commit or discard local vault changes before syncing');
+		if (status.conflicted.length > 0) throw new Error('resolve merge conflicts before syncing');
+		if (status.ahead > 0 && status.behind > 0) throw new Error('local and remote histories diverged; manual merge required');
+	}
+
+	if (status.ahead > 0 || !status.remoteBranch || !status.upstream) {
+		const pushed = await pushGitHubRemote(vault);
+		steps.push(pushed.message);
+		status = pushed.status;
+	}
+
+	if (steps.length === 1) steps.push('Vault is already up to date.');
+	return {
+		ok: true,
+		status,
+		message: steps.join(' ')
+	};
+}

@@ -1,11 +1,13 @@
 <script lang="ts">
 	interface Props {
+		canSync: boolean;
 		canCheck: boolean;
 		canFetch: boolean;
 		canPull: boolean;
 		canPush: boolean;
 		isBusy: boolean;
 		onRefresh: () => void;
+		onSync: () => void;
 		onCheck: () => void;
 		onFetch: () => void;
 		onPull: () => void;
@@ -13,12 +15,14 @@
 	}
 
 	let {
+		canSync,
 		canCheck,
 		canFetch,
 		canPull,
 		canPush,
 		isBusy,
 		onRefresh,
+		onSync,
 		onCheck,
 		onFetch,
 		onPull,
@@ -28,10 +32,11 @@
 
 <div class="actions">
 	<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh</button>
+	<button class="action-btn primary" onclick={onSync} disabled={!canSync}>Sync now</button>
 	<button class="action-btn" onclick={onCheck} disabled={!canCheck}>Check remote</button>
 	<button class="action-btn" onclick={onFetch} disabled={!canFetch}>Fetch</button>
 	<button class="action-btn" onclick={onPull} disabled={!canPull}>Pull</button>
-	<button class="action-btn primary" onclick={onPush} disabled={!canPush}>Push</button>
+	<button class="action-btn" onclick={onPush} disabled={!canPush}>Push</button>
 </div>
 
 <style>

@@ -1056,6 +1056,7 @@ test('settings exposes GitHub sync status and controls', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 	await expect(page.getByPlaceholder('https://github.com/owner/repo.git')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Check remote' })).toBeVisible();
 	await expect(page.getByText(/Add a GitHub remote|Vault is clean|Commit or discard/)).toBeVisible({ timeout: 5_000 });
 });
@@ -1385,6 +1386,50 @@ test('sync push fetches first and refuses unseen remote commits', async ({ reque
 	expect(refreshed.canPush).toBe(false);
 	expect(refreshed.canPull).toBe(true);
 	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(false);
+});
+
+test('sync now pushes local commits and pulls fast-forward remote commits', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sync-now-vault');
+	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sync-now-origin.git');
+	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sync-now-remote-worktree');
+	for (const dir of [vaultDir, bareDir, cloneDir]) fs.rmSync(dir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nBase.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Sync Now Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const initialized = await request.get(`/api/vaults/${vault.id}/sync`);
+	expect(initialized.ok()).toBe(true);
+	const branch = git(vaultDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+	execFileSync('git', ['init', '--bare', bareDir], { stdio: 'ignore' });
+	git(vaultDir, ['remote', 'add', 'origin', bareDir]);
+
+	const firstSync = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'sync' } });
+	expect(firstSync.ok(), await firstSync.text()).toBe(true);
+	const firstBody = await firstSync.json() as { message: string; status: { ahead: number; behind: number; remoteBranch: string | null } };
+	expect(firstBody.message).toContain('Pushed vault to GitHub');
+	expect(firstBody.status).toMatchObject({ ahead: 0, behind: 0, remoteBranch: `origin/${branch}` });
+	expect(git(vaultDir, ['rev-parse', 'HEAD'])).toBe(git(bareDir, ['rev-parse', branch]));
+
+	execFileSync('git', ['--git-dir', bareDir, 'symbolic-ref', 'HEAD', `refs/heads/${branch}`]);
+	execFileSync('git', ['clone', '--branch', branch, bareDir, cloneDir], { stdio: 'ignore' });
+	git(cloneDir, ['config', 'user.email', 'remote@example.test']);
+	git(cloneDir, ['config', 'user.name', 'Remote Test']);
+	fs.writeFileSync(path.join(cloneDir, 'RemoteOnly.md'), '# Remote only\n');
+	git(cloneDir, ['add', 'RemoteOnly.md']);
+	git(cloneDir, ['commit', '-m', 'remote: add note']);
+	git(cloneDir, ['push', 'origin', branch]);
+
+	const secondSync = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'sync' } });
+	expect(secondSync.ok(), await secondSync.text()).toBe(true);
+	const secondBody = await secondSync.json() as { message: string; status: { ahead: number; behind: number } };
+	expect(secondBody.message).toContain('Pulled 1 commit');
+	expect(secondBody.status).toMatchObject({ ahead: 0, behind: 0 });
+	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(true);
 });
 
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {

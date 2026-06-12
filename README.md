@@ -2,7 +2,7 @@
 
 > A self-hosted markdown knowledge base. Obsidian-style wikilinks, backlinks, graph, and live preview — but web-first (no Electron) and git-native for sync and history.
 
-Diamond Markdown is a single SvelteKit app. Point it at a folder of `.md` files, get a full knowledge-base UI in any browser. Every save is a git commit, so your history is real, diffable, and portable — and syncing across devices is a `git push` away.
+Diamond Markdown is a single SvelteKit app. Point it at a folder of `.md` files, get a full knowledge-base UI in any browser. Every save is a git commit, so your history is real, diffable, and portable — and syncing across devices is a safe Settings action or `git push` away.
 
 Marketing site: [diamondmarkdown.com](https://diamondmarkdown.com)
 
@@ -11,7 +11,7 @@ Marketing site: [diamondmarkdown.com](https://diamondmarkdown.com)
 Obsidian is great. It's also Electron, its sync is proprietary and paid, and its plugin model locks you to their runtime. Diamond Markdown makes a different set of trade-offs:
 
 - **Web-first.** Works on desktop, tablet, and phone browsers. Nothing to install per device. PWA install gets you a home-screen icon.
-- **Git-native versioning.** Every save is a commit. Real history, real diffs, real branches. Sync is just `git push` / `git pull` — no proprietary protocol.
+- **Git-native versioning.** Every save is a commit. Real history, real diffs, real branches. Sync uses ordinary `git fetch`, fast-forward pull, and push semantics — no proprietary protocol.
 - **Markdown files, flat on disk.** No lock-in. Uninstall Diamond Markdown tomorrow and your notes are still there.
 - **Multi-vault from day one.** Different folders, different indexes, one app.
 - **Open source (MIT).**
@@ -123,7 +123,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 ### Versioning
 - Git auto-commit on save (debounced, per-vault repo)
 - Per-note history viewer with diff, snapshot copy, and git-backed restore
-- GitHub sync panel in Settings — configure a GitHub remote, check reachability, fetch status, pull fast-forward updates, and push local commits
+- GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, and push local commits
 
 ### Daily notes
 - ⌘⇧D opens today's `Daily Notes/YYYY-MM-DD.md`
@@ -187,7 +187,7 @@ Single SvelteKit app:
 - Server (`src/lib/server/`) handles filesystem, git, indexing — never exposes raw paths, only vault-relative paths
 - Desktop (`src-tauri/`) wraps the same server app in Tauri and launches it on
   loopback for local desktop use
-- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with remote health checks, clean-worktree guidance, fast-forward pulls, divergence guards, and write blocking when the last fetched remote is behind or diverged
+- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with remote health checks, safe one-click sync, clean-worktree guidance, fast-forward pulls, divergence guards, and write blocking when the last fetched remote is behind or diverged
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`
 - Plugin runtime (`src/lib/plugins/`) — vault-local manifests and ESM modules register scoped commands at vault boot

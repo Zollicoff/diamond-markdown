@@ -7,10 +7,11 @@ import {
 	getGitSyncStatus,
 	pullGitHubRemote,
 	pushGitHubRemote,
-	setGitHubRemote
+	setGitHubRemote,
+	syncGitHubRemote
 } from '$lib/server/git-sync';
 
-type SyncAction = 'set-remote' | 'check' | 'fetch' | 'pull' | 'push';
+type SyncAction = 'set-remote' | 'check' | 'fetch' | 'pull' | 'push' | 'sync';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const vault = getVault(params.vaultId);
@@ -42,6 +43,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		}
 		if (body.action === 'push') {
 			return json(await pushGitHubRemote(vault));
+		}
+		if (body.action === 'sync') {
+			return json(await syncGitHubRemote(vault));
 		}
 		throw error(400, 'unknown sync action');
 	} catch (e) {

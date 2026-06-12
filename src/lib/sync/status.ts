@@ -10,6 +10,7 @@ export interface GitSyncUiState {
 	canFetch: boolean;
 	canPull: boolean;
 	canPush: boolean;
+	canSync: boolean;
 	indicator: GitSyncIndicator;
 	recovery: GitSyncRecoveryKind;
 }
@@ -39,6 +40,7 @@ export function buildGitSyncUiState(
 	busy: string | null
 ): GitSyncUiState {
 	const isBusy = busy !== null;
+	const canRunSync = !!status && status.initialized && !!status.remoteUrl && status.clean && status.conflicted.length === 0 && !status.diverged && !isBusy;
 	return {
 		isBusy,
 		canSaveRemote: remoteUrl.trim().length > 0 && (status?.initialized ?? true) && !isBusy,
@@ -46,6 +48,7 @@ export function buildGitSyncUiState(
 		canFetch: !!status?.initialized && !!status.remoteUrl && !isBusy,
 		canPull: !!status?.initialized && !!status.canPull && !isBusy,
 		canPush: !!status?.initialized && !!status.canPush && !isBusy,
+		canSync: canRunSync,
 		indicator: gitSyncIndicator(status),
 		recovery: classifyGitSyncRecovery(status)
 	};

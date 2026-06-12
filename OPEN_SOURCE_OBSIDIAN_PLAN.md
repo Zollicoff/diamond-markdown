@@ -52,14 +52,15 @@ Risks:
 
 ### 3. Make Sync Real
 
-- Maintain the explicit git status/pull/push UI per vault.
+- Maintain the explicit git status/sync/pull/push UI per vault.
 - Add conflict detection before save when the working tree diverges. ✓ Write
   APIs now block after fetch when the remote is behind, diverged, or
   merge-conflicted.
 - Add a conflict-resolution workflow for remote pulls and local edits.
 - Support per-vault remote setup instructions and health checks. ✓ Settings now
-  shows setup commands for unconfigured vaults and can run a non-interactive
-  remote reachability check.
+  shows setup commands for unconfigured vaults, can run a non-interactive
+  remote reachability check, and exposes a safe one-click sync action that
+  fetches before pulling or pushing.
 
 ### 4. Improve Daily-Driver UX
 
@@ -104,7 +105,7 @@ For the next public milestone, aim for:
 - zero moderate/high audit findings
 - green e2e suite
 - explicit self-hosting/security documentation
-- basic GitHub sync status/pull/push UI
+- basic GitHub sync status/sync/pull/push UI
 - path/indexer route tests
 - mobile polish pass
 

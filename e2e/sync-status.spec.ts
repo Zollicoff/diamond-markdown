@@ -71,6 +71,7 @@ test.describe('git sync UI state', () => {
 			canFetch: true,
 			canPull: false,
 			canPush: true,
+			canSync: true,
 			indicator: 'ok',
 			recovery: null
 		});
@@ -83,12 +84,14 @@ test.describe('git sync UI state', () => {
 			canFetch: false,
 			canPull: false,
 			canPush: false,
+			canSync: false,
 			indicator: 'warn',
 			recovery: 'remote-changes'
 		});
 
 		const dirty = buildGitSyncUiState(status({ clean: false, files: [{ path: 'Draft.md', index: ' ', workingDir: 'M' }] }), 'https://github.com/owner/repo.git', null);
 		expect(dirty).toMatchObject({
+			canSync: false,
 			indicator: 'warn',
 			recovery: 'local-changes'
 		});
@@ -104,8 +107,19 @@ test.describe('git sync UI state', () => {
 			canFetch: false,
 			canPull: false,
 			canPush: false,
+			canSync: false,
 			indicator: 'warn',
 			recovery: null
+		});
+
+		const disconnected = buildGitSyncUiState(
+			status({ needsRemote: true, remoteUrl: null, remoteDisplayUrl: null }),
+			'',
+			null
+		);
+		expect(disconnected).toMatchObject({
+			canSync: false,
+			recovery: 'setup'
 		});
 	});
 

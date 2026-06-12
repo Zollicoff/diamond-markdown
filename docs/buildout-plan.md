@@ -25,6 +25,10 @@ Diamond Markdown already has the right foundation:
 
 The app is past prototype status. The remaining work is about making the
 architecture honest, boring, and durable while filling daily-driver gaps.
+The product-level gap matrix lives in
+[docs/obsidian-parity-audit.md](./obsidian-parity-audit.md); use it to pick
+work that moves Diamond toward the Obsidian-style daily-driver goal, not merely
+the next convenient subsystem slice.
 
 ## Main Risks
 
@@ -34,9 +38,9 @@ architecture honest, boring, and durable while filling daily-driver gaps.
 2. **Large components still carry too many responsibilities.** `GraphView`,
    `GitSyncPanel`, `PluginPanel`, `FileTreePanel`, and `NoteView` should keep
    shedding pure logic into modules.
-3. **Sync is real but still manual.** The current model is safe and explicit,
-   but users need clearer recovery flows and future automation that never hides
-   git conflicts.
+3. **Sync is real but still too manual.** The current model is safe and
+   explicit, but users need one obvious "Sync now" path plus recovery flows
+   that never hide git conflicts.
 4. **Plugin API must stay small.** Obsidian compatibility pressure can easily
    turn into a maintenance trap.
 5. **Desktop distribution is not finished.** Local self-contained builds exist;
@@ -280,17 +284,22 @@ Use small, pushable slices:
 - **Release build handoff hardening.** Verify that adapter-node production
    output and manifest-referenced server chunks are readable before starting
    auth, read-only, and Playwright release checks.
+- **Safe one-click GitHub sync.** Add a `sync` action that fetches first, pulls
+   fast-forward remote-only changes, pushes local-only commits or first-time
+   remote branches, and stops on dirty, conflicted, or diverged states.
 
 ## Next Implementation Slices
 
-1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
-   `FileTreePanel` into pure helpers and small presentational pieces.
+1. **Large-vault search upgrade.** Add an indexed search path or at least a
+   thresholded warning/plan so full-text search does not overclaim scale.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without
    executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
+4. **Component diet.** Continue extracting large views only when the split
+   directly supports a product-facing feature or verification gap.
 
 ## Verification Gates
 
