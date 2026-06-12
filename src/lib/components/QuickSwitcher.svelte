@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { api } from '$lib/vault-api';
+	import type { SearchHit } from '$lib/types';
 
 	interface Props {
 		vaultId: string;
@@ -10,7 +12,7 @@
 
 	let open = $state(false);
 	let query = $state('');
-	let results = $state<{ path: string; title: string; snippet?: string }[]>([]);
+	let results = $state<SearchHit[]>([]);
 	let fullText = $state(false);
 	let selectedIdx = $state(0);
 	let inputEl: HTMLInputElement | null = $state(null);
@@ -68,18 +70,18 @@
 		if (!query.trim()) { results = []; return; }
 		controller = new AbortController();
 		try {
-			const url = `/api/vaults/${vaultId}/search?q=${encodeURIComponent(query)}${fullText ? '&full=1' : ''}`;
-			const res = await fetch(url, { signal: controller.signal });
-			if (!res.ok) return;
-			const data = await res.json();
-			results = data.results ?? [];
+			results = await api.search(vaultId, query, {
+				full: fullText,
+				limit: 25,
+				signal: controller.signal
+			});
 			selectedIdx = 0;
 		} catch (e) {
 			if ((e as Error).name !== 'AbortError') console.error(e);
 		}
 	}
 
-	function pick(r: { path: string } | undefined): void {
+	function pick(r: SearchHit | undefined): void {
 		if (!r) return;
 		open = false;
 		goto(`/vault/${vaultId}/note/${encodeURI(r.path)}`);

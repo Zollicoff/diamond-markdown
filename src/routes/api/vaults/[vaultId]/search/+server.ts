@@ -3,6 +3,14 @@ import type { RequestHandler } from './$types';
 import Fuse from 'fuse.js';
 import { getVault } from '$lib/server/vault';
 import { getIndex } from '$lib/server/indexer';
+import {
+	buildSearchResponse,
+	clampSearchLimit,
+	DEFAULT_FULL_TEXT_SEARCH_LIMIT,
+	DEFAULT_TITLE_SEARCH_LIMIT,
+	emptySearchResponse,
+	searchFullTextIndex
+} from '$lib/server/search';
 
 /**
  * Two search modes, one endpoint:
@@ -14,7 +22,11 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	if (!vault) throw error(404, 'vault not found');
 	const q = url.searchParams.get('q') ?? '';
 	const full = url.searchParams.get('full') === '1';
-	if (!q.trim()) return json({ results: [] });
+	const limit = clampSearchLimit(
+		url.searchParams.get('limit'),
+		full ? DEFAULT_FULL_TEXT_SEARCH_LIMIT : DEFAULT_TITLE_SEARCH_LIMIT
+	);
+	if (!q.trim()) return json(emptySearchResponse(q, full ? 'full' : 'title', limit));
 
 	const idx = getIndex(vault);
 	const entries = [...idx.notes.values()].map((m) => ({
@@ -30,29 +42,19 @@ export const GET: RequestHandler = async ({ params, url }) => {
 			threshold: 0.4,
 			includeScore: true
 		});
-		const hits = fuse.search(q, { limit: 25 });
-		return json({
-			results: hits.map((h) => ({
+		const hits = fuse.search(q);
+		return json(buildSearchResponse(
+			q,
+			'title',
+			limit,
+			hits.slice(0, limit).map((h) => ({
 				path: h.item.path,
 				title: h.item.title,
 				score: h.score ?? 0
-			}))
-		});
+			})),
+			hits.length
+		));
 	}
 
-	// Full-text — index-backed substring search with ±40 char context.
-	const qLower = q.toLowerCase();
-	const results: { path: string; title: string; snippet: string }[] = [];
-	for (const meta of idx.notes.values()) {
-		const doc = idx.searchDocs.get(meta.notePath);
-		if (!doc) continue;
-		const i = doc.textLower.indexOf(qLower);
-		if (i === -1) continue;
-		const start = Math.max(0, i - 40);
-		const end = Math.min(doc.text.length, i + q.length + 40);
-		const snippet = (start > 0 ? '…' : '') + doc.text.slice(start, end).trim() + (end < doc.text.length ? '…' : '');
-		results.push({ path: meta.notePath, title: meta.title, snippet });
-		if (results.length >= 50) break;
-	}
-	return json({ results });
+	return json(searchFullTextIndex(idx, q, limit));
 };

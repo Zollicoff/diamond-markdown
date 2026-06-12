@@ -178,6 +178,15 @@ export interface SearchHit {
 	snippet?: string;
 }
 
+export interface SearchResponse {
+	query: string;
+	mode: 'title' | 'full';
+	limit: number;
+	total: number;
+	limited: boolean;
+	results: SearchHit[];
+}
+
 export interface GitFileStatus {
 	path: string;
 	index: string;

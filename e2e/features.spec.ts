@@ -69,11 +69,19 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 
 	const search = await request.get(`/api/vaults/${vault.id}/search?q=Cache`);
 	expect(search.ok()).toBe(true);
-	const searchBody = await search.json() as { results: { path: string }[] };
+	const searchBody = await search.json() as { mode: string; total: number; limit: number; limited: boolean; results: { path: string }[] };
+	expect(searchBody.mode).toBe('title');
+	expect(searchBody.total).toBeGreaterThanOrEqual(1);
+	expect(searchBody.limit).toBe(25);
+	expect(searchBody.limited).toBe(false);
 	expect(searchBody.results.some((r) => r.path === 'Cache Seed.md')).toBe(true);
 	const fullSearch = await request.get(`/api/vaults/${vault.id}/search?q=${encodeURIComponent('Links to')}&full=1`);
 	expect(fullSearch.ok()).toBe(true);
-	const fullSearchBody = await fullSearch.json() as { results: { path: string; snippet: string }[] };
+	const fullSearchBody = await fullSearch.json() as { mode: string; total: number; limit: number; limited: boolean; results: { path: string; snippet: string }[] };
+	expect(fullSearchBody.mode).toBe('full');
+	expect(fullSearchBody.total).toBeGreaterThanOrEqual(1);
+	expect(fullSearchBody.limit).toBe(50);
+	expect(fullSearchBody.limited).toBe(false);
 	expect(fullSearchBody.results.find((r) => r.path === 'Cache Seed.md')?.snippet).toContain('Links to');
 
 	const cacheFiles = fs.readdirSync(cacheDir)

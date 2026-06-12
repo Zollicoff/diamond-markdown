@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType } from './canvas/view';
 import { emit } from './events';
@@ -390,10 +390,23 @@ export const api = {
 		emit('tree:invalidate', { vaultId });
 	},
 
-	async search(vaultId: string, query: string, opts: { full?: boolean } = {}): Promise<SearchHit[]> {
-		const url = `/api/vaults/${vaultId}/search?q=${encodeURIComponent(query)}${opts.full ? '&full=1' : ''}`;
-		const res = await json<{ results: SearchHit[] }>(url);
-		return res.results ?? [];
+	async search(vaultId: string, query: string, opts: { full?: boolean; limit?: number; signal?: AbortSignal } = {}): Promise<SearchHit[]> {
+		return (await this.searchWithMeta(vaultId, query, opts)).results;
+	},
+
+	async searchWithMeta(vaultId: string, query: string, opts: { full?: boolean; limit?: number; signal?: AbortSignal } = {}): Promise<SearchResponse> {
+		const params = new URLSearchParams({ q: query });
+		if (opts.full) params.set('full', '1');
+		if (opts.limit) params.set('limit', String(opts.limit));
+		const res = await json<SearchResponse>(`/api/vaults/${vaultId}/search?${params.toString()}`, { signal: opts.signal });
+		return {
+			query: res.query ?? query.trim(),
+			mode: res.mode ?? (opts.full ? 'full' : 'title'),
+			limit: res.limit ?? opts.limit ?? (opts.full ? 50 : 25),
+			total: res.total ?? res.results?.length ?? 0,
+			limited: res.limited ?? false,
+			results: res.results ?? []
+		};
 	},
 
 	async tags(vaultId: string): Promise<{ tag: string; count: number }[]> {

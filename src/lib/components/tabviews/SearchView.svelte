@@ -3,7 +3,7 @@
 	import { api } from '$lib/vault-api';
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
-	import type { SearchHit } from '$lib/types';
+	import type { SearchHit, SearchResponse } from '$lib/types';
 
 	interface Props {
 		vaultId: string;
@@ -18,6 +18,7 @@
 	let q = $state(query);
 	let fullText = $state(false);
 	let results = $state<SearchHit[]>([]);
+	let meta = $state<SearchResponse | null>(null);
 	let loading = $state(false);
 	let err = $state<string | null>(null);
 	let controller: AbortController | null = null;
@@ -39,6 +40,7 @@
 		onQueryChange?.(trimmed);
 		if (!trimmed) {
 			results = [];
+			meta = null;
 			loading = false;
 			err = null;
 			return;
@@ -48,11 +50,17 @@
 		loading = true;
 		err = null;
 		try {
-			const hits = await api.search(vaultId, trimmed, { full: fullText });
-			results = hits;
+			const response = await api.searchWithMeta(vaultId, trimmed, {
+				full: fullText,
+				limit: fullText ? 100 : 50,
+				signal: controller.signal
+			});
+			results = response.results;
+			meta = response;
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			results = [];
+			meta = null;
 		} finally {
 			loading = false;
 		}
@@ -103,7 +111,7 @@
 			<input
 				bind:this={inputEl}
 				type="text"
-				placeholder={fullText ? 'Search in note contents…' : 'Search note titles…'}
+				placeholder={fullText ? 'Search notes and contents…' : 'Search note titles…'}
 				value={q}
 				oninput={onInput}
 				autocomplete="off"
@@ -113,9 +121,9 @@
 				class="mode-toggle"
 				class:active={fullText}
 				onclick={toggleFullText}
-				title={fullText ? 'Full-text (body) — click to switch to titles' : 'Title — click to switch to full-text'}
+				title={fullText ? 'Notes and contents — click to switch to titles' : 'Titles — click to switch to notes and contents'}
 			>
-				{fullText ? 'Body' : 'Title'}
+				{fullText ? 'Notes' : 'Title'}
 			</button>
 		</div>
 		<p class="hint">
@@ -123,6 +131,7 @@
 			{:else if err}<span class="err">Error: {err}</span>
 			{:else if !q.trim()}Type to search.
 			{:else if results.length === 0}No matches.
+			{:else if meta?.limited}Showing {results.length} of {meta.total} matches.
 			{:else}{results.length} result{results.length === 1 ? '' : 's'}
 			{/if}
 		</p>

@@ -290,11 +290,15 @@ Use small, pushable slices:
 - **Index-backed full-text search.** Persist normalized note body text in the
    vault index cache and serve full-text queries from that index instead of
    reading every markdown file on each search request.
+- **Search ranking and capped-result metadata.** Rank indexed full-text
+   results across title, alias, path, and body matches, support multi-token
+   fallback matches, and return total/limited metadata so UI surfaces do not
+   imply every match is rendered.
 
 ## Next Implementation Slices
 
-1. **Search ranking and result scale.** Improve full-text ranking and
-   large-result rendering now that searches use the persisted index corpus.
+1. **Search query language.** Add verified support for more Obsidian-like
+   search operators or advanced filters without sacrificing the indexed path.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without
