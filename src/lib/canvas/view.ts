@@ -33,6 +33,14 @@ export interface CanvasConnectionDraft {
 	toNodeId: string;
 }
 
+export interface CanvasEdgeSummary {
+	id: string;
+	label: string;
+	fromLabel: string;
+	toLabel: string;
+	description: string;
+}
+
 export type CanvasTextDrafts = Record<string, string>;
 
 const PADDING = 80;
@@ -173,6 +181,22 @@ export function canvasConnectionDraft(
 		? currentToNodeId
 		: nodes.find((node) => node.id !== fromNodeId)?.id ?? '';
 	return { fromNodeId, toNodeId };
+}
+
+export function canvasEdgeSummaries(doc: Pick<CanvasDoc, 'nodes' | 'edges'>): CanvasEdgeSummary[] {
+	const nodes = new Map(doc.nodes.map((node) => [node.id, canvasNodeTitle(node)]));
+	return doc.edges.map((edge) => {
+		const fromLabel = nodes.get(edge.fromNode) ?? edge.fromNode;
+		const toLabel = nodes.get(edge.toNode) ?? edge.toNode;
+		const label = edge.label?.trim() || 'unlabeled';
+		return {
+			id: edge.id,
+			label,
+			fromLabel,
+			toLabel,
+			description: `${fromLabel} to ${toLabel}${label !== 'unlabeled' ? `: ${label}` : ''}`
+		};
+	});
 }
 
 function plural(count: number, singular: string): string {

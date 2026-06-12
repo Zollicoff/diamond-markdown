@@ -39,13 +39,14 @@ export interface CanvasSvgExport {
 	svg: string;
 }
 
-export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node' | 'add-edge';
+export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node' | 'add-edge' | 'delete-edge';
 
 export interface MutateCanvasInput {
 	path: string;
 	action: CanvasEditAction;
 	expectedRevision?: string;
 	nodeId?: string;
+	edgeId?: string;
 	fromNode?: string;
 	toNode?: string;
 	label?: string;
@@ -295,6 +296,16 @@ function edgeRecord(value: unknown): Record<string, unknown> | null {
 	return typeof edge?.id === 'string' ? edge : null;
 }
 
+function rawEdgeId(value: unknown, index: number): string | null {
+	const edge = record(value);
+	if (!edge) return null;
+	const explicitId = text(edge.id);
+	if (explicitId) return explicitId;
+	const fromNode = text(edge.fromNode);
+	const toNode = text(edge.toNode);
+	return fromNode && toNode ? `${fromNode}->${toNode}:${index}` : null;
+}
+
 function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
 	return typeof value === 'number' && Number.isFinite(value)
 		? Math.min(max, Math.max(min, value))
@@ -407,6 +418,11 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		};
 		if (label) edge.label = label;
 		edges.push(edge);
+	} else if (input.action === 'delete-edge') {
+		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
+		const index = edges.findIndex((edge, edgeIndex) => rawEdgeId(edge, edgeIndex) === input.edgeId);
+		if (index < 0) throw new CanvasFileError('canvas edge not found', 404);
+		edges.splice(index, 1);
 	} else {
 		throw new CanvasFileError('unsupported canvas edit action');
 	}

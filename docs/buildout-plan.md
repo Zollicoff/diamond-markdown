@@ -121,6 +121,8 @@ Use small, pushable slices:
 - **Canvas edge creation.** Connect existing Canvas nodes from the board with
    optional labels and persist Obsidian-compatible edges through git-backed
    commits with stale-revision protection.
+- **Canvas edge deletion.** List Canvas edges in the board view and remove
+   them through git-backed commits with stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

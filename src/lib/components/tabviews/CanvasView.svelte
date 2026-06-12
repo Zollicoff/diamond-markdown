@@ -8,6 +8,7 @@
 		canvasDraftChanged,
 		canvasDraftFor,
 		canConnectCanvasNodes,
+		canvasEdgeSummaries,
 		canvasNodePositionChanged,
 		canvasNodeOptions,
 		canvasNodesWithPosition,
@@ -16,6 +17,7 @@
 		edgeLines,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
 	import CanvasNodeCard from './canvas/CanvasNodeCard.svelte';
 
 	interface Props {
@@ -34,6 +36,7 @@
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
 	let moveSavingNodeId = $state<string | null>(null);
+	let deletingEdgeId = $state<string | null>(null);
 	let edgeFromNodeId = $state('');
 	let edgeToNodeId = $state('');
 	let edgeLabel = $state('');
@@ -55,6 +58,7 @@
 	const displayDoc = $derived(doc ? { ...doc, nodes: displayNodes } : null);
 	const bounds = $derived(canvasBounds(displayNodes));
 	const lines = $derived(displayDoc ? edgeLines(displayDoc, bounds) : []);
+	const edgeSummaries = $derived(doc ? canvasEdgeSummaries(doc) : []);
 	const nodeOptions = $derived(canvasNodeOptions(doc?.nodes ?? []));
 	const canAddEdge = $derived(Boolean(
 		doc &&
@@ -127,6 +131,21 @@
 			error = (e as Error).message;
 		} finally {
 			addingEdge = false;
+		}
+	}
+
+	async function deleteEdge(edgeId: string): Promise<void> {
+		if (!doc || deletingEdgeId) return;
+		deletingEdgeId = edgeId;
+		error = null;
+		try {
+			const res = await api.deleteCanvasEdge(vaultId, path, edgeId, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas edge removed', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			deletingEdgeId = null;
 		}
 	}
 
@@ -291,6 +310,7 @@
 				{/each}
 			</ul>
 		{/if}
+		<CanvasEdgeList edges={edgeSummaries} {deletingEdgeId} onDelete={deleteEdge} />
 		<div class="canvas-scroll">
 			<div class="canvas-board" style={`width: ${bounds.width}px; height: ${bounds.height}px;`}>
 				<svg class="edge-layer" width={bounds.width} height={bounds.height} aria-hidden="true">

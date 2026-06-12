@@ -10,6 +10,7 @@ import {
 	canvasDraftChanged,
 	canvasDraftFor,
 	canConnectCanvasNodes,
+	canvasEdgeSummaries,
 	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeOptions,
@@ -77,6 +78,15 @@ test.describe('canvas view helpers', () => {
 		expect(canvasConnectionDraft(doc.nodes, 'b', 'a')).toEqual({ fromNodeId: 'b', toNodeId: 'a' });
 		expect(canConnectCanvasNodes('a', 'b')).toBe(true);
 		expect(canConnectCanvasNodes('a', 'a')).toBe(false);
+		expect(canvasEdgeSummaries(doc)).toEqual([
+			{
+				id: 'edge-a-b',
+				label: 'opens',
+				fromLabel: 'text',
+				toLabel: 'Home.md',
+				description: 'text to Home.md: opens'
+			}
+		]);
 	});
 });
 
@@ -247,6 +257,21 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	});
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const deletedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'delete-edge',
+			edgeId: edgeAddedBody.doc.edges.at(-1)?.id,
+			expectedRevision: edgeAddedBody.doc.revision
+		}
+	});
+	expect(deletedEdge.ok(), await deletedEdge.text()).toBe(true);
+	const deletedEdgeBody = await deletedEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(deletedEdgeBody.sha).toBeTruthy();
+	expect(deletedEdgeBody.doc.edges).toHaveLength(1);
+	expect(deletedEdgeBody.doc.edges.some((edge) => edge.label === 'returns')).toBe(false);
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as {
 		nodes: { id?: string; text?: string; x?: number; y?: number }[];
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
@@ -254,7 +279,7 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
 	expect(raw.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
-	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns')).toBe(true);
+	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns')).toBe(false);
 });
 
 test('canvas view adds and saves text cards from the board', async ({ page, request }) => {
@@ -295,7 +320,7 @@ test('canvas view adds and saves text cards from the board', async ({ page, requ
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
-test('canvas view adds labeled edges between nodes', async ({ page, request }) => {
+test('canvas view adds and removes labeled edges between nodes', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-edge-ui-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -318,12 +343,21 @@ test('canvas view adds labeled edges between nodes', async ({ page, request }) =
 	await page.getByRole('button', { name: 'Connect' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 2 edges · editable text cards');
 	await expect(page.locator('.edge-label').filter({ hasText: 'returns' })).toBeVisible();
+	await expect(page.getByLabel('Canvas edges')).toContainText('returns');
 
 	await expect.poll(async () => {
 		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
 		const body = await loaded.json() as CanvasDoc;
 		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns');
 	}).toBe(true);
+	await page.getByRole('button', { name: /Remove canvas edge Home\.md to text: returns/ }).click();
+	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
+	await expect(page.getByLabel('Canvas edges')).not.toContainText('returns');
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns');
+	}).toBe(false);
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
