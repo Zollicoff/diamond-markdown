@@ -15,8 +15,11 @@
 		changed: boolean;
 		saving: boolean;
 		moving: boolean;
+		deleting: boolean;
+		disableDelete: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onSave: (node: CanvasNode) => void | Promise<void>;
+		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
 
@@ -27,10 +30,15 @@
 		changed,
 		saving,
 		moving,
+		deleting,
+		disableDelete,
 		onDraftChange,
 		onSave,
+		onDelete,
 		onMovePointerDown
 	}: Props = $props();
+
+	const title = $derived(canvasNodeTitle(node));
 </script>
 
 <article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={nodeStyle(node, bounds)}>
@@ -38,13 +46,13 @@
 		<button
 			type="button"
 			class="node-drag-handle"
-			aria-label={`Move canvas node ${canvasNodeTitle(node)}`}
+			aria-label={`Move canvas node ${title}`}
 			title="Move canvas node"
 			onpointerdown={(event) => onMovePointerDown(node, event)}
 		></button>
 		<div class="node-type">{node.type}</div>
 	</div>
-	<h3 title={canvasNodeTitle(node)}>{canvasNodeTitle(node)}</h3>
+	<h3 title={title}>{title}</h3>
 	{#if node.type === 'text'}
 		<textarea
 			class="node-editor"
@@ -60,11 +68,39 @@
 			>
 				{saving ? 'Saving...' : 'Save text'}
 			</button>
+			<button
+				class="mini node-remove"
+				aria-label={`Remove canvas node ${title}`}
+				disabled={disableDelete}
+				onclick={() => void onDelete(node)}
+			>
+				{deleting ? 'Removing...' : 'Remove'}
+			</button>
 		</div>
 	{:else if canvasNodeBody(node)}
 		<p>{canvasNodeBody(node)}</p>
+		<div class="node-actions">
+			<button
+				class="mini node-remove"
+				aria-label={`Remove canvas node ${title}`}
+				disabled={disableDelete}
+				onclick={() => void onDelete(node)}
+			>
+				{deleting ? 'Removing...' : 'Remove'}
+			</button>
+		</div>
 	{:else}
 		<p class="empty">No preview content</p>
+		<div class="node-actions">
+			<button
+				class="mini node-remove"
+				aria-label={`Remove canvas node ${title}`}
+				disabled={disableDelete}
+				onclick={() => void onDelete(node)}
+			>
+				{deleting ? 'Removing...' : 'Remove'}
+			</button>
+		</div>
 	{/if}
 </article>
 
@@ -182,9 +218,14 @@
 	}
 	.node-actions {
 		display: flex;
+		gap: 6px;
 		justify-content: flex-end;
 	}
 	.node-save {
+		padding: 2px 7px;
+		font-size: 0.7rem;
+	}
+	.node-remove {
 		padding: 2px 7px;
 		font-size: 0.7rem;
 	}

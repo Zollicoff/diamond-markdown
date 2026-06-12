@@ -43,6 +43,7 @@
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
 	let moveSavingNodeId = $state<string | null>(null);
+	let deletingNodeId = $state<string | null>(null);
 	let savingEdgeId = $state<string | null>(null);
 	let deletingEdgeId = $state<string | null>(null);
 	let edgeLabelDrafts = $state<CanvasEdgeLabelDrafts>({});
@@ -122,6 +123,21 @@
 			error = (e as Error).message;
 		} finally {
 			savingNodeId = null;
+		}
+	}
+
+	async function deleteNode(node: CanvasNode): Promise<void> {
+		if (!doc || deletingNodeId || savingNodeId || movingNodeId || moveSavingNodeId || savingEdgeId || deletingEdgeId) return;
+		deletingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.deleteCanvasNode(vaultId, path, node.id, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas node removed', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			deletingNodeId = null;
 		}
 	}
 
@@ -381,8 +397,11 @@
 						changed={canvasDraftChanged(node, textDrafts)}
 						saving={savingNodeId === node.id}
 						moving={movingNodeId === node.id || moveSavingNodeId === node.id}
+						deleting={deletingNodeId === node.id}
+						disableDelete={deletingNodeId !== null || savingNodeId !== null || movingNodeId !== null || moveSavingNodeId !== null || savingEdgeId !== null || deletingEdgeId !== null}
 						onDraftChange={setDraft}
 						onSave={saveTextNode}
+						onDelete={deleteNode}
 						onMovePointerDown={startMoveNode}
 					/>
 				{/each}

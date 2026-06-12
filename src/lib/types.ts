@@ -117,6 +117,16 @@ export interface AttachmentUploadResult {
 	sha: string | null;
 }
 
+export type AttachmentKind = 'image' | 'audio' | 'video' | 'pdf' | 'file';
+
+export interface AttachmentRef {
+	path: string;
+	filename: string;
+	size: number;
+	mtime: number;
+	kind: AttachmentKind;
+}
+
 export interface CanvasNode {
 	id: string;
 	type: string;

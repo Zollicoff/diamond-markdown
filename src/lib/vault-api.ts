@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType } from './canvas/view';
 import { emit } from './events';
@@ -119,6 +119,22 @@ export const api = {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ path, action: 'move-node', nodeId, x, y, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
+	async deleteCanvasNode(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'delete-node', nodeId, expectedRevision })
 		});
 		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
 		emit('tree:invalidate', { vaultId });
@@ -245,6 +261,11 @@ export const api = {
 		});
 		emit('tree:invalidate', { vaultId });
 		return res;
+	},
+
+	async attachments(vaultId: string): Promise<AttachmentRef[]> {
+		const res = await json<{ attachments: AttachmentRef[] }>(`/api/vaults/${vaultId}/attachment`);
+		return res.attachments ?? [];
 	},
 
 	async renameNote(vaultId: string, from: string, to: string): Promise<{ linksUpdated: number; touched: string[]; sha: string | null }> {

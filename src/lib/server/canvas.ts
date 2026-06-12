@@ -44,6 +44,7 @@ export type CanvasEditAction =
 	| 'add-text-node'
 	| 'update-node-text'
 	| 'move-node'
+	| 'delete-node'
 	| 'add-edge'
 	| 'update-edge-label'
 	| 'delete-edge';
@@ -451,6 +452,17 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		node.x = requiredBoundedNumber(input.x, 'x', -100_000, 100_000);
 		node.y = requiredBoundedNumber(input.y, 'y', -100_000, 100_000);
+	} else if (input.action === 'delete-node') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		const index = nodes.findIndex((node) => nodeRecord(node)?.id === input.nodeId);
+		if (index < 0) throw new CanvasFileError('canvas node not found', 404);
+		nodes.splice(index, 1);
+		for (let edgeIndex = edges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
+			const edge = record(edges[edgeIndex]);
+			if (edge && (edge.fromNode === input.nodeId || edge.toNode === input.nodeId)) {
+				edges.splice(edgeIndex, 1);
+			}
+		}
 	} else if (input.action === 'add-edge') {
 		const fromNode = text(input.fromNode);
 		const toNode = text(input.toNode);

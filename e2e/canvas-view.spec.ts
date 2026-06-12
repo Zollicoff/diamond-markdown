@@ -178,7 +178,7 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	expect(fs.existsSync(path.join(vaultDir, 'Export.canvas'))).toBe(true);
 });
 
-test('canvas API adds and edits text cards with clean git commits and stale guards', async ({ request }) => {
+test('canvas API adds, edits, moves, and deletes cards with clean git commits and stale guards', async ({ request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-edit-api-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -349,6 +349,21 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	expect(deletedEdgeBody.doc.edges.some((edge) => edge.label === 'returns')).toBe(false);
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const deletedNode = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'delete-node',
+			nodeId: 'b',
+			expectedRevision: deletedEdgeBody.doc.revision
+		}
+	});
+	expect(deletedNode.ok(), await deletedNode.text()).toBe(true);
+	const deletedNodeBody = await deletedNode.json() as { sha: string | null; doc: CanvasDoc };
+	expect(deletedNodeBody.sha).toBeTruthy();
+	expect(deletedNodeBody.doc.nodes.some((node) => node.id === 'b')).toBe(false);
+	expect(deletedNodeBody.doc.edges.some((edge) => edge.fromNode === 'b' || edge.toNode === 'b')).toBe(false);
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as {
 		nodes: { id?: string; text?: string; file?: string; url?: string; x?: number; y?: number }[];
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
@@ -357,7 +372,8 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
 	expect(raw.nodes.some((node) => node.file === 'Home.md')).toBe(true);
 	expect(raw.nodes.some((node) => node.url === 'https://example.com/research')).toBe(true);
-	expect(raw.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
+	expect(raw.nodes.some((node) => node.id === 'b')).toBe(false);
+	expect(raw.edges.some((edge) => edge.fromNode === 'b' || edge.toNode === 'b')).toBe(false);
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns')).toBe(false);
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'routes back')).toBe(false);
 });
@@ -469,6 +485,42 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
+test('canvas view removes nodes and connected edges from the board', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-node-delete-ui-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), canvasJson);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Node Delete UI Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
+	await expect(page.getByLabel('Canvas edges')).toContainText('Home.md');
+
+	await page.getByRole('button', { name: 'Remove canvas node Home.md' }).click();
+	await expect(page.locator('.canvas-view')).toContainText('1 node · 0 edges · editable text cards');
+	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toHaveCount(0);
+	await expect(page.getByLabel('Canvas edges')).toHaveCount(0);
+
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return {
+			hasHomeNode: body.nodes.some((node) => node.id === 'b'),
+			edgeCount: body.edges.length
+		};
+	}).toEqual({ hasHomeNode: false, edgeCount: 0 });
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
+});
+
 test('canvas view drags nodes and saves positions to the Canvas file', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-move-ui-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
@@ -491,7 +543,7 @@ test('canvas view drags nodes and saves positions to the Canvas file', async ({ 
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.locator('.tree .file-link').filter({ hasText: 'Board' }).click();
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
-	const moveHandle = page.getByLabel('Move canvas node Home.md');
+	const moveHandle = page.getByRole('button', { name: 'Move canvas node Home.md', exact: true });
 	await expect(moveHandle).toBeVisible();
 	const box = await moveHandle.boundingBox();
 	expect(box).toBeTruthy();

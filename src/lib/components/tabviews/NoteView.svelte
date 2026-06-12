@@ -11,6 +11,7 @@
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
 	import { confirmDialog } from '$lib/dialogs';
 	import NoteTopBar from './note/NoteTopBar.svelte';
 	import {
@@ -55,6 +56,7 @@
 	let err = $state<string | null>(null);
 	let editorApi = $state<EditorApi | null>(null);
 	let uploadingAttachments = $state(0);
+	let attachmentPickerOpen = $state(false);
 	let EditorView = $state<NoteViewComponent | null>(null);
 	let PreviewView = $state<NoteViewComponent | null>(null);
 	let ToolbarView = $state<NoteViewComponent | null>(null);
@@ -188,6 +190,10 @@
 		}
 	}
 
+	function insertExistingAttachment(path: string): void {
+		editorApi?.insert(attachmentEmbedMarkdown([path]));
+	}
+
 	const resolveLink: LinkResolver = (target: string) => {
 		return resolveNoteLink(doc, vaultId, target);
 	};
@@ -296,7 +302,7 @@
 	/>
 
 	{#if mode !== 'read' && ToolbarView}
-		<ToolbarView api={editorApi} />
+		<ToolbarView api={editorApi} onAttachExisting={() => (attachmentPickerOpen = true)} />
 	{/if}
 
 	{#if uploadingAttachments > 0}
@@ -336,6 +342,14 @@
 
 {#if menuOpen}
 	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
+{/if}
+
+{#if attachmentPickerOpen}
+	<AttachmentPicker
+		{vaultId}
+		onInsert={insertExistingAttachment}
+		onClose={() => (attachmentPickerOpen = false)}
+	/>
 {/if}
 
 <style>

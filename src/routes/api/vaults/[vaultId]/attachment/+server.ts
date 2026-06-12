@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { assertVaultCanWrite, isVaultWriteBlockedError } from '$lib/server/git';
-import { saveAttachment } from '$lib/server/attachment-service';
+import { listAttachments, saveAttachment } from '$lib/server/attachment-service';
 import { getVault } from '$lib/server/vault';
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
@@ -21,6 +21,16 @@ function mutationStatus(e: unknown): number {
 	if (isVaultWriteBlockedError(e)) return 409;
 	return 400;
 }
+
+export const GET: RequestHandler = async ({ params }) => {
+	const vault = getVault(params.vaultId);
+	if (!vault) throw error(404, 'vault not found');
+	try {
+		return json({ attachments: listAttachments(vault) });
+	} catch (e) {
+		throw error(mutationStatus(e), (e as Error).message);
+	}
+};
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const vault = getVault(params.vaultId);

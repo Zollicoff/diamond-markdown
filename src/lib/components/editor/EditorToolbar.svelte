@@ -3,9 +3,10 @@
 
 	interface Props {
 		api: EditorApi | null;
+		onAttachExisting?: () => void;
 	}
 
-	let { api }: Props = $props();
+	let { api, onAttachExisting }: Props = $props();
 
 	function act(fn: (api: EditorApi) => void): void {
 		if (!api) return;
@@ -54,6 +55,18 @@
 		</div>
 		{#if gi < groups.length - 1}<div class="sep"></div>{/if}
 	{/each}
+	{#if onAttachExisting}
+		<div class="sep"></div>
+		<div class="group">
+			<button
+				class="t-btn"
+				title="Insert attachment"
+				aria-label="Insert attachment"
+				disabled={!api}
+				onclick={onAttachExisting}
+			>📎</button>
+		</div>
+	{/if}
 </div>
 
 <style>
