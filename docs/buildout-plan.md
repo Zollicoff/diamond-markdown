@@ -139,6 +139,9 @@ Use small, pushable slices:
 - **Canvas file-card type routing.** Route Canvas file cards by extension:
    Markdown files open as note tabs, `.canvas` files open as Canvas tabs, and
    unsupported asset paths stay editable without pretending to be note tabs.
+- **Canvas header split.** Move Canvas title, stats, add-node controls, edge
+   creation controls, and SVG export markup out of `CanvasView` into focused
+   presentational components.
 - **Canvas board split.** Move Canvas SVG edge rendering and node-card layout
    out of `CanvasView` into a focused presentational board component.
 - **Graph settings state extraction.** Move graph setting hydration,

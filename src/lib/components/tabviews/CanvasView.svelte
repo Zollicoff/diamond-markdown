@@ -19,7 +19,6 @@
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
-		canvasSummary,
 		canvasTextDrafts,
 		canSaveCanvasNodeRefDraft,
 		edgeLines,
@@ -30,9 +29,9 @@
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
-	import CanvasAddNodeForm from './canvas/CanvasAddNodeForm.svelte';
 	import CanvasBoard from './canvas/CanvasBoard.svelte';
 	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
+	import CanvasHeader from './canvas/CanvasHeader.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -107,6 +106,18 @@
 
 	function setEdgeLabelDraft(edge: CanvasEdgeSummary, value: string): void {
 		edgeLabelDrafts = { ...edgeLabelDrafts, [edge.id]: value };
+	}
+
+	function setEdgeFromNodeId(nodeId: string): void {
+		edgeFromNodeId = nodeId;
+	}
+
+	function setEdgeToNodeId(nodeId: string): void {
+		edgeToNodeId = nodeId;
+	}
+
+	function setNewEdgeLabel(label: string): void {
+		edgeLabel = label;
 	}
 
 	function openRefNode(node: CanvasNode): void {
@@ -352,46 +363,24 @@
 </script>
 
 <section class="canvas-view">
-	<header class="canvas-head">
-		<div>
-			<h2>{doc?.title ?? path.split('/').pop()?.replace(/\.canvas$/i, '') ?? 'Canvas'}</h2>
-			<p class="mono">{path}</p>
-		</div>
-		{#if doc}
-			<div class="canvas-actions">
-				<div class="canvas-stats mono">{canvasSummary(doc)} · editable text cards</div>
-				<CanvasAddNodeForm adding={addingNode} onAdd={addNode} />
-				<form
-					class="edge-form"
-					onsubmit={(event) => {
-						event.preventDefault();
-						void addEdge();
-					}}
-				>
-					<select class="mini edge-select" aria-label="Canvas edge source" bind:value={edgeFromNodeId} disabled={addingEdge || nodeOptions.length < 2}>
-						{#each nodeOptions as option (option.id)}
-							<option value={option.id}>{option.label}</option>
-						{/each}
-					</select>
-					<span class="edge-arrow" aria-hidden="true">→</span>
-					<select class="mini edge-select" aria-label="Canvas edge target" bind:value={edgeToNodeId} disabled={addingEdge || nodeOptions.length < 2}>
-						{#each nodeOptions as option (option.id)}
-							<option value={option.id}>{option.label}</option>
-						{/each}
-					</select>
-					<input
-						class="mini edge-label-input"
-						aria-label="Canvas edge label"
-						placeholder="label"
-						bind:value={edgeLabel}
-						disabled={addingEdge || nodeOptions.length < 2}
-					/>
-					<button class="mini" disabled={!canAddEdge}>{addingEdge ? 'Connecting…' : 'Connect'}</button>
-				</form>
-				<a class="mini" href={exportHref} download={exportName}>Download SVG</a>
-			</div>
-		{/if}
-	</header>
+	<CanvasHeader
+		{doc}
+		{path}
+		{addingNode}
+		{addingEdge}
+		{canAddEdge}
+		{nodeOptions}
+		{edgeFromNodeId}
+		{edgeToNodeId}
+		{edgeLabel}
+		{exportHref}
+		{exportName}
+		onAddNode={addNode}
+		onAddEdge={addEdge}
+		onEdgeFromNodeChange={setEdgeFromNodeId}
+		onEdgeToNodeChange={setEdgeToNodeId}
+		onEdgeLabelChange={setNewEdgeLabel}
+	/>
 
 	{#if loading}
 		<div class="state">Loading Canvas…</div>
@@ -447,75 +436,6 @@
 		min-height: 0;
 		background: var(--bg);
 	}
-	.canvas-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		padding: 10px 14px;
-		border-bottom: 1px solid var(--border);
-	}
-	h2 {
-		margin: 0;
-		font-family: 'Bricolage Grotesque', var(--sans);
-		font-size: 0.96rem;
-	}
-	.canvas-head p {
-		margin: 3px 0 0;
-		color: var(--fg-dim);
-		font-size: 0.72rem;
-	}
-	.canvas-stats {
-		color: var(--fg-dim);
-		font-size: 0.72rem;
-		white-space: nowrap;
-	}
-	.canvas-actions {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-		gap: 10px;
-	}
-	.mini {
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 3px 9px;
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.76rem;
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.edge-form {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		min-width: 0;
-	}
-	.edge-select {
-		max-width: 150px;
-		background: var(--bg);
-	}
-	.edge-label-input {
-		width: 82px;
-		background: var(--bg);
-	}
-	.edge-label-input::placeholder {
-		color: var(--fg-dim);
-	}
-	.edge-arrow {
-		color: var(--fg-dim);
-		font-size: 0.72rem;
-	}
-	.mini:hover {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.mini:disabled {
-		cursor: not-allowed;
-		opacity: 0.55;
-	}
 	.warnings {
 		margin: 0;
 		padding: 8px 14px 8px 28px;
@@ -535,22 +455,5 @@
 		color: var(--danger);
 		padding: 20px;
 		text-align: center;
-	}
-	.mono {
-		font-family: var(--mono);
-		font-variant-numeric: tabular-nums;
-	}
-
-	@media (max-width: 900px) {
-		.canvas-head {
-			align-items: flex-start;
-		}
-		.canvas-actions {
-			justify-content: flex-start;
-		}
-		.edge-form {
-			width: 100%;
-			flex-wrap: wrap;
-		}
 	}
 </style>
