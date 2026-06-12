@@ -29,7 +29,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Outgoing links panel
 - [x] Tag index page
 - [x] Fuzzy quick-switcher
-- [x] Ranked index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, paged loading, and virtualized results
+- [x] Ranked index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, folder grouping, paged loading, and virtualized results
 - [x] Git auto-commit on save (debounced)
 - [x] Per-note history viewer (git log + diff)
 - [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)
@@ -114,9 +114,9 @@ runtime compatibility is a non-goal.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
 - **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
-- **Search grouping.** Search now has ranked indexed results, operators,
-  regex, pagination, virtualization, and git-backed saved searches; grouped
-  search dashboards can stay incremental.
+- **Search dashboards.** Search now has ranked indexed results, operators,
+  regex, folder grouping, pagination, virtualization, and git-backed saved
+  searches; richer dashboards can stay incremental.
 
 ## Non-goals
 

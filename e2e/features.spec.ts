@@ -583,6 +583,43 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	await expect(search.locator('.result').filter({ hasText: 'Virtual 239' })).toBeVisible({ timeout: 4_000 });
 });
 
+test('search tab groups results by folder without breaking virtualized result rows', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'search-grouped-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, 'Projects'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Archive'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Inbox.md'), '# Inbox\n\nsearchgroupneedle root note.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Projects', 'Solar.md'), '# Solar\n\nsearchgroupneedle project note.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Projects', 'Water.md'), '# Water\n\nsearchgroupneedle second project note.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Archive', 'Old.md'), '# Old\n\nsearchgroupneedle archived note.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Search Grouped Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.rail .r-btn[aria-label="Search"]').click();
+	const search = page.locator('.search-view');
+	await search.getByRole('button', { name: 'Title' }).click();
+	await search.locator('input[type="text"]').first().fill('searchgroupneedle');
+	await expect(search.locator('.hint')).toContainText('4 results', { timeout: 5_000 });
+	await expect(search.locator('.result-group')).toHaveCount(0);
+
+	await search.getByRole('button', { name: 'Folder' }).click();
+	await expect(search.locator('.result-group')).toHaveCount(3);
+	await expect(search.locator('.result-group').filter({ hasText: 'Projects' })).toContainText('2');
+	await expect(search.locator('.result-group').filter({ hasText: 'Archive' })).toContainText('1');
+	await expect(search.locator('.result-group').filter({ hasText: 'Vault root' })).toContainText('1');
+	await expect(search.locator('.result').filter({ hasText: 'Projects/Solar.md' })).toBeVisible();
+
+	await search.getByRole('button', { name: 'Off' }).click();
+	await expect(search.locator('.result-group')).toHaveCount(0);
+	await expect(search.locator('.result')).toHaveCount(4);
+});
+
 test('right panel shows unlinked note mentions beside backlinks', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'unlinked-mentions-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });

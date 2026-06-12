@@ -9,7 +9,13 @@
 		savedSearchName,
 		searchModeFromFullText
 	} from '$lib/search/saved';
-	import { searchResultRowStyle, visibleSearchWindow } from '$lib/search/view';
+	import {
+		buildSearchResultRows,
+		searchResultRowStyle,
+		visibleSearchRows,
+		type SearchResultDisplayRow,
+		type SearchGroupMode
+	} from '$lib/search/view';
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import type { SavedSearch, SavedSearchMode, SearchHit, SearchResponse } from '$lib/types';
@@ -27,6 +33,7 @@
 	// svelte-ignore state_referenced_locally
 	let q = $state(query);
 	let fullText = $state(false);
+	let groupMode = $state<SearchGroupMode>('none');
 	let results = $state<SearchHit[]>([]);
 	let savedSearches = $state<SavedSearch[]>([]);
 	let savedName = $state('Saved search');
@@ -44,7 +51,8 @@
 	let controller: AbortController | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let requestId = 0;
-	let resultWindow = $derived(visibleSearchWindow(results, scrollTop, viewportHeight));
+	let resultRows = $derived(buildSearchResultRows(results, groupMode));
+	let resultWindow = $derived(visibleSearchRows(resultRows, scrollTop, viewportHeight));
 	let currentMode = $derived<SavedSearchMode>(searchModeFromFullText(fullText));
 	let searchAlreadySaved = $derived(savedSearches.some((search) => isActiveSavedSearch(search, q, currentMode)));
 	let canSaveSearch = $derived(
@@ -157,6 +165,12 @@
 		void runSearch(q);
 	}
 
+	function setGroupMode(mode: SearchGroupMode): void {
+		if (groupMode === mode) return;
+		groupMode = mode;
+		resetResultWindow();
+	}
+
 	async function loadSavedSearches(): Promise<void> {
 		savedLoading = true;
 		savedErr = null;
@@ -225,6 +239,16 @@
 		}
 	}
 
+	function openResultRow(row: SearchResultDisplayRow, evt: MouseEvent): void {
+		if (row.kind !== 'result') return;
+		open(row.hit, evt);
+	}
+
+	function onResultRowKey(e: KeyboardEvent, row: SearchResultDisplayRow): void {
+		if (row.kind !== 'result') return;
+		onResultKey(e, row.hit);
+	}
+
 	function isAbortError(error: unknown): boolean {
 		return error instanceof DOMException && error.name === 'AbortError';
 	}
@@ -281,13 +305,34 @@
 			<button
 				type="button"
 				class="save-search"
-					disabled={!canSaveSearch}
-					onclick={saveCurrentSearch}
-					aria-label="Save current search"
-					title={saveSearchTitle}
-				>
+				disabled={!canSaveSearch}
+				onclick={saveCurrentSearch}
+				aria-label="Save current search"
+				title={saveSearchTitle}
+			>
 				{savingSearch ? 'Saving' : 'Save'}
 			</button>
+		</div>
+		<div class="search-options" aria-label="Search display options">
+			<div class="segmented" role="group" aria-label="Group search results">
+				<span class="seg-label">Group</span>
+				<button
+					type="button"
+					class:active={groupMode === 'none'}
+					aria-pressed={groupMode === 'none'}
+					onclick={() => setGroupMode('none')}
+				>
+					Off
+				</button>
+				<button
+					type="button"
+					class:active={groupMode === 'folder'}
+					aria-pressed={groupMode === 'folder'}
+					onclick={() => setGroupMode('folder')}
+				>
+					Folder
+				</button>
+			</div>
 		</div>
 		<div class="saved-search-control">
 			<input
@@ -349,20 +394,27 @@
 
 	<div class="results" bind:this={resultsEl} onscroll={onResultsScroll}>
 		<div class="result-spacer" style={`height: ${resultWindow.totalHeight}px;`}>
-			{#each resultWindow.visibleResults as row (row.hit.path)}
-				<button
-					type="button"
-					class="result"
-					style={searchResultRowStyle(row)}
-					onclick={(e) => open(row.hit, e)}
-					onkeydown={(e) => onResultKey(e, row.hit)}
-				>
-					<div class="title">{row.hit.title || row.hit.path}</div>
-					<div class="path">{row.hit.path}</div>
-					{#if row.hit.snippet}
-						<div class="snippet">{row.hit.snippet}</div>
-					{/if}
-				</button>
+			{#each resultWindow.visibleRows as item (item.row.key)}
+				{#if item.row.kind === 'group'}
+					<div class="result-group" style={searchResultRowStyle(item.row)}>
+						<span class="group-title">{item.row.label}</span>
+						<span class="group-count">{item.row.count}</span>
+					</div>
+				{:else}
+					<button
+						type="button"
+						class="result"
+						style={searchResultRowStyle(item.row)}
+						onclick={(e) => openResultRow(item.row, e)}
+						onkeydown={(e) => onResultRowKey(e, item.row)}
+					>
+						<div class="title">{item.row.hit.title || item.row.hit.path}</div>
+						<div class="path">{item.row.hit.path}</div>
+						{#if item.row.hit.snippet}
+							<div class="snippet">{item.row.hit.snippet}</div>
+						{/if}
+					</button>
+				{/if}
 			{/each}
 		</div>
 		{#if meta?.hasMore}
@@ -439,6 +491,46 @@
 		color: var(--fg-dim);
 		border-color: var(--border);
 		cursor: default;
+	}
+	.search-options {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-top: 8px;
+	}
+	.segmented {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
+		padding: 2px;
+	}
+	.seg-label {
+		color: var(--fg-dim);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0;
+		padding: 0 6px 0 5px;
+	}
+	.segmented button {
+		min-width: 48px;
+		border: 0;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.76rem;
+		padding: 4px 8px;
+		cursor: pointer;
+	}
+	.segmented button:hover {
+		color: var(--fg);
+	}
+	.segmented button.active {
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		color: var(--accent);
 	}
 	.saved-search-control {
 		margin-top: 8px;
@@ -573,6 +665,33 @@
 	.load-more:disabled {
 		cursor: default;
 		opacity: 0.6;
+	}
+	.result-group {
+		position: absolute;
+		left: 0;
+		right: 0;
+		height: var(--search-result-row-height);
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 12px;
+		box-sizing: border-box;
+		color: var(--fg-dim);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0;
+		pointer-events: none;
+	}
+	.group-title {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.group-count {
+		flex: 0 0 auto;
+		color: var(--fg-muted);
+		font-family: var(--mono);
 	}
 	.result {
 		display: block;

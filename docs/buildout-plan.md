@@ -333,6 +333,10 @@ Use small, pushable slices:
    as a page size instead of a hard stop, expose `offset`/`nextOffset`
    metadata, and let the Search tab load more ranked matches without
    over-rendering.
+- **Search result folder grouping.** Keep ranked/paged search responses flat
+   while adding a client-side grouped row model, virtualized folder headers,
+   and Search tab controls so loaded results can be scanned by vault location
+   without changing server search semantics.
 - **Saved searches.** Persist named title/full-text searches in
    `.diamondmd/searches.json`, commit changes with the vault, and expose compact
    restore/delete controls in the Search tab so recurring searches follow

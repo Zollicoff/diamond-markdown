@@ -11,7 +11,13 @@ import {
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
 import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src/lib/server/search';
 import { isActiveSavedSearch, savedSearchButtonLabel, savedSearchModeLabel, savedSearchName, searchModeFromFullText } from '../src/lib/search/saved';
-import { searchResultRowStyle, visibleSearchWindow } from '../src/lib/search/view';
+import {
+	buildSearchResultRows,
+	searchResultFolder,
+	searchResultRowStyle,
+	visibleSearchRows,
+	visibleSearchWindow
+} from '../src/lib/search/view';
 
 function emptyIndex(): VaultIndex {
 	return {
@@ -168,6 +174,43 @@ test('search result view helpers virtualize large returned result sets', () => {
 	expect(middle.visibleResults[0].hit.path).toBe('Notes/Result 028.md');
 	expect(searchResultRowStyle(middle.visibleResults[0], 30)).toBe(
 		'--search-result-row-height: 30px; transform: translateY(840px);'
+	);
+});
+
+test('search result view helpers group virtualized rows by folder', () => {
+	const results = [
+		{ path: 'Projects/Solar Plan.md', title: 'Solar Plan', snippet: 'roof survey' },
+		{ path: 'Archive/Solar Draft.md', title: 'Solar Draft', snippet: 'old survey' },
+		{ path: 'Projects/Water Plan.md', title: 'Water Plan', snippet: 'water survey' },
+		{ path: 'Inbox.md', title: 'Inbox', snippet: 'root survey' }
+	];
+
+	expect(searchResultFolder('Projects/Solar Plan.md')).toBe('Projects');
+	expect(searchResultFolder('Inbox.md')).toBe('Vault root');
+
+	const rows = buildSearchResultRows(results, 'folder', 40, 12);
+	expect(rows.groupCount).toBe(3);
+	expect(rows.resultCount).toBe(4);
+	expect(rows.totalHeight).toBe(196);
+	expect(rows.rows.map((row) => row.kind === 'group' ? `${row.label}:${row.count}` : row.hit.path)).toEqual([
+		'Projects:2',
+		'Projects/Solar Plan.md',
+		'Projects/Water Plan.md',
+		'Archive:1',
+		'Archive/Solar Draft.md',
+		'Vault root:1',
+		'Inbox.md'
+	]);
+
+	const middle = visibleSearchRows(rows, 52, 50, 1);
+	expect(middle.visibleRows.map((item) => item.row.key)).toEqual([
+		'result:0:Projects/Solar Plan.md',
+		'result:2:Projects/Water Plan.md',
+		'group:archive',
+		'result:1:Archive/Solar Draft.md'
+	]);
+	expect(searchResultRowStyle(rows.rows[2])).toBe(
+		'--search-result-row-height: 40px; transform: translateY(52px);'
 	);
 });
 
