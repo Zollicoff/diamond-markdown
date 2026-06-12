@@ -333,6 +333,9 @@ Use small, pushable slices:
    settings during import preflight, surface safe attachment-folder behavior
    and migration notes for new-note/link/delete preferences, and reuse the same
    safe folder parser for attachment uploads and attachment organization.
+- **Git sync incoming-file recovery.** Populate remote changed paths for
+  behind-only sync states and show incoming file names beside the recovery
+  controls before users pull or run one-click sync.
 
 ## Next Implementation Slices
 

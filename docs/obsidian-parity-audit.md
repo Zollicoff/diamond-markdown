@@ -50,7 +50,7 @@ The main remaining product risks are:
 | Search | Partial | Fuzzy switcher plus ranked persisted index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe regex terms, paged loading, virtualized results, and capped-result metadata | Advanced grouping and saved-search polish remain basic |
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
-| GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, divergence/recovery UI | Background sync and conflict resolution remain manual by design |
+| GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, incoming-file review, divergence/recovery UI | Background sync and conflict resolution remain manual by design |
 | Import from Obsidian | Partial | `.obsidian` detection, supported `app.json` migration notes, plugin settings migration guidance, attachment folder detection, Canvas preservation | No full plugin migration or execution; some Obsidian UI preferences remain guidance-only |
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |

@@ -17,8 +17,10 @@
 		copy: GitSyncRecoveryCopy | null;
 		setupCommands: string;
 		resolutionCommands: string;
+		canSync: boolean;
 		canPull: boolean;
 		isBusy: boolean;
+		onSync?: () => void;
 		onPull?: () => void;
 		onRefresh?: () => void;
 	}
@@ -29,13 +31,16 @@
 		copy,
 		setupCommands,
 		resolutionCommands,
+		canSync,
 		canPull,
 		isBusy,
+		onSync,
 		onPull,
 		onRefresh
 	}: Props = $props();
 
 	const localChangeItems = $derived(buildGitSyncLocalChangeItems(status?.files ?? []));
+	const remoteChangeItems = $derived(buildGitSyncPathItems(status?.remoteChanges ?? []));
 	const conflictItems = $derived(buildGitSyncPathItems(status?.conflicted ?? []));
 	const divergedSections = $derived.by(() => status ? buildGitSyncDivergedSections(status) : []);
 </script>
@@ -52,8 +57,13 @@
 		<GitSyncRecoveryHeader {copy} />
 		<p>{copy.body}</p>
 		<div class="panel-actions">
-			<button class="action-btn primary" onclick={onPull} disabled={!canPull}>Pull now</button>
+			<button class="action-btn primary" onclick={() => onSync?.()} disabled={!canSync}>Sync now</button>
+			<button class="action-btn" onclick={() => onPull?.()} disabled={!canPull}>Pull only</button>
 			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh</button>
+		</div>
+		<div class="change-box remote incoming-files">
+			<h3>Incoming files</h3>
+			<GitSyncFileList items={remoteChangeItems} empty="No incoming file paths reported." />
 		</div>
 		<GitSyncCommandBlock commands={resolutionCommands} />
 	</div>
@@ -165,6 +175,9 @@
 	}
 	.local-files {
 		margin-top: 10px;
+	}
+	.incoming-files {
+		margin: 8px 0 10px;
 	}
 	.change-box.hot {
 		border-color: color-mix(in srgb, var(--danger) 55%, var(--border));

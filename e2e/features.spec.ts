@@ -1433,7 +1433,7 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 	await expect(page.locator('.change-box.overlap').getByText('Shared.md')).toBeVisible();
 });
 
-test('vault writes are blocked until fetched remote commits are pulled', async ({ request }) => {
+test('vault writes are blocked until fetched remote commits are pulled', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-vault');
 	const bareDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-origin.git');
 	const cloneDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'behind-remote-worktree');
@@ -1474,12 +1474,23 @@ test('vault writes are blocked until fetched remote commits are pulled', async (
 		diverged: boolean;
 		canPull: boolean;
 		canPush: boolean;
+		remoteChanges: string[];
 	};
 	expect(status.ahead).toBe(0);
 	expect(status.behind).toBe(1);
 	expect(status.diverged).toBe(false);
 	expect(status.canPull).toBe(true);
 	expect(status.canPush).toBe(false);
+	expect(status.remoteChanges).toEqual(['RemoteOnly.md']);
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('Settings').click();
+	const recovery = page.locator('.sync-block').filter({ hasText: 'Remote changes waiting' });
+	await expect(recovery.getByText('Incoming files')).toBeVisible();
+	await expect(recovery.getByText('RemoteOnly.md')).toBeVisible();
+	await expect(recovery.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+	await expect(recovery.getByRole('button', { name: 'Pull only' })).toBeEnabled();
 
 	const blockedSave = await request.post(`/api/vaults/${vault.id}/note`, {
 		data: { path: 'Local While Behind.md', content: '# Should not save\n' }

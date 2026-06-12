@@ -89,6 +89,15 @@ test.describe('git sync UI state', () => {
 			recovery: 'remote-changes'
 		});
 
+		const behind = buildGitSyncUiState(status({ canPull: true, canPush: false, behind: 1 }), 'https://github.com/owner/repo.git', null);
+		expect(behind).toMatchObject({
+			canPull: true,
+			canPush: false,
+			canSync: true,
+			indicator: 'warn',
+			recovery: 'remote-changes'
+		});
+
 		const dirty = buildGitSyncUiState(status({ clean: false, files: [{ path: 'Draft.md', index: ' ', workingDir: 'M' }] }), 'https://github.com/owner/repo.git', null);
 		expect(dirty).toMatchObject({
 			canSync: false,
@@ -181,6 +190,10 @@ test.describe('git sync UI state', () => {
 
 		expect(buildGitSyncPathItems(['Shared.md'])).toEqual([
 			{ path: 'Shared.md', title: 'Shared.md' }
+		]);
+		expect(buildGitSyncPathItems(['Remote.md', 'Folder/Other.md'])).toEqual([
+			{ path: 'Remote.md', title: 'Remote.md' },
+			{ path: 'Folder/Other.md', title: 'Folder/Other.md' }
 		]);
 
 		const diverged = status({

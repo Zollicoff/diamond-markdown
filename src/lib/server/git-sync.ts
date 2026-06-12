@@ -175,10 +175,10 @@ export async function getGitSyncStatus(vault: Vault): Promise<GitSyncStatus> {
 			remoteBranch = candidate;
 			remoteSha = await rawOrNull(g, ['rev-parse', '--short', candidate]);
 			({ ahead, behind } = parseAheadBehind(await rawOrNull(g, ['rev-list', '--left-right', '--count', `HEAD...${candidate}`])));
-			if (ahead > 0 && behind > 0) {
+			if (ahead > 0 || behind > 0) {
 				mergeBase = await rawOrNull(g, ['merge-base', 'HEAD', candidate]);
-				localChangedPaths = await changedSince(g, mergeBase, 'HEAD');
-				remoteChangedPaths = await changedSince(g, mergeBase, candidate);
+				if (ahead > 0) localChangedPaths = await changedSince(g, mergeBase, 'HEAD');
+				if (behind > 0) remoteChangedPaths = await changedSince(g, mergeBase, candidate);
 			}
 		}
 	}

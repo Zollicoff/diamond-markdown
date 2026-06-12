@@ -103,8 +103,10 @@
 		copy={recoveryCopy}
 		{setupCommands}
 		{resolutionCommands}
+		canSync={ui.canSync}
 		canPull={ui.canPull}
 		isBusy={ui.isBusy}
+		onSync={() => run('sync', () => api.syncNow(vaultId))}
 		onPull={() => run('pull', () => api.pullSync(vaultId))}
 		onRefresh={loadStatus}
 	/>
