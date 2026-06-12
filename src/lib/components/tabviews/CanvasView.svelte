@@ -29,9 +29,8 @@
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
-	import CanvasBoard from './canvas/CanvasBoard.svelte';
-	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
+	import CanvasStage from './canvas/CanvasStage.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -382,50 +381,34 @@
 		onEdgeLabelChange={setNewEdgeLabel}
 	/>
 
-	{#if loading}
-		<div class="state">Loading Canvas…</div>
-	{:else if error}
-		<div class="state error">{error}</div>
-	{:else if doc && doc.nodes.length === 0}
-		<div class="state">This Canvas has no readable nodes yet.</div>
-	{:else if doc}
-		{#if doc.warnings.length > 0}
-			<ul class="warnings">
-				{#each doc.warnings as warning}
-					<li>{warning}</li>
-				{/each}
-			</ul>
-		{/if}
-		<CanvasEdgeList
-			edges={edgeSummaries}
-			{edgeLabelDrafts}
-			{savingEdgeId}
-			{deletingEdgeId}
-			onLabelDraftChange={setEdgeLabelDraft}
-			onSaveLabel={saveEdgeLabel}
-			onDelete={deleteEdge}
-		/>
-		<CanvasBoard
-			nodes={displayNodes}
-			{bounds}
-			{lines}
-			{textDrafts}
-			{refDrafts}
-			{savingNodeId}
-			{movingNodeId}
-			{moveSavingNodeId}
-			{deletingNodeId}
-			{savingEdgeId}
-			{deletingEdgeId}
-			onDraftChange={setDraft}
-			onRefDraftChange={setRefDraft}
-			onSave={saveTextNode}
-			onSaveRef={saveRefNode}
-			onOpenRef={openRefNode}
-			onDelete={deleteNode}
-			onMovePointerDown={startMoveNode}
-		/>
-	{/if}
+	<CanvasStage
+		{loading}
+		{error}
+		{doc}
+		nodes={displayNodes}
+		{bounds}
+		{lines}
+		{edgeSummaries}
+		{textDrafts}
+		{refDrafts}
+		{edgeLabelDrafts}
+		{savingNodeId}
+		{movingNodeId}
+		{moveSavingNodeId}
+		{deletingNodeId}
+		{savingEdgeId}
+		{deletingEdgeId}
+		onEdgeLabelDraftChange={setEdgeLabelDraft}
+		onSaveEdgeLabel={saveEdgeLabel}
+		onDeleteEdge={deleteEdge}
+		onDraftChange={setDraft}
+		onRefDraftChange={setRefDraft}
+		onSaveNode={saveTextNode}
+		onSaveRefNode={saveRefNode}
+		onOpenRefNode={openRefNode}
+		onDeleteNode={deleteNode}
+		onMovePointerDown={startMoveNode}
+	/>
 </section>
 
 <style>
@@ -435,25 +418,5 @@
 		height: 100%;
 		min-height: 0;
 		background: var(--bg);
-	}
-	.warnings {
-		margin: 0;
-		padding: 8px 14px 8px 28px;
-		border-bottom: 1px solid color-mix(in srgb, var(--warning, #fbbf24), var(--border) 70%);
-		background: color-mix(in srgb, var(--warning, #fbbf24), transparent 92%);
-		color: var(--fg-muted);
-		font-size: 0.78rem;
-	}
-	.state {
-		display: grid;
-		place-items: center;
-		height: 100%;
-		color: var(--fg-dim);
-		font-size: 0.88rem;
-	}
-	.state.error {
-		color: var(--danger);
-		padding: 20px;
-		text-align: center;
 	}
 </style>

@@ -126,6 +126,10 @@ Use small, pushable slices:
    postprocessing, Mermaid rendering, and hover-preview state in `Preview`
    while moving the rendered markdown surface and hover-card DOM/CSS into
    focused presentational components.
+- **Canvas stage split.** Keep Canvas loading, mutation, stale-revision, and
+   drag orchestration in `CanvasView` while moving body states, warning
+   display, edge-list mounting, and board mounting into a focused
+   presentational component.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
