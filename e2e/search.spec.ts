@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
-import { clampSearchLimit, searchFullTextIndex } from '../src/lib/server/search';
+import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src/lib/server/search';
 import { searchResultRowStyle, visibleSearchWindow } from '../src/lib/search/view';
 
 function emptyIndex(): VaultIndex {
@@ -67,13 +67,28 @@ test('indexed full-text search reports capped result sets separately from return
 	}
 
 	const response = searchFullTextIndex(idx, 'needle', 7);
+	const secondPage = searchFullTextIndex(idx, 'needle', 7, 7);
+	const lastPage = searchFullTextIndex(idx, 'needle', 7, 35);
 
 	expect(response.total).toBe(40);
 	expect(response.limit).toBe(7);
+	expect(response.offset).toBe(0);
 	expect(response.limited).toBe(true);
+	expect(response.hasMore).toBe(true);
+	expect(response.nextOffset).toBe(7);
 	expect(response.results).toHaveLength(7);
+	expect(secondPage.offset).toBe(7);
+	expect(secondPage.nextOffset).toBe(14);
+	expect(secondPage.results[0].path).toBe('Notes/Needle 07.md');
+	expect(lastPage.offset).toBe(35);
+	expect(lastPage.hasMore).toBe(false);
+	expect(lastPage.nextOffset).toBeNull();
+	expect(lastPage.results).toHaveLength(5);
 	expect(clampSearchLimit('500', 50)).toBe(200);
 	expect(clampSearchLimit('bad', 50)).toBe(50);
+	expect(clampSearchOffset('12')).toBe(12);
+	expect(clampSearchOffset('-1')).toBe(0);
+	expect(clampSearchOffset('bad')).toBe(0);
 });
 
 test('indexed full-text search supports filters, quoted phrases, and exclusions', () => {

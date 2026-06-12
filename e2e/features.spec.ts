@@ -275,7 +275,7 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'search-virtual-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
-	for (let i = 0; i < 140; i += 1) {
+	for (let i = 0; i < 240; i += 1) {
 		const padded = String(i).padStart(3, '0');
 		fs.writeFileSync(
 			path.join(vaultDir, `Virtual ${padded}.md`),
@@ -295,17 +295,20 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	const search = page.locator('.search-view');
 	await search.getByRole('button', { name: 'Title' }).click();
 	await search.locator('input[type="text"]').fill('virtualneedle');
-	await expect(search.locator('.hint')).toContainText('140 results', { timeout: 5_000 });
+	await expect(search.locator('.hint')).toContainText('Showing 200 of 240 matches', { timeout: 5_000 });
 	await expect(search.locator('.result').first()).toContainText('Virtual 000');
 
 	const rendered = await search.locator('.result').count();
 	expect(rendered).toBeLessThan(60);
+	await expect(search.getByRole('button', { name: 'Load more (200/240)' })).toBeVisible();
+	await search.getByRole('button', { name: 'Load more (200/240)' }).click();
+	await expect(search.locator('.hint')).toContainText('240 results', { timeout: 5_000 });
 
 	await search.locator('.results').evaluate((el) => {
 		el.scrollTop = el.scrollHeight;
 		el.dispatchEvent(new Event('scroll'));
 	});
-	await expect(search.locator('.result').filter({ hasText: 'Virtual 139' })).toBeVisible({ timeout: 4_000 });
+	await expect(search.locator('.result').filter({ hasText: 'Virtual 239' })).toBeVisible({ timeout: 4_000 });
 });
 
 test('new note command uses an in-app name dialog', async ({ page, request }) => {

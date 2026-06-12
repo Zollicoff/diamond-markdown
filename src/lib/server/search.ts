@@ -44,13 +44,23 @@ export function clampSearchLimit(raw: string | null, fallback: number): number {
 	return Math.min(parsed, MAX_SEARCH_LIMIT);
 }
 
-export function emptySearchResponse(query: string, mode: SearchResponse['mode'], limit: number): SearchResponse {
+export function clampSearchOffset(raw: string | null): number {
+	if (!raw) return 0;
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+	return parsed;
+}
+
+export function emptySearchResponse(query: string, mode: SearchResponse['mode'], limit: number, offset = 0): SearchResponse {
 	return {
 		query: query.trim(),
 		mode,
 		limit,
+		offset,
 		total: 0,
 		limited: false,
+		hasMore: false,
+		nextOffset: null,
 		results: []
 	};
 }
@@ -60,21 +70,27 @@ export function buildSearchResponse(
 	mode: SearchResponse['mode'],
 	limit: number,
 	results: SearchHit[],
-	total = results.length
+	total = results.length,
+	offset = 0
 ): SearchResponse {
+	const nextOffset = offset + results.length;
+	const hasMore = nextOffset < total;
 	return {
 		query: query.trim(),
 		mode,
 		limit,
+		offset,
 		total,
-		limited: total > results.length,
+		limited: hasMore,
+		hasMore,
+		nextOffset: hasMore ? nextOffset : null,
 		results
 	};
 }
 
-export function searchFullTextIndex(idx: VaultIndex, query: string, limit = DEFAULT_FULL_TEXT_SEARCH_LIMIT): SearchResponse {
+export function searchFullTextIndex(idx: VaultIndex, query: string, limit = DEFAULT_FULL_TEXT_SEARCH_LIMIT, offset = 0): SearchResponse {
 	const parts = parseQuery(query);
-	if (!parts.raw) return emptySearchResponse(query, 'full', limit);
+	if (!parts.raw) return emptySearchResponse(query, 'full', limit, offset);
 
 	const ranked: RankedHit[] = [];
 	for (const meta of idx.notes.values()) {
@@ -88,8 +104,8 @@ export function searchFullTextIndex(idx: VaultIndex, query: string, limit = DEFA
 		return a.path.localeCompare(b.path);
 	});
 
-	const capped = ranked.slice(0, limit).map(({ rank: _rank, firstIndex: _firstIndex, ...hit }) => hit);
-	return buildSearchResponse(query, 'full', limit, capped, ranked.length);
+	const capped = ranked.slice(offset, offset + limit).map(({ rank: _rank, firstIndex: _firstIndex, ...hit }) => hit);
+	return buildSearchResponse(query, 'full', limit, capped, ranked.length, offset);
 }
 
 function rankNote(idx: VaultIndex, meta: NoteMeta, query: QueryParts): RankedHit | null {

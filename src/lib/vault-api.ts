@@ -390,22 +390,30 @@ export const api = {
 		emit('tree:invalidate', { vaultId });
 	},
 
-	async search(vaultId: string, query: string, opts: { full?: boolean; limit?: number; signal?: AbortSignal } = {}): Promise<SearchHit[]> {
+	async search(vaultId: string, query: string, opts: { full?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<SearchHit[]> {
 		return (await this.searchWithMeta(vaultId, query, opts)).results;
 	},
 
-	async searchWithMeta(vaultId: string, query: string, opts: { full?: boolean; limit?: number; signal?: AbortSignal } = {}): Promise<SearchResponse> {
+	async searchWithMeta(vaultId: string, query: string, opts: { full?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<SearchResponse> {
 		const params = new URLSearchParams({ q: query });
 		if (opts.full) params.set('full', '1');
 		if (opts.limit) params.set('limit', String(opts.limit));
+		if (opts.offset) params.set('offset', String(opts.offset));
 		const res = await json<SearchResponse>(`/api/vaults/${vaultId}/search?${params.toString()}`, { signal: opts.signal });
+		const results = res.results ?? [];
+		const offset = res.offset ?? opts.offset ?? 0;
+		const total = res.total ?? results.length;
+		const nextOffset = res.nextOffset ?? (offset + results.length < total ? offset + results.length : null);
 		return {
 			query: res.query ?? query.trim(),
 			mode: res.mode ?? (opts.full ? 'full' : 'title'),
 			limit: res.limit ?? opts.limit ?? (opts.full ? 50 : 25),
-			total: res.total ?? res.results?.length ?? 0,
-			limited: res.limited ?? false,
-			results: res.results ?? []
+			offset,
+			total,
+			limited: res.limited ?? nextOffset !== null,
+			hasMore: res.hasMore ?? nextOffset !== null,
+			nextOffset,
+			results
 		};
 	},
 

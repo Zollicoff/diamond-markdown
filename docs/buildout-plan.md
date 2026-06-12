@@ -303,21 +303,23 @@ Use small, pushable slices:
 - **Search result virtualization.** Render large returned search result sets
    through a virtual window in the search tab, backed by pure view helpers and
    browser coverage for scrolling from the first to last returned match.
+- **Search pagination beyond capped results.** Treat the search response limit
+   as a page size instead of a hard stop, expose `offset`/`nextOffset`
+   metadata, and let the Search tab load more ranked matches without
+   over-rendering.
 
 ## Next Implementation Slices
 
 1. **Desktop release CI.** Add and verify a matrix workflow for desktop
    preflight/build/artifact upload once a GitHub credential with `workflow`
    scope is available.
-2. **Search pagination beyond capped results.** Add a server/client paging path
-   for result sets larger than the current bounded response window.
-3. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
+2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without
    executing Obsidian plugins.
-4. **Verification hardening.** Add tests for remaining dialog-driven
+3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
-5. **Component diet.** Continue extracting large views only when the split
+4. **Component diet.** Continue extracting large views only when the split
    directly supports a product-facing feature or verification gap.
 
 ## Verification Gates

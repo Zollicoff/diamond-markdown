@@ -24,9 +24,11 @@
 	let viewportHeight = $state(0);
 	let meta = $state<SearchResponse | null>(null);
 	let loading = $state(false);
+	let loadingMore = $state(false);
 	let err = $state<string | null>(null);
 	let controller: AbortController | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let requestId = 0;
 	let resultWindow = $derived(visibleSearchWindow(results, scrollTop, viewportHeight));
 
 	onMount(() => {
@@ -52,8 +54,9 @@
 		debounceTimer = setTimeout(() => void runSearch(q), 120);
 	}
 
-	async function runSearch(query: string): Promise<void> {
+	async function runSearch(query: string, append = false): Promise<void> {
 		const trimmed = query.trim();
+		const id = ++requestId;
 		// Tell the parent so the tab title updates.
 		onQueryChange?.(trimmed);
 		if (!trimmed) {
@@ -61,29 +64,41 @@
 			meta = null;
 			resetResultWindow();
 			loading = false;
+			loadingMore = false;
 			err = null;
 			return;
 		}
+		if (append && !meta?.nextOffset) return;
 		controller?.abort();
 		controller = new AbortController();
-		loading = true;
+		if (append) loadingMore = true;
+		else {
+			loading = true;
+			loadingMore = false;
+		}
 		err = null;
 		try {
 			const response = await api.searchWithMeta(vaultId, trimmed, {
 				full: fullText,
 				limit: fullText ? 200 : 100,
+				offset: append ? meta?.nextOffset ?? results.length : 0,
 				signal: controller.signal
 			});
-			results = response.results;
+			if (id !== requestId) return;
+			results = append ? [...results, ...response.results] : response.results;
 			meta = response;
-			resetResultWindow();
+			if (!append) resetResultWindow();
 		} catch (e) {
+			if (id !== requestId || isAbortError(e)) return;
 			err = e instanceof Error ? e.message : String(e);
 			results = [];
 			meta = null;
 			resetResultWindow();
 		} finally {
-			loading = false;
+			if (id === requestId) {
+				if (append) loadingMore = false;
+				else loading = false;
+			}
 		}
 	}
 
@@ -101,6 +116,11 @@
 		if (resultsEl) resultsEl.scrollTop = 0;
 	}
 
+	function loadMore(): void {
+		if (loading || loadingMore || !meta?.nextOffset) return;
+		void runSearch(q, true);
+	}
+
 	function toggleFullText(): void {
 		fullText = !fullText;
 		void runSearch(q);
@@ -115,6 +135,10 @@
 			e.preventDefault();
 			open(hit, e);
 		}
+	}
+
+	function isAbortError(error: unknown): boolean {
+		return error instanceof DOMException && error.name === 'AbortError';
 	}
 
 	// If the bound query prop changes externally (e.g., the search command
@@ -162,7 +186,7 @@
 			{:else if err}<span class="err">Error: {err}</span>
 			{:else if !q.trim()}Type to search.
 			{:else if results.length === 0}No matches.
-			{:else if meta?.limited}Showing {results.length} of {meta.total} matches.
+			{:else if meta && meta.total > results.length}Showing {results.length} of {meta.total} matches.
 			{:else}{results.length} result{results.length === 1 ? '' : 's'}
 			{/if}
 		</p>
@@ -186,6 +210,13 @@
 				</button>
 			{/each}
 		</div>
+		{#if meta?.hasMore}
+			<div class="results-footer">
+				<button type="button" class="load-more" disabled={loading || loadingMore} onclick={loadMore}>
+					{loadingMore ? 'Loading…' : `Load more (${results.length}/${meta.total})`}
+				</button>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -255,6 +286,29 @@
 	.result-spacer {
 		position: relative;
 		min-height: 100%;
+	}
+	.results-footer {
+		display: flex;
+		justify-content: center;
+		padding: 8px 0 14px;
+	}
+	.load-more {
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: var(--bg-elev);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.8rem;
+		padding: 6px 12px;
+		cursor: pointer;
+	}
+	.load-more:hover:not(:disabled) {
+		color: var(--fg);
+		border-color: var(--accent);
+	}
+	.load-more:disabled {
+		cursor: default;
+		opacity: 0.6;
 	}
 	.result {
 		display: block;

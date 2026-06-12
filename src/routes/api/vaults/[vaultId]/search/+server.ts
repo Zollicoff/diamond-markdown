@@ -6,6 +6,7 @@ import { getIndex } from '$lib/server/indexer';
 import {
 	buildSearchResponse,
 	clampSearchLimit,
+	clampSearchOffset,
 	DEFAULT_FULL_TEXT_SEARCH_LIMIT,
 	DEFAULT_TITLE_SEARCH_LIMIT,
 	emptySearchResponse,
@@ -26,7 +27,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		url.searchParams.get('limit'),
 		full ? DEFAULT_FULL_TEXT_SEARCH_LIMIT : DEFAULT_TITLE_SEARCH_LIMIT
 	);
-	if (!q.trim()) return json(emptySearchResponse(q, full ? 'full' : 'title', limit));
+	const offset = clampSearchOffset(url.searchParams.get('offset'));
+	if (!q.trim()) return json(emptySearchResponse(q, full ? 'full' : 'title', limit, offset));
 
 	const idx = getIndex(vault);
 	const entries = [...idx.notes.values()].map((m) => ({
@@ -47,14 +49,15 @@ export const GET: RequestHandler = async ({ params, url }) => {
 			q,
 			'title',
 			limit,
-			hits.slice(0, limit).map((h) => ({
+			hits.slice(offset, offset + limit).map((h) => ({
 				path: h.item.path,
 				title: h.item.title,
 				score: h.score ?? 0
 			})),
-			hits.length
+			hits.length,
+			offset
 		));
 	}
 
-	return json(searchFullTextIndex(idx, q, limit));
+	return json(searchFullTextIndex(idx, q, limit, offset));
 };

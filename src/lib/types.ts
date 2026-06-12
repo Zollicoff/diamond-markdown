@@ -182,8 +182,11 @@ export interface SearchResponse {
 	query: string;
 	mode: 'title' | 'full';
 	limit: number;
+	offset: number;
 	total: number;
 	limited: boolean;
+	hasMore: boolean;
+	nextOffset: number | null;
 	results: SearchHit[];
 }
 
