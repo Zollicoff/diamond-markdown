@@ -7,6 +7,7 @@
 		importReadiness,
 		importSummary,
 		obsidianAppConfigSummary,
+		obsidianBookmarksSummary,
 		obsidianDailyNotesSummary,
 		obsidianTemplatesSummary,
 		obsidianPluginMigrationNotes,
@@ -140,6 +141,19 @@
 				{/each}
 			</ul>
 		{/if}
+	{/if}
+
+	{#if analysis.obsidianBookmarks.status !== 'missing'}
+		<div class="note">
+			<span class="note-label">Obsidian bookmarks</span>
+			<span>{obsidianBookmarksSummary(analysis.obsidianBookmarks)}</span>
+			{#if analysis.obsidianBookmarks.path}
+				<span class="mono">{analysis.obsidianBookmarks.path}</span>
+			{/if}
+			{#if analysis.obsidianBookmarks.paths.length > 0}
+				<span class="mono">{compactPathList(analysis.obsidianBookmarks.paths, 4)}</span>
+			{/if}
+		</div>
 	{/if}
 
 	{#if analysis.obsidianPlugins.length > 0}

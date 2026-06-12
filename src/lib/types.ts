@@ -45,7 +45,9 @@ export interface ObsidianAppConfigInfo {
 	newFileLocation?: string;
 	newFileFolderPath?: string;
 	newFileFolderStatus: 'safe' | 'unsafe' | 'missing' | 'not-configured';
+	useMarkdownLinks?: boolean;
 	alwaysUpdateLinks?: boolean;
+	newLinkFormat?: string;
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
 }
@@ -95,9 +97,28 @@ export interface ObsidianTemplatesInfo {
 	warnings: string[];
 }
 
+export interface ObsidianBookmarksInfo {
+	path?: string;
+	status: JsonFileStatus;
+	source: 'bookmarks' | 'starred' | 'missing';
+	bytes?: number;
+	totalItems: number;
+	importableBookmarks: number;
+	paths: string[];
+	warnings: string[];
+}
+
 export interface NewNoteLocation {
 	folder: string | null;
 	source: 'obsidian-app-config' | 'vault-root';
+}
+
+export type EditorLinkStyle = 'wikilink' | 'markdown';
+
+export interface EditorLinkPreference {
+	style: EditorLinkStyle;
+	newLinkFormat: string | null;
+	source: 'obsidian-app-config' | 'diamond-default';
 }
 
 export interface ObsidianPluginInfo {
@@ -128,6 +149,7 @@ export interface VaultImportAnalysis {
 	obsidianAppConfig: ObsidianAppConfigInfo;
 	obsidianDailyNotes: ObsidianDailyNotesInfo;
 	obsidianTemplates: ObsidianTemplatesInfo;
+	obsidianBookmarks: ObsidianBookmarksInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];
 	recommendedExcludedFolders: string[];

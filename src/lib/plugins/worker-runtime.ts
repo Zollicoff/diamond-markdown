@@ -42,6 +42,7 @@ type WorkerCapabilityName =
 	| 'editor.prependLines'
 	| 'editor.toggleHeading'
 	| 'editor.insertWikilink'
+	| 'editor.insertNoteLink'
 	| 'editor.insertCodeBlock'
 	| 'editor.scrollToHeading'
 	| 'editor.focus';
@@ -174,6 +175,9 @@ function makeEditorProxy(target) {
     },
     insertWikilink() {
       return requestCapability('editor.insertWikilink', { target });
+    },
+    insertNoteLink(style) {
+      return requestCapability('editor.insertNoteLink', { target, style });
     },
     insertCodeBlock(lang) {
       return requestCapability('editor.insertCodeBlock', { target, lang });
@@ -452,6 +456,14 @@ async function runWorkerCapability(files: PluginFilesApi, message: WorkerCapabil
 		case 'editor.insertWikilink':
 			activeEditorForTarget(readEditorTarget(input)).editor.insertWikilink();
 			return { ok: true };
+		case 'editor.insertNoteLink': {
+			const style = readOptionalString(input, 'style', 32);
+			if (style !== undefined && style !== 'wikilink' && style !== 'markdown') {
+				throw new Error('link style must be wikilink or markdown');
+			}
+			activeEditorForTarget(readEditorTarget(input)).editor.insertNoteLink(style);
+			return { ok: true };
+		}
 		case 'editor.insertCodeBlock':
 			activeEditorForTarget(readEditorTarget(input)).editor.insertCodeBlock(readOptionalString(input, 'lang', 32));
 			return { ok: true };

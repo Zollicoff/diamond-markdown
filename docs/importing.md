@@ -16,6 +16,8 @@ an existing Obsidian vault. The preflight reports:
   preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
+- Obsidian `bookmarks.json` or legacy `starred.json` note bookmarks that can
+  seed Diamond's git-backed bookmarks
 - Obsidian plugin folders plus read-only manifest/settings migration guidance
 - Obsidian Canvas files that will be preserved and opened with visual editing
 - whether the folder already has `.git`
@@ -26,11 +28,12 @@ Diamond reads known-safe `.obsidian/app.json` settings during preflight and
 shows them as migration notes instead of dumping the raw JSON. It currently
 honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
 attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
-default destination for generic New Note commands, and `alwaysUpdateLinks` for
-note/folder rename and move operations. Explicit folder context actions such as
-New note here still use the selected folder. Other app settings such as
-`useMarkdownLinks`, `newLinkFormat`, and `trashOption` are reported so migration
-mismatches are visible before opening the vault.
+default destination for generic New Note commands, `useMarkdownLinks` for the
+editor link button's inserted syntax, and `alwaysUpdateLinks` for note/folder
+rename and move operations. Explicit folder context actions such as New note
+here still use the selected folder. Other app settings such as `newLinkFormat`
+and `trashOption` are reported so migration mismatches are visible before
+opening the vault.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same
@@ -53,6 +56,15 @@ plugin manifests plus the top-level keys in each plugin `data.json`, then shows
 per-plugin migration notes for enabled state, manifest health, settings-file
 health, preserved file location, and manual migration action. It does not expose
 full plugin setting values in the preview.
+
+When `.obsidian/bookmarks.json` or legacy `.obsidian/starred.json` is present,
+Diamond imports visible Markdown file bookmarks into `.diamondmd/bookmarks.json`
+when the vault is registered, as long as a Diamond bookmark store does not
+already exist. The importer supports nested Obsidian bookmark groups but only
+seeds note-level file bookmarks; Obsidian search bookmarks, missing files,
+hidden/config paths, Canvas files, and other non-note entries remain preserved
+in `.obsidian` but are not converted into Diamond bookmarks. If the imported
+vault already has Git initialized, Diamond commits the seeded bookmark file.
 
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
@@ -124,6 +136,8 @@ initial state of the imported vault is captured explicitly.
 
 - It does not import or execute Obsidian plugins.
 - It does not automatically migrate Obsidian plugin settings into Diamond plugins.
+- It does not convert Obsidian search bookmarks, bookmark groups, or non-note
+  bookmarks into Diamond bookmarks.
 - It does not automatically apply every `.obsidian/app.json` UI preference.
 - It does not rewrite wikilinks or embeds.
 - It does not move attachments during import.

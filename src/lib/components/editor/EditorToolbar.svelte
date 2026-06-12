@@ -1,12 +1,15 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
+	import { linkToolbarButton } from '$lib/editor/link-insertion';
+	import type { EditorLinkStyle } from '$lib/types';
 
 	interface Props {
 		api: EditorApi | null;
+		linkStyle?: EditorLinkStyle;
 		onAttachExisting?: () => void;
 	}
 
-	let { api, onAttachExisting }: Props = $props();
+	let { api, linkStyle = 'wikilink', onAttachExisting }: Props = $props();
 
 	function act(fn: (api: EditorApi) => void): void {
 		if (!api) return;
@@ -15,7 +18,8 @@
 
 	interface Btn { icon: string; title: string; action: (a: EditorApi) => void; }
 
-	const groups: Btn[][] = [
+	const linkButton = $derived(linkToolbarButton(linkStyle));
+	const groups = $derived<Btn[][]>([
 		[
 			{ icon: 'B',     title: 'Bold (⌘B)',        action: (a) => a.wrap('**') },
 			{ icon: 'I',     title: 'Italic (⌘I)',      action: (a) => a.wrap('*') },
@@ -34,10 +38,10 @@
 			{ icon: '❝',     title: 'Quote',            action: (a) => a.prependLines('> ') }
 		],
 		[
-			{ icon: '[[ ]]', title: 'Wikilink',         action: (a) => a.insertWikilink() },
+			{ icon: linkButton.icon, title: linkButton.title, action: (a) => a.insertNoteLink(linkStyle) },
 			{ icon: '{ }',   title: 'Code block',       action: (a) => a.insertCodeBlock() }
 		]
-	];
+	]);
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Formatting">

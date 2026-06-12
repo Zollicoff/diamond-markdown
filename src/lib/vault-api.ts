@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
@@ -70,6 +70,10 @@ export const api = {
 
 	async newNoteLocation(vaultId: string): Promise<NewNoteLocation> {
 		return json(`/api/vaults/${vaultId}/new-note-location`);
+	},
+
+	async linkStyle(vaultId: string): Promise<EditorLinkPreference> {
+		return json(`/api/vaults/${vaultId}/link-style`);
 	},
 
 	async canvas(vaultId: string, path: string): Promise<CanvasDoc> {

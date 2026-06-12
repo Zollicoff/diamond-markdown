@@ -9,6 +9,7 @@ import type {
 	VaultImportCheckItem
 } from '$lib/types';
 import { readObsidianAppConfig } from './obsidian-config';
+import { readObsidianBookmarks } from './obsidian-bookmarks';
 import { readObsidianDailyNotesConfig } from './obsidian-daily';
 import { readObsidianTemplatesConfig } from './obsidian-templates';
 
@@ -77,6 +78,20 @@ function obsidianTemplatesDetail(config: ObsidianTemplatesInfo): string {
 	return 'No Obsidian Templates settings were found.';
 }
 
+function obsidianBookmarksDetail(config: ReturnType<typeof readObsidianBookmarks>): string {
+	if (config.status === 'invalid') {
+		return `${config.path ?? '.obsidian/bookmarks.json'} is invalid; Diamond will preserve it but cannot import bookmarks.`;
+	}
+	if (config.status === 'missing') {
+		return 'No Obsidian bookmarks or legacy starred file was found.';
+	}
+	if (config.importableBookmarks > 0) {
+		const source = config.source === 'starred' ? 'legacy starred' : 'bookmark';
+		return `${config.importableBookmarks} ${source} item${config.importableBookmarks === 1 ? '' : 's'} can seed Diamond bookmarks on registration.`;
+	}
+	return `${config.path ?? '.obsidian/bookmarks.json'} found, but no visible Markdown note bookmarks were recognized.`;
+}
+
 export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (!inputPath?.trim()) throw new Error('path required');
 	const root = expandHome(inputPath);
@@ -104,6 +119,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const obsidianAppConfig = readObsidianAppConfig(root);
 	const obsidianDailyNotes = readObsidianDailyNotesConfig(root);
 	const obsidianTemplates = readObsidianTemplatesConfig(root);
+	const obsidianBookmarks = readObsidianBookmarks(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
@@ -202,6 +218,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	warnings.push(...obsidianAppConfig.warnings);
 	warnings.push(...obsidianDailyNotes.warnings);
 	warnings.push(...obsidianTemplates.warnings);
+	warnings.push(...obsidianBookmarks.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
 	const attachmentDetail = likelyAttachmentFolders.length > 0
@@ -261,6 +278,14 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				: obsidianTemplates.status === 'present' ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-bookmarks',
+			'Obsidian bookmarks',
+			obsidianBookmarksDetail(obsidianBookmarks),
+			obsidianBookmarks.status === 'invalid'
+				? 'warn'
+				: obsidianBookmarks.importableBookmarks > 0 ? 'info' : 'ok'
+		),
+		item(
 			'canvas',
 			'Canvas files',
 			canvasFiles > 0
@@ -303,6 +328,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		obsidianAppConfig,
 		obsidianDailyNotes,
 		obsidianTemplates,
+		obsidianBookmarks,
 		obsidianPluginFolders,
 		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),

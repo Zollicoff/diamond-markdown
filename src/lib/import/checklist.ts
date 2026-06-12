@@ -1,5 +1,6 @@
 import type {
 	ObsidianAppConfigInfo,
+	ObsidianBookmarksInfo,
 	ObsidianDailyNotesInfo,
 	ObsidianTemplatesInfo,
 	ObsidianPluginInfo,
@@ -107,6 +108,14 @@ export function obsidianTemplatesSummary(config: ObsidianTemplatesInfo): string 
 	if (config.status === 'invalid') return '.obsidian/templates.json is present but invalid.';
 	if (config.settings.length === 0) return '.obsidian/templates.json found; no supported Templates settings were recognized.';
 	return `${config.settings.length} Templates setting${config.settings.length === 1 ? '' : 's'} found; templates load from ${config.folderPath ?? 'Templates'}.`;
+}
+
+export function obsidianBookmarksSummary(config: ObsidianBookmarksInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/bookmarks.json or legacy .obsidian/starred.json file was found.';
+	if (config.status === 'invalid') return `${config.path ?? '.obsidian/bookmarks.json'} is present but invalid.`;
+	if (config.importableBookmarks === 0) return `${config.path ?? '.obsidian/bookmarks.json'} found; no visible Markdown note bookmarks were recognized.`;
+	const source = config.source === 'starred' ? 'legacy starred' : 'bookmark';
+	return `${config.importableBookmarks} Obsidian ${source} item${config.importableBookmarks === 1 ? '' : 's'} can seed Diamond bookmarks.`;
 }
 
 function formatBytes(bytes: number | undefined): string {

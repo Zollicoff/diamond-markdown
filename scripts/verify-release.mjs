@@ -10,16 +10,46 @@ function commandFor(command) {
 	return command;
 }
 
-function run(label, command, args, env = {}) {
+function runCommand(label, command, args, env = {}, options = {}) {
 	console.log(`\n==> ${label}`);
 	console.log(`$ ${[command, ...args].join(' ')}`);
-	const result = spawnSync(commandFor(command), args, {
+	return spawnSync(commandFor(command), args, {
 		stdio: 'inherit',
-		env: { ...process.env, ...env }
+		env: { ...process.env, ...env },
+		timeout: options.timeoutMs,
+		killSignal: 'SIGTERM'
 	});
+}
+
+function failedStatus(result) {
+	if (result.error) {
+		if (result.error.code === 'ETIMEDOUT') return 'timed out';
+		return result.error.message;
+	}
+	if (typeof result.status === 'number') return `exited ${result.status}`;
+	if (result.signal) return `signaled ${result.signal}`;
+	return 'failed';
+}
+
+function run(label, command, args, env = {}, options = {}) {
+	const result = runCommand(label, command, args, env, options);
 	if (result.status !== 0) {
+		console.error(`${label} ${failedStatus(result)}.`);
 		process.exit(result.status ?? 1);
 	}
+}
+
+function runWithRetry(label, command, args, env = {}, options = {}) {
+	const attempts = options.attempts ?? 2;
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		if (attempt > 1) console.log(`Retrying ${label} (${attempt}/${attempts})...`);
+		options.beforeAttempt?.(attempt);
+		const result = runCommand(label, command, args, env, options);
+		if (result.status === 0) return;
+		console.error(`${label} attempt ${attempt}/${attempts} ${failedStatus(result)}.`);
+		if (attempt < attempts) sleep(1000);
+	}
+	process.exit(1);
 }
 
 function playwrightEnv() {
@@ -70,8 +100,11 @@ function waitForProductionBuildOutput() {
 
 run('Dependency audit', 'npm', ['audit', '--audit-level=moderate']);
 run('Type and Svelte diagnostics', 'npm', ['run', 'check']);
-cleanProductionBuildOutput();
-run('Production build', 'npm', ['run', 'build', '--', '--logLevel', 'warn'], { CI: '1' });
+runWithRetry('Production build', 'npm', ['run', 'build', '--', '--logLevel', 'warn'], { CI: '1' }, {
+	attempts: 2,
+	timeoutMs: 90_000,
+	beforeAttempt: cleanProductionBuildOutput
+});
 waitForProductionBuildOutput();
 run('Basic Auth production smoke', 'npm', ['run', 'verify:auth']);
 run('Read-only production smoke', 'npm', ['run', 'verify:readonly']);

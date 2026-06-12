@@ -18,6 +18,11 @@ export interface SaveBookmarkInput {
 	title?: unknown;
 }
 
+export interface SeedBookmarkInput extends SaveBookmarkInput {
+	createdAt?: unknown;
+	updatedAt?: unknown;
+}
+
 export interface SaveBookmarkResult {
 	bookmark: Bookmark;
 	bookmarks: Bookmark[];
@@ -26,6 +31,10 @@ export interface SaveBookmarkResult {
 
 function bookmarksPath(vault: VaultRef): string {
 	return path.join(vault.path, BOOKMARKS_REL_PATH);
+}
+
+export function bookmarkStoreExists(vault: VaultRef): boolean {
+	return fs.existsSync(bookmarksPath(vault));
 }
 
 function nowIso(): string {
@@ -70,6 +79,24 @@ function normalizeBookmark(raw: unknown): Bookmark | null {
 		title,
 		createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : nowIso(),
 		updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : nowIso()
+	};
+}
+
+function normalizeSeedBookmark(input: SeedBookmarkInput): Bookmark | null {
+	let rel: string;
+	try {
+		rel = cleanBookmarkPath(input.path);
+	} catch {
+		return null;
+	}
+	const createdAt = typeof input.createdAt === 'string' && input.createdAt
+		? input.createdAt
+		: nowIso();
+	return {
+		path: rel,
+		title: cleanBookmarkTitle(input.title, rel),
+		createdAt,
+		updatedAt: typeof input.updatedAt === 'string' && input.updatedAt ? input.updatedAt : createdAt
 	};
 }
 
@@ -127,6 +154,26 @@ export function saveBookmark(vault: VaultRef, input: SaveBookmarkInput): SaveBoo
 	const bookmarks = sortBookmarks(next).slice(0, MAX_BOOKMARKS);
 	writeStore(vault, { version: 1, bookmarks });
 	return { bookmark, bookmarks, created: existingIndex < 0 };
+}
+
+export function seedBookmarks(
+	vault: VaultRef,
+	inputs: SeedBookmarkInput[]
+): { created: boolean; imported: number; bookmarks: Bookmark[] } {
+	if (bookmarkStoreExists(vault)) return { created: false, imported: 0, bookmarks: listBookmarks(vault) };
+	const seen = new Set<string>();
+	const bookmarks: Bookmark[] = [];
+	for (const input of inputs) {
+		const bookmark = normalizeSeedBookmark(input);
+		if (!bookmark || seen.has(bookmark.path)) continue;
+		seen.add(bookmark.path);
+		bookmarks.push(bookmark);
+	}
+	const sorted = sortBookmarks(bookmarks).slice(0, MAX_BOOKMARKS);
+	if (sorted.length > 0) {
+		writeStore(vault, { version: 1, bookmarks: sorted });
+	}
+	return { created: sorted.length > 0, imported: sorted.length, bookmarks: sorted };
 }
 
 export function deleteBookmark(vault: VaultRef, inputPath: unknown): { deleted: boolean; bookmarks: Bookmark[] } {

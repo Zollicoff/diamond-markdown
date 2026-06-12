@@ -171,7 +171,8 @@ Editor command contexts include `editor`, `doc`, `notePath`, `paneId`, `tabId`,
 Worker editor commands support the same registration shape, but `when` is not
 available because functions cannot be moved across the Worker boundary. The
 worker editor proxy currently supports `insert`, `insertTemplate`, `wrap`,
-`prependLines`, `toggleHeading`, `insertWikilink`, `insertCodeBlock`,
+`prependLines`, `toggleHeading`, `insertWikilink`, `insertNoteLink`,
+`insertCodeBlock`,
 `scrollToHeading`, and `focus`; each method returns a promise because the host
 applies the mutation.
 

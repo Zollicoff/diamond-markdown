@@ -165,6 +165,13 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		timeFormat: 'HH:mm:ss',
 		privateTemplatesSetting: 'do-not-render-this-template-config-value'
 	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
+		items: [
+			{ type: 'file', path: 'Notes/Home.md', title: 'Home bookmark' },
+			{ type: 'file', path: 'Missing.md', title: 'Missing bookmark' },
+			{ type: 'search', query: 'tag:#todo' }
+		]
+	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['dataview']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'manifest.json'), JSON.stringify({
 		id: 'dataview',
@@ -227,6 +234,13 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
+		obsidianBookmarks: {
+			status: string;
+			source: string;
+			importableBookmarks: number;
+			paths: string[];
+			warnings: string[];
+		};
 		obsidianPluginFolders: string[];
 		obsidianPlugins: {
 			id: string;
@@ -272,7 +286,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		value: 'Attachments',
 		level: 'info'
 	});
-	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor shortcuts still favor wikilinks');
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor link button inserts Markdown link syntax');
 	expect(JSON.stringify(body.obsidianAppConfig)).not.toContain('do-not-render-this-app-config-value');
 	expect(body.obsidianDailyNotes).toMatchObject({
 		status: 'present',
@@ -297,6 +311,12 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	});
 	expect(body.obsidianTemplates.settings.map((setting) => setting.id)).toEqual(['folder', 'dateFormat', 'timeFormat']);
 	expect(JSON.stringify(body.obsidianTemplates)).not.toContain('do-not-render-this-template-config-value');
+	expect(body.obsidianBookmarks).toMatchObject({
+		status: 'present',
+		source: 'bookmarks',
+		importableBookmarks: 1,
+		paths: ['Notes/Home.md']
+	});
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
 	expect(body.obsidianPlugins[0]).toMatchObject({
 		id: 'dataview',
@@ -314,6 +334,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.canvasExamples).toContain('Board.canvas');
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
 	expect(body.checklist.find((row) => row.id === 'obsidian-templates')?.detail).toContain('templates load from Snippet Bank');
+	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 bookmark item can seed Diamond bookmarks');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
@@ -345,6 +366,18 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		dateFormat: 'dddd, MMMM D, YYYY',
 		timeFormat: 'HH:mm:ss',
 		privateTemplatesSetting: 'do-not-render-this-template-config-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
+		items: [
+			{
+				type: 'group',
+				title: 'Pinned',
+				items: [
+					{ type: 'file', path: 'Home.md', title: 'Home bookmark' },
+					{ type: 'file', path: 'Missing.md', title: 'Missing bookmark' }
+				]
+			}
+		]
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['obsidian-kanban']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), JSON.stringify({
@@ -407,6 +440,9 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Template time format');
 	await expect(page.locator('.import-card')).toContainText('HH:mm:ss');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-template-config-value');
+	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
+	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');
+	await expect(page.locator('.import-card')).toContainText('Home.md');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
@@ -540,6 +576,76 @@ test('bookmarks are vault-local and follow git-backed note and folder moves', as
 	expect(deletedNote.ok(), await deletedNote.text()).toBe(true);
 	const afterDelete = JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8')) as { bookmarks: { path: string }[] };
 	expect(afterDelete.bookmarks.map((bookmark) => bookmark.path)).toEqual(['Projects/Archive/Old.md']);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
+test('vault registration seeds Obsidian bookmarks into git-backed Diamond bookmarks', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-bookmark-import-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Projects'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Projects', 'Solar.md'), '# Solar\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
+		items: [
+			{
+				type: 'group',
+				title: 'Pinned',
+				items: [
+					{ type: 'file', path: 'Home.md', title: 'Home bookmark', ctime: 1_700_000_000_000 },
+					{ type: 'file', path: 'Projects/Solar.md', title: 'Solar bookmark' },
+					{ type: 'file', path: 'Board.canvas', title: 'Board' },
+					{ type: 'file', path: 'Missing.md', title: 'Missing' }
+				]
+			}
+		]
+	}));
+	git(vaultDir, ['init']);
+	git(vaultDir, ['config', 'user.email', 'test@example.com']);
+	git(vaultDir, ['config', 'user.name', 'Diamond Test']);
+	git(vaultDir, ['add', '.']);
+	git(vaultDir, ['commit', '-m', 'init fixture']);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Bookmark Import', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const createdBody = await created.json() as {
+		vault: { id: string };
+		obsidianBookmarks: { imported: number; created: boolean; sha: string | null; paths: string[] };
+	};
+	expect(createdBody.obsidianBookmarks).toMatchObject({
+		created: true,
+		imported: 2,
+		paths: ['Projects/Solar.md', 'Home.md']
+	});
+	expect(createdBody.obsidianBookmarks.sha).toMatch(/^[a-f0-9]{40}$/);
+
+	const bookmarksFile = path.join(vaultDir, '.diamondmd', 'bookmarks.json');
+	expect(JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8'))).toMatchObject({
+		bookmarks: [
+			expect.objectContaining({ path: 'Projects/Solar.md', title: 'Solar bookmark' }),
+			expect.objectContaining({ path: 'Home.md', title: 'Home bookmark' })
+		]
+	});
+	const listed = await request.get(`/api/vaults/${createdBody.vault.id}/bookmarks`);
+	expect(listed.ok(), await listed.text()).toBe(true);
+	const listedBody = await listed.json() as { bookmarks: { path: string }[] };
+	expect(listedBody.bookmarks.map((bookmark) => bookmark.path)).toEqual(['Projects/Solar.md', 'Home.md']);
+	expect(git(vaultDir, ['log', '--oneline', '--', '.diamondmd/bookmarks.json'])).toContain('create: imported Obsidian bookmarks');
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+
+	const second = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Bookmark Import Again', path: vaultDir }
+	});
+	expect(second.ok(), await second.text()).toBe(true);
+	const secondBody = await second.json() as { obsidianBookmarks: { imported: number; created: boolean; reason?: string } };
+	expect(secondBody.obsidianBookmarks).toMatchObject({
+		created: false,
+		imported: 0,
+		reason: 'diamond-bookmarks-exist'
+	});
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 });
 
@@ -822,6 +928,45 @@ test('template command honors safe Obsidian Templates settings', async ({ reques
 	expect(outside.status()).toBe(400);
 });
 
+test('editor link button honors Obsidian Markdown-link preference', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-markdown-link-style-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		useMarkdownLinks: true,
+		newLinkFormat: 'relative'
+	}));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLink style test.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Markdown Link Style', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const preference = await request.get(`/api/vaults/${vault.id}/link-style`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toMatchObject({
+		style: 'markdown',
+		newLinkFormat: 'relative',
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`);
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await page.getByRole('tab', { name: 'Source' }).click();
+	await expect(page.getByRole('button', { name: 'Markdown link' })).toBeVisible();
+	const editor = page.locator('.cm-content').first();
+	await editor.click();
+	await page.keyboard.press('Meta+End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('MARK:');
+	await page.getByRole('button', { name: 'Markdown link' }).click();
+	const text = await editor.innerText();
+	expect(text).toContain('MARK:[]()');
+	expect(text).not.toContain('MARK:[[]]');
+});
+
 test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {
 	const notePath = 'Delete Dialog Note.md';
 	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);
@@ -886,7 +1031,13 @@ test('delete folder command confirms before removing non-empty folders', async (
 	await folderRow.click({ button: 'right' });
 	await page.getByRole('menuitem', { name: 'Delete folder + contents' }).click();
 	await expect(dialog).toBeVisible();
+	const deleteResponse = page.waitForResponse((response) =>
+		response.url().includes(`/api/vaults/${vault.id}/folder`) &&
+		response.request().method() === 'DELETE'
+	);
 	await dialog.getByRole('button', { name: 'Delete' }).click();
+	const deleted = await deleteResponse;
+	expect(deleted.ok(), await deleted.text()).toBe(true);
 	await expect.poll(() => fs.existsSync(absFolder)).toBe(false);
 	const missing = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
 	expect(missing.status()).toBe(404);

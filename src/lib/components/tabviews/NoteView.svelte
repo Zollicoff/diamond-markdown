@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { NoteDoc } from '$lib/types';
+	import type { EditorLinkStyle, NoteDoc } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
@@ -64,6 +64,7 @@
 	let PreviewView = $state<NoteViewComponent | null>(null);
 	let ToolbarView = $state<NoteViewComponent | null>(null);
 	let viewLoadError = $state<string | null>(null);
+	let linkStyle = $state<EditorLinkStyle>('wikilink');
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -91,6 +92,20 @@
 				void load();
 			});
 		}
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			linkStyle = 'wikilink';
+			api.linkStyle(id)
+				.then((preference) => {
+					if (id === vaultId) linkStyle = preference.style;
+				})
+				.catch(() => {
+					if (id === vaultId) linkStyle = 'wikilink';
+				});
+		});
 	});
 
 	// Refresh when a sibling saves the same note, or this note is renamed.
@@ -327,6 +342,7 @@
 		{vaultId}
 		{doc}
 		{mode}
+		{linkStyle}
 		{content}
 		{editorApi}
 		{uploadingAttachments}

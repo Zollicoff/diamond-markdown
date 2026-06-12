@@ -8,11 +8,13 @@ import {
 	importSummary,
 	obsidianDailyNotesSummary,
 	obsidianAppConfigSummary,
+	obsidianBookmarksSummary,
 	obsidianTemplatesSummary,
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
-import { preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
+import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
+import { editorLinkPreference, preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
@@ -50,6 +52,14 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			dateFormatStatus: 'missing',
 			timeFormatStatus: 'missing',
 			settings: [],
+			warnings: []
+		},
+		obsidianBookmarks: {
+			status: 'missing',
+			source: 'missing',
+			totalItems: 0,
+			importableBookmarks: 0,
+			paths: [],
 			warnings: []
 		},
 		obsidianPluginFolders: [],
@@ -194,6 +204,37 @@ test.describe('import checklist helpers', () => {
 		})).toBe('1 Templates setting found; templates load from Snippet Bank.');
 	});
 
+	test('summarizes Obsidian bookmarks importability', () => {
+		expect(obsidianBookmarksSummary(analysis().obsidianBookmarks)).toBe('No .obsidian/bookmarks.json or legacy .obsidian/starred.json file was found.');
+		expect(obsidianBookmarksSummary({
+			path: '.obsidian/bookmarks.json',
+			status: 'invalid',
+			source: 'bookmarks',
+			totalItems: 0,
+			importableBookmarks: 0,
+			paths: [],
+			warnings: []
+		})).toBe('.obsidian/bookmarks.json is present but invalid.');
+		expect(obsidianBookmarksSummary({
+			path: '.obsidian/bookmarks.json',
+			status: 'present',
+			source: 'bookmarks',
+			totalItems: 3,
+			importableBookmarks: 2,
+			paths: ['Home.md', 'Projects/Solar.md'],
+			warnings: []
+		})).toBe('2 Obsidian bookmark items can seed Diamond bookmarks.');
+		expect(obsidianBookmarksSummary({
+			path: '.obsidian/starred.json',
+			status: 'present',
+			source: 'starred',
+			totalItems: 1,
+			importableBookmarks: 1,
+			paths: ['Legacy.md'],
+			warnings: []
+		})).toBe('1 Obsidian legacy starred item can seed Diamond bookmarks.');
+	});
+
 	test('uses safe Obsidian Templates settings for template runtime defaults', () => {
 		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-templates-'));
 		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
@@ -297,6 +338,40 @@ test.describe('import checklist helpers', () => {
 
 		fs.writeFileSync(appJson, JSON.stringify({ alwaysUpdateLinks: true }));
 		expect(shouldUpdateLinksOnRename(vaultDir)).toBe(true);
+	});
+
+	test('uses Obsidian Markdown-link preference for editor link insertion', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-link-style-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		expect(editorLinkPreference(vaultDir)).toEqual({
+			style: 'wikilink',
+			newLinkFormat: null,
+			source: 'diamond-default'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({
+			useMarkdownLinks: true,
+			newLinkFormat: 'relative'
+		}));
+		expect(editorLinkPreference(vaultDir)).toEqual({
+			style: 'markdown',
+			newLinkFormat: 'relative',
+			source: 'obsidian-app-config'
+		});
+		expect(linkToolbarButton('markdown')).toEqual({ icon: '[]()', title: 'Markdown link' });
+		expect(linkInsertion('', 'markdown')).toEqual({ text: '[]()', anchorOffset: 1, headOffset: 1 });
+		expect(linkInsertion('Solar Plan', 'markdown')).toEqual({
+			text: '[Solar Plan]()',
+			anchorOffset: 13,
+			headOffset: 13
+		});
+		expect(linkInsertion('Solar Plan', 'wikilink')).toEqual({
+			text: '[[Solar Plan]]',
+			anchorOffset: 2,
+			headOffset: 12
+		});
 	});
 
 	test('uses safe Obsidian daily note settings for the daily-note plan', () => {

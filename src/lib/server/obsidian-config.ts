@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeVaultPath } from './paths';
 import type {
+	EditorLinkPreference,
 	JsonFileStatus,
 	ObsidianAppConfigInfo,
 	ObsidianAppConfigSetting,
@@ -168,12 +169,13 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 
 	const useMarkdownLinks = booleanValue(body.useMarkdownLinks);
 	if (useMarkdownLinks !== null) {
+		base.useMarkdownLinks = useMarkdownLinks;
 		base.settings.push(setting(
 			'useMarkdownLinks',
 			'Link style',
 			useMarkdownLinks ? 'Markdown links' : 'Wikilinks',
 			useMarkdownLinks
-				? 'Diamond renders imported Markdown links and wikilinks; editor shortcuts still favor wikilinks.'
+				? 'Diamond renders imported Markdown links and wikilinks; the editor link button inserts Markdown link syntax.'
 				: 'Diamond preserves and creates Obsidian-style wikilinks.'
 		));
 	}
@@ -197,6 +199,7 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 
 	const newLinkFormat = stringValue(body.newLinkFormat);
 	if (newLinkFormat) {
+		base.newLinkFormat = newLinkFormat;
 		base.settings.push(setting(
 			'newLinkFormat',
 			'New link format',
@@ -227,4 +230,14 @@ export function preferredObsidianNewNoteFolder(root: string): string | null {
 export function shouldUpdateLinksOnRename(root: string): boolean {
 	const config = readObsidianAppConfig(root);
 	return config.alwaysUpdateLinks !== false;
+}
+
+export function editorLinkPreference(root: string): EditorLinkPreference {
+	const config = readObsidianAppConfig(root);
+	const style = config.useMarkdownLinks ? 'markdown' : 'wikilink';
+	return {
+		style,
+		newLinkFormat: config.newLinkFormat ?? null,
+		source: config.useMarkdownLinks === undefined ? 'diamond-default' : 'obsidian-app-config'
+	};
 }

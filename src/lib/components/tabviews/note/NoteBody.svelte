@@ -1,13 +1,14 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { NoteDoc } from '$lib/types';
+	import type { EditorLinkStyle, NoteDoc } from '$lib/types';
 	import type { NoteViewComponent } from '$lib/note/lazy-components';
 
 	interface Props {
 		vaultId: string;
 		doc: NoteDoc | null;
 		mode: 'live' | 'source' | 'read';
+		linkStyle: EditorLinkStyle;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -31,6 +32,7 @@
 		vaultId,
 		doc,
 		mode,
+		linkStyle,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -52,7 +54,7 @@
 </script>
 
 {#if mode !== 'read' && ToolbarView}
-	<ToolbarView api={editorApi} onAttachExisting={onAttachExisting} />
+	<ToolbarView api={editorApi} {linkStyle} onAttachExisting={onAttachExisting} />
 {/if}
 
 {#if uploadingAttachments > 0}

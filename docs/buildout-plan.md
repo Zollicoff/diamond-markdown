@@ -108,6 +108,9 @@ Use small, pushable slices:
 - **Release verifier isolation.** Run release Playwright verification on a fresh
    local port and serve production static assets through an e2e preview wrapper
    that returns clean 404s instead of crashing on stale immutable chunk requests.
+- **Release build-output hardening.** Bound production build hangs with a
+   timeout/retry in `verify:release`, and make the Playwright webserver verify
+   required adapter-node output before importing the production handler.
 - **Dirty sync recovery state.** Surface local uncommitted vault changes as a
    distinct warning/review state with file visibility and commit/stash recovery
    commands.
@@ -214,6 +217,15 @@ Use small, pushable slices:
 - **Obsidian plugin settings visibility.** Surface Obsidian plugin manifests,
    enabled state, and `data.json` presence in import preflight without
    executing or modifying Obsidian plugins.
+- **Obsidian bookmark import.** Detect `.obsidian/bookmarks.json` and legacy
+   `.obsidian/starred.json` during import preflight, seed visible note-level
+   file bookmarks into `.diamondmd/bookmarks.json` on registration when no
+   Diamond bookmark store exists, and commit that metadata file for git-backed
+   imported vaults.
+- **Obsidian link-style preference.** Honor safe `.obsidian/app.json`
+   `useMarkdownLinks` by switching the editor link toolbar action between
+   Obsidian wikilinks and Markdown link syntax without changing existing note
+   content.
 - **Shared pointer open-mode helper.** Move modifier-click and middle-click
    open-mode rules into a workspace helper used by note preview, search,
    file tree, bookmarks, and recent notes.
@@ -369,6 +381,10 @@ Use small, pushable slices:
    note/folder references unchanged during explicit note and folder rename or
    move operations; keep reference-safe rewrites as the default when the
    setting is missing or enabled.
+- **Obsidian Markdown-link preference.** Honor `.obsidian/app.json`
+   `useMarkdownLinks: true` for the editor link toolbar button so new inserted
+   links use Markdown `[]()` syntax while existing wikilinks and imported notes
+   remain untouched.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

@@ -9,6 +9,8 @@
 import { EditorView } from '@codemirror/view';
 import { slugifyHeading } from '$lib/util/strings';
 import { blockReferenceId } from '$lib/markdown/wikilinks';
+import { linkInsertion } from './link-insertion';
+import type { EditorLinkStyle } from '$lib/types';
 
 export interface EditorApi {
 	/** Wrap the current selection in prefix/suffix (e.g. '**' / '**'). */
@@ -25,6 +27,8 @@ export interface EditorApi {
 	insertTemplate(text: string): void;
 	/** Insert a wikilink `[[target]]` (uses selection as target if any). */
 	insertWikilink(): void;
+	/** Insert a note link using the vault's configured link style. */
+	insertNoteLink(style?: EditorLinkStyle): void;
 	/** Insert a fenced code block, preserving the selection as the body. */
 	insertCodeBlock(lang?: string): void;
 	/** Scroll the editor to a markdown heading or Obsidian block id anchor. */
@@ -141,22 +145,23 @@ export function makeEditorApi(getView: () => EditorView | null): EditorApi {
 			});
 		},
 
-		insertWikilink() {
+		insertNoteLink(style = 'wikilink') {
 			withView((view) => {
 				const { from, to } = view.state.selection.main;
 				const sel = view.state.sliceDoc(from, to);
-				if (sel) {
-					view.dispatch({
-						changes: { from, to, insert: `[[${sel}]]` },
-						selection: { anchor: from + 2, head: from + 2 + sel.length }
-					});
-				} else {
-					view.dispatch({
-						changes: { from, insert: '[[]]' },
-						selection: { anchor: from + 2 }
-					});
-				}
+				const insertion = linkInsertion(sel, style);
+				view.dispatch({
+					changes: { from, to, insert: insertion.text },
+					selection: {
+						anchor: from + insertion.anchorOffset,
+						head: from + insertion.headOffset
+					}
+				});
 			});
+		},
+
+		insertWikilink() {
+			this.insertNoteLink('wikilink');
 		},
 
 		insertCodeBlock(lang = '') {
