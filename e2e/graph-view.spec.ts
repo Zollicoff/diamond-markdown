@@ -6,6 +6,13 @@ import {
 	selectNodesInBox,
 	selectionBoxFromPoints
 } from '../src/lib/graph/view';
+import {
+	graphDragMoved,
+	graphNodeOpenTitle,
+	panGraphTransform,
+	toggleGraphPathSelection,
+	zoomGraphTransform
+} from '../src/lib/graph/interaction';
 
 function node(path: string, title: string, degree: number, x = 0, y = 0): GNode {
 	return {
@@ -59,6 +66,30 @@ test.describe('graph view helpers', () => {
 			x: 50,
 			y: 30
 		});
+	});
+
+	test('keeps pointer interaction math outside the graph component', () => {
+		const zoomed = zoomGraphTransform({
+			screenPoint: { x: 100, y: 80 },
+			deltaY: -1,
+			transform: { viewX: 20, viewY: 10, viewScale: 1 }
+		});
+		expect(zoomed.viewX).toBeCloseTo(12);
+		expect(zoomed.viewY).toBeCloseTo(3);
+		expect(zoomed.viewScale).toBeCloseTo(1.1);
+
+		expect(panGraphTransform(
+			{ x: 40, y: 50 },
+			{ x: 10, y: 20 },
+			{ x: 25, y: 5 }
+		)).toEqual({ viewX: 55, viewY: 35 });
+
+		expect(graphDragMoved({ x: 0, y: 0 }, { x: 3, y: 3 })).toBe(true);
+		expect(graphDragMoved({ x: 0, y: 0 }, { x: 2, y: 2 })).toBe(false);
+		expect(toggleGraphPathSelection(['A.md'], 'B.md')).toEqual(['A.md', 'B.md']);
+		expect(toggleGraphPathSelection(['A.md', 'B.md'], 'A.md')).toEqual(['B.md']);
+		expect(graphNodeOpenTitle(node('Folder/Fallback.md', '', 0))).toBe('Fallback');
+		expect(graphNodeOpenTitle(node('Folder/Named.md', 'Named note', 0))).toBe('Named note');
 	});
 
 	test('selects visible nodes inside the drag box without disturbing tiny drags', () => {

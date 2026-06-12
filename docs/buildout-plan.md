@@ -109,6 +109,9 @@ Use small, pushable slices:
 - **Graph toolbar split.** Move graph counts, selection clear, settings toggle,
    reset, and centering controls out of `GraphView` into a presentational
    `GraphToolbar` component.
+- **Graph interaction helper extraction.** Move zoom, pan, drag-threshold,
+   selection-toggle, and node-open title logic out of `GraphView` into pure
+   graph helpers with focused tests.
 
 ## Next Implementation Slices
 

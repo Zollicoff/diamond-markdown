@@ -14,6 +14,13 @@
 		selectNodesInBox,
 		selectionBoxFromPoints
 	} from '$lib/graph/view';
+	import {
+		graphDragMoved,
+		graphNodeOpenTitle,
+		panGraphTransform,
+		toggleGraphPathSelection,
+		zoomGraphTransform
+	} from '$lib/graph/interaction';
 	import GraphCanvas from './GraphCanvas.svelte';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 	import GraphToolbar from './GraphToolbar.svelte';
@@ -49,7 +56,6 @@
 	let dragStartY = 0;
 	let dragMoved = false;
 	let suppressNextNodeClick = false;
-	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
 	let hoverPath = $state<string | null>(null);
 	let selectedPaths = $state<string[]>([]);
 
@@ -168,16 +174,18 @@
 	// --- Pointer + view handlers ---------------------------------------
 	function onWheel(e: WheelEvent): void {
 		e.preventDefault();
-		const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
 		const cx = e.clientX - rect.left;
 		const cy = e.clientY - rect.top;
-		const wx = (cx - viewX) / viewScale;
-		const wy = (cy - viewY) / viewScale;
-		viewScale = Math.max(0.2, Math.min(4, viewScale * factor));
-		viewX = cx - wx * viewScale;
-		viewY = cy - wy * viewScale;
+		const next = zoomGraphTransform({
+			screenPoint: { x: cx, y: cy },
+			deltaY: e.deltaY,
+			transform: { viewX, viewY, viewScale }
+		});
+		viewX = next.viewX;
+		viewY = next.viewY;
+		viewScale = next.viewScale;
 	}
 
 	function capturePointer(el: Element, pointerId: number): void {
@@ -199,9 +207,7 @@
 	}
 
 	function toggleSelection(path: string): void {
-		selectedPaths = selectedPaths.includes(path)
-			? selectedPaths.filter((p) => p !== path)
-			: [...selectedPaths, path];
+		selectedPaths = toggleGraphPathSelection(selectedPaths, path);
 	}
 
 	function finishSelection(additive: boolean): void {
@@ -246,9 +252,10 @@
 		}
 		if (draggingNode) {
 			if (!dragMoved) {
-				const dx = e.clientX - dragStartX;
-				const dy = e.clientY - dragStartY;
-				if (dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) dragMoved = true;
+				dragMoved = graphDragMoved(
+					{ x: dragStartX, y: dragStartY },
+					{ x: e.clientX, y: e.clientY }
+				);
 			}
 			const rect = svgEl?.getBoundingClientRect();
 			if (!rect) return;
@@ -257,8 +264,13 @@
 			return;
 		}
 		if (!isPanning) return;
-		viewX = panOrigX + (e.clientX - panStartX);
-		viewY = panOrigY + (e.clientY - panStartY);
+		const next = panGraphTransform(
+			{ x: panOrigX, y: panOrigY },
+			{ x: panStartX, y: panStartY },
+			{ x: e.clientX, y: e.clientY }
+		);
+		viewX = next.viewX;
+		viewY = next.viewY;
 	}
 
 	function onPointerUpBG(e: PointerEvent): void {
@@ -325,7 +337,7 @@
 			toggleSelection(n.path);
 			return;
 		}
-		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
+		const title = graphNodeOpenTitle(n);
 		const mode = e.altKey ? 'new-pane' : 'new-tab';
 		openNote(vaultId, n.path, title, mode);
 	}
@@ -338,7 +350,7 @@
 			toggleSelection(n.path);
 			return;
 		}
-		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
+		const title = graphNodeOpenTitle(n);
 		openNote(vaultId, n.path, title, 'new-tab');
 	}
 
