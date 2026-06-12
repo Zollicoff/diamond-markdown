@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked, Renderer, type Tokens } from 'marked';
-import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags } from './wikilink';
+import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags, wikilinkFragment } from './wikilink';
 import { splitFrontmatter } from './frontmatter';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
@@ -36,7 +36,8 @@ import {
 	splitAssetReference
 } from './embed';
 import { renderObsidianCallout } from './callouts';
-import { slugify, escHtml, escAttr } from '$lib/util/strings';
+import { addObsidianBlockIds } from './block-ids';
+import { slugify, slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -190,7 +191,7 @@ function renderBodyForPublish(
 			const resolved = resolveTarget(idx, link.target);
 			const display = link.display ?? link.target;
 			if (resolved && slugs.has(resolved)) {
-				return `<a class="wikilink" href="${slugs.get(resolved)}.html">${escHtml(display)}</a>`;
+				return `<a class="wikilink" href="${slugs.get(resolved)}.html${wikilinkFragment(link)}">${escHtml(display)}</a>`;
 			}
 			return `<span class="wikilink wikilink--broken" title="not published">${escHtml(display)}</span>`;
 		});
@@ -203,11 +204,19 @@ function renderBodyForPublish(
 	const raw = marked.parse(processed, {
 		renderer: createPublishRenderer(vault, sourcePath, imagesCopied, outDir)
 	}) as string;
-	return purify.sanitize(raw, {
+	return purify.sanitize(addObsidianBlockIds(addHeadingIds(raw)), {
 		ALLOWED_ATTR: [
 			'href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel',
 			'loading', 'width', 'height', 'aria-label', 'controls', 'preload', 'download', 'open'
 		]
+	});
+}
+
+function addHeadingIds(html: string): string {
+	return html.replace(/<h([1-6])>([\s\S]*?)<\/h\1>/g, (_w, level: string, inner: string) => {
+		const text = inner.replace(/<[^>]+>/g, '').trim();
+		const id = slugifyHeading(text);
+		return `<h${level} id="${escAttr(id)}">${inner}</h${level}>`;
 	});
 }
 

@@ -41,6 +41,11 @@ render as styled callout blocks in read mode and static publish. Fold markers
 use native disclosure blocks, so collapsed and expanded defaults survive
 without client-only JavaScript.
 
+Obsidian block IDs on paragraphs and list items, such as
+`Important install step ^install-steps`, render as linkable anchors in read mode
+and static publish. Wikilinks like `[[Target#^install-steps]]` preserve the
+block-reference fragment instead of treating it as a heading link.
+
 Frontmatter `tags` and `aliases` are read from either flow arrays
 (`tags: [project/foo, review]`) or Obsidian-style block lists, so imported
 vaults keep their search, tag index, and alias-based wikilink behavior without

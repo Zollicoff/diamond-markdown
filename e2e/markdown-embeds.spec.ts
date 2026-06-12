@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { NoteDoc } from '../src/lib/types';
-import { replaceEmbeds, type ParsedEmbed } from '../src/lib/server/wikilink';
+import { parseWikilinks, replaceEmbeds, wikilinkFragment, type ParsedEmbed } from '../src/lib/server/wikilink';
 import { splitAssetReference } from '../src/lib/server/embed';
 import { parseObsidianCallout } from '../src/lib/server/callouts';
 
@@ -226,6 +226,88 @@ test.describe('Obsidian image embed variants', () => {
 		expect(fs.existsSync(path.join(report.outDir, 'assets', 'clip.mp4'))).toBe(true);
 		expect(fs.existsSync(path.join(report.outDir, 'assets', 'packet.pdf'))).toBe(true);
 		expect(fs.existsSync(path.join(report.outDir, 'assets', 'bundle.zip'))).toBe(true);
+	});
+
+	test('renders Obsidian block references in read mode and static publish output', async ({ request }) => {
+		const parsed = parseWikilinks('Jump to [[Target#^install-steps|specific block]] and [[Target#Details]].');
+		expect(parsed[0]).toMatchObject({
+			target: 'Target',
+			heading: null,
+			blockId: 'install-steps',
+			display: 'specific block'
+		});
+		expect(wikilinkFragment(parsed[0])).toBe('#^install-steps');
+		expect(parsed[1]).toMatchObject({
+			target: 'Target',
+			heading: 'Details',
+			blockId: null,
+			display: null
+		});
+		expect(wikilinkFragment(parsed[1])).toBe('#details');
+
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'block-reference-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(vaultDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(vaultDir, 'Target.md'),
+			[
+				'---',
+				'title: Target',
+				'public: true',
+				'---',
+				'# Target',
+				'',
+				'Important install paragraph ^install-steps',
+				'',
+				'## Details',
+				'',
+				'More target text.'
+			].join('\n')
+		);
+		fs.writeFileSync(
+			path.join(vaultDir, 'Source.md'),
+			[
+				'---',
+				'title: Source',
+				'public: true',
+				'---',
+				'# Source',
+				'',
+				'Jump to [[Target#^install-steps|specific block]] and [[Target#Details|details heading]].'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Block Reference Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const sourceRes = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Source.md')}`);
+		expect(sourceRes.ok()).toBe(true);
+		const source = await sourceRes.json() as NoteDoc;
+		expect(source.outgoingLinks).toContainEqual({ target: 'Target', resolved: 'Target.md' });
+		expect(source.html).toContain(`/vault/${vault.id}/note/Target.md#^install-steps`);
+		expect(source.html).toContain(`/vault/${vault.id}/note/Target.md#details`);
+
+		const targetRes = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Target.md')}`);
+		expect(targetRes.ok()).toBe(true);
+		const target = await targetRes.json() as NoteDoc;
+		expect(target.html).toContain('<p id="^install-steps">Important install paragraph</p>');
+		expect(target.html).toContain('<h2 id="details">Details</h2>');
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(2);
+
+		const sourceHtml = fs.readFileSync(path.join(report.outDir, 'source.html'), 'utf-8');
+		expect(sourceHtml).toContain('href="target.html#^install-steps"');
+		expect(sourceHtml).toContain('href="target.html#details"');
+
+		const targetHtml = fs.readFileSync(path.join(report.outDir, 'target.html'), 'utf-8');
+		expect(targetHtml).toContain('<p id="^install-steps">Important install paragraph</p>');
+		expect(targetHtml).toContain('<h2 id="details">Details</h2>');
 	});
 
 	test('renders source-relative Markdown image links in read mode and static publish output', async ({ request }) => {

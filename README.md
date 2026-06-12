@@ -58,7 +58,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 - **Vault** — a folder of markdown files. Every vault is its own git repository (auto-initialized on first save).
 - **Note** — a `.md` file inside a vault. The file's path within the vault is its identity.
-- **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading. Broken links render visibly so you can create missing notes.
+- **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading, and `[[Note#^block-id]]` deep-links to an Obsidian block ID. Broken links render visibly so you can create missing notes.
 - **Note embed** — `![[Note]]` renders the target note inline (cycle-safe).
 - **Attachment embed** — `![[image.png]]`, `![[audio.mp3]]`, `![[video.mp4]]`, `![[packet.pdf]]`, and other vault files render from local vault assets.
 - **Callout** — Obsidian-style callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+` render in read mode and static publish.
@@ -80,6 +80,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Right-click any wikilink for a context menu (Open / Open in new tab / Open in new pane / Copy path)
 - Hover preview — mouseover a wikilink for a floating card with the target's first ~800 chars rendered through the same pipeline
 - Heading anchors — every heading gets a stable id so `[[Note#Heading]]` deep-links work
+- Obsidian block anchors — paragraph/list block IDs such as `^install-steps` become stable anchors for `[[Note#^install-steps]]`
 - Backlinks panel — every note linking to the open note
 - Outgoing links panel
 - Outline panel — headings of the active note, click to scroll
@@ -89,6 +90,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Code highlighting (highlight.js, server-rendered, language auto-detect)
 - Mermaid diagrams (lazy-loaded client-side)
 - Footnotes — standard `[^1]` references with back-links
+- Obsidian block IDs — trailing paragraph/list markers such as `^block-id` render as linkable anchors without showing the marker text
 - Note embeds (`![[Note]]`), image embeds (`![[image.png]]`, `![[image.png|300]]`, `![[image.png|300x200]]`)
 
 ### Workspace

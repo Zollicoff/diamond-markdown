@@ -6,13 +6,15 @@
  *   [[path/to/note]]
  *   [[Note Title|display text]]
  *   [[Note Title#Heading]]
+ *   [[Note Title#^block-id]]
  *   [[Note Title#Heading|display text]]
  *
  * Resolution lives in indexer.ts — this file is just the syntax parser.
  */
 
-import { WIKILINK_RE } from '$lib/util/strings';
+import { WIKILINK_RE, slugifyHeading } from '$lib/util/strings';
 import { parseObsidianEmbedMeta, splitAssetReference } from './embed';
+import { isObsidianBlockId, blockReferenceId } from './block-ids';
 
 export interface ParsedWikilink {
 	/** Exact substring from the source, including `[[` and `]]`. */
@@ -21,8 +23,25 @@ export interface ParsedWikilink {
 	target: string;
 	/** Heading anchor after `#`, or null. */
 	heading: string | null;
+	/** Obsidian block reference id after `#^`, or null. */
+	blockId: string | null;
 	/** Display text (after `|`), or null to fall back to target. */
 	display: string | null;
+}
+
+export function parseWikilinkSubpath(value: string | undefined): Pick<ParsedWikilink, 'heading' | 'blockId'> {
+	const subpath = value?.trim() ?? '';
+	if (!subpath) return { heading: null, blockId: null };
+	if (subpath.startsWith('^')) {
+		const blockId = subpath.slice(1).trim();
+		if (isObsidianBlockId(blockId)) return { heading: null, blockId };
+	}
+	return { heading: subpath, blockId: null };
+}
+
+export function wikilinkFragment(link: Pick<ParsedWikilink, 'heading' | 'blockId'>): string {
+	if (link.blockId) return `#${blockReferenceId(link.blockId)}`;
+	return link.heading ? `#${slugifyHeading(link.heading)}` : '';
 }
 
 /**
@@ -33,10 +52,12 @@ export interface ParsedWikilink {
 export function parseWikilinks(body: string): ParsedWikilink[] {
 	const out: ParsedWikilink[] = [];
 	for (const match of body.matchAll(WIKILINK_RE)) {
+		const subpath = parseWikilinkSubpath(match[2]);
 		out.push({
 			raw: match[0],
 			target: match[1].trim(),
-			heading: match[2]?.trim() ?? null,
+			heading: subpath.heading,
+			blockId: subpath.blockId,
 			display: match[3]?.trim() ?? null
 		});
 	}
@@ -52,10 +73,12 @@ export function replaceWikilinks(
 	render: (link: ParsedWikilink) => string
 ): string {
 	return body.replace(WIKILINK_RE, (raw, target, heading, display) => {
+		const subpath = parseWikilinkSubpath(heading as string | undefined);
 		return render({
 			raw,
 			target: (target as string).trim(),
-			heading: (heading as string | undefined)?.trim() ?? null,
+			heading: subpath.heading,
+			blockId: subpath.blockId,
 			display: (display as string | undefined)?.trim() ?? null
 		});
 	});

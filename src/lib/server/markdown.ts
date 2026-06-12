@@ -19,7 +19,7 @@ import { marked, Renderer, type Tokens } from 'marked';
 import markedFootnote from 'marked-footnote';
 import katex from 'katex';
 import hljs from 'highlight.js';
-import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
+import { replaceWikilinks, replaceEmbeds, isImagePath, wikilinkFragment } from './wikilink';
 import {
 	attachmentEmbedKind,
 	embedImageAttrs,
@@ -35,6 +35,7 @@ import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
 import { purify } from './sanitize';
 import { renderObsidianCallout } from './callouts';
+import { addObsidianBlockIds } from './block-ids';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -61,7 +62,19 @@ export interface RenderResult {
 export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string, sourcePath: string | null = null): RenderResult {
 	const outgoing: { target: string; resolved: string | null }[] = [];
 	const html = renderInner(vault, idx, body, outgoing, new Set(), sourcePath);
-	return { html, outgoingLinks: outgoing };
+	return { html, outgoingLinks: dedupeOutgoingLinks(outgoing) };
+}
+
+function dedupeOutgoingLinks(links: RenderResult['outgoingLinks']): RenderResult['outgoingLinks'] {
+	const seen = new Set<string>();
+	const deduped: RenderResult['outgoingLinks'] = [];
+	for (const link of links) {
+		const key = `${link.target}\0${link.resolved ?? ''}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(link);
+	}
+	return deduped;
 }
 
 /** Inner recursive renderer — `visited` is the chain of paths currently being
@@ -129,7 +142,7 @@ function renderInner(
 			if (!resolved) {
 				return `<a class="wikilink wikilink--broken" href="/vault/${vault.id}/create?title=${encodeURIComponent(link.target)}" data-target="${escAttr(link.target)}">${escHtml(display)}</a>`;
 			}
-			const hash = link.heading ? `#${slugifyHeading(link.heading)}` : '';
+			const hash = wikilinkFragment(link);
 			const href = `/vault/${vault.id}/note/${encodeURI(resolved)}${hash}`;
 			return `<a class="wikilink" href="${href}" data-target="${escAttr(resolved)}">${escHtml(display)}</a>`;
 		});
@@ -146,9 +159,10 @@ function renderInner(
 
 	// 4. Add id attributes to headings so `[[Note#Heading]]` deep-links work.
 	const withHeadingIds = addHeadingIds(raw);
+	const withBlockIds = addObsidianBlockIds(withHeadingIds);
 
 	// 5. Sanitize.
-	return purify.sanitize(withHeadingIds, {
+	return purify.sanitize(withBlockIds, {
 		ALLOWED_ATTR,
 		ADD_ATTR: ['target']
 	});

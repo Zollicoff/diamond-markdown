@@ -243,6 +243,9 @@ Use small, pushable slices:
 - **Obsidian callout rendering.** Render `> [!TYPE]` callouts, including
    collapsed and expanded fold markers, in both read mode and static publish
    while preserving markdown inside the callout body.
+- **Obsidian block-reference compatibility.** Render paragraph/list block IDs
+   such as `^install-steps` as linkable anchors and preserve
+   `[[Note#^block-id]]` fragments in read mode and static publish.
 - **Obsidian block-list frontmatter.** Parse block-list `tags` and `aliases`
    from imported vaults so tag indexes, search, and alias wikilinks match
    common Obsidian frontmatter without rewriting note files.
@@ -267,6 +270,9 @@ Use small, pushable slices:
 - **Canvas edge endpoint compatibility.** Preserve JSON Canvas `fromEnd` and
    `toEnd` metadata and render endpoint arrows in both the live board and SVG
    export, including the spec default arrow at the target endpoint.
+- **Release build handoff hardening.** Verify that adapter-node production
+   output and manifest-referenced server chunks are readable before starting
+   auth, read-only, and Playwright release checks.
 
 ## Next Implementation Slices
 
