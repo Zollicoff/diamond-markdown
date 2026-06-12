@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import { attachmentEmbedMarkdown, filterAttachments, formatAttachmentSize } from '../src/lib/note/attachments';
-import { sanitizeAttachmentFilename } from '../src/lib/server/attachment-service';
+import { preferredAttachmentFolder, sanitizeAttachmentFilename } from '../src/lib/server/attachment-service';
 import type { AttachmentRef } from '../src/lib/types';
 
 function git(cwd: string, args: string[]): string {
@@ -117,6 +117,46 @@ test.describe('attachment uploads', () => {
 		] satisfies AttachmentRef[];
 		expect(filterAttachments(attachments, 'pdf').map((attachment) => attachment.path)).toEqual(['Docs/site.pdf']);
 		expect(filterAttachments(attachments, 'roof').map((attachment) => attachment.path)).toEqual(['Attachments/roof.png']);
+	});
+
+	test('uses safe Obsidian attachment folder config for new uploads', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-attachment-folder-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(
+			path.join(vaultDir, '.obsidian', 'app.json'),
+			JSON.stringify({ attachmentFolderPath: 'Media/Uploads' }, null, 2)
+		);
+		fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+		expect(preferredAttachmentFolder({ id: 'test', name: 'Test', path: vaultDir })).toBe('Media/Uploads');
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Obsidian Attachment Folder Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const uploaded = await request.post(`/api/vaults/${vault.id}/attachment`, {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: 'roof.png',
+					mimeType: 'image/png',
+					buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47])
+				}
+			}
+		});
+		expect(uploaded.ok()).toBe(true);
+		const body = await uploaded.json() as { path: string; filename: string; sha: string | null };
+		expect(body).toMatchObject({ path: 'Media/Uploads/roof.png', filename: 'roof.png' });
+		expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, 'Media', 'Uploads', 'roof.png'))).toBe(true);
+
+		fs.writeFileSync(
+			path.join(vaultDir, '.obsidian', 'app.json'),
+			JSON.stringify({ attachmentFolderPath: '../outside' }, null, 2)
+		);
+		expect(preferredAttachmentFolder({ id: 'test', name: 'Test', path: vaultDir })).toBe('Attachments');
 	});
 
 	test('renames attachments and rewrites markdown references in one commit', async ({ request }) => {

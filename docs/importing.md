@@ -36,8 +36,10 @@ Static publish copies those non-image attachments into the exported `assets/`
 folder.
 
 In edit mode, dropping or pasting local files into a note copies them into the
-vault's `Attachments/` folder, assigns a non-overwriting filename, commits the
-new asset to the vault git history, and inserts an Obsidian-style embed link.
+vault's configured Obsidian attachment folder when `.obsidian/app.json` declares
+a safe relative `attachmentFolderPath`; otherwise Diamond uses `Attachments/`.
+Uploads receive non-overwriting filenames, are committed to the vault git
+history, and insert Obsidian-style embed links.
 
 If media files are present outside a named attachment folder, the preflight
 marks that as a review item. Diamond still registers the vault in place, but
