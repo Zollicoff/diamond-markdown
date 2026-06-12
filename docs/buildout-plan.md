@@ -297,11 +297,15 @@ Use small, pushable slices:
 - **Search query operators.** Support quoted phrases, `tag:`, `path:`,
    `file:`/`title:`, `content:`/`body:`, and leading `-` exclusions inside
    the indexed full-text search path.
+- **Desktop release preflight.** Add `npm run verify:desktop-release` plus
+   `docs/desktop-release.md` so current-host desktop bundle inputs, sidecars,
+   signing inputs, and artifact expectations are checked before packaging.
 
 ## Next Implementation Slices
 
-1. **Desktop release track.** Add release automation docs and a workflow plan
-   for sidecars/signing/artifacts before claiming desktop distribution.
+1. **Desktop release CI.** Add and verify a matrix workflow for desktop
+   preflight/build/artifact upload once a GitHub credential with `workflow`
+   scope is available.
 2. **Search result virtualization.** Render very large result sets without
    relying on a fixed capped list as the only scale control.
 3. **Obsidian compatibility gaps.** Add verified handling for more daily-driver

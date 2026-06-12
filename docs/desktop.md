@@ -32,10 +32,17 @@ For a self-contained bundle on the current host platform:
 npm run desktop:build:self-contained
 ```
 
-That command prepares `src-tauri/binaries/node-<target-triple>` and builds with
-`src-tauri/tauri.sidecar.conf.json`, which adds the prepared runtime as a Tauri
-sidecar. On macOS and Linux, the prep script defaults to the official Node.js
-runtime for the current Node version so the bundle does not depend on a
+Before building a self-contained release bundle, run the desktop release
+preflight:
+
+```sh
+npm run verify:desktop-release
+```
+
+The self-contained build prepares `src-tauri/binaries/node-<target-triple>` and
+builds with `src-tauri/tauri.sidecar.conf.json`, which adds the prepared runtime
+as a Tauri sidecar. On macOS and Linux, the prep script defaults to the official
+Node.js runtime for the current Node version so the bundle does not depend on a
 Homebrew/system Node install. Run the command separately on each release target,
 or provide the target-specific sidecar binaries before cross-compiling.
 
@@ -75,3 +82,6 @@ The remaining desktop release work is to automate sidecar preparation for every
 published target, or replace the Node backend with native Rust filesystem/git
 commands. The current scripts make the current host platform self-contained
 when a sidecar build is used.
+
+The cross-platform release plan, artifact expectations, and signing inputs live
+in [desktop-release.md](./desktop-release.md).

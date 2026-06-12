@@ -148,7 +148,25 @@ Check:
 - `SECURITY.md` and `docs/self-hosting.md` describe the current security model.
 - New user-visible behavior is documented in `DESIGN.md` when architectural.
 
-## 10. Tag Or Deploy
+## 10. Desktop Release Preflight
+
+For a current-host self-contained desktop build:
+
+```sh
+npm run verify:desktop-release
+```
+
+Required:
+
+- Production backend output exists under `build/`.
+- Tauri bundle resources include `backend/build` and `sample-vault`.
+- The host Node sidecar exists, is executable, reports a Node.js version, and is git-ignored.
+- Package and Tauri versions match.
+- Signing/notarization environment status is recorded in the command output.
+
+For the full desktop release plan, see `docs/desktop-release.md`.
+
+## 11. Tag Or Deploy
 
 Only after all required checks pass:
 

@@ -161,6 +161,9 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Supports current-platform self-contained builds via
   `npm run desktop:build:self-contained`, which prepares a Node sidecar and
   bundles it through Tauri
+- `npm run verify:desktop-release` checks current-host bundle inputs before
+  building; the cross-platform release plan is in
+  [docs/desktop-release.md](./docs/desktop-release.md)
 
 ### Plugins
 - Vault-local ESM plugins from `.diamondmd/plugins/<plugin-id>/`

@@ -24,7 +24,8 @@ The main remaining product risks are:
    safe primitives and a one-click sync path, but it intentionally stops short
    of automatic background merge/conflict handling.
 2. **Desktop release is not a shipped cross-platform story.** The Tauri shell
-   exists, but release automation and signing/upload paths remain unfinished.
+   exists and current-host release inputs have a preflight, but matrix CI,
+   signing, notarization, and upload remain unfinished.
 3. **Plugin compatibility is intentionally small.** Diamond can support useful
    plugins, but it is not and should not claim full Obsidian plugin parity.
 4. **Large-vault search is improving.** Tree and graph have scale work, and
@@ -54,14 +55,15 @@ The main remaining product risks are:
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
-| Desktop | Partial | Tauri wrapper and current-platform sidecar build scripts | Cross-platform release automation/signing/upload is not done |
+| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, and documented release matrix | Cross-platform CI, signing/notarization, and artifact upload are not done |
 | Plugins | Partial | Manifest/catalog install, workers, iframes, command/editor/markdown/settings hooks | Full Obsidian plugin API parity is deferred/non-goal |
 | Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, full Playwright | Keep expanding targeted coverage as features land |
 
 ## Highest-Value Next Slices
 
-1. **Desktop release track.** Add release automation docs and a workflow plan
-   for sidecars/signing/artifacts before claiming desktop distribution.
+1. **Desktop release CI.** Add and verify a matrix workflow for desktop
+   preflight/build/artifact upload once a GitHub credential with `workflow`
+   scope is available.
 2. **Search result virtualization.** Render very large result sets without
    relying on a fixed capped list as the only scale control.
 3. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,

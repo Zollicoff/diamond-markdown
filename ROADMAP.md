@@ -91,6 +91,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Curated plugin registry/catalog
 - [x] **Tauri v2 desktop wrapper** — native desktop shell that launches the existing built SvelteKit/Node backend on loopback and opens a Tauri webview, reusing 100% of current app behavior.
 - [x] **Current-platform self-contained desktop runtime** — optional Tauri sidecar config plus `desktop:prepare-node-sidecar` / `desktop:build:self-contained` scripts bundle the current host's Node runtime instead of requiring system Node.
+- [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
 - [ ] **Cross-platform desktop release automation** — prepare/sign/upload Node sidecars or native Rust backend builds for every published macOS / Windows / Linux target.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
