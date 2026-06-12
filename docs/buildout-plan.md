@@ -135,6 +135,10 @@ Use small, pushable slices:
    pure helper with deterministic coverage.
 - **Graph drag coordinate helper.** Move graph node drag pinning math out of
    `GraphView` and into pure interaction helpers with deterministic coverage.
+- **Note body split.** Keep note loading, saving, bus events, wikilink
+   behavior, and attachment mutation in `NoteView` while moving toolbar,
+   attachment upload status, editor/preview loading states, and dynamic view
+   rendering into a focused body component.
 - **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
    snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through

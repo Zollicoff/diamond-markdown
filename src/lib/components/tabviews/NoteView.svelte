@@ -29,6 +29,7 @@
 		readingTimeLabel,
 		resolveNoteLink
 	} from '$lib/note/view';
+	import NoteBody from './note/NoteBody.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -301,43 +302,28 @@
 		onSave={save}
 	/>
 
-	{#if mode !== 'read' && ToolbarView}
-		<ToolbarView api={editorApi} onAttachExisting={() => (attachmentPickerOpen = true)} />
-	{/if}
-
-	{#if uploadingAttachments > 0}
-		<div class="attachment-status" role="status">
-			Attaching {uploadingAttachments} file{uploadingAttachments === 1 ? '' : 's'}…
-		</div>
-	{/if}
-
-	<div class="body">
-		{#if !doc}
-			<div class="loading">Loading…</div>
-		{:else if viewLoadError}
-			<div class="loading err">Could not load view: {viewLoadError}</div>
-		{:else if mode === 'read' && PreviewView}
-			<PreviewView html={doc.html} {vaultId} {doc} />
-		{:else if mode === 'read' && waitingForPreview}
-			<div class="loading">Loading preview…</div>
-		{:else if mode !== 'read' && EditorView}
-			<EditorView
-				value={content}
-				mode={mode as 'live' | 'source'}
-				{resolveLink}
-				onChange={onContentChange}
-				onSave={save}
-				onWikilinkClick={handleWikilinkClick}
-				onWikilinkContext={handleWikilinkContext}
-				onFilesInsert={handleAttachmentFiles}
-				onReady={(a: EditorApi) => (editorApi = a)}
-			/>
-		{:else if waitingForEditor}
-			<div class="loading">Loading editor…</div>
-		{:else}
-			<div class="loading">Loading…</div>
-		{/if}
-	</div>
+	<NoteBody
+		{vaultId}
+		{doc}
+		{mode}
+		{content}
+		{editorApi}
+		{uploadingAttachments}
+		{EditorView}
+		{PreviewView}
+		{ToolbarView}
+		{viewLoadError}
+		{waitingForEditor}
+		{waitingForPreview}
+		{resolveLink}
+		onContentChange={onContentChange}
+		onSave={save}
+		onWikilinkClick={handleWikilinkClick}
+		onWikilinkContext={handleWikilinkContext}
+		onFilesInsert={handleAttachmentFiles}
+		onEditorReady={(api: EditorApi) => (editorApi = api)}
+		onAttachExisting={() => (attachmentPickerOpen = true)}
+	/>
 </div>
 
 {#if menuOpen}
@@ -354,14 +340,4 @@
 
 <style>
 	.note-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-	.body { flex: 1; min-height: 0; overflow: hidden; }
-	.attachment-status {
-		padding: 0.45rem 1rem;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg-elev);
-		color: var(--fg-dim);
-		font-size: 0.82rem;
-	}
-	.loading { padding: 2rem; color: var(--fg-dim); }
-	.loading.err { color: var(--danger); }
 </style>
