@@ -129,12 +129,13 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 
 	const newFileLocation = stringValue(body.newFileLocation);
 	if (newFileLocation) {
+		base.newFileLocation = newFileLocation;
 		base.settings.push(setting(
 			'newFileLocation',
 			'New note location',
 			newFileLocationLabel(newFileLocation),
 			newFileLocation === 'folder'
-				? 'Diamond reports this setting during import; new-note commands still use the selected folder or typed path.'
+				? 'Diamond uses the configured safe folder for generic new-note commands; New note here still uses the selected folder.'
 				: 'Diamond reports this setting during import; new-note commands still use the current command context.'
 		));
 	}
@@ -148,7 +149,7 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 				'newFileFolderPath',
 				'Configured new-note folder',
 				safe,
-				'Reported for migration planning; Diamond does not silently move new notes during import.'
+				'Used for generic new-note commands when Obsidian is configured to create notes in a folder; import never moves existing notes.'
 			));
 		} else {
 			base.newFileFolderStatus = 'unsafe';
@@ -212,4 +213,10 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 	}
 
 	return base;
+}
+
+export function preferredObsidianNewNoteFolder(root: string): string | null {
+	const config = readObsidianAppConfig(root);
+	if (config.newFileLocation !== 'folder') return null;
+	return config.newFileFolderStatus === 'safe' ? config.newFileFolderPath ?? null : null;
 }

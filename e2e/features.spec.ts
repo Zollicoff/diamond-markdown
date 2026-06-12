@@ -480,6 +480,45 @@ test('new note command uses an in-app name dialog', async ({ page, request }) =>
 	await request.delete(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`).catch(() => undefined);
 });
 
+test('generic new note command honors safe Obsidian configured folder', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-new-note-folder-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		newFileLocation: 'folder',
+		newFileFolderPath: 'Notes/Inbox'
+	}, null, 2));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nSeed note.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian New Note Folder', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+	const location = await request.get(`/api/vaults/${vault.id}/new-note-location`);
+	expect(location.ok()).toBe(true);
+	const locationBody = await location.json() as { folder: string | null; source: string };
+	expect(locationBody).toEqual({
+		folder: 'Notes/Inbox',
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }).click();
+	const dialog = page.getByRole('dialog', { name: 'New note' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByLabel('Name in Notes/Inbox').fill('Configured Folder Note');
+	await dialog.getByRole('button', { name: 'Create note' }).click();
+	await expect(dialog).toBeHidden();
+
+	const notePath = 'Notes/Inbox/Configured Folder Note.md';
+	await expect.poll(() => fs.existsSync(path.join(vaultDir, notePath))).toBe(true);
+	const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
+	expect(loaded.ok()).toBe(true);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
 test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {
 	const notePath = 'Delete Dialog Note.md';
 	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);

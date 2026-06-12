@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 import {
+	buildNewNotePath,
+	cleanNewNoteInput,
+	ensureNewNoteMarkdownPath,
+	newNotePromptLabel,
+	newNoteTitle
+} from '../src/lib/note/new-note';
+import {
 	ensureMarkdownPath,
 	formatSavedAt,
 	markdownWordCount,
@@ -32,6 +39,25 @@ test.describe('note view helpers', () => {
 		expect(openModeForPointer({ ctrlKey: true })).toBe('new-tab');
 		expect(openModeForPointer({ button: 0, altKey: true })).toBe('new-pane');
 		expect(openModeForPointer({})).toBe('replace');
+	});
+
+	test('builds new-note paths from configured or explicit folders', () => {
+		expect(cleanNewNoteInput('/Daily Plan/')).toBe('Daily Plan');
+		expect(ensureNewNoteMarkdownPath('Daily Plan')).toBe('Daily Plan.md');
+		expect(ensureNewNoteMarkdownPath('Daily Plan.markdown')).toBe('Daily Plan.markdown');
+		expect(ensureNewNoteMarkdownPath('Daily Plan.txt')).toBe('Daily Plan.txt.md');
+		expect(newNoteTitle('Nested/Daily Plan.markdown')).toBe('Daily Plan');
+		expect(newNotePromptLabel('Notes/Inbox')).toBe('Name in Notes/Inbox');
+		expect(newNotePromptLabel('')).toBe('Name in vault root');
+		expect(buildNewNotePath('Weekly Plan', 'Notes/Inbox')).toEqual({
+			path: 'Notes/Inbox/Weekly Plan.md',
+			title: 'Weekly Plan'
+		});
+		expect(buildNewNotePath('Projects/Weekly Plan', 'Notes/Inbox')).toEqual({
+			path: 'Notes/Inbox/Projects/Weekly Plan.md',
+			title: 'Weekly Plan'
+		});
+		expect(buildNewNotePath('   ', 'Notes/Inbox')).toBeNull();
 	});
 
 	test('counts readable markdown and formats save/read labels', () => {

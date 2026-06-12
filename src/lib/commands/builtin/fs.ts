@@ -12,14 +12,11 @@ import type { TreeNode } from '$lib/types';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
 import { alertDialog, confirmDialog, notify, promptText } from '$lib/dialogs';
+import { buildNewNotePath, newNotePromptLabel } from '$lib/note/new-note';
 import { isCanvasTreeFile } from '$lib/tree/view';
 
 async function promptPath(title: string, label: string, confirmLabel: string, placeholder = ''): Promise<string | null> {
 	return promptText({ title, label, placeholder, confirmLabel });
-}
-
-function ensureMd(s: string): string {
-	return /\.[a-z0-9]+$/i.test(s) ? s : s + '.md';
 }
 
 function markdownNode(ctx: CommandContext): TreeNode | null {
@@ -42,17 +39,21 @@ export function registerFsCommands(): void {
 		category: 'file',
 		async exec(ctx: CommandContext) {
 			const vaultId = ctx.vaultId!;
-			const parent = ctx.node?.type === 'directory' ? ctx.node.path : '';
+			const explicitParent = ctx.node?.type === 'directory' ? ctx.node.path : null;
+			const configured = explicitParent
+				? null
+				: await api.newNoteLocation(vaultId).catch(() => null);
+			const parent = explicitParent ?? configured?.folder ?? '';
 			const raw = await promptPath(
 				'New note',
-				`Name in ${parent || 'vault root'}`,
+				newNotePromptLabel(parent),
 				'Create note'
 			);
 			if (!raw) return;
-			const rel = (parent ? `${parent}/` : '') + ensureMd(raw);
-			const title = raw.split('/').pop()!.replace(/\.md$/, '');
+			const note = buildNewNotePath(raw, parent);
+			if (!note) return;
 			try {
-				await api.createNote(vaultId, rel, `---\ntitle: ${title}\n---\n\n`);
+				await api.createNote(vaultId, note.path, `---\ntitle: ${note.title}\n---\n\n`);
 			} catch (e) {
 				await alertDialog({ title: 'Could not create note', message: (e as Error).message, tone: 'danger' });
 			}

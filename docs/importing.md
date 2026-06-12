@@ -23,9 +23,12 @@ The `.obsidian` folder is preserved on disk but skipped from note indexing.
 Diamond reads known-safe `.obsidian/app.json` settings during preflight and
 shows them as migration notes instead of dumping the raw JSON. It currently
 honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
-attachments. Other app settings such as `newFileLocation`, `newFileFolderPath`,
-`useMarkdownLinks`, `alwaysUpdateLinks`, `newLinkFormat`, and `trashOption` are
-reported so migration mismatches are visible before opening the vault.
+attachments, and a safe `newFileLocation: "folder"` plus `newFileFolderPath`
+as the default destination for generic New Note commands. Explicit folder
+context actions such as New note here still use the selected folder. Other app
+settings such as `useMarkdownLinks`, `alwaysUpdateLinks`, `newLinkFormat`, and
+`trashOption` are reported so migration mismatches are visible before opening
+the vault.
 
 Diamond will not execute Obsidian community plugins. The import preview reads
 plugin manifests plus the top-level keys in each plugin `data.json`, then shows

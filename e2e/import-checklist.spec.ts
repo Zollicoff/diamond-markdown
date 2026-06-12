@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
 	compactPathList,
 	importReadiness,
@@ -7,7 +10,7 @@ import {
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
-import { safeVaultFolder } from '../src/lib/server/obsidian-config';
+import { preferredObsidianNewNoteFolder, safeVaultFolder } from '../src/lib/server/obsidian-config';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
 function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnalysis {
@@ -75,6 +78,7 @@ test.describe('import checklist helpers', () => {
 			bytes: 64,
 			attachmentFolderStatus: 'safe',
 			attachmentFolderPath: 'Media/Uploads',
+			newFileLocation: 'folder',
 			newFileFolderStatus: 'safe',
 			newFileFolderPath: 'Notes/Inbox',
 			settings: [
@@ -106,6 +110,30 @@ test.describe('import checklist helpers', () => {
 		expect(safeVaultFolder('.obsidian/plugins')).toBeNull();
 		expect(safeVaultFolder('node_modules/cache')).toBeNull();
 		expect(safeVaultFolder('')).toBeNull();
+	});
+
+	test('uses only safe Obsidian folder settings for generic new-note defaults', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-new-note-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		fs.writeFileSync(appJson, JSON.stringify({
+			newFileLocation: 'folder',
+			newFileFolderPath: 'Notes/Inbox'
+		}));
+		expect(preferredObsidianNewNoteFolder(vaultDir)).toBe('Notes/Inbox');
+
+		fs.writeFileSync(appJson, JSON.stringify({
+			newFileLocation: 'folder',
+			newFileFolderPath: '../outside'
+		}));
+		expect(preferredObsidianNewNoteFolder(vaultDir)).toBeNull();
+
+		fs.writeFileSync(appJson, JSON.stringify({
+			newFileLocation: 'current',
+			newFileFolderPath: 'Notes/Inbox'
+		}));
+		expect(preferredObsidianNewNoteFolder(vaultDir)).toBeNull();
 	});
 
 	test('summarizes Obsidian plugin metadata without implying execution', () => {

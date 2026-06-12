@@ -101,6 +101,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
+- Obsidian import preflight that preserves `.obsidian`, honors safe attachment/new-note folder settings, and surfaces plugin settings as manual migration guidance
 - Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel

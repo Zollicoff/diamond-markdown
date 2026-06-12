@@ -42,10 +42,16 @@ export interface ObsidianAppConfigInfo {
 	bytes?: number;
 	attachmentFolderPath?: string;
 	attachmentFolderStatus: 'safe' | 'unsafe' | 'missing';
+	newFileLocation?: string;
 	newFileFolderPath?: string;
 	newFileFolderStatus: 'safe' | 'unsafe' | 'missing' | 'not-configured';
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
+}
+
+export interface NewNoteLocation {
+	folder: string | null;
+	source: 'obsidian-app-config' | 'vault-root';
 }
 
 export interface ObsidianPluginInfo {

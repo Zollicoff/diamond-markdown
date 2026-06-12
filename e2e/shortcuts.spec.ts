@@ -78,9 +78,7 @@ test('⌘⇧D opens today\'s daily note', async ({ page }) => {
 	await page.keyboard.press(`${MOD}+Shift+KeyD`);
 	// Daily note becomes a new tab; either a new tab appears or the
 	// active tab title changes to a YYYY-MM-DD pattern.
-	await page.waitForTimeout(500);
-	const url = page.url();
-	expect(url).toMatch(/Daily Notes\/\d{4}-\d{2}-\d{2}|note\/Daily/);
+	await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/Daily Notes\/\d{4}-\d{2}-\d{2}|note\/Daily/);
 });
 
 test('⌘⇧L cycles theme', async ({ page }) => {
