@@ -2,6 +2,7 @@
 	import { api } from '$lib/vault-api';
 	import type { AttachmentRef } from '$lib/types';
 	import { filterAttachments, formatAttachmentSize } from '$lib/note/attachments';
+	import { confirmDialog, notify } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -14,6 +15,7 @@
 	let selectedPaths = $state<string[]>([]);
 	let query = $state('');
 	let loading = $state(true);
+	let deleting = $state(false);
 	let error = $state<string | null>(null);
 
 	const visible = $derived(filterAttachments(attachments, query));
@@ -60,6 +62,38 @@
 		onClose();
 	}
 
+	async function deleteSelected(): Promise<void> {
+		if (selected.length === 0 || deleting) return;
+		const count = selected.length;
+		const confirmed = await confirmDialog({
+			title: count === 1 ? 'Delete attachment' : `Delete ${count} attachments`,
+			message: count === 1
+				? `Delete "${selected[0].path}" from this vault? Existing notes that embed it will keep the now-missing reference.`
+				: `Delete ${count} selected attachments from this vault? Existing notes that embed them will keep the now-missing references.`,
+			confirmLabel: count === 1 ? 'Delete attachment' : 'Delete attachments',
+			tone: 'danger'
+		});
+		if (!confirmed) return;
+		deleting = true;
+		error = null;
+		const paths = selected.map((attachment) => attachment.path);
+		try {
+			for (const path of paths) {
+				await api.deleteAttachment(vaultId, path);
+			}
+			selectedPaths = [];
+			await load();
+			notify({
+				title: count === 1 ? 'Attachment deleted' : `${count} attachments deleted`,
+				tone: 'success'
+			});
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			deleting = false;
+		}
+	}
+
 	function closeFromBackdrop(event: MouseEvent): void {
 		if (event.target === event.currentTarget) onClose();
 	}
@@ -101,6 +135,9 @@
 			<div>
 				<button class="secondary" disabled={visible.length === 0} onclick={selectVisible}>Select visible</button>
 				<button class="secondary" disabled={selected.length === 0} onclick={clearSelection}>Clear</button>
+				<button class="danger" disabled={selected.length === 0 || deleting} onclick={() => void deleteSelected()}>
+					{deleting ? 'Deleting...' : 'Delete selected'}
+				</button>
 			</div>
 		</div>
 
@@ -191,6 +228,7 @@
 	}
 	.icon-btn,
 	.secondary,
+	.danger,
 	.primary {
 		border: 1px solid var(--border);
 		border-radius: 5px;
@@ -212,7 +250,16 @@
 		border-color: color-mix(in srgb, var(--accent), var(--border) 40%);
 		color: var(--accent);
 	}
+	.danger {
+		border-color: color-mix(in srgb, var(--danger), var(--border) 40%);
+		color: var(--danger);
+	}
 	.primary:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+	.danger:disabled,
+	.secondary:disabled {
 		opacity: 0.5;
 		cursor: default;
 	}
@@ -243,7 +290,8 @@
 		display: flex;
 		gap: 6px;
 	}
-	.selection-bar .secondary {
+	.selection-bar .secondary,
+	.selection-bar .danger {
 		padding: 4px 8px;
 		font-size: 0.74rem;
 	}

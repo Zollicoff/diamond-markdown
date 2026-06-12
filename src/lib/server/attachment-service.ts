@@ -14,6 +14,12 @@ export interface AttachmentUploadResult {
 	sha: string | null;
 }
 
+export interface AttachmentDeleteResult {
+	ok: true;
+	path: string;
+	sha: string | null;
+}
+
 const DEFAULT_ATTACHMENT_FOLDER = 'Attachments';
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const MAX_LISTED_ATTACHMENTS = 1_000;
@@ -119,6 +125,23 @@ export async function saveAttachment(vault: Vault, file: File): Promise<Attachme
 		path: rel,
 		filename: path.basename(rel),
 		size: buffer.byteLength,
+		sha: res?.sha ?? null
+	};
+}
+
+export async function deleteAttachment(vault: Vault, inputPath: string): Promise<AttachmentDeleteResult> {
+	const rel = normalizeVaultPath(inputPath);
+	if (!attachmentKind(rel)) throw new Error('path is not an attachment');
+	const abs = resolveInVault(vault, rel);
+	if (!fs.existsSync(abs)) throw new Error('attachment not found');
+	const stat = fs.statSync(abs);
+	if (!stat.isFile()) throw new Error('path is not an attachment file');
+
+	fs.rmSync(abs, { force: true });
+	const res = await commitChange(vault, [rel], 'delete', rel);
+	return {
+		ok: true,
+		path: rel,
 		sha: res?.sha ?? null
 	};
 }

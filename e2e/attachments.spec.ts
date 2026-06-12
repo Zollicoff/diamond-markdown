@@ -87,6 +87,18 @@ test.describe('attachment uploads', () => {
 			kind: 'image',
 			size: 4
 		});
+		const deniedDelete = await request.delete(`/api/vaults/${vault.id}/attachment?path=${encodeURIComponent('Home.md')}`);
+		expect(deniedDelete.status()).toBe(400);
+		expect(await deniedDelete.text()).toContain('path is not an attachment');
+		const removed = await request.delete(`/api/vaults/${vault.id}/attachment?path=${encodeURIComponent(secondBody.path)}`);
+		expect(removed.ok()).toBe(true);
+		const removeBody = await removed.json() as { path: string; sha: string | null };
+		expect(removeBody.path).toBe(secondBody.path);
+		expect(removeBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, secondBody.path))).toBe(false);
+		const afterDelete = await request.get(`/api/vaults/${vault.id}/attachment`);
+		const afterDeleteBody = await afterDelete.json() as { attachments: AttachmentRef[] };
+		expect(afterDeleteBody.attachments.some((attachment) => attachment.path === secondBody.path)).toBe(false);
 		expect(git(vaultDir, ['log', '--oneline', '--', 'Attachments'])).toContain('create: Attachments/roof plan.png');
 	});
 
@@ -190,6 +202,40 @@ test.describe('attachment uploads', () => {
 			const note = await loaded.json() as { content: string };
 			return note.content;
 		}).toContain('![[Attachments/bulk sample spec.pdf]]');
+	});
+
+	test('deletes selected vault attachments from the picker with confirmation', async ({ page, request }) => {
+		const notePath = 'Getting Started.md';
+		const uploaded = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: 'delete sample.pdf',
+					mimeType: 'application/pdf',
+					buffer: Buffer.from('%PDF-1.4\n')
+				}
+			}
+		});
+		expect(uploaded.ok()).toBe(true);
+		const uploadedBody = await uploaded.json() as { path: string };
+
+		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByRole('button', { name: 'Insert attachment' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
+		await dialog.getByLabel('Filter attachments').fill('delete sample');
+		await dialog.getByRole('option', { name: /delete sample\.pdf/ }).click();
+		await expect(dialog.getByText('1 selected')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Delete selected' }).click();
+		const confirm = page.getByRole('alertdialog', { name: 'Delete attachment' });
+		await expect(confirm).toContainText('Existing notes that embed it will keep the now-missing reference.');
+		await confirm.getByRole('button', { name: 'Delete attachment' }).click();
+
+		await expect(dialog.getByRole('option', { name: /delete sample\.pdf/ })).toHaveCount(0);
+		await expect(dialog.getByText('0 selected')).toBeVisible();
+		await expect(page.getByText('Attachment deleted')).toBeVisible();
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
+		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
 	});
 
 	test('drops a local file into the editor and inserts an Obsidian embed', async ({ page, request }) => {

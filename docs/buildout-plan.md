@@ -160,6 +160,9 @@ Use small, pushable slices:
 - **Bulk attachment insertion.** Multi-select filtered vault assets from the
    attachment picker and insert multiple Obsidian-style embeds in one editor
    action.
+- **Attachment deletion.** Delete selected vault-local assets from the
+   attachment picker through confirmed, git-backed commits while leaving
+   existing markdown references explicit.
 - **Git sync recovery view split.** Move recovery headers, command blocks,
    file lists, and diverged-change view models out of the recovery panel so
    future GitHub conflict flows can stay small and testable.
@@ -172,9 +175,9 @@ Use small, pushable slices:
 1. **Component diet.** Continue extracting `GraphView`, `GitSyncPanel`, and
    `FileTreePanel` into pure helpers and small presentational pieces.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as attachment rename/delete flows, deeper Canvas formatting
-   support, and deeper plugin-settings migration guidance without executing
-   Obsidian plugins.
+   import edges such as attachment rename/link-rewrite flows, deeper Canvas
+   formatting support, and deeper plugin-settings migration guidance without
+   executing Obsidian plugins.
 3. **Verification hardening.** Add tests for remaining dialog-driven
    destructive actions and sync recovery flows before expanding automation.
 

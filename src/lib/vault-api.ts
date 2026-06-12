@@ -296,6 +296,11 @@ export const api = {
 		return res.attachments ?? [];
 	},
 
+	async deleteAttachment(vaultId: string, path: string): Promise<void> {
+		await json(`/api/vaults/${vaultId}/attachment?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+		emit('tree:invalidate', { vaultId });
+	},
+
 	async renameNote(vaultId: string, from: string, to: string): Promise<{ linksUpdated: number; touched: string[]; sha: string | null }> {
 		const res = await json<{ linksUpdated: number; touched: string[]; sha: string | null }>(
 			`/api/vaults/${vaultId}/note`,
