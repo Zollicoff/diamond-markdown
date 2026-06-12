@@ -41,6 +41,11 @@ render as styled callout blocks in read mode and static publish. Fold markers
 use native disclosure blocks, so collapsed and expanded defaults survive
 without client-only JavaScript.
 
+Frontmatter `tags` and `aliases` are read from either flow arrays
+(`tags: [project/foo, review]`) or Obsidian-style block lists, so imported
+vaults keep their search, tag index, and alias-based wikilink behavior without
+rewriting note files.
+
 In edit mode, dropping or pasting local files into a note copies them into the
 vault's configured Obsidian attachment folder when `.obsidian/app.json` declares
 a safe relative `attachmentFolderPath`; otherwise Diamond uses `Attachments/`.

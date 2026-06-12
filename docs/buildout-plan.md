@@ -243,6 +243,9 @@ Use small, pushable slices:
 - **Obsidian callout rendering.** Render `> [!TYPE]` callouts, including
    collapsed and expanded fold markers, in both read mode and static publish
    while preserving markdown inside the callout body.
+- **Obsidian block-list frontmatter.** Parse block-list `tags` and `aliases`
+   from imported vaults so tag indexes, search, and alias wikilinks match
+   common Obsidian frontmatter without rewriting note files.
 
 ## Next Implementation Slices
 

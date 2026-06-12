@@ -2,7 +2,7 @@
  * Minimal YAML frontmatter parser. We only need: strings, arrays of strings,
  * booleans, and ISO dates. A dependency-free micro-parser is plenty for that.
  *
- * If a vault grows to use exotic YAML (nested objects, anchors, flow style),
+ * If a vault grows to use exotic YAML (nested objects, anchors, folded scalars),
  * swap in `js-yaml` — for now, keep the zero-dep surface.
  */
 
@@ -41,18 +41,40 @@ export function splitFrontmatter(source: string): Split {
 
 /**
  * Parse a tiny subset of YAML: `key: value` lines with string / array /
- * boolean / number values. No nesting, no multi-line scalars.
+ * boolean / number values, plus common Obsidian block arrays:
+ *
+ * tags:
+ *   - research
+ *   - project/foo
+ *
+ * No nested objects or multi-line scalars.
  */
 function parseSimpleYaml(src: string): Frontmatter {
 	const out: Frontmatter = {};
 	const lines = src.split(/\r?\n/);
+	let blockListKey: string | null = null;
+
 	for (const line of lines) {
 		const trimmed = line.replace(/\s+$/, '');
-		if (!trimmed || trimmed.startsWith('#')) continue;
+		const content = trimmed.trim();
+		if (!content || content.startsWith('#')) continue;
+
 		const kv = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
-		if (!kv) continue;
-		const [, key, rawVal] = kv;
-		out[key] = parseYamlValue(rawVal);
+		if (kv) {
+			const [, key, rawVal] = kv;
+			out[key] = parseYamlValue(rawVal);
+			blockListKey = rawVal.trim() === '' ? key : null;
+			continue;
+		}
+
+		const listItem = trimmed.match(/^\s+-\s*(.*)$/);
+		if (listItem && blockListKey) {
+			if (!Array.isArray(out[blockListKey])) out[blockListKey] = [];
+			(out[blockListKey] as unknown[]).push(parseYamlValue(listItem[1]));
+			continue;
+		}
+
+		blockListKey = null;
 	}
 	return out;
 }

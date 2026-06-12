@@ -64,7 +64,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Callout** — Obsidian-style callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+` render in read mode and static publish.
 - **Backlink** — automatically computed index of every note that wikilinks *to* the note you're viewing.
 - **Tag** — `#hashtag` in body text or `tags:` in frontmatter. Tag index lists every tag and the notes that use it.
-- **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized.
+- **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized, including Obsidian block-list `tags` and `aliases`.
 
 ## Features
 
