@@ -5,10 +5,15 @@ import path from 'node:path';
 const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const e2ePort = String(4300 + Math.floor(Math.random() * 2000));
 
+function commandFor(command) {
+	if (process.platform === 'win32' && command === 'npm') return 'npm.cmd';
+	return command;
+}
+
 function run(label, command, args, env = {}) {
 	console.log(`\n==> ${label}`);
 	console.log(`$ ${[command, ...args].join(' ')}`);
-	const result = spawnSync(command, args, {
+	const result = spawnSync(commandFor(command), args, {
 		stdio: 'inherit',
 		env: { ...process.env, ...env }
 	});

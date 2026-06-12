@@ -55,7 +55,7 @@ The main remaining product risks are:
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
-| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, and documented release matrix | Cross-platform CI, signing/notarization, and artifact upload are not done |
+| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, and documented release matrix | Cross-platform workflow run, signing/notarization, and artifact upload are not done |
 | Plugins | Partial | Manifest/catalog install, workers, iframes, command/editor/markdown/settings hooks | Full Obsidian plugin API parity is deferred/non-goal |
 | Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, full Playwright | Keep expanding targeted coverage as features land |
 

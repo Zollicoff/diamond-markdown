@@ -36,7 +36,7 @@ export default defineConfig({
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }
 	],
 	webServer: {
-		command: `node e2e/setup-fixture.mjs && (test -f build/handler.js || npm run build -- --logLevel warn) && npm run preview:e2e`,
+		command: 'node scripts/playwright-webserver.mjs',
 		url: `http://127.0.0.1:${PORT}/`,
 		reuseExistingServer: false,
 		timeout: 60_000,

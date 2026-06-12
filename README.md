@@ -165,7 +165,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
   `npm run desktop:build:self-contained`, which prepares a Node sidecar and
   bundles it through Tauri
 - `npm run verify:desktop-release` checks current-host bundle inputs before
-  building; the cross-platform release plan is in
+  building; the release verifier uses a cross-platform preview launcher, and
+  the cross-platform release plan is in
   [docs/desktop-release.md](./docs/desktop-release.md)
 
 ### Plugins

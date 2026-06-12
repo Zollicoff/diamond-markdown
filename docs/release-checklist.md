@@ -166,6 +166,10 @@ Required:
 
 For the full desktop release plan, see `docs/desktop-release.md`.
 
+The Playwright webServer must remain launched through
+`scripts/playwright-webserver.mjs` instead of inline shell syntax so the full
+release verifier can run on Windows, macOS, and Linux CI runners.
+
 ## 11. Tag Or Deploy
 
 Only after all required checks pass:

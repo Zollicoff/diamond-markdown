@@ -304,6 +304,10 @@ Use small, pushable slices:
 - **Desktop release preflight.** Add `npm run verify:desktop-release` plus
    `docs/desktop-release.md` so current-host desktop bundle inputs, sidecars,
    signing inputs, and artifact expectations are checked before packaging.
+- **Cross-platform release verifier launcher.** Run Playwright e2e preview
+   setup through a Node launcher instead of Unix shell syntax, and make the
+   release verifier invoke `npm.cmd` on Windows so future desktop matrix jobs
+   can exercise the same release gate.
 - **Search result virtualization.** Render large returned search result sets
    through a virtual window in the search tab, backed by pure view helpers and
    browser coverage for scrolling from the first to last returned match.
@@ -319,7 +323,8 @@ Use small, pushable slices:
 
 1. **Desktop release CI.** Add and verify a matrix workflow for desktop
    preflight/build/artifact upload once a GitHub credential with `workflow`
-   scope is available.
+   scope is available; the local release verifier no longer depends on Unix
+   shell syntax.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support and deeper
    plugin-settings migration guidance without executing Obsidian plugins.
