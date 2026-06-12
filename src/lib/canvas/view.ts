@@ -44,8 +44,25 @@ export interface CanvasEdgeSummary {
 
 export type CanvasTextDrafts = Record<string, string>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
+export type CanvasAddNodeType = 'text' | 'file' | 'link';
 
 const PADDING = 80;
+
+export function canvasAddNodePlaceholder(type: CanvasAddNodeType): string {
+	if (type === 'file') return 'Note.md';
+	if (type === 'link') return 'https://example.com';
+	return 'New text card';
+}
+
+export function canvasAddNodeButtonLabel(type: CanvasAddNodeType): string {
+	if (type === 'file') return 'Add file';
+	if (type === 'link') return 'Add URL';
+	return 'Add text';
+}
+
+export function canSubmitCanvasAddNode(type: CanvasAddNodeType, value: string): boolean {
+	return type === 'text' || value.trim().length > 0;
+}
 
 export function canvasBounds(nodes: CanvasNode[]): CanvasBounds {
 	if (nodes.length === 0) {

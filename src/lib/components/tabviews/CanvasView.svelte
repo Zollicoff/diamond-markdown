@@ -18,10 +18,12 @@
 		canvasSummary,
 		canvasTextDrafts,
 		edgeLines,
+		type CanvasAddNodeType,
 		type CanvasEdgeLabelDrafts,
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import CanvasAddNodeForm from './canvas/CanvasAddNodeForm.svelte';
 	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
 	import CanvasNodeCard from './canvas/CanvasNodeCard.svelte';
 
@@ -36,7 +38,7 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let textDrafts = $state<CanvasTextDrafts>({});
-	let addingText = $state(false);
+	let addingNode = $state(false);
 	let addingEdge = $state(false);
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
@@ -93,18 +95,18 @@
 		edgeLabelDrafts = { ...edgeLabelDrafts, [edge.id]: value };
 	}
 
-	async function addTextNode(): Promise<void> {
-		if (!doc || addingText) return;
-		addingText = true;
+	async function addNode(type: CanvasAddNodeType, value: string): Promise<void> {
+		if (!doc || addingNode) return;
+		addingNode = true;
 		error = null;
 		try {
-			const res = await api.addCanvasTextNode(vaultId, path, doc.revision);
+			const res = await api.addCanvasNode(vaultId, path, type, value, doc.revision);
 			setDoc(res.doc);
-			emit('toast:show', { title: 'Text card added', tone: 'success' });
+			emit('toast:show', { title: 'Canvas node added', tone: 'success' });
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			addingText = false;
+			addingNode = false;
 		}
 	}
 
@@ -294,9 +296,7 @@
 		{#if doc}
 			<div class="canvas-actions">
 				<div class="canvas-stats mono">{canvasSummary(doc)} · editable text cards</div>
-				<button class="mini" disabled={addingText} onclick={addTextNode}>
-					{addingText ? 'Adding…' : 'Add text'}
-				</button>
+				<CanvasAddNodeForm adding={addingNode} onAdd={addNode} />
 				<form
 					class="edge-form"
 					onsubmit={(event) => {

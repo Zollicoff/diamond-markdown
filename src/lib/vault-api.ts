@@ -9,6 +9,7 @@
 
 import type { AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
+import type { CanvasAddNodeType } from './canvas/view';
 import { emit } from './events';
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -18,6 +19,27 @@ async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
 		throw new Error(`HTTP ${res.status}${body ? ': ' + body.slice(0, 200) : ''}`);
 	}
 	return res.json() as Promise<T>;
+}
+
+async function addCanvasNodeRequest(
+	vaultId: string,
+	path: string,
+	nodeType: CanvasAddNodeType,
+	value: string,
+	expectedRevision: string
+): Promise<CanvasMutationResult> {
+	const payload: Record<string, unknown> = { path, action: 'add-node', nodeType, expectedRevision };
+	if (nodeType === 'file') payload.file = value;
+	else if (nodeType === 'link') payload.url = value;
+	else payload.text = value || 'New text card';
+	const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+	emit('tree:invalidate', { vaultId });
+	return res;
 }
 
 export const api = {
@@ -55,14 +77,17 @@ export const api = {
 		expectedRevision: string,
 		text = 'New text card'
 	): Promise<CanvasMutationResult> {
-		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path, action: 'add-text-node', expectedRevision, text })
-		});
-		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
-		emit('tree:invalidate', { vaultId });
-		return res;
+		return addCanvasNodeRequest(vaultId, path, 'text', text, expectedRevision);
+	},
+
+	async addCanvasNode(
+		vaultId: string,
+		path: string,
+		nodeType: CanvasAddNodeType,
+		value: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		return addCanvasNodeRequest(vaultId, path, nodeType, value, expectedRevision);
 	},
 
 	async updateCanvasTextNode(

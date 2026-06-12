@@ -40,6 +40,7 @@ export interface CanvasSvgExport {
 }
 
 export type CanvasEditAction =
+	| 'add-node'
 	| 'add-text-node'
 	| 'update-node-text'
 	| 'move-node'
@@ -53,10 +54,13 @@ export interface MutateCanvasInput {
 	expectedRevision?: string;
 	nodeId?: string;
 	edgeId?: string;
+	nodeType?: 'text' | 'file' | 'link';
 	fromNode?: string;
 	toNode?: string;
 	label?: string;
 	text?: string;
+	file?: string;
+	url?: string;
 	x?: number;
 	y?: number;
 	width?: number;
@@ -343,7 +347,7 @@ function createCanvasEdgeId(edges: unknown[]): string {
 	return `edge-${Date.now().toString(36)}`;
 }
 
-function nextTextNodePosition(nodes: unknown[]): { x: number; y: number } {
+function nextNodePosition(nodes: unknown[]): { x: number; y: number } {
 	let maxRight = -Infinity;
 	let minY = Infinity;
 	for (const raw of nodes) {
@@ -357,6 +361,36 @@ function nextTextNodePosition(nodes: unknown[]): { x: number; y: number } {
 	}
 	if (!Number.isFinite(maxRight)) return { x: 0, y: 0 };
 	return { x: maxRight + 80, y: Number.isFinite(minY) ? minY : 0 };
+}
+
+function cleanOptionalLabel(value: unknown): string {
+	return typeof value === 'string' ? value.trim().slice(0, 200) : '';
+}
+
+function requiredText(value: unknown, name: string, maxLength: number): string {
+	const cleaned = typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+	if (!cleaned) throw new CanvasFileError(`${name} is required`);
+	return cleaned;
+}
+
+function cleanCanvasUrl(value: unknown): string {
+	const cleaned = requiredText(value, 'url', 2_000);
+	let parsed: URL;
+	try {
+		parsed = new URL(cleaned);
+	} catch {
+		throw new CanvasFileError('url must be a valid URL');
+	}
+	if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+		throw new CanvasFileError('url must use http or https');
+	}
+	return parsed.toString();
+}
+
+function canvasNodeType(value: unknown): 'text' | 'file' | 'link' {
+	if (value === undefined || value === 'text') return 'text';
+	if (value === 'file' || value === 'link') return value;
+	throw new CanvasFileError('unsupported canvas node type');
 }
 
 export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Promise<CanvasMutationResult> {
@@ -381,17 +415,29 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		parsed.edges = edges;
 	}
 
-	if (input.action === 'add-text-node') {
-		const position = nextTextNodePosition(nodes);
-		nodes.push({
-			id: createCanvasNodeId(nodes, 'text'),
-			type: 'text',
+	if (input.action === 'add-node' || input.action === 'add-text-node') {
+		const type = input.action === 'add-text-node' ? 'text' : canvasNodeType(input.nodeType);
+		const position = nextNodePosition(nodes);
+		const node: Record<string, unknown> = {
+			id: createCanvasNodeId(nodes, type),
+			type,
 			x: boundedNumber(input.x, position.x, -100_000, 100_000),
 			y: boundedNumber(input.y, position.y, -100_000, 100_000),
 			width: boundedNumber(input.width, 260, 120, 1200),
-			height: boundedNumber(input.height, 140, 80, 900),
-			text: typeof input.text === 'string' ? input.text : 'New text card'
-		});
+			height: boundedNumber(input.height, type === 'text' ? 140 : 120, 80, 900)
+		};
+		if (type === 'text') {
+			node.text = typeof input.text === 'string' && input.text.trim() ? input.text : 'New text card';
+		} else if (type === 'file') {
+			node.file = normalizeVaultPath(requiredText(input.file, 'file', 500));
+			const label = cleanOptionalLabel(input.label);
+			if (label) node.label = label;
+		} else {
+			node.url = cleanCanvasUrl(input.url);
+			const label = cleanOptionalLabel(input.label);
+			if (label) node.label = label;
+		}
+		nodes.push(node);
 	} else if (input.action === 'update-node-text') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		if (typeof input.text !== 'string') throw new CanvasFileError('text is required');
