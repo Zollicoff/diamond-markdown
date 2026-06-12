@@ -9,6 +9,9 @@ import {
 	canvasConnectionDraft,
 	canvasDraftChanged,
 	canvasDraftFor,
+	canvasEdgeLabelChanged,
+	canvasEdgeLabelDraftFor,
+	canvasEdgeLabelDrafts,
 	canConnectCanvasNodes,
 	canvasEdgeSummaries,
 	canvasNodeClass,
@@ -78,15 +81,21 @@ test.describe('canvas view helpers', () => {
 		expect(canvasConnectionDraft(doc.nodes, 'b', 'a')).toEqual({ fromNodeId: 'b', toNodeId: 'a' });
 		expect(canConnectCanvasNodes('a', 'b')).toBe(true);
 		expect(canConnectCanvasNodes('a', 'a')).toBe(false);
-		expect(canvasEdgeSummaries(doc)).toEqual([
+		const edgeSummaries = canvasEdgeSummaries(doc);
+		expect(edgeSummaries).toEqual([
 			{
 				id: 'edge-a-b',
 				label: 'opens',
+				editableLabel: 'opens',
 				fromLabel: 'text',
 				toLabel: 'Home.md',
 				description: 'text to Home.md: opens'
 			}
 		]);
+		const edgeDrafts = canvasEdgeLabelDrafts(edgeSummaries);
+		expect(canvasEdgeLabelDraftFor(edgeSummaries[0], edgeDrafts)).toBe('opens');
+		expect(canvasEdgeLabelChanged(edgeSummaries[0], edgeDrafts)).toBe(false);
+		expect(canvasEdgeLabelChanged(edgeSummaries[0], { ...edgeDrafts, 'edge-a-b': 'loops back' })).toBe(true);
 	});
 });
 
@@ -257,12 +266,42 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	});
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const updatedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-label',
+			edgeId: edgeAddedBody.doc.edges.at(-1)?.id,
+			label: 'routes back',
+			expectedRevision: edgeAddedBody.doc.revision
+		}
+	});
+	expect(updatedEdge.ok(), await updatedEdge.text()).toBe(true);
+	const updatedEdgeBody = await updatedEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(updatedEdgeBody.sha).toBeTruthy();
+	expect(updatedEdgeBody.doc.edges.at(-1)).toMatchObject({ label: 'routes back' });
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const clearedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-label',
+			edgeId: updatedEdgeBody.doc.edges.at(-1)?.id,
+			label: '   ',
+			expectedRevision: updatedEdgeBody.doc.revision
+		}
+	});
+	expect(clearedEdge.ok(), await clearedEdge.text()).toBe(true);
+	const clearedEdgeBody = await clearedEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(clearedEdgeBody.sha).toBeTruthy();
+	expect(clearedEdgeBody.doc.edges.at(-1)?.label).toBeUndefined();
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const deletedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
 			action: 'delete-edge',
-			edgeId: edgeAddedBody.doc.edges.at(-1)?.id,
-			expectedRevision: edgeAddedBody.doc.revision
+			edgeId: clearedEdgeBody.doc.edges.at(-1)?.id,
+			expectedRevision: clearedEdgeBody.doc.revision
 		}
 	});
 	expect(deletedEdge.ok(), await deletedEdge.text()).toBe(true);
@@ -280,6 +319,7 @@ test('canvas API adds and edits text cards with clean git commits and stale guar
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
 	expect(raw.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns')).toBe(false);
+	expect(raw.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'routes back')).toBe(false);
 });
 
 test('canvas view adds and saves text cards from the board', async ({ page, request }) => {
@@ -320,7 +360,7 @@ test('canvas view adds and saves text cards from the board', async ({ page, requ
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
-test('canvas view adds and removes labeled edges between nodes', async ({ page, request }) => {
+test('canvas view adds, edits, and removes labeled edges between nodes', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-edge-ui-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -350,13 +390,25 @@ test('canvas view adds and removes labeled edges between nodes', async ({ page, 
 		const body = await loaded.json() as CanvasDoc;
 		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns');
 	}).toBe(true);
-	await page.getByRole('button', { name: /Remove canvas edge Home\.md to text: returns/ }).click();
-	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
-	await expect(page.getByLabel('Canvas edges')).not.toContainText('returns');
+
+	const labelInput = page.getByLabel(/Edit label for canvas edge Home\.md to text: returns/);
+	await labelInput.fill('loops back');
+	await page.getByRole('button', { name: /Save canvas edge Home\.md to text: returns/ }).click();
+	await expect(page.locator('.edge-label').filter({ hasText: 'loops back' })).toBeVisible();
+	await expect(page.getByLabel('Canvas edges')).toContainText('loops back');
 	await expect.poll(async () => {
 		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
 		const body = await loaded.json() as CanvasDoc;
-		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'returns');
+		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'loops back');
+	}).toBe(true);
+
+	await page.getByRole('button', { name: /Remove canvas edge Home\.md to text: loops back/ }).click();
+	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
+	await expect(page.getByLabel('Canvas edges')).not.toContainText('loops back');
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		return body.edges.some((edge) => edge.fromNode === 'b' && edge.toNode === 'a' && edge.label === 'loops back');
 	}).toBe(false);
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });

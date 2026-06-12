@@ -118,6 +118,23 @@ export const api = {
 		return res;
 	},
 
+	async updateCanvasEdgeLabel(
+		vaultId: string,
+		path: string,
+		edgeId: string,
+		label: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'update-edge-label', edgeId, label, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async deleteCanvasEdge(
 		vaultId: string,
 		path: string,

@@ -1,13 +1,30 @@
 <script lang="ts">
-	import type { CanvasEdgeSummary } from '$lib/canvas/view';
+	import {
+		canvasEdgeLabelChanged,
+		canvasEdgeLabelDraftFor,
+		type CanvasEdgeLabelDrafts,
+		type CanvasEdgeSummary
+	} from '$lib/canvas/view';
 
 	interface Props {
 		edges: CanvasEdgeSummary[];
+		edgeLabelDrafts: CanvasEdgeLabelDrafts;
+		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
+		onLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
+		onSaveLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onDelete: (edgeId: string) => void | Promise<void>;
 	}
 
-	let { edges, deletingEdgeId, onDelete }: Props = $props();
+	let {
+		edges,
+		edgeLabelDrafts,
+		savingEdgeId,
+		deletingEdgeId,
+		onLabelDraftChange,
+		onSaveLabel,
+		onDelete
+	}: Props = $props();
 </script>
 
 {#if edges.length > 0}
@@ -24,10 +41,33 @@
 							<span class="label">({edge.label})</span>
 						{/if}
 					</span>
+					<form
+						class="edge-edit"
+						onsubmit={(event) => {
+							event.preventDefault();
+							void onSaveLabel(edge);
+						}}
+					>
+						<input
+							class="edge-label-input"
+							aria-label={`Edit label for canvas edge ${edge.description}`}
+							placeholder="label"
+							value={canvasEdgeLabelDraftFor(edge, edgeLabelDrafts)}
+							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							oninput={(event) => onLabelDraftChange(edge, event.currentTarget.value)}
+						/>
+						<button
+							class="edge-save"
+							aria-label={`Save canvas edge ${edge.description}`}
+							disabled={!canvasEdgeLabelChanged(edge, edgeLabelDrafts) || savingEdgeId !== null || deletingEdgeId !== null}
+						>
+							{savingEdgeId === edge.id ? 'Saving...' : 'Save'}
+						</button>
+					</form>
 					<button
 						class="edge-remove"
 						aria-label={`Remove canvas edge ${edge.description}`}
-						disabled={deletingEdgeId !== null}
+						disabled={deletingEdgeId !== null || savingEdgeId !== null}
 						onclick={() => void onDelete(edge.id)}
 					>
 						{deletingEdgeId === edge.id ? 'Removing...' : 'Remove'}
@@ -67,7 +107,7 @@
 		align-items: center;
 		gap: 7px;
 		min-width: 0;
-		max-width: 360px;
+		max-width: 520px;
 		flex: 0 0 auto;
 		border: 1px solid var(--border);
 		border-radius: 5px;
@@ -94,6 +134,28 @@
 	.label {
 		color: var(--fg-dim);
 	}
+	.edge-edit {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+	}
+	.edge-label-input {
+		width: 112px;
+		min-width: 80px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
+		color: var(--fg);
+		font: inherit;
+		font-size: 0.68rem;
+		padding: 3px 6px;
+	}
+	.edge-label-input:focus {
+		border-color: var(--accent);
+		outline: none;
+	}
+	.edge-save,
 	.edge-remove {
 		border: 1px solid var(--border);
 		border-radius: 4px;
@@ -104,10 +166,15 @@
 		padding: 2px 6px;
 		cursor: pointer;
 	}
+	.edge-save:hover:not(:disabled) {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
 	.edge-remove:hover:not(:disabled) {
 		border-color: var(--danger);
 		color: var(--danger);
 	}
+	.edge-save:disabled,
 	.edge-remove:disabled {
 		cursor: default;
 		opacity: 0.55;

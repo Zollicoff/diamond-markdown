@@ -39,7 +39,13 @@ export interface CanvasSvgExport {
 	svg: string;
 }
 
-export type CanvasEditAction = 'add-text-node' | 'update-node-text' | 'move-node' | 'add-edge' | 'delete-edge';
+export type CanvasEditAction =
+	| 'add-text-node'
+	| 'update-node-text'
+	| 'move-node'
+	| 'add-edge'
+	| 'update-edge-label'
+	| 'delete-edge';
 
 export interface MutateCanvasInput {
 	path: string;
@@ -418,6 +424,17 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		};
 		if (label) edge.label = label;
 		edges.push(edge);
+	} else if (input.action === 'update-edge-label') {
+		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
+		if (typeof input.label !== 'string') throw new CanvasFileError('label is required');
+		const edge = edges.map((candidate, edgeIndex) => ({
+			id: rawEdgeId(candidate, edgeIndex),
+			record: record(candidate)
+		})).find((candidate) => candidate.id === input.edgeId)?.record;
+		if (!edge) throw new CanvasFileError('canvas edge not found', 404);
+		const label = input.label.trim().slice(0, 200);
+		if (label) edge.label = label;
+		else delete edge.label;
 	} else if (input.action === 'delete-edge') {
 		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
 		const index = edges.findIndex((edge, edgeIndex) => rawEdgeId(edge, edgeIndex) === input.edgeId);

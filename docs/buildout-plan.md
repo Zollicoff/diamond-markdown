@@ -123,6 +123,9 @@ Use small, pushable slices:
    commits with stale-revision protection.
 - **Canvas edge deletion.** List Canvas edges in the board view and remove
    them through git-backed commits with stale-revision protection.
+- **Canvas edge label editing.** Edit or clear existing Canvas edge labels
+   from the board view through git-backed commits with stale-revision
+   protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

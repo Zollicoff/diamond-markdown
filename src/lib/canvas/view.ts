@@ -36,12 +36,14 @@ export interface CanvasConnectionDraft {
 export interface CanvasEdgeSummary {
 	id: string;
 	label: string;
+	editableLabel: string;
 	fromLabel: string;
 	toLabel: string;
 	description: string;
 }
 
 export type CanvasTextDrafts = Record<string, string>;
+export type CanvasEdgeLabelDrafts = Record<string, string>;
 
 const PADDING = 80;
 
@@ -188,15 +190,29 @@ export function canvasEdgeSummaries(doc: Pick<CanvasDoc, 'nodes' | 'edges'>): Ca
 	return doc.edges.map((edge) => {
 		const fromLabel = nodes.get(edge.fromNode) ?? edge.fromNode;
 		const toLabel = nodes.get(edge.toNode) ?? edge.toNode;
-		const label = edge.label?.trim() || 'unlabeled';
+		const editableLabel = edge.label?.trim() ?? '';
+		const label = editableLabel || 'unlabeled';
 		return {
 			id: edge.id,
 			label,
+			editableLabel,
 			fromLabel,
 			toLabel,
 			description: `${fromLabel} to ${toLabel}${label !== 'unlabeled' ? `: ${label}` : ''}`
 		};
 	});
+}
+
+export function canvasEdgeLabelDrafts(edges: CanvasEdgeSummary[]): CanvasEdgeLabelDrafts {
+	return Object.fromEntries(edges.map((edge) => [edge.id, edge.editableLabel]));
+}
+
+export function canvasEdgeLabelDraftFor(edge: CanvasEdgeSummary, drafts: CanvasEdgeLabelDrafts): string {
+	return drafts[edge.id] ?? edge.editableLabel;
+}
+
+export function canvasEdgeLabelChanged(edge: CanvasEdgeSummary, drafts: CanvasEdgeLabelDrafts): boolean {
+	return canvasEdgeLabelDraftFor(edge, drafts).trim() !== edge.editableLabel;
 }
 
 function plural(count: number, singular: string): string {

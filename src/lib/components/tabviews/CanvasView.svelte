@@ -7,6 +7,9 @@
 		canvasConnectionDraft,
 		canvasDraftChanged,
 		canvasDraftFor,
+		canvasEdgeLabelChanged,
+		canvasEdgeLabelDraftFor,
+		canvasEdgeLabelDrafts,
 		canConnectCanvasNodes,
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
@@ -15,6 +18,8 @@
 		canvasSummary,
 		canvasTextDrafts,
 		edgeLines,
+		type CanvasEdgeLabelDrafts,
+		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
 	import CanvasEdgeList from './canvas/CanvasEdgeList.svelte';
@@ -36,7 +41,9 @@
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
 	let moveSavingNodeId = $state<string | null>(null);
+	let savingEdgeId = $state<string | null>(null);
 	let deletingEdgeId = $state<string | null>(null);
+	let edgeLabelDrafts = $state<CanvasEdgeLabelDrafts>({});
 	let edgeFromNodeId = $state('');
 	let edgeToNodeId = $state('');
 	let edgeLabel = $state('');
@@ -72,6 +79,7 @@
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
 		textDrafts = canvasTextDrafts(next.nodes);
+		edgeLabelDrafts = canvasEdgeLabelDrafts(canvasEdgeSummaries(next));
 		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
 		edgeFromNodeId = edgeDraft.fromNodeId;
 		edgeToNodeId = edgeDraft.toNodeId;
@@ -79,6 +87,10 @@
 
 	function setDraft(node: CanvasNode, value: string): void {
 		textDrafts = { ...textDrafts, [node.id]: value };
+	}
+
+	function setEdgeLabelDraft(edge: CanvasEdgeSummary, value: string): void {
+		edgeLabelDrafts = { ...edgeLabelDrafts, [edge.id]: value };
 	}
 
 	async function addTextNode(): Promise<void> {
@@ -135,7 +147,7 @@
 	}
 
 	async function deleteEdge(edgeId: string): Promise<void> {
-		if (!doc || deletingEdgeId) return;
+		if (!doc || deletingEdgeId || savingEdgeId) return;
 		deletingEdgeId = edgeId;
 		error = null;
 		try {
@@ -146,6 +158,27 @@
 			error = (e as Error).message;
 		} finally {
 			deletingEdgeId = null;
+		}
+	}
+
+	async function saveEdgeLabel(edge: CanvasEdgeSummary): Promise<void> {
+		if (!doc || savingEdgeId || deletingEdgeId || !canvasEdgeLabelChanged(edge, edgeLabelDrafts)) return;
+		savingEdgeId = edge.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasEdgeLabel(
+				vaultId,
+				path,
+				edge.id,
+				canvasEdgeLabelDraftFor(edge, edgeLabelDrafts),
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas edge saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingEdgeId = null;
 		}
 	}
 
@@ -310,7 +343,15 @@
 				{/each}
 			</ul>
 		{/if}
-		<CanvasEdgeList edges={edgeSummaries} {deletingEdgeId} onDelete={deleteEdge} />
+		<CanvasEdgeList
+			edges={edgeSummaries}
+			{edgeLabelDrafts}
+			{savingEdgeId}
+			{deletingEdgeId}
+			onLabelDraftChange={setEdgeLabelDraft}
+			onSaveLabel={saveEdgeLabel}
+			onDelete={deleteEdge}
+		/>
 		<div class="canvas-scroll">
 			<div class="canvas-board" style={`width: ${bounds.width}px; height: ${bounds.height}px;`}>
 				<svg class="edge-layer" width={bounds.width} height={bounds.height} aria-hidden="true">
