@@ -190,8 +190,8 @@
 		}
 	}
 
-	function insertExistingAttachment(path: string): void {
-		editorApi?.insert(attachmentEmbedMarkdown([path]));
+	function insertExistingAttachments(paths: string[]): void {
+		editorApi?.insert(attachmentEmbedMarkdown(paths));
 	}
 
 	const resolveLink: LinkResolver = (target: string) => {
@@ -347,7 +347,7 @@
 {#if attachmentPickerOpen}
 	<AttachmentPicker
 		{vaultId}
-		onInsert={insertExistingAttachment}
+		onInsert={insertExistingAttachments}
 		onClose={() => (attachmentPickerOpen = false)}
 	/>
 {/if}

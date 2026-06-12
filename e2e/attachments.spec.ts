@@ -136,6 +136,62 @@ test.describe('attachment uploads', () => {
 		}).toContain('![[Attachments/picker packet.pdf]]');
 	});
 
+	test('selects multiple existing vault attachments and inserts embeds together', async ({ page, request }) => {
+		const notePath = 'Attachment Bulk Picker Test.md';
+		const roof = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: 'bulk sample roof.png',
+					mimeType: 'image/png',
+					buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47])
+				}
+			}
+		});
+		expect(roof.ok()).toBe(true);
+		const spec = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: 'bulk sample spec.pdf',
+					mimeType: 'application/pdf',
+					buffer: Buffer.from('%PDF-1.4\n')
+				}
+			}
+		});
+		expect(spec.ok()).toBe(true);
+		await request.post('/api/vaults/default/note', {
+			data: { path: notePath, content: '# Attachment Bulk Picker Test\n\n', commitNow: false }
+		});
+
+		await page.goto(`/vault/default/note/${encodeURIComponent(notePath)}`);
+		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByRole('button', { name: 'Insert attachment' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
+		await dialog.getByLabel('Filter attachments').fill('bulk sample');
+		await expect(dialog.getByRole('option', { name: /bulk sample roof\.png/ })).toBeVisible();
+		await expect(dialog.getByRole('option', { name: /bulk sample spec\.pdf/ })).toBeVisible();
+		await expect(dialog.getByText('0 selected')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Select visible' }).click();
+		await expect(dialog.getByText('2 selected')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Insert 2 embeds' }).click();
+		await expect(dialog).toBeHidden();
+		await expect(page.locator('.cm-content').first()).toContainText('bulk sample roof.png');
+		await expect(page.locator('.cm-content').first()).toContainText('bulk sample spec.pdf');
+
+		await page.keyboard.press('Meta+S');
+		await expect.poll(async () => {
+			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const note = await loaded.json() as { content: string };
+			return note.content;
+		}).toContain('![[Attachments/bulk sample roof.png]]');
+		await expect.poll(async () => {
+			const loaded = await request.get(`/api/vaults/default/note?path=${encodeURIComponent(notePath)}`);
+			const note = await loaded.json() as { content: string };
+			return note.content;
+		}).toContain('![[Attachments/bulk sample spec.pdf]]');
+	});
+
 	test('drops a local file into the editor and inserts an Obsidian embed', async ({ page, request }) => {
 		const notePath = 'Attachment Drop Test.md';
 		const attachmentPath = path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments', 'dropped diagram.svg');

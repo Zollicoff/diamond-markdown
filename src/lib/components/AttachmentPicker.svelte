@@ -5,26 +5,30 @@
 
 	interface Props {
 		vaultId: string;
-		onInsert: (path: string) => void | Promise<void>;
+		onInsert: (paths: string[]) => void | Promise<void>;
 		onClose: () => void;
 	}
 
 	let { vaultId, onInsert, onClose }: Props = $props();
 	let attachments = $state<AttachmentRef[]>([]);
-	let selectedPath = $state<string | null>(null);
+	let selectedPaths = $state<string[]>([]);
 	let query = $state('');
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
 	const visible = $derived(filterAttachments(attachments, query));
-	const selected = $derived(attachments.find((attachment) => attachment.path === selectedPath) ?? null);
+	const selectedPathSet = $derived(new Set(selectedPaths));
+	const selected = $derived(attachments.filter((attachment) => selectedPathSet.has(attachment.path)));
+	const insertLabel = $derived(
+		selected.length === 1 ? 'Insert embed' : `Insert ${selected.length} embeds`
+	);
 
 	async function load(): Promise<void> {
 		loading = true;
 		error = null;
 		try {
 			attachments = await api.attachments(vaultId);
-			selectedPath = attachments[0]?.path ?? null;
+			selectedPaths = [];
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -32,9 +36,27 @@
 		}
 	}
 
-	async function insertSelected(): Promise<void> {
-		if (!selected) return;
-		await onInsert(selected.path);
+	function togglePath(path: string): void {
+		selectedPaths = selectedPathSet.has(path)
+			? selectedPaths.filter((candidate) => candidate !== path)
+			: [...selectedPaths, path];
+	}
+
+	function selectVisible(): void {
+		const next = [...selectedPaths];
+		for (const attachment of visible) {
+			if (!next.includes(attachment.path)) next.push(attachment.path);
+		}
+		selectedPaths = next;
+	}
+
+	function clearSelection(): void {
+		selectedPaths = [];
+	}
+
+	async function insertSelected(paths = selected.map((attachment) => attachment.path)): Promise<void> {
+		if (!paths.length) return;
+		await onInsert(paths);
 		onClose();
 	}
 
@@ -74,6 +96,13 @@
 			placeholder={attachments.length === 0 ? 'No attachments found' : 'Filter by name, path, or type'}
 			bind:value={query}
 		/>
+		<div class="selection-bar">
+			<span>{selected.length} selected</span>
+			<div>
+				<button class="secondary" disabled={visible.length === 0} onclick={selectVisible}>Select visible</button>
+				<button class="secondary" disabled={selected.length === 0} onclick={clearSelection}>Clear</button>
+			</div>
+		</div>
 
 		{#if loading}
 			<div class="state">Loading attachments...</div>
@@ -87,15 +116,13 @@
 					<button
 						type="button"
 						class="row"
-						class:selected={attachment.path === selectedPath}
+						class:selected={selectedPathSet.has(attachment.path)}
 						role="option"
-						aria-selected={attachment.path === selectedPath}
-						onclick={() => (selectedPath = attachment.path)}
-						ondblclick={() => {
-							selectedPath = attachment.path;
-							void insertSelected();
-						}}
+						aria-selected={selectedPathSet.has(attachment.path)}
+						onclick={() => togglePath(attachment.path)}
+						ondblclick={() => void insertSelected([attachment.path])}
 					>
+						<span class="check" aria-hidden="true">{selectedPathSet.has(attachment.path) ? '✓' : ''}</span>
 						<span class="kind">{attachment.kind}</span>
 						<span class="main">
 							<span class="name">{attachment.filename}</span>
@@ -109,8 +136,8 @@
 
 		<footer>
 			<button class="secondary" onclick={onClose}>Cancel</button>
-			<button class="primary" disabled={!selected} onclick={() => void insertSelected()}>
-				Insert embed
+			<button class="primary" disabled={selected.length === 0} onclick={() => void insertSelected()}>
+				{insertLabel}
 			</button>
 		</footer>
 	</div>
@@ -203,8 +230,25 @@
 		border-color: var(--accent);
 		outline: 2px solid color-mix(in srgb, var(--accent), transparent 70%);
 	}
+	.selection-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		margin: 10px 16px 0;
+		color: var(--fg-dim);
+		font-size: 0.76rem;
+	}
+	.selection-bar div {
+		display: flex;
+		gap: 6px;
+	}
+	.selection-bar .secondary {
+		padding: 4px 8px;
+		font-size: 0.74rem;
+	}
 	.list {
-		margin: 12px 16px 0;
+		margin: 10px 16px 0;
 		border: 1px solid var(--border);
 		border-radius: 7px;
 		overflow: auto;
@@ -214,7 +258,7 @@
 	.row {
 		width: 100%;
 		display: grid;
-		grid-template-columns: 58px minmax(0, 1fr) auto;
+		grid-template-columns: 22px 58px minmax(0, 1fr) auto;
 		align-items: center;
 		gap: 10px;
 		border: 0;
@@ -231,6 +275,17 @@
 	.row:hover,
 	.row.selected {
 		background: var(--bg-hover);
+	}
+	.check {
+		width: 16px;
+		height: 16px;
+		display: grid;
+		place-items: center;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		color: var(--accent);
+		font-size: 0.72rem;
+		font-weight: 700;
 	}
 	.kind {
 		border: 1px solid var(--border);
@@ -276,7 +331,7 @@
 
 	@media (max-width: 640px) {
 		.row {
-			grid-template-columns: 52px minmax(0, 1fr);
+			grid-template-columns: 22px 52px minmax(0, 1fr);
 		}
 		.size {
 			display: none;
