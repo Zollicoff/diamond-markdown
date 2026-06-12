@@ -246,6 +246,9 @@ Use small, pushable slices:
 - **Obsidian block-list frontmatter.** Parse block-list `tags` and `aliases`
    from imported vaults so tag indexes, search, and alias wikilinks match
    common Obsidian frontmatter without rewriting note files.
+- **File tree mutation helper extraction.** Move rename and drag/drop mutation
+   classification out of `FileTreePanel` into pure tree helpers with coverage
+   for note, Canvas, folder, and no-op rename cases.
 
 ## Next Implementation Slices
 

@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { TreeNode } from '../src/lib/types';
 import {
+	buildTreeDropMoveIntent,
+	buildTreeRenameIntent,
 	collectDirectoryPaths,
 	defaultTreePanelPreferences,
 	flattenVisibleTreeRows,
@@ -18,6 +20,8 @@ import {
 	treeFileDisplayName,
 	treeFileHref,
 	treeInitialRenameValue,
+	treeMutationKindForNode,
+	treeMutationKindForPath,
 	treePanelPreferencesSnapshot,
 	treePathIsDescendant,
 	treePathParent,
@@ -194,5 +198,54 @@ test.describe('tree view helpers', () => {
 		expect(renamedTreeNodePath(canvas, 'Roadmap')).toBe('Boards/Roadmap.canvas');
 		expect(renamedTreeNodePath(markdown, 'Weekly')).toBe('Notes/Weekly.markdown');
 		expect(renamedTreeNodePath(dir('Boards'), 'Canvases')).toBe('Canvases');
+	});
+
+	test('builds file-tree rename and drop mutation intents outside the component', () => {
+		const canvas = { ...file('Boards/Plan.canvas'), fileKind: 'canvas' as const };
+		const markdown = { ...file('Notes/Daily.markdown'), fileKind: 'markdown' as const };
+		const folder = dir('Notes/Archive');
+
+		expect(treeMutationKindForPath('Boards/Plan.canvas')).toBe('canvas');
+		expect(treeMutationKindForPath('Notes/Daily.md')).toBe('note');
+		expect(treeMutationKindForPath('Notes/Daily.markdown')).toBe('note');
+		expect(treeMutationKindForPath('Notes/Archive')).toBe('folder');
+		expect(treeMutationKindForNode(canvas)).toBe('canvas');
+		expect(treeMutationKindForNode(markdown)).toBe('note');
+		expect(treeMutationKindForNode(folder)).toBe('folder');
+
+		expect(buildTreeRenameIntent(canvas, 'Roadmap')).toEqual({
+			kind: 'canvas',
+			from: 'Boards/Plan.canvas',
+			to: 'Boards/Roadmap.canvas'
+		});
+		expect(buildTreeRenameIntent(markdown, 'Weekly')).toEqual({
+			kind: 'note',
+			from: 'Notes/Daily.markdown',
+			to: 'Notes/Weekly.markdown'
+		});
+		expect(buildTreeRenameIntent(folder, 'Reference')).toEqual({
+			kind: 'folder',
+			from: 'Notes/Archive',
+			to: 'Notes/Reference'
+		});
+
+		expect(buildTreeRenameIntent(markdown, 'Daily ')).toBeNull();
+		expect(buildTreeRenameIntent(folder, '')).toBeNull();
+		expect(buildTreeDropMoveIntent('Notes/Daily.md', 'Projects')).toEqual({
+			kind: 'note',
+			from: 'Notes/Daily.md',
+			to: 'Projects/Daily.md'
+		});
+		expect(buildTreeDropMoveIntent('Boards/Plan.canvas', '/Projects/Boards/')).toEqual({
+			kind: 'canvas',
+			from: 'Boards/Plan.canvas',
+			to: 'Projects/Boards/Plan.canvas'
+		});
+		expect(buildTreeDropMoveIntent('Notes/Archive', '')).toEqual({
+			kind: 'folder',
+			from: 'Notes/Archive',
+			to: 'Archive'
+		});
+		expect(buildTreeDropMoveIntent('Home.md', '')).toBeNull();
 	});
 });

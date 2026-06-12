@@ -38,6 +38,14 @@ export interface VisibleTreeWindow {
 	visibleRows: VisibleTreeRow[];
 }
 
+export type TreeMutationKind = 'note' | 'canvas' | 'folder';
+
+export interface TreeMutationIntent {
+	kind: TreeMutationKind;
+	from: string;
+	to: string;
+}
+
 const COLLATOR_OPTIONS: Intl.CollatorOptions = { sensitivity: 'base', numeric: true };
 export const TREE_SORT_MENU_WIDTH = 220;
 export const TREE_ROW_HEIGHT = 26;
@@ -238,6 +246,46 @@ export function renamedTreeNodePath(node: TreeNode, newName: string): string {
 	const hasKnownExt = /\.(md|markdown|canvas)$/i.test(trimmed);
 	const fileName = hasKnownExt || !existingExt ? trimmed : `${trimmed}${existingExt}`;
 	return parent ? `${parent}/${fileName}` : fileName;
+}
+
+export function treeMutationKindForPath(path: string): TreeMutationKind {
+	if (/\.canvas$/i.test(path)) return 'canvas';
+	if (/\.(md|markdown)$/i.test(path)) return 'note';
+	return 'folder';
+}
+
+export function treeMutationKindForNode(node: TreeNode): TreeMutationKind {
+	if (node.type === 'directory') return 'folder';
+	if (isCanvasTreeFile(node)) return 'canvas';
+	return 'note';
+}
+
+export function buildTreeRenameIntent(node: TreeNode, newName: string): TreeMutationIntent | null {
+	const currentName = node.type === 'file' ? treeFileDisplayName(node) : node.name;
+	if (!newName.trim() || newName === currentName || newName === node.name) return null;
+
+	const to = renamedTreeNodePath(node, newName);
+	if (to === node.path) return null;
+	return {
+		kind: treeMutationKindForNode(node),
+		from: node.path,
+		to
+	};
+}
+
+export function buildTreeDropMoveIntent(srcPath: string, destFolder: string): TreeMutationIntent | null {
+	const name = srcPath.split('/').pop();
+	if (!name) return null;
+
+	const targetFolder = destFolder.replace(/^\/+|\/+$/g, '');
+	const to = targetFolder ? `${targetFolder}/${name}` : name;
+	if (to === srcPath) return null;
+
+	return {
+		kind: treeMutationKindForPath(srcPath),
+		from: srcPath,
+		to
+	};
 }
 
 export function isCanvasTreeFile(node: TreeNode): boolean {

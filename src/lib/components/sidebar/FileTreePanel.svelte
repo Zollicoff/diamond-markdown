@@ -13,13 +13,15 @@
 	import { alertDialog } from '$lib/dialogs';
 	import { createTreePanelState } from '$lib/tree/panel-state.svelte';
 	import {
+		buildTreeDropMoveIntent,
+		buildTreeRenameIntent,
 		collectDirectoryPaths,
 		isCanvasTreeFile,
 		isMarkdownTreeFile,
-		renamedTreeNodePath,
 		revealParentDirectories,
 		sortTreeNodes,
 		treeFileDisplayName,
+		type TreeMutationIntent,
 		topLevelDirectoryPaths
 	} from '$lib/tree/view';
 
@@ -89,34 +91,31 @@
 		renamingPath = node.path;
 	}
 
+	async function runTreeMutation(intent: TreeMutationIntent): Promise<void> {
+		if (intent.kind === 'canvas') await api.renameCanvas(vaultId, intent.from, intent.to);
+		else if (intent.kind === 'note') await api.renameNote(vaultId, intent.from, intent.to);
+		else await api.renameFolder(vaultId, intent.from, intent.to);
+	}
+
 	async function commitRename(node: TreeNode, newName: string): Promise<void> {
-		const currentName = node.type === 'file' ? treeFileDisplayName(node) : node.name;
-		if (!newName || newName === currentName || newName === node.name) {
+		const intent = buildTreeRenameIntent(node, newName);
+		if (!intent) {
 			renamingPath = null;
 			return;
 		}
-		const newPath = renamedTreeNodePath(node, newName);
 		renamingPath = null;
 		try {
-			if (isCanvasTreeFile(node)) await api.renameCanvas(vaultId, node.path, newPath);
-			else if (node.type === 'file') await api.renameNote(vaultId, node.path, newPath);
-			else await api.renameFolder(vaultId, node.path, newPath);
+			await runTreeMutation(intent);
 		} catch (e) {
 			await alertDialog({ title: 'Could not rename item', message: (e as Error).message, tone: 'danger' });
 		}
 	}
 
 	async function handleDropMove(srcPath: string, destFolder: string): Promise<void> {
-		const isMarkdown = /\.(md|markdown)$/i.test(srcPath);
-		const isCanvas = /\.canvas$/i.test(srcPath);
-		const isFolder = !isMarkdown && !isCanvas;
-		const name = srcPath.split('/').pop()!;
-		const newPath = destFolder ? `${destFolder}/${name}` : name;
-		if (newPath === srcPath) return;
+		const intent = buildTreeDropMoveIntent(srcPath, destFolder);
+		if (!intent) return;
 		try {
-			if (isFolder) await api.renameFolder(vaultId, srcPath, newPath);
-			else if (isCanvas) await api.renameCanvas(vaultId, srcPath, newPath);
-			else await api.renameNote(vaultId, srcPath, newPath);
+			await runTreeMutation(intent);
 		} catch (e) {
 			await alertDialog({ title: 'Could not move item', message: (e as Error).message, tone: 'danger' });
 		}
