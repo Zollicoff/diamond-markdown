@@ -10,9 +10,15 @@
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { confirmDialog } from '$lib/dialogs';
+	import NoteTopBar from './note/NoteTopBar.svelte';
+	import {
+		loadNoteEditor,
+		loadNotePreview,
+		loadNoteToolbar,
+		type NoteViewComponent
+	} from '$lib/note/lazy-components';
 	import {
 		ensureMarkdownPath,
-		formatSavedAt,
 		isStaleRevisionError,
 		markdownWordCount,
 		notePathFromVaultHref,
@@ -21,27 +27,6 @@
 		readingTimeLabel,
 		resolveNoteLink
 	} from '$lib/note/view';
-
-	type ViewComponent = any;
-
-	let editorPromise: Promise<ViewComponent> | null = null;
-	let previewPromise: Promise<ViewComponent> | null = null;
-	let toolbarPromise: Promise<ViewComponent> | null = null;
-
-	function loadEditor(): Promise<ViewComponent> {
-		editorPromise ??= import('$lib/components/editor/Editor.svelte').then((m) => m.default);
-		return editorPromise;
-	}
-
-	function loadPreview(): Promise<ViewComponent> {
-		previewPromise ??= import('$lib/components/editor/Preview.svelte').then((m) => m.default);
-		return previewPromise;
-	}
-
-	function loadToolbar(): Promise<ViewComponent> {
-		toolbarPromise ??= import('$lib/components/editor/EditorToolbar.svelte').then((m) => m.default);
-		return toolbarPromise;
-	}
 
 	interface Props {
 		vaultId: string;
@@ -68,9 +53,9 @@
 	let savedAt = $state<number | null>(null);
 	let err = $state<string | null>(null);
 	let editorApi = $state<EditorApi | null>(null);
-	let EditorView = $state<ViewComponent | null>(null);
-	let PreviewView = $state<ViewComponent | null>(null);
-	let ToolbarView = $state<ViewComponent | null>(null);
+	let EditorView = $state<NoteViewComponent | null>(null);
+	let PreviewView = $state<NoteViewComponent | null>(null);
+	let ToolbarView = $state<NoteViewComponent | null>(null);
 	let viewLoadError = $state<string | null>(null);
 
 	let loadedPath: string | null = null;
@@ -236,16 +221,20 @@
 	const waitingForEditor = $derived(mode !== 'read' && (!EditorView || !ToolbarView));
 	const waitingForPreview = $derived(mode === 'read' && !PreviewView);
 
+	function openHistory(): void {
+		emitBus('history:open', { vaultId, path });
+	}
+
 	$effect(() => {
 		let alive = true;
 		viewLoadError = null;
 		if (mode === 'read') {
 			editorApi = null;
-			loadPreview()
+			loadNotePreview()
 				.then((component) => { if (alive) PreviewView = component; })
 				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
 		} else {
-			Promise.all([loadEditor(), loadToolbar()])
+			Promise.all([loadNoteEditor(), loadNoteToolbar()])
 				.then(([editor, toolbar]) => {
 					if (!alive) return;
 					EditorView = editor;
@@ -271,33 +260,21 @@
 </script>
 
 <div class="note-view">
-	<header class="topbar">
-		<div class="crumbs mono">{path}</div>
-		<div class="save-status">
-			{#if wordCount > 0}
-				<span class="meta mono" title="Word count · estimated reading time">{wordCount} words · {readingTime}</span>
-			{/if}
-			<div class="mode-group" role="tablist" aria-label="View mode">
-				<button class:active={mode === 'live'}   onclick={() => onModeChange?.('live')}   role="tab" aria-selected={mode === 'live'}>Live</button>
-				<button class:active={mode === 'source'} onclick={() => onModeChange?.('source')} role="tab" aria-selected={mode === 'source'}>Source</button>
-				<button class:active={mode === 'read'}   onclick={() => onModeChange?.('read')}   role="tab" aria-selected={mode === 'read'}>Read</button>
-			</div>
-			{#if saving}<span class="status saving">saving…</span>
-			{:else if err}<span class="status err" title={err}>{isConflict ? 'conflict' : 'error'}</span>
-			{:else if dirty}<span class="status dirty">●</span>
-			{:else if savedAt}<span class="status saved">{formatSavedAt(savedAt)}</span>{/if}
-			{#if isConflict}
-				<button class="btn danger" onclick={reloadFromDisk}>Reload</button>
-			{/if}
-			<button
-				class="btn"
-				onclick={() => emitBus('history:open', { vaultId, path })}
-				title="Show version history"
-				aria-label="Show version history"
-			>⏱</button>
-			<button class="btn" onclick={save} disabled={!dirty || saving}>Save</button>
-		</div>
-	</header>
+	<NoteTopBar
+		{path}
+		{wordCount}
+		{readingTime}
+		{mode}
+		{saving}
+		{dirty}
+		{savedAt}
+		{err}
+		{isConflict}
+		{onModeChange}
+		onReload={reloadFromDisk}
+		onHistory={openHistory}
+		onSave={save}
+	/>
 
 	{#if mode !== 'read' && ToolbarView}
 		<ToolbarView api={editorApi} />
@@ -337,52 +314,7 @@
 
 <style>
 	.note-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-	.topbar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 6px 14px;
-		border-bottom: 1px solid var(--border);
-		gap: 16px;
-		background: var(--bg);
-	}
-	.crumbs { color: var(--fg-muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-	.save-status { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--fg-dim); }
-	.meta { font-size: 0.74rem; color: var(--fg-muted); white-space: nowrap; }
-
-	.mode-group { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); padding: 2px; border-radius: 6px; }
-	.mode-group button {
-		background: transparent;
-		border: 0;
-		color: var(--fg-muted);
-		padding: 2px 9px;
-		border-radius: 4px;
-		font-size: 0.74rem;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.mode-group button:hover { color: var(--fg); }
-	.mode-group button.active { background: var(--bg-elev); color: var(--accent); }
-	.status.saving { color: var(--fg-muted); }
-	.status.dirty  { color: var(--accent); font-size: 1.2em; line-height: 1; }
-	.status.saved  { color: var(--success); }
-	.status.err    { color: var(--danger); }
-	.btn {
-		padding: 3px 12px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		color: var(--fg);
-		font-size: 0.78rem;
-		cursor: pointer;
-	}
-	.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-	.btn.danger { color: var(--danger); }
-	.btn.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
-	.btn:disabled { opacity: 0.4; cursor: default; }
-
 	.body { flex: 1; min-height: 0; overflow: hidden; }
 	.loading { padding: 2rem; color: var(--fg-dim); }
 	.loading.err { color: var(--danger); }
-	.mono { font-family: var(--mono); }
 </style>
