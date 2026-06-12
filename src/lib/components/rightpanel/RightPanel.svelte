@@ -20,6 +20,7 @@
 			<BacklinksPanel
 				{vaultId}
 				backlinks={doc.backlinks}
+				unlinkedMentions={doc.unlinkedMentions}
 				outgoing={doc.outgoingLinks}
 				tags={doc.tags}
 			/>

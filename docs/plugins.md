@@ -249,8 +249,10 @@ export function activate(api) {
 }
 ```
 
-Right-panel renderers receive the active `doc` object. They rerender when the
-active note changes, and may return a cleanup function.
+Right-panel renderers receive the active `doc` object, including outgoing
+links, backlinks, unlinked mentions, tags, frontmatter, rendered HTML, and raw
+body content. They rerender when the active note changes, and may return a
+cleanup function.
 
 Trusted and worker plugins can register right-sidebar iframe panels the same
 way as settings panels. The posted context includes the active `doc`.

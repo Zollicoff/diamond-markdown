@@ -307,6 +307,9 @@ Use small, pushable slices:
    as a page size instead of a hard stop, expose `offset`/`nextOffset`
    metadata, and let the Search tab load more ranked matches without
    over-rendering.
+- **Unlinked mentions.** Surface notes that mention the active note title,
+   stem, or aliases without already wikilinking it, using the existing index
+   and right-panel link list instead of a new vault scan.
 
 ## Next Implementation Slices
 

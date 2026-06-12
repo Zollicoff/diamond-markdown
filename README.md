@@ -1,6 +1,6 @@
 # Diamond Markdown
 
-> A self-hosted markdown knowledge base. Obsidian-style wikilinks, backlinks, graph, and live preview — but web-first (no Electron) and git-native for sync and history.
+> A self-hosted markdown knowledge base. Obsidian-style wikilinks, backlinks, unlinked mentions, graph, and live preview — but web-first (no Electron) and git-native for sync and history.
 
 Diamond Markdown is a single SvelteKit app. Point it at a folder of `.md` files, get a full knowledge-base UI in any browser. Every save is a git commit, so your history is real, diffable, and portable — and syncing across devices is a safe Settings action or `git push` away.
 
@@ -63,6 +63,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Attachment embed** — `![[image.png]]`, `![[audio.mp3]]`, `![[video.mp4]]`, `![[packet.pdf]]`, and other vault files render from local vault assets.
 - **Callout** — Obsidian-style callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+` render in read mode and static publish.
 - **Backlink** — automatically computed index of every note that wikilinks *to* the note you're viewing.
+- **Unlinked mention** — a note that mentions the current note's title, filename stem, or alias in plain text without making it a wikilink yet.
 - **Tag** — `#hashtag` in body text or `tags:` in frontmatter. Tag index lists every tag and the notes that use it.
 - **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized, including Obsidian block-list `tags` and `aliases`.
 
@@ -82,6 +83,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Heading anchors — every heading gets a stable id so `[[Note#Heading]]` deep-links work
 - Obsidian block anchors — paragraph/list block IDs such as `^install-steps` become stable anchors for `[[Note#^install-steps]]` in Live Preview, Read mode, and static publish
 - Backlinks panel — every note linking to the open note
+- Unlinked mentions panel — notes that mention the open note title, filename stem, or alias without a wikilink
 - Outgoing links panel
 - Outline panel — headings of the active note, click to scroll
 

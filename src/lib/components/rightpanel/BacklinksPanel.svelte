@@ -1,14 +1,15 @@
 <script lang="ts">
-	interface LinkRef { path: string; title: string; }
+	import type { LinkRef, OutgoingLink } from '$lib/types';
 
 	interface Props {
 		vaultId: string;
 		backlinks: LinkRef[];
-		outgoing?: { target: string; resolved: string | null }[];
+		unlinkedMentions?: LinkRef[];
+		outgoing?: OutgoingLink[];
 		tags?: string[];
 	}
 
-	let { vaultId, backlinks, outgoing = [], tags = [] }: Props = $props();
+	let { vaultId, backlinks, unlinkedMentions = [], outgoing = [], tags = [] }: Props = $props();
 </script>
 
 <aside class="panel">
@@ -20,6 +21,27 @@
 			<ul>
 				{#each backlinks as b}
 					<li><a href={`/vault/${vaultId}/note/${encodeURI(b.path)}`}>{b.title}</a></li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section>
+		<h3>Unlinked mentions <span class="count">{unlinkedMentions.length}</span></h3>
+		{#if unlinkedMentions.length === 0}
+			<p class="empty">No plain-text mentions found.</p>
+		{:else}
+			<ul>
+				{#each unlinkedMentions as mention}
+					<li>
+						<a
+							class="mention-link"
+							href={`/vault/${vaultId}/note/${encodeURI(mention.path)}`}
+							title={`Mentions this note without a wikilink: ${mention.path}`}
+						>
+							{mention.title}
+						</a>
+					</li>
 				{/each}
 			</ul>
 		{/if}
@@ -87,6 +109,10 @@
 		color: var(--fg);
 	}
 	li a:hover { background: var(--bg-hover); text-decoration: none; color: var(--accent); }
+	.mention-link {
+		border-left: 2px solid var(--accent);
+		padding-left: 7px;
+	}
 	.broken { color: var(--link-broken); font-style: italic; padding: 5px 8px; display: block; }
 	.empty { color: var(--fg-dim); font-size: 0.82rem; margin: 0; padding: 4px 8px; }
 	.tag-row { display: flex; flex-wrap: wrap; gap: 4px; }

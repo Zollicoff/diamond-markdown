@@ -107,6 +107,7 @@ export interface NoteDoc {
 	html: string;
 	outgoingLinks: OutgoingLink[];
 	backlinks: LinkRef[];
+	unlinkedMentions: LinkRef[];
 	tags: string[];
 }
 

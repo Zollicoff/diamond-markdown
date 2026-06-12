@@ -5,6 +5,7 @@ import type { NoteDoc } from '$lib/types';
 import { commitChange } from './git';
 import { splitFrontmatter } from './frontmatter';
 import { getIndex, removeNote, upsertNote } from './indexer';
+import { unlinkedMentionsForNote } from './mentions';
 import { renderMarkdown } from './markdown';
 import { ensureMdExt, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -61,6 +62,7 @@ export function loadNote(vault: Vault, inputPath: string): NoteDoc {
 		path: p,
 		title: idx.notes.get(p)?.title ?? p
 	}));
+	const unlinkedMentions = unlinkedMentionsForNote(idx, rel);
 
 	return {
 		path: rel,
@@ -72,6 +74,7 @@ export function loadNote(vault: Vault, inputPath: string): NoteDoc {
 		html,
 		outgoingLinks,
 		backlinks,
+		unlinkedMentions,
 		tags: meta?.tags ?? []
 	};
 }

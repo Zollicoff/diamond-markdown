@@ -19,6 +19,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Broken link styling + click-to-create
 - [x] Frontmatter parser (title, tags, aliases, created, updated, public)
 - [x] Backlinks panel
+- [x] Unlinked mentions panel
 - [x] Outgoing links panel
 - [x] Tag index page
 - [x] Fuzzy quick-switcher

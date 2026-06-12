@@ -27,6 +27,7 @@
 			html: doc.html,
 			outgoingLinks: doc.outgoingLinks.map((link) => ({ target: link.target, resolved: link.resolved })),
 			backlinks: doc.backlinks.map((link) => ({ path: link.path, title: link.title })),
+			unlinkedMentions: doc.unlinkedMentions.map((link) => ({ path: link.path, title: link.title })),
 			tags: [...doc.tags]
 		}
 	});

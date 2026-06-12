@@ -311,6 +311,34 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	await expect(search.locator('.result').filter({ hasText: 'Virtual 239' })).toBeVisible({ timeout: 4_000 });
 });
 
+test('right panel shows unlinked note mentions beside backlinks', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'unlinked-mentions-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nTarget note.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Linked.md'), '# Linked\n\nSee [[Home]].\n');
+	fs.writeFileSync(path.join(vaultDir, 'Mentioner.md'), '# Mentioner\n\nHome came up in conversation without a wikilink.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Unlinked Mentions Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Home.md')}`);
+	expect(loaded.ok()).toBe(true);
+	const body = await loaded.json() as {
+		backlinks: { path: string; title: string }[];
+		unlinkedMentions: { path: string; title: string }[];
+	};
+	expect(body.backlinks).toEqual([{ path: 'Linked.md', title: 'Linked' }]);
+	expect(body.unlinkedMentions).toEqual([{ path: 'Mentioner.md', title: 'Mentioner' }]);
+
+	await page.goto(`/vault/${vault.id}/note/Home.md`);
+	await expect(page.locator('.right-col')).toContainText('Unlinked mentions');
+	await expect(page.locator('.right-col')).toContainText('Mentioner');
+});
+
 test('new note command uses an in-app name dialog', async ({ page, request }) => {
 	const notePath = 'Dialog Created Note.md';
 	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);

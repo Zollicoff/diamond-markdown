@@ -42,7 +42,7 @@ The main remaining product risks are:
 | Vault filesystem model | Done | Vault registry, server path guards, import preflight, file tree tests | Keep all new disk routes on server path helpers |
 | Markdown editing | Done | CodeMirror source/live/read modes, toolbar, word count, stale revision guard | Polish editor edge cases as reported |
 | Wikilinks and navigation | Done | Alias/path/heading/block refs, context menus, hover previews, modifier opens | More obscure Obsidian link aliases can be added later |
-| Backlinks/outgoing links | Done | Indexer and right-panel link lists | Unlinked mentions are not implemented |
+| Backlinks/outgoing links | Done | Indexer and right-panel link lists, including unlinked mention detection | Keep mention matching conservative so it remains useful on large vaults |
 | Tags/frontmatter | Done | Inline tags plus Obsidian block-list `tags` and `aliases` | Broader YAML compatibility can remain incremental |
 | Render pipeline | Done | KaTeX, Mermaid, code highlighting, footnotes, embeds, callouts, block IDs | Continue adding edge cases only when imported vaults expose them |
 | Attachments | Done | Upload/drop/paste, picker, multi-select insert, delete, rename with reference rewrites, Obsidian folder config | Bulk move/organize UI is still absent |
@@ -66,8 +66,8 @@ The main remaining product risks are:
    scope is available.
 2. **Honest public roadmap cleanup.** Update README/ROADMAP wording so Canvas,
    plugins, offline, and desktop are explicitly scoped.
-3. **Unlinked mentions.** Add a backlinks-adjacent view for note-title mentions
-   that are not already wikilinks.
+3. **Attachment organization.** Add bulk move/organize affordances for imported
+   asset-heavy vaults without changing existing markdown references silently.
 
 ## Current Product Line
 
