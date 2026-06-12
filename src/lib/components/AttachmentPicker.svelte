@@ -2,7 +2,7 @@
 	import { api } from '$lib/vault-api';
 	import type { AttachmentRef } from '$lib/types';
 	import { filterAttachments, formatAttachmentSize } from '$lib/note/attachments';
-	import { confirmDialog, notify } from '$lib/dialogs';
+	import { confirmDialog, notify, promptText } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -16,6 +16,7 @@
 	let query = $state('');
 	let loading = $state(true);
 	let deleting = $state(false);
+	let renaming = $state(false);
 	let error = $state<string | null>(null);
 
 	const visible = $derived(filterAttachments(attachments, query));
@@ -63,7 +64,7 @@
 	}
 
 	async function deleteSelected(): Promise<void> {
-		if (selected.length === 0 || deleting) return;
+		if (selected.length === 0 || deleting || renaming) return;
 		const count = selected.length;
 		const confirmed = await confirmDialog({
 			title: count === 1 ? 'Delete attachment' : `Delete ${count} attachments`,
@@ -91,6 +92,36 @@
 			error = (e as Error).message;
 		} finally {
 			deleting = false;
+		}
+	}
+
+	async function renameSelected(): Promise<void> {
+		if (selected.length !== 1 || deleting || renaming) return;
+		const attachment = selected[0];
+		const nextPath = await promptText({
+			title: 'Rename attachment',
+			label: 'Vault path',
+			value: attachment.path,
+			confirmLabel: 'Rename'
+		});
+		if (!nextPath || nextPath === attachment.path) return;
+		renaming = true;
+		error = null;
+		try {
+			const res = await api.renameAttachment(vaultId, attachment.path, nextPath);
+			selectedPaths = [res.to];
+			await load();
+			notify({
+				title: 'Attachment renamed',
+				message: res.linksUpdated > 0
+					? `${res.linksUpdated} markdown reference${res.linksUpdated === 1 ? '' : 's'} updated.`
+					: 'No markdown references needed updating.',
+				tone: 'success'
+			});
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			renaming = false;
 		}
 	}
 
@@ -135,7 +166,10 @@
 			<div>
 				<button class="secondary" disabled={visible.length === 0} onclick={selectVisible}>Select visible</button>
 				<button class="secondary" disabled={selected.length === 0} onclick={clearSelection}>Clear</button>
-				<button class="danger" disabled={selected.length === 0 || deleting} onclick={() => void deleteSelected()}>
+				<button class="secondary" disabled={selected.length !== 1 || deleting || renaming} onclick={() => void renameSelected()}>
+					{renaming ? 'Renaming...' : 'Rename'}
+				</button>
+				<button class="danger" disabled={selected.length === 0 || deleting || renaming} onclick={() => void deleteSelected()}>
 					{deleting ? 'Deleting...' : 'Delete selected'}
 				</button>
 			</div>

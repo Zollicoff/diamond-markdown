@@ -2,8 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { commitChange } from './git';
+import { getIndex, upsertNote } from './indexer';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
+import { splitAssetReference } from './embed';
+import { replaceEmbeds } from './wikilink';
+import { resolveMarkdownImagePath } from './embed';
 import type { AttachmentKind, AttachmentRef } from '$lib/types';
 
 export interface AttachmentUploadResult {
@@ -17,6 +21,15 @@ export interface AttachmentUploadResult {
 export interface AttachmentDeleteResult {
 	ok: true;
 	path: string;
+	sha: string | null;
+}
+
+export interface AttachmentRenameResult {
+	ok: true;
+	from: string;
+	to: string;
+	linksUpdated: number;
+	touched: string[];
 	sha: string | null;
 }
 
@@ -67,6 +80,104 @@ function attachmentKind(relPath: string): AttachmentKind | null {
 
 function shouldSkipDir(name: string): boolean {
 	return name.startsWith('.') || EXCLUDED_DIRS.has(name);
+}
+
+function assertAttachmentPath(inputPath: string): string {
+	const rel = normalizeVaultPath(inputPath);
+	if (!attachmentKind(rel)) throw new Error('path is not an attachment');
+	return rel;
+}
+
+function sameAttachmentRef(target: string, oldPath: string): boolean {
+	return splitAssetReference(target).path.toLowerCase() === oldPath.toLowerCase();
+}
+
+function preserveSuffix(target: string, newPath: string): string {
+	return `${newPath}${splitAssetReference(target).suffix}`;
+}
+
+function relativeMarkdownHref(notePath: string, newPath: string, suffix: string): string {
+	const noteDir = path.posix.dirname(notePath);
+	const rel = path.posix.relative(noteDir === '.' ? '' : noteDir, newPath) || path.posix.basename(newPath);
+	const href = `${rel}${suffix}`;
+	return /\s/.test(href) ? `<${href}>` : href;
+}
+
+function splitMarkdownImageDestination(body: string): { href: string; rest: string; wrapped: boolean } | null {
+	const trimmed = body.trim();
+	if (!trimmed) return null;
+	if (trimmed.startsWith('<')) {
+		const close = trimmed.indexOf('>');
+		if (close < 0) return null;
+		return {
+			href: trimmed.slice(1, close),
+			rest: trimmed.slice(close + 1),
+			wrapped: true
+		};
+	}
+	const match = trimmed.match(/^(\S+)([\s\S]*)$/);
+	if (!match) return null;
+	return { href: match[1], rest: match[2], wrapped: false };
+}
+
+function rewriteMarkdownImagesInText(
+	text: string,
+	notePath: string,
+	oldPath: string,
+	newPath: string
+): { text: string; hits: number } {
+	let hits = 0;
+	const next = text.replace(/!\[([^\]\n]*)\]\(([^)\n]+)\)/g, (whole, alt: string, body: string) => {
+		const dest = splitMarkdownImageDestination(body);
+		if (!dest) return whole;
+		const resolved = resolveMarkdownImagePath(dest.href, notePath);
+		if (!resolved || resolved.toLowerCase() !== oldPath.toLowerCase()) return whole;
+
+		hits++;
+		const suffix = splitAssetReference(dest.href).suffix;
+		const href = relativeMarkdownHref(notePath, newPath, suffix);
+		return `![${alt}](${href}${dest.rest})`;
+	});
+	return { text: next, hits };
+}
+
+function rewriteAttachmentReferences(
+	vault: Vault,
+	oldPath: string,
+	newPath: string
+): { touched: string[]; linksUpdated: number } {
+	const idx = getIndex(vault);
+	const touched = new Set<string>();
+	let linksUpdated = 0;
+
+	for (const notePath of idx.notes.keys()) {
+		let abs: string;
+		try {
+			abs = resolveInVault(vault, notePath);
+		} catch {
+			continue;
+		}
+		if (!fs.existsSync(abs)) continue;
+		const content = fs.readFileSync(abs, 'utf-8');
+		let embedHits = 0;
+		const withEmbeds = replaceEmbeds(content, (embed) => {
+			if (!sameAttachmentRef(embed.target, oldPath)) return embed.raw;
+			embedHits++;
+			const meta = embed.raw.match(/!\[\[[^\[\]|\n]+?(\|[^\[\]\n]+?)?\]\]/)?.[1] ?? '';
+			return `![[${preserveSuffix(embed.target, newPath)}${meta}]]`;
+		});
+		const markdown = rewriteMarkdownImagesInText(withEmbeds, notePath, oldPath, newPath);
+		const next = markdown.text;
+		const hits = embedHits + markdown.hits;
+		if (hits > 0 && next !== content) {
+			fs.writeFileSync(abs, next);
+			upsertNote(vault, notePath, next);
+			touched.add(notePath);
+			linksUpdated += hits;
+		}
+	}
+
+	return { touched: [...touched], linksUpdated };
 }
 
 export function listAttachments(vault: Vault): AttachmentRef[] {
@@ -130,8 +241,7 @@ export async function saveAttachment(vault: Vault, file: File): Promise<Attachme
 }
 
 export async function deleteAttachment(vault: Vault, inputPath: string): Promise<AttachmentDeleteResult> {
-	const rel = normalizeVaultPath(inputPath);
-	if (!attachmentKind(rel)) throw new Error('path is not an attachment');
+	const rel = assertAttachmentPath(inputPath);
 	const abs = resolveInVault(vault, rel);
 	if (!fs.existsSync(abs)) throw new Error('attachment not found');
 	const stat = fs.statSync(abs);
@@ -144,4 +254,25 @@ export async function deleteAttachment(vault: Vault, inputPath: string): Promise
 		path: rel,
 		sha: res?.sha ?? null
 	};
+}
+
+export async function renameAttachment(vault: Vault, fromInput: string, toInput: string): Promise<AttachmentRenameResult> {
+	const from = assertAttachmentPath(fromInput);
+	const to = assertAttachmentPath(toInput);
+	if (from.toLowerCase() === to.toLowerCase()) throw new Error('destination must be different');
+	const fromAbs = resolveInVault(vault, from);
+	const toAbs = resolveInVault(vault, to);
+	if (!fs.existsSync(fromAbs) || !fs.statSync(fromAbs).isFile()) throw new Error('attachment not found');
+	if (fs.existsSync(toAbs)) throw new Error('destination already exists');
+
+	const { touched, linksUpdated } = rewriteAttachmentReferences(vault, from, to);
+	fs.mkdirSync(path.dirname(toAbs), { recursive: true });
+
+	fs.renameSync(fromAbs, toAbs);
+	const summary = linksUpdated > 0
+		? `${from} → ${to} (+${linksUpdated} reference${linksUpdated === 1 ? '' : 's'} updated)`
+		: `${from} → ${to}`;
+	const res = await commitChange(vault, [from, to, ...touched], 'rename', summary);
+
+	return { ok: true, from, to, touched, linksUpdated, sha: res?.sha ?? null };
 }

@@ -119,6 +119,50 @@ test.describe('attachment uploads', () => {
 		expect(filterAttachments(attachments, 'roof').map((attachment) => attachment.path)).toEqual(['Attachments/roof.png']);
 	});
 
+	test('renames attachments and rewrites markdown references in one commit', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'attachment-rename-api-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, 'Files'), { recursive: true });
+		fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, 'Files', 'packet.pdf'), '%PDF-1.4\n');
+		fs.writeFileSync(
+			path.join(vaultDir, 'Notes', 'Refs.md'),
+			[
+				'# Refs',
+				'',
+				'![[Files/packet.pdf#page=3|Site packet]]',
+				'',
+				'![Packet preview](../Files/packet.pdf#page=3 "Packet")'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Attachment Rename API Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const renamed = await request.patch(`/api/vaults/${vault.id}/attachment`, {
+			data: { from: 'Files/packet.pdf', to: 'Files/renamed packet.pdf' }
+		});
+		expect(renamed.ok()).toBe(true);
+		const body = await renamed.json() as { from: string; to: string; linksUpdated: number; touched: string[]; sha: string | null };
+		expect(body).toMatchObject({
+			from: 'Files/packet.pdf',
+			to: 'Files/renamed packet.pdf',
+			linksUpdated: 2,
+			touched: ['Notes/Refs.md']
+		});
+		expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, 'Files', 'packet.pdf'))).toBe(false);
+		expect(fs.existsSync(path.join(vaultDir, 'Files', 'renamed packet.pdf'))).toBe(true);
+		const note = fs.readFileSync(path.join(vaultDir, 'Notes', 'Refs.md'), 'utf-8');
+		expect(note).toContain('![[Files/renamed packet.pdf#page=3|Site packet]]');
+		expect(note).toContain('![Packet preview](<../Files/renamed packet.pdf#page=3> "Packet")');
+		expect(git(vaultDir, ['status', '--short'])).toBe('');
+		expect(git(vaultDir, ['log', '--oneline', '-1'])).toContain('rename: Files/packet.pdf → Files/renamed packet.pdf (+2 references updated)');
+	});
+
 	test('picks an existing vault attachment from the editor toolbar and inserts an embed', async ({ page, request }) => {
 		const notePath = 'Attachment Picker Test.md';
 		const attachmentDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments');
@@ -235,6 +279,40 @@ test.describe('attachment uploads', () => {
 		await expect(dialog.getByText('0 selected')).toBeVisible();
 		await expect(page.getByText('Attachment deleted')).toBeVisible();
 		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
+		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
+	});
+
+	test('renames a selected vault attachment from the picker', async ({ page, request }) => {
+		const uploaded = await request.post('/api/vaults/default/attachment', {
+			headers: { origin: testOrigin() },
+			multipart: {
+				file: {
+					name: 'rename sample.pdf',
+					mimeType: 'application/pdf',
+					buffer: Buffer.from('%PDF-1.4\n')
+				}
+			}
+		});
+		expect(uploaded.ok()).toBe(true);
+		const uploadedBody = await uploaded.json() as { path: string };
+
+		await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByRole('button', { name: 'Insert attachment' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
+		await dialog.getByLabel('Filter attachments').fill('rename sample');
+		await dialog.getByRole('option', { name: /rename sample\.pdf/ }).click();
+		await dialog.getByRole('button', { name: 'Rename' }).click();
+		const prompt = page.getByRole('dialog', { name: 'Rename attachment' });
+		await prompt.getByLabel('Vault path').fill('Attachments/renamed sample.pdf');
+		await prompt.getByRole('button', { name: 'Rename' }).click();
+
+		await expect(dialog.getByRole('option', { name: /rename sample\.pdf/ })).toHaveCount(0);
+		await dialog.getByLabel('Filter attachments').fill('renamed sample');
+		await expect(dialog.getByRole('option', { name: /renamed sample\.pdf/ })).toBeVisible();
+		await expect(page.getByText('Attachment renamed')).toBeVisible();
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, uploadedBody.path))).toBe(false);
+		await expect.poll(() => fs.existsSync(path.join(FIXTURE_PATHS.VAULT_DIR, 'Attachments', 'renamed sample.pdf'))).toBe(true);
 		await expect.poll(() => git(FIXTURE_PATHS.VAULT_DIR, ['status', '--short'])).toBe('');
 	});
 

@@ -301,6 +301,26 @@ export const api = {
 		emit('tree:invalidate', { vaultId });
 	},
 
+	async renameAttachment(
+		vaultId: string,
+		from: string,
+		to: string
+	): Promise<{ from: string; to: string; linksUpdated: number; touched: string[]; sha: string | null }> {
+		const res = await json<{ from: string; to: string; linksUpdated: number; touched: string[]; sha: string | null }>(
+			`/api/vaults/${vaultId}/attachment`,
+			{
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ from, to })
+			}
+		);
+		for (const path of res.touched) {
+			emit('note:saved', { vaultId, path, sha: res.sha });
+		}
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async renameNote(vaultId: string, from: string, to: string): Promise<{ linksUpdated: number; touched: string[]; sha: string | null }> {
 		const res = await json<{ linksUpdated: number; touched: string[]; sha: string | null }>(
 			`/api/vaults/${vaultId}/note`,
