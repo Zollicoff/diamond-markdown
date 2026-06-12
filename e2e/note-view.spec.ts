@@ -5,9 +5,9 @@ import {
 	markdownWordCount,
 	notePathFromVaultHref,
 	noteTitleFromPath,
-	openModeForPointer,
 	readingTimeLabel
 } from '../src/lib/note/view';
+import { openModeForPointer } from '../src/lib/workspace/open-mode';
 
 test.describe('note view helpers', () => {
 	test('keeps note path, title, and pointer behavior aligned with NoteView', () => {
@@ -20,7 +20,9 @@ test.describe('note view helpers', () => {
 		expect(openModeForPointer({ button: 0 })).toBe('replace');
 		expect(openModeForPointer({ button: 1 })).toBe('new-tab');
 		expect(openModeForPointer({ button: 0, metaKey: true })).toBe('new-tab');
+		expect(openModeForPointer({ ctrlKey: true })).toBe('new-tab');
 		expect(openModeForPointer({ button: 0, altKey: true })).toBe('new-pane');
+		expect(openModeForPointer({})).toBe('replace');
 	});
 
 	test('counts readable markdown and formats save/read labels', () => {

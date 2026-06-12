@@ -7,6 +7,7 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import { confirmDialog } from '$lib/dialogs';
@@ -23,7 +24,6 @@
 		markdownWordCount,
 		notePathFromVaultHref,
 		noteTitleFromPath,
-		openModeForPointer,
 		readingTimeLabel,
 		resolveNoteLink
 	} from '$lib/note/view';

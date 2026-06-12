@@ -2,15 +2,6 @@ import type { NoteDoc } from '$lib/types';
 import type { LinkResolver } from '$lib/editor/live-preview';
 import { READING_SPEED_WPM } from '$lib/util/constants';
 
-export type PointerOpenMode = 'replace' | 'new-tab' | 'new-pane';
-
-export interface PointerOpenInput {
-	button: number;
-	metaKey?: boolean;
-	ctrlKey?: boolean;
-	altKey?: boolean;
-}
-
 export function markdownWordCount(markdown: string): number {
 	const stripped = markdown
 		.replace(/^---[\s\S]*?\n---\s*\n/, '')
@@ -31,13 +22,6 @@ export function noteTitleFromPath(path: string): string {
 
 export function ensureMarkdownPath(target: string): string {
 	return /\.md$/i.test(target) ? target : `${target}.md`;
-}
-
-export function openModeForPointer(input: PointerOpenInput): PointerOpenMode {
-	if (input.button === 1) return 'new-tab';
-	if (input.metaKey || input.ctrlKey) return 'new-tab';
-	if (input.altKey) return 'new-pane';
-	return 'replace';
 }
 
 export function notePathFromVaultHref(vaultId: string, href: string): string | null {

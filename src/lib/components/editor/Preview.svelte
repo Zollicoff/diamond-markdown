@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { openNote, openTab } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { listMarkdownPostprocessors } from '$lib/plugins/extensions.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
 	import type { NoteDoc } from '$lib/types';
@@ -31,13 +32,6 @@
 		return m ? decodeURIComponent(m[1]) : null;
 	}
 
-	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
-		if (e.button === 1) return 'new-tab';
-		if (e.metaKey || e.ctrlKey) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
-	}
-
 	function onClick(e: MouseEvent): void {
 		const target = e.target as HTMLElement;
 		const a = target.closest('a');
@@ -62,7 +56,7 @@
 			if (path) {
 				e.preventDefault();
 				const title = path.split('/').pop()!.replace(/\.md$/, '');
-				openNote(vaultId, path, title, modeFor(e));
+				openNote(vaultId, path, title, openModeForPointer(e));
 				return;
 			}
 		}

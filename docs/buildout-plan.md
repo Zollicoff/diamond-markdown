@@ -123,6 +123,9 @@ Use small, pushable slices:
 - **Obsidian plugin settings visibility.** Surface Obsidian plugin manifests,
    enabled state, and `data.json` presence in import preflight without
    executing or modifying Obsidian plugins.
+- **Shared pointer open-mode helper.** Move modifier-click and middle-click
+   open-mode rules into a workspace helper used by note preview, search,
+   file tree, bookmarks, and recent notes.
 
 ## Next Implementation Slices
 

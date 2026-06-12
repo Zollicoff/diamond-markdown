@@ -2,6 +2,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { api } from '$lib/vault-api';
 	import { openNote } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import type { SearchHit } from '$lib/types';
 
 	interface Props {
@@ -68,10 +69,7 @@
 	}
 
 	function open(hit: SearchHit, evt: MouseEvent | KeyboardEvent): void {
-		const mod = ('metaKey' in evt && (evt.metaKey || evt.ctrlKey)) || ('button' in evt && evt.button === 1);
-		const alt = 'altKey' in evt && evt.altKey;
-		const mode = alt ? 'new-pane' : mod ? 'new-tab' : 'replace';
-		openNote(vaultId, hit.path, hit.title, mode);
+		openNote(vaultId, hit.path, hit.title, openModeForPointer(evt));
 	}
 
 	function onResultKey(e: KeyboardEvent, hit: SearchHit): void {

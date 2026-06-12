@@ -7,9 +7,9 @@
 	import { api } from '$lib/vault-api';
 	import { openCanvas, openNote } from '$lib/workspace/actions';
 	import { canvasFileMenu, fileMenu, folderMenu, rootMenu } from './menu-builders';
-	import type { OpenMode } from '$lib/workspace/types';
 	import { on as onBus } from '$lib/events';
 	import { workspace } from '$lib/workspace/store.svelte';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { alertDialog } from '$lib/dialogs';
 	import {
 		collectDirectoryPaths,
@@ -164,19 +164,12 @@
 		showMenu(e, rootMenu({ vaultId, beginRename }));
 	}
 
-	function modeFor(e: MouseEvent): OpenMode {
-		if (e.button === 1) return 'new-tab';
-		if (e.metaKey || e.ctrlKey) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
-	}
-
 	function onFileClick(e: MouseEvent, node: TreeNode): void {
 		if (renamingPath === node.path) return;
 		e.preventDefault();
 		const title = treeFileDisplayName(node);
-		if (isCanvasTreeFile(node)) openCanvas(vaultId, node.path, title, modeFor(e));
-		else if (isMarkdownTreeFile(node)) openNote(vaultId, node.path, title, modeFor(e));
+		if (isCanvasTreeFile(node)) openCanvas(vaultId, node.path, title, openModeForPointer(e));
+		else if (isMarkdownTreeFile(node)) openNote(vaultId, node.path, title, openModeForPointer(e));
 	}
 
 	onMount(() => {
