@@ -117,6 +117,9 @@ Use small, pushable slices:
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.
+- **Graph settings helper extraction.** Move settings defaults, storage keys,
+   and persisted-value parsing out of `GraphView` into pure helpers with
+   focused tests.
 
 ## Next Implementation Slices
 

@@ -6,7 +6,6 @@
 	import { buildGraphSimulationData } from '$lib/graph/data';
 	import {
 		simulateStep,
-		SIM_DEFAULTS,
 		type GNode,
 		type GEdge
 	} from '$lib/graph/sim';
@@ -22,6 +21,12 @@
 		toggleGraphPathSelection,
 		zoomGraphTransform
 	} from '$lib/graph/interaction';
+	import {
+		defaultGraphSettings,
+		graphSettingsStorageKey,
+		parseGraphSettings,
+		type GraphSettingsSnapshot
+	} from '$lib/graph/settings';
 	import GraphCanvas from './GraphCanvas.svelte';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 	import GraphToolbar from './GraphToolbar.svelte';
@@ -61,48 +66,54 @@
 	let selectedPaths = $state<string[]>([]);
 
 	// --- Tunable params (per-vault, persisted) -------------------------
-	let nodeScale = $state(SIM_DEFAULTS.nodeScale);
-	let repulse = $state(SIM_DEFAULTS.repulse);
-	let linkForce = $state(SIM_DEFAULTS.linkForce);
-	let linkDist = $state(SIM_DEFAULTS.linkDist);
-	let centerForce = $state(SIM_DEFAULTS.centerForce);
-	let hideOrphans = $state(false);
-	let searchQuery = $state('');
+	const graphDefaults = defaultGraphSettings();
+	let nodeScale = $state(graphDefaults.nodeScale);
+	let repulse = $state(graphDefaults.repulse);
+	let linkForce = $state(graphDefaults.linkForce);
+	let linkDist = $state(graphDefaults.linkDist);
+	let centerForce = $state(graphDefaults.centerForce);
+	let hideOrphans = $state(graphDefaults.hideOrphans);
+	let searchQuery = $state(graphDefaults.searchQuery);
 	let panelOpen = $state(false);
 	let settingsHydrated = false;
 
-	const settingsKey = (): string => `diamondmd:graph-settings:${vaultId}`;
+	const settingsKey = (): string => graphSettingsStorageKey(vaultId);
+
+	function applySettings(settings: Partial<GraphSettingsSnapshot>): void {
+		if (settings.nodeScale !== undefined) nodeScale = settings.nodeScale;
+		if (settings.repulse !== undefined) repulse = settings.repulse;
+		if (settings.linkForce !== undefined) linkForce = settings.linkForce;
+		if (settings.linkDist !== undefined) linkDist = settings.linkDist;
+		if (settings.centerForce !== undefined) centerForce = settings.centerForce;
+		if (settings.hideOrphans !== undefined) hideOrphans = settings.hideOrphans;
+		if (settings.searchQuery !== undefined) searchQuery = settings.searchQuery;
+	}
+
+	function currentSettings(): GraphSettingsSnapshot {
+		return { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
+	}
 
 	function hydrateSettings(): void {
 		if (typeof localStorage === 'undefined') return;
-		try {
-			const raw = localStorage.getItem(settingsKey());
-			if (!raw) return;
-			const v = JSON.parse(raw) as Partial<typeof SIM_DEFAULTS> & { hideOrphans?: boolean; searchQuery?: string };
-			if (typeof v.nodeScale === 'number') nodeScale = v.nodeScale;
-			if (typeof v.repulse === 'number') repulse = v.repulse;
-			if (typeof v.linkForce === 'number') linkForce = v.linkForce;
-			if (typeof v.linkDist === 'number') linkDist = v.linkDist;
-			if (typeof v.centerForce === 'number') centerForce = v.centerForce;
-			if (typeof v.hideOrphans === 'boolean') hideOrphans = v.hideOrphans;
-			if (typeof v.searchQuery === 'string') searchQuery = v.searchQuery;
-		} catch { /* corrupt JSON — stick with defaults */ }
+		applySettings(parseGraphSettings(localStorage.getItem(settingsKey())));
 	}
 
 	function resetForces(): void {
-		nodeScale = SIM_DEFAULTS.nodeScale;
-		repulse = SIM_DEFAULTS.repulse;
-		linkForce = SIM_DEFAULTS.linkForce;
-		linkDist = SIM_DEFAULTS.linkDist;
-		centerForce = SIM_DEFAULTS.centerForce;
+		const defaults = defaultGraphSettings();
+		nodeScale = defaults.nodeScale;
+		repulse = defaults.repulse;
+		linkForce = defaults.linkForce;
+		linkDist = defaults.linkDist;
+		centerForce = defaults.centerForce;
 	}
 	function resetFilters(): void {
-		hideOrphans = false;
-		searchQuery = '';
+		const defaults = defaultGraphSettings();
+		hideOrphans = defaults.hideOrphans;
+		searchQuery = defaults.searchQuery;
 	}
 
 	$effect(() => {
-		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
+		const snapshot = currentSettings();
 		if (!settingsHydrated || typeof localStorage === 'undefined') return;
 		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
 	});

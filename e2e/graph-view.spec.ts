@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import type { GNode, GEdge } from '../src/lib/graph/sim';
 import { buildGraphSimulationData } from '../src/lib/graph/data';
 import {
+	defaultGraphSettings,
+	graphSettingsStorageKey,
+	parseGraphSettings
+} from '../src/lib/graph/settings';
+import {
 	buildGraphProjection,
 	screenToGraph,
 	selectNodesInBox,
@@ -113,6 +118,36 @@ test.describe('graph view helpers', () => {
 			{ path: 'A.md', title: 'A', degree: 2, x: -100, y: 100, vx: 0, vy: 0, fx: null, fy: null },
 			{ path: 'B.md', title: 'B', degree: 1, x: 0, y: -160, vx: 0, vy: 0, fx: null, fy: null }
 		]);
+	});
+
+	test('keeps graph settings defaults and storage parsing outside the component', () => {
+		expect(graphSettingsStorageKey('vault-1')).toBe('diamondmd:graph-settings:vault-1');
+		expect(defaultGraphSettings()).toEqual({
+			nodeScale: 1,
+			repulse: 1500,
+			linkForce: 0.05,
+			linkDist: 90,
+			centerForce: 0.01,
+			hideOrphans: false,
+			searchQuery: ''
+		});
+		expect(parseGraphSettings('not-json')).toEqual({});
+		expect(parseGraphSettings(JSON.stringify({
+			nodeScale: 2,
+			repulse: 'bad',
+			linkForce: 0.12,
+			linkDist: Number.POSITIVE_INFINITY,
+			centerForce: 0.02,
+			hideOrphans: true,
+			searchQuery: 'daily',
+			extra: 'ignored'
+		}))).toEqual({
+			nodeScale: 2,
+			linkForce: 0.12,
+			centerForce: 0.02,
+			hideOrphans: true,
+			searchQuery: 'daily'
+		});
 	});
 
 	test('selects visible nodes inside the drag box without disturbing tiny drags', () => {
