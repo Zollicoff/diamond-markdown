@@ -1,8 +1,16 @@
 <script lang="ts">
 	import {
+		CANVAS_EDGE_END_OPTIONS,
+		CANVAS_EDGE_SIDE_OPTIONS,
 		canvasEdgeLabelChanged,
 		canvasEdgeLabelDraftFor,
+		canvasEdgeRoutingChanged,
+		canvasEdgeRoutingDraftFor,
 		type CanvasEdgeLabelDrafts,
+		type CanvasEdgeEnd,
+		type CanvasEdgeRoutingDraft,
+		type CanvasEdgeRoutingDrafts,
+		type CanvasEdgeSide,
 		type CanvasEdgeSummary
 	} from '$lib/canvas/view';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
@@ -10,24 +18,37 @@
 	interface Props {
 		edges: CanvasEdgeSummary[];
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
+		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
 		onLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
+		onRoutingDraftChange: (edge: CanvasEdgeSummary, draft: CanvasEdgeRoutingDraft) => void;
 		onSaveLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onColorChange: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
+		onSaveRouting: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onDelete: (edgeId: string) => void | Promise<void>;
 	}
 
 	let {
 		edges,
 		edgeLabelDrafts,
+		edgeRoutingDrafts,
 		savingEdgeId,
 		deletingEdgeId,
 		onLabelDraftChange,
+		onRoutingDraftChange,
 		onSaveLabel,
 		onColorChange,
+		onSaveRouting,
 		onDelete
 	}: Props = $props();
+
+	function updateRoutingDraft(edge: CanvasEdgeSummary, patch: Partial<CanvasEdgeRoutingDraft>): void {
+		onRoutingDraftChange(edge, {
+			...canvasEdgeRoutingDraftFor(edge, edgeRoutingDrafts),
+			...patch
+		});
+	}
 </script>
 
 {#if edges.length > 0}
@@ -35,6 +56,7 @@
 		<div class="edge-list-title">Edges</div>
 		<div class="edge-items">
 			{#each edges as edge (edge.id)}
+				{@const routingDraft = canvasEdgeRoutingDraftFor(edge, edgeRoutingDrafts)}
 				<div class="edge-item">
 					<span class="edge-copy" title={edge.description}>
 						<span>{edge.fromLabel}</span>
@@ -73,6 +95,69 @@
 							disabled={!canvasEdgeLabelChanged(edge, edgeLabelDrafts) || savingEdgeId !== null || deletingEdgeId !== null}
 						>
 							{savingEdgeId === edge.id ? 'Saving...' : 'Save'}
+						</button>
+					</form>
+					<form
+						class="edge-routing"
+						onsubmit={(event) => {
+							event.preventDefault();
+							void onSaveRouting(edge);
+						}}
+					>
+						<select
+							aria-label={`Canvas edge ${edge.description} from side`}
+							value={routingDraft.fromSide}
+							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							onchange={(event) => updateRoutingDraft(edge, {
+								fromSide: event.currentTarget.value as CanvasEdgeSide
+							})}
+						>
+							{#each CANVAS_EDGE_SIDE_OPTIONS as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+						<select
+							aria-label={`Canvas edge ${edge.description} to side`}
+							value={routingDraft.toSide}
+							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							onchange={(event) => updateRoutingDraft(edge, {
+								toSide: event.currentTarget.value as CanvasEdgeSide
+							})}
+						>
+							{#each CANVAS_EDGE_SIDE_OPTIONS as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+						<select
+							aria-label={`Canvas edge ${edge.description} start endpoint`}
+							value={routingDraft.fromEnd}
+							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							onchange={(event) => updateRoutingDraft(edge, {
+								fromEnd: event.currentTarget.value as CanvasEdgeEnd
+							})}
+						>
+							{#each CANVAS_EDGE_END_OPTIONS as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+						<select
+							aria-label={`Canvas edge ${edge.description} end endpoint`}
+							value={routingDraft.toEnd}
+							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							onchange={(event) => updateRoutingDraft(edge, {
+								toEnd: event.currentTarget.value as CanvasEdgeEnd
+							})}
+						>
+							{#each CANVAS_EDGE_END_OPTIONS as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+						<button
+							class="edge-save"
+							aria-label={`Save canvas edge routing ${edge.description}`}
+							disabled={!canvasEdgeRoutingChanged(edge, edgeRoutingDrafts) || savingEdgeId !== null || deletingEdgeId !== null}
+						>
+							{savingEdgeId === edge.id ? 'Saving...' : 'Route'}
 						</button>
 					</form>
 					<button
@@ -118,7 +203,7 @@
 		align-items: center;
 		gap: 7px;
 		min-width: 0;
-		max-width: 520px;
+		max-width: 860px;
 		flex: 0 0 auto;
 		border: 1px solid var(--border);
 		border-radius: 5px;
@@ -150,6 +235,26 @@
 		align-items: center;
 		gap: 5px;
 		min-width: 0;
+	}
+	.edge-routing {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.edge-routing select {
+		width: 70px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.66rem;
+		padding: 2px 4px;
+	}
+	.edge-routing select:focus {
+		border-color: var(--accent);
+		outline: none;
 	}
 	.edge-label-input {
 		width: 112px;

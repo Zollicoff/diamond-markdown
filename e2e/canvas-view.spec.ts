@@ -6,6 +6,8 @@ import { FIXTURE_PATHS } from './setup-fixture';
 import type { CanvasDoc } from '../src/lib/types';
 import {
 	CANVAS_COLOR_OPTIONS,
+	CANVAS_EDGE_END_OPTIONS,
+	CANVAS_EDGE_SIDE_OPTIONS,
 	canvasBounds,
 	canvasConnectionDraft,
 	canvasDraftChanged,
@@ -22,6 +24,9 @@ import {
 	canvasEdgeMarkerStyle,
 	canvasEdgeMarkerUrl,
 	canvasEdgeEndpoint,
+	canvasEdgeRoutingChanged,
+	canvasEdgeRoutingDraftFor,
+	canvasEdgeRoutingDrafts,
 	canvasEdgeSide,
 	canvasGroupLabelChanged,
 	canvasGroupLabelDraftFor,
@@ -177,6 +182,14 @@ test.describe('canvas view helpers', () => {
 			'cyan',
 			'purple'
 		]);
+		expect(CANVAS_EDGE_SIDE_OPTIONS.map((option) => option.value)).toEqual([
+			'center',
+			'top',
+			'right',
+			'bottom',
+			'left'
+		]);
+		expect(CANVAS_EDGE_END_OPTIONS.map((option) => option.value)).toEqual(['none', 'arrow']);
 		expect(canvasNodeColorStyle(doc.nodes[0])).toContain('--canvas-node-border: #dc2626');
 		expect(canvasNodeStyle(doc.nodes[0], bounds)).toContain('--canvas-node-bg: #fee2e2');
 		expect(canvasSvgNodeColors(doc.nodes[0])).toEqual({ fill: '#fee2e2', stroke: '#dc2626' });
@@ -347,6 +360,10 @@ test.describe('canvas view helpers', () => {
 				fromLabel: 'text',
 				toLabel: 'Home.md',
 				description: 'text to Home.md: opens',
+				fromSide: 'center',
+				toSide: 'center',
+				fromEnd: 'none',
+				toEnd: 'arrow',
 				color: '5'
 			}
 		]);
@@ -354,6 +371,18 @@ test.describe('canvas view helpers', () => {
 		expect(canvasEdgeLabelDraftFor(edgeSummaries[0], edgeDrafts)).toBe('opens');
 		expect(canvasEdgeLabelChanged(edgeSummaries[0], edgeDrafts)).toBe(false);
 		expect(canvasEdgeLabelChanged(edgeSummaries[0], { ...edgeDrafts, 'edge-a-b': 'loops back' })).toBe(true);
+		const edgeRoutingDrafts = canvasEdgeRoutingDrafts(edgeSummaries);
+		expect(canvasEdgeRoutingDraftFor(edgeSummaries[0], edgeRoutingDrafts)).toEqual({
+			fromSide: 'center',
+			toSide: 'center',
+			fromEnd: 'none',
+			toEnd: 'arrow'
+		});
+		expect(canvasEdgeRoutingChanged(edgeSummaries[0], edgeRoutingDrafts)).toBe(false);
+		expect(canvasEdgeRoutingChanged(edgeSummaries[0], {
+			...edgeRoutingDrafts,
+			'edge-a-b': { fromSide: 'right', toSide: 'left', fromEnd: 'arrow', toEnd: 'none' }
+		})).toBe(true);
 	});
 });
 
@@ -933,13 +962,77 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(invalidEdgeColor.status()).toBe(400);
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const routedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-routing',
+			edgeId: clearedEdgeColorBody.doc.edges.at(-1)?.id,
+			fromSide: 'top',
+			toSide: 'bottom',
+			fromEnd: 'arrow',
+			toEnd: 'none',
+			expectedRevision: clearedEdgeColorBody.doc.revision
+		}
+	});
+	expect(routedEdge.ok(), await routedEdge.text()).toBe(true);
+	const routedEdgeBody = await routedEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(routedEdgeBody.sha).toBeTruthy();
+	expect(routedEdgeBody.doc.edges.at(-1)).toMatchObject({
+		fromSide: 'top',
+		toSide: 'bottom',
+		fromEnd: 'arrow',
+		toEnd: 'none'
+	});
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const resetRoutedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-routing',
+			edgeId: routedEdgeBody.doc.edges.at(-1)?.id,
+			fromSide: 'center',
+			toSide: 'center',
+			fromEnd: 'none',
+			toEnd: 'arrow',
+			expectedRevision: routedEdgeBody.doc.revision
+		}
+	});
+	expect(resetRoutedEdge.ok(), await resetRoutedEdge.text()).toBe(true);
+	const resetRoutedEdgeBody = await resetRoutedEdge.json() as { sha: string | null; doc: CanvasDoc };
+	expect(resetRoutedEdgeBody.sha).toBeTruthy();
+	expect(resetRoutedEdgeBody.doc.edges.at(-1)).toMatchObject({
+		fromNode: 'b',
+		toNode: 'a',
+		label: 'routes back'
+	});
+	expect(resetRoutedEdgeBody.doc.edges.at(-1)?.fromSide).toBeUndefined();
+	expect(resetRoutedEdgeBody.doc.edges.at(-1)?.toSide).toBeUndefined();
+	expect(resetRoutedEdgeBody.doc.edges.at(-1)?.fromEnd).toBeUndefined();
+	expect(resetRoutedEdgeBody.doc.edges.at(-1)?.toEnd).toBeUndefined();
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const invalidEdgeRoute = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-edge-routing',
+			edgeId: resetRoutedEdgeBody.doc.edges.at(-1)?.id,
+			fromSide: 'sideways',
+			toSide: 'left',
+			fromEnd: 'none',
+			toEnd: 'arrow',
+			expectedRevision: resetRoutedEdgeBody.doc.revision
+		}
+	});
+	expect(invalidEdgeRoute.status()).toBe(400);
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const clearedEdge = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
 			action: 'update-edge-label',
-			edgeId: clearedEdgeColorBody.doc.edges.at(-1)?.id,
+			edgeId: resetRoutedEdgeBody.doc.edges.at(-1)?.id,
 			label: '   ',
-			expectedRevision: clearedEdgeColorBody.doc.revision
+			expectedRevision: resetRoutedEdgeBody.doc.revision
 		}
 	});
 	expect(clearedEdge.ok(), await clearedEdge.text()).toBe(true);
@@ -1102,6 +1195,23 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 		const body = await loaded.json() as CanvasDoc;
 		return body.edges.find((edge) => edge.id === 'edge-a-b')?.color;
 	}).toBe('4');
+	await page.getByLabel('Canvas edge text to Home.md: opens from side').selectOption('right');
+	await page.getByLabel('Canvas edge text to Home.md: opens to side').selectOption('left');
+	await page.getByLabel('Canvas edge text to Home.md: opens start endpoint').selectOption('none');
+	await page.getByLabel('Canvas edge text to Home.md: opens end endpoint').selectOption('arrow');
+	await page.getByRole('button', { name: 'Save canvas edge routing text to Home.md: opens' }).click();
+	await expect(page.getByText('Canvas edge routing saved')).toBeVisible({ timeout: 10_000 });
+	await expect.poll(async () => {
+		const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await loaded.json() as CanvasDoc;
+		const edge = body.edges.find((candidate) => candidate.id === 'edge-a-b');
+		return edge ? {
+			fromSide: edge.fromSide,
+			toSide: edge.toSide,
+			fromEnd: edge.fromEnd,
+			toEnd: edge.toEnd
+		} : null;
+	}).toEqual({ fromSide: 'right', toSide: 'left', fromEnd: undefined, toEnd: undefined });
 
 	await page.getByLabel('Canvas edge source').selectOption('b');
 	await page.getByLabel('Canvas edge target').selectOption('a');
@@ -1295,7 +1405,7 @@ test('canvas API renames, moves, and deletes Canvas files with clean git commits
 	expect(gitStatus(vaultDir)).toBe('');
 });
 
-test('canvas file context menu exposes rename and delete actions', async ({ page, request }) => {
+test('canvas file context menu deletes through an in-app confirmation dialog', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-menu-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -1314,4 +1424,19 @@ test('canvas file context menu exposes rename and delete actions', async ({ page
 	await boardLink.click({ button: 'right' });
 	await expect(page.getByRole('menuitem', { name: /Rename/ })).toBeVisible();
 	await expect(page.getByRole('menuitem', { name: /Delete Canvas/ })).toBeVisible();
+	await page.getByRole('menuitem', { name: /Delete Canvas/ }).click();
+	const dialog = page.getByRole('alertdialog', { name: 'Delete Canvas' });
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toContainText('This is reversible through git history.');
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toBeHidden();
+	expect(fs.existsSync(path.join(vaultDir, 'Board.canvas'))).toBe(true);
+
+	await boardLink.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Delete Canvas/ }).click();
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Delete' }).click();
+	await expect.poll(() => fs.existsSync(path.join(vaultDir, 'Board.canvas'))).toBe(false);
+	await expect(page.locator('.tree .file-link').filter({ hasText: 'Board' })).toHaveCount(0);
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });

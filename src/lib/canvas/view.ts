@@ -50,7 +50,18 @@ export interface CanvasEdgeSummary {
 	fromLabel: string;
 	toLabel: string;
 	description: string;
+	fromSide: CanvasEdgeSide;
+	toSide: CanvasEdgeSide;
+	fromEnd: CanvasEdgeEnd;
+	toEnd: CanvasEdgeEnd;
 	color?: string;
+}
+
+export interface CanvasEdgeRoutingDraft {
+	fromSide: CanvasEdgeSide;
+	toSide: CanvasEdgeSide;
+	fromEnd: CanvasEdgeEnd;
+	toEnd: CanvasEdgeEnd;
 }
 
 export interface CanvasNodeRefDraft {
@@ -103,7 +114,21 @@ export type CanvasTextDrafts = Record<string, string>;
 export type CanvasGroupLabelDrafts = Record<string, string>;
 export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
+export type CanvasEdgeRoutingDrafts = Record<string, CanvasEdgeRoutingDraft>;
 export type CanvasAddNodeType = 'text' | 'file' | 'link' | 'group';
+
+export const CANVAS_EDGE_SIDE_OPTIONS: { value: CanvasEdgeSide; label: string }[] = [
+	{ value: 'center', label: 'center' },
+	{ value: 'top', label: 'top' },
+	{ value: 'right', label: 'right' },
+	{ value: 'bottom', label: 'bottom' },
+	{ value: 'left', label: 'left' }
+];
+
+export const CANVAS_EDGE_END_OPTIONS: { value: CanvasEdgeEnd; label: string }[] = [
+	{ value: 'none', label: 'none' },
+	{ value: 'arrow', label: 'arrow' }
+];
 
 const PADDING = 80;
 const OBSIDIAN_CANVAS_COLORS: Record<string, CanvasDisplayColor> = {
@@ -676,6 +701,10 @@ export function canvasEdgeSummaries(doc: Pick<CanvasDoc, 'nodes' | 'edges'>): Ca
 			fromLabel,
 			toLabel,
 			description: `${fromLabel} to ${toLabel}${label !== 'unlabeled' ? `: ${label}` : ''}`,
+			fromSide: canvasEdgeSide(edge.fromSide),
+			toSide: canvasEdgeSide(edge.toSide),
+			fromEnd: canvasEdgeEndpoint(edge, 'from'),
+			toEnd: canvasEdgeEndpoint(edge, 'to'),
 			color: edge.color
 		};
 	});
@@ -691,6 +720,27 @@ export function canvasEdgeLabelDraftFor(edge: CanvasEdgeSummary, drafts: CanvasE
 
 export function canvasEdgeLabelChanged(edge: CanvasEdgeSummary, drafts: CanvasEdgeLabelDrafts): boolean {
 	return canvasEdgeLabelDraftFor(edge, drafts).trim() !== edge.editableLabel;
+}
+
+export function canvasEdgeRoutingDrafts(edges: CanvasEdgeSummary[]): CanvasEdgeRoutingDrafts {
+	return Object.fromEntries(edges.map((edge) => [edge.id, canvasEdgeRoutingDraftFor(edge, {})]));
+}
+
+export function canvasEdgeRoutingDraftFor(edge: CanvasEdgeSummary, drafts: CanvasEdgeRoutingDrafts): CanvasEdgeRoutingDraft {
+	return drafts[edge.id] ?? {
+		fromSide: edge.fromSide,
+		toSide: edge.toSide,
+		fromEnd: edge.fromEnd,
+		toEnd: edge.toEnd
+	};
+}
+
+export function canvasEdgeRoutingChanged(edge: CanvasEdgeSummary, drafts: CanvasEdgeRoutingDrafts): boolean {
+	const draft = canvasEdgeRoutingDraftFor(edge, drafts);
+	return draft.fromSide !== edge.fromSide ||
+		draft.toSide !== edge.toSide ||
+		draft.fromEnd !== edge.fromEnd ||
+		draft.toEnd !== edge.toEnd;
 }
 
 function plural(count: number, singular: string): string {

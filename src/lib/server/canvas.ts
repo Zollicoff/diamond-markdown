@@ -4,8 +4,10 @@ import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasMutationResult, CanvasNode } from '$lib/types';
 import {
 	canvasBounds,
+	canvasEdgeEnd,
 	canvasEdgeMarkerId,
 	canvasEdgeMarkerUrl,
+	canvasEdgeSide,
 	canvasLayeredNodes,
 	canvasNodeBody,
 	canvasNodeTitle,
@@ -14,6 +16,7 @@ import {
 	edgeLines,
 	normalizeCanvasColor
 } from '$lib/canvas/view';
+import type { CanvasEdgeEnd, CanvasEdgeSide } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -63,6 +66,7 @@ export type CanvasEditAction =
 	| 'add-edge'
 	| 'update-edge-label'
 	| 'update-edge-color'
+	| 'update-edge-routing'
 	| 'delete-edge';
 
 export interface MutateCanvasInput {
@@ -74,6 +78,10 @@ export interface MutateCanvasInput {
 	nodeType?: 'text' | 'file' | 'link' | 'group';
 	fromNode?: string;
 	toNode?: string;
+	fromSide?: string;
+	toSide?: string;
+	fromEnd?: string;
+	toEnd?: string;
 	label?: string;
 	text?: string;
 	file?: string;
@@ -414,6 +422,39 @@ function cleanCanvasColor(value: unknown): string | null {
 	return normalized;
 }
 
+function cleanCanvasEdgeSide(value: unknown, name: string): CanvasEdgeSide {
+	if (typeof value !== 'string') throw new CanvasFileError(`${name} is required`);
+	const trimmed = value.trim();
+	if (trimmed === 'center') return 'center';
+	const side = canvasEdgeSide(trimmed);
+	if (side === 'center') {
+		throw new CanvasFileError(`${name} must be center, top, right, bottom, or left`);
+	}
+	return side;
+}
+
+function cleanCanvasEdgeEnd(value: unknown, name: string): CanvasEdgeEnd {
+	if (typeof value !== 'string') throw new CanvasFileError(`${name} is required`);
+	const end = canvasEdgeEnd(value.trim(), 'none');
+	if (end !== value.trim()) throw new CanvasFileError(`${name} must be none or arrow`);
+	return end;
+}
+
+function setCanvasEdgeSide(edge: Record<string, unknown>, key: 'fromSide' | 'toSide', side: CanvasEdgeSide): void {
+	if (side === 'center') delete edge[key];
+	else edge[key] = side;
+}
+
+function setCanvasEdgeEnd(
+	edge: Record<string, unknown>,
+	key: 'fromEnd' | 'toEnd',
+	end: CanvasEdgeEnd,
+	defaultEnd: CanvasEdgeEnd
+): void {
+	if (end === defaultEnd) delete edge[key];
+	else edge[key] = end;
+}
+
 function requiredText(value: unknown, name: string, maxLength: number): string {
 	const cleaned = typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 	if (!cleaned) throw new CanvasFileError(`${name} is required`);
@@ -590,6 +631,17 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		const color = cleanCanvasColor(input.color);
 		if (color) edge.color = color;
 		else delete edge.color;
+	} else if (input.action === 'update-edge-routing') {
+		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
+		const edge = edges.map((candidate, edgeIndex) => ({
+			id: rawEdgeId(candidate, edgeIndex),
+			record: record(candidate)
+		})).find((candidate) => candidate.id === input.edgeId)?.record;
+		if (!edge) throw new CanvasFileError('canvas edge not found', 404);
+		setCanvasEdgeSide(edge, 'fromSide', cleanCanvasEdgeSide(input.fromSide, 'fromSide'));
+		setCanvasEdgeSide(edge, 'toSide', cleanCanvasEdgeSide(input.toSide, 'toSide'));
+		setCanvasEdgeEnd(edge, 'fromEnd', cleanCanvasEdgeEnd(input.fromEnd, 'fromEnd'), 'none');
+		setCanvasEdgeEnd(edge, 'toEnd', cleanCanvasEdgeEnd(input.toEnd, 'toEnd'), 'arrow');
 	} else if (input.action === 'delete-edge') {
 		if (!input.edgeId) throw new CanvasFileError('edgeId is required');
 		const index = edges.findIndex((edge, edgeIndex) => rawEdgeId(edge, edgeIndex) === input.edgeId);

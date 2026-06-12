@@ -16,7 +16,7 @@ Obsidian is great. It's also Electron, its sync is proprietary and paid, and its
 - **Multi-vault from day one.** Different folders, different indexes, one app.
 - **Open source (MIT).**
 
-If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, Canvas previews with markdown-aware text cards plus node positioning/resizing/color edits, and real version history in a browser, Diamond Markdown is for you.
+If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, Canvas previews with markdown-aware text cards plus node positioning/resizing/color/routing edits, and real version history in a browser, Diamond Markdown is for you.
 
 ## Status
 
@@ -101,7 +101,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
-- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, and node/edge color edits
+- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)

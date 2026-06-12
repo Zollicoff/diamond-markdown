@@ -4,6 +4,8 @@
 		CanvasBounds,
 		CanvasEdgeLabelDrafts,
 		CanvasEdgeLine,
+		CanvasEdgeRoutingDraft,
+		CanvasEdgeRoutingDrafts,
 		CanvasEdgeSummary,
 		CanvasGroupLabelDrafts,
 		CanvasNodeRefDraft,
@@ -25,6 +27,7 @@
 		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
+		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
 		savingNodeId: string | null;
 		movingNodeId: string | null;
 		moveSavingNodeId: string | null;
@@ -34,8 +37,10 @@
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
 		onEdgeLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
+		onEdgeRoutingDraftChange: (edge: CanvasEdgeSummary, draft: CanvasEdgeRoutingDraft) => void;
 		onSaveEdgeLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onSaveEdgeColor: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
+		onSaveEdgeRouting: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onDeleteEdge: (edgeId: string) => void | Promise<void>;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
@@ -62,6 +67,7 @@
 		groupLabelDrafts,
 		refDrafts,
 		edgeLabelDrafts,
+		edgeRoutingDrafts,
 		savingNodeId,
 		movingNodeId,
 		moveSavingNodeId,
@@ -71,8 +77,10 @@
 		savingEdgeId,
 		deletingEdgeId,
 		onEdgeLabelDraftChange,
+		onEdgeRoutingDraftChange,
 		onSaveEdgeLabel,
 		onSaveEdgeColor,
+		onSaveEdgeRouting,
 		onDeleteEdge,
 		onDraftChange,
 		onGroupLabelDraftChange,
@@ -105,11 +113,14 @@
 	<CanvasEdgeList
 		edges={edgeSummaries}
 		{edgeLabelDrafts}
+		{edgeRoutingDrafts}
 		{savingEdgeId}
 		{deletingEdgeId}
 		onLabelDraftChange={onEdgeLabelDraftChange}
+		onRoutingDraftChange={onEdgeRoutingDraftChange}
 		onSaveLabel={onSaveEdgeLabel}
 		onColorChange={onSaveEdgeColor}
+		onSaveRouting={onSaveEdgeRouting}
 		onDelete={onDeleteEdge}
 	/>
 	<CanvasBoard

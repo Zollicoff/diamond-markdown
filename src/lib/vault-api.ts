@@ -9,7 +9,7 @@
 
 import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, CanvasDoc, CanvasMutationResult, GitSyncResult, GitSyncStatus, NoteDoc, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
-import type { CanvasAddNodeType } from './canvas/view';
+import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -268,6 +268,34 @@ export const api = {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ path, action: 'update-edge-color', edgeId, color, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
+	async updateCanvasEdgeRouting(
+		vaultId: string,
+		path: string,
+		edgeId: string,
+		routing: {
+			fromSide: CanvasEdgeSide;
+			toSide: CanvasEdgeSide;
+			fromEnd: CanvasEdgeEnd;
+			toEnd: CanvasEdgeEnd;
+		},
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				path,
+				action: 'update-edge-routing',
+				edgeId,
+				...routing,
+				expectedRevision
+			})
 		});
 		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
 		emit('tree:invalidate', { vaultId });

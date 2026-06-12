@@ -287,7 +287,8 @@ Use small, pushable slices:
    with deterministic graph helper coverage.
 - **Canvas edge-side compatibility.** Respect imported Obsidian Canvas
    `fromSide` and `toSide` anchors when drawing board and SVG export
-   connections, while keeping center anchors as the fallback.
+   connections, edit those anchors through git-backed edge routing controls,
+   and keep center anchors as the fallback.
 - **Graph canvas edge helper extraction.** Resolve graph canvas edge endpoints
    in a pure helper so `GraphCanvas` renders prepared edge view data instead
    of doing repeated template lookups.
@@ -296,7 +297,8 @@ Use small, pushable slices:
    components so the canvas wrapper owns only the SVG shell.
 - **Canvas edge endpoint compatibility.** Preserve JSON Canvas `fromEnd` and
    `toEnd` metadata and render endpoint arrows in both the live board and SVG
-   export, including the spec default arrow at the target endpoint.
+   export, including the spec default arrow at the target endpoint; edit
+   source/target arrowheads through the same edge routing controls.
 - **Release build handoff hardening.** Verify that adapter-node production
    output and manifest-referenced server chunks are readable before starting
    auth, read-only, and Playwright release checks.

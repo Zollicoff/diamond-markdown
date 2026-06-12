@@ -454,6 +454,50 @@ test('delete note command uses an in-app confirmation dialog', async ({ page, re
 	await expect.poll(() => fs.existsSync(abs)).toBe(false);
 });
 
+test('delete folder command confirms before removing non-empty folders', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'folder-delete-dialog-vault');
+	const folder = 'Delete Dialog Folder';
+	const notePath = `${folder}/Inside.md`;
+	const absFolder = path.join(vaultDir, folder);
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+
+	const registered = await request.post('/api/vaults', {
+		data: { name: 'Folder Delete Dialog Vault', path: vaultDir }
+	});
+	expect(registered.ok(), await registered.text()).toBe(true);
+	const { vault } = await registered.json() as { vault: { id: string } };
+
+	const created = await request.post(`/api/vaults/${vault.id}/note`, {
+		data: { path: notePath, content: '# Inside\n\nTemporary folder note.\n' }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, notePath))).toBe(true);
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	const folderRow = page.locator('.dir-head').filter({ hasText: folder }).first();
+	await expect(folderRow).toBeVisible();
+	await folderRow.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Delete folder + contents' }).click();
+	const dialog = page.getByRole('alertdialog', { name: 'Delete folder and contents' });
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toContainText(`Delete folder "${folder}" and everything inside it?`);
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toBeHidden();
+	expect(fs.existsSync(path.join(vaultDir, notePath))).toBe(true);
+
+	await folderRow.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Delete folder + contents' }).click();
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Delete' }).click();
+	await expect.poll(() => fs.existsSync(absFolder)).toBe(false);
+	const missing = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent(notePath)}`);
+	expect(missing.status()).toBe(404);
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
 test('broken wikilinks use an in-app create confirmation dialog', async ({ page, request }) => {
 	const sourcePath = 'Broken Wikilink Dialog.md';
 	const target = 'Confirm Created Target';

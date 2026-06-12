@@ -11,6 +11,9 @@
 		canvasEdgeLabelChanged,
 		canvasEdgeLabelDraftFor,
 		canvasEdgeLabelDrafts,
+		canvasEdgeRoutingChanged,
+		canvasEdgeRoutingDraftFor,
+		canvasEdgeRoutingDrafts,
 		canvasGroupLabelDraftFor,
 		canvasGroupLabelDrafts,
 		canConnectCanvasNodes,
@@ -29,6 +32,8 @@
 		edgeLines,
 		type CanvasAddNodeType,
 		type CanvasEdgeLabelDrafts,
+		type CanvasEdgeRoutingDraft,
+		type CanvasEdgeRoutingDrafts,
 		type CanvasGroupLabelDrafts,
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
@@ -74,6 +79,7 @@
 	let savingEdgeId = $state<string | null>(null);
 	let deletingEdgeId = $state<string | null>(null);
 	let edgeLabelDrafts = $state<CanvasEdgeLabelDrafts>({});
+	let edgeRoutingDrafts = $state<CanvasEdgeRoutingDrafts>({});
 	let edgeFromNodeId = $state('');
 	let edgeToNodeId = $state('');
 	let edgeLabel = $state('');
@@ -107,7 +113,9 @@
 		textDrafts = canvasTextDrafts(next.nodes);
 		groupLabelDrafts = canvasGroupLabelDrafts(next.nodes);
 		refDrafts = canvasNodeRefDrafts(next.nodes);
-		edgeLabelDrafts = canvasEdgeLabelDrafts(canvasEdgeSummaries(next));
+		const summaries = canvasEdgeSummaries(next);
+		edgeLabelDrafts = canvasEdgeLabelDrafts(summaries);
+		edgeRoutingDrafts = canvasEdgeRoutingDrafts(summaries);
 		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
 		edgeFromNodeId = edgeDraft.fromNodeId;
 		edgeToNodeId = edgeDraft.toNodeId;
@@ -127,6 +135,10 @@
 
 	function setEdgeLabelDraft(edge: CanvasEdgeSummary, value: string): void {
 		edgeLabelDrafts = { ...edgeLabelDrafts, [edge.id]: value };
+	}
+
+	function setEdgeRoutingDraft(edge: CanvasEdgeSummary, draft: CanvasEdgeRoutingDraft): void {
+		edgeRoutingDrafts = { ...edgeRoutingDrafts, [edge.id]: draft };
 	}
 
 	function setEdgeFromNodeId(nodeId: string): void {
@@ -331,6 +343,27 @@
 		}
 	}
 
+	async function saveEdgeRouting(edge: CanvasEdgeSummary): Promise<void> {
+		if (!doc || savingEdgeId || deletingEdgeId || !canvasEdgeRoutingChanged(edge, edgeRoutingDrafts)) return;
+		savingEdgeId = edge.id;
+		error = null;
+		try {
+			const res = await api.updateCanvasEdgeRouting(
+				vaultId,
+				path,
+				edge.id,
+				canvasEdgeRoutingDraftFor(edge, edgeRoutingDrafts),
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas edge routing saved', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			savingEdgeId = null;
+		}
+	}
+
 	function cleanupDragListeners(): void {
 		window.removeEventListener('pointermove', moveNodePointer);
 		window.removeEventListener('pointerup', handleMovePointerUp);
@@ -522,6 +555,7 @@
 		{groupLabelDrafts}
 		{refDrafts}
 		{edgeLabelDrafts}
+		{edgeRoutingDrafts}
 		{savingNodeId}
 		{movingNodeId}
 		{moveSavingNodeId}
@@ -531,8 +565,10 @@
 		{savingEdgeId}
 		{deletingEdgeId}
 		onEdgeLabelDraftChange={setEdgeLabelDraft}
+		onEdgeRoutingDraftChange={setEdgeRoutingDraft}
 		onSaveEdgeLabel={saveEdgeLabel}
 		onSaveEdgeColor={saveEdgeColor}
+		onSaveEdgeRouting={saveEdgeRouting}
 		onDeleteEdge={deleteEdge}
 		onDraftChange={setDraft}
 		onGroupLabelDraftChange={setGroupLabelDraft}
