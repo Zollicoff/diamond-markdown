@@ -22,11 +22,8 @@
 		zoomGraphTransform
 	} from '$lib/graph/interaction';
 	import {
-		defaultGraphSettings,
-		graphSettingsStorageKey,
-		parseGraphSettings,
-		type GraphSettingsSnapshot
-	} from '$lib/graph/settings';
+		createGraphSettingsState
+	} from '$lib/graph/settings-state.svelte';
 	import GraphCanvas from './GraphCanvas.svelte';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 	import GraphToolbar from './GraphToolbar.svelte';
@@ -66,63 +63,26 @@
 	let selectedPaths = $state<string[]>([]);
 
 	// --- Tunable params (per-vault, persisted) -------------------------
-	const graphDefaults = defaultGraphSettings();
-	let nodeScale = $state(graphDefaults.nodeScale);
-	let repulse = $state(graphDefaults.repulse);
-	let linkForce = $state(graphDefaults.linkForce);
-	let linkDist = $state(graphDefaults.linkDist);
-	let centerForce = $state(graphDefaults.centerForce);
-	let hideOrphans = $state(graphDefaults.hideOrphans);
-	let searchQuery = $state(graphDefaults.searchQuery);
+	const graphSettings = createGraphSettingsState(() => vaultId);
+	const settings = graphSettings.settings;
 	let panelOpen = $state(false);
-	let settingsHydrated = false;
-
-	const settingsKey = (): string => graphSettingsStorageKey(vaultId);
-
-	function applySettings(settings: Partial<GraphSettingsSnapshot>): void {
-		if (settings.nodeScale !== undefined) nodeScale = settings.nodeScale;
-		if (settings.repulse !== undefined) repulse = settings.repulse;
-		if (settings.linkForce !== undefined) linkForce = settings.linkForce;
-		if (settings.linkDist !== undefined) linkDist = settings.linkDist;
-		if (settings.centerForce !== undefined) centerForce = settings.centerForce;
-		if (settings.hideOrphans !== undefined) hideOrphans = settings.hideOrphans;
-		if (settings.searchQuery !== undefined) searchQuery = settings.searchQuery;
-	}
-
-	function currentSettings(): GraphSettingsSnapshot {
-		return { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
-	}
-
-	function hydrateSettings(): void {
-		if (typeof localStorage === 'undefined') return;
-		applySettings(parseGraphSettings(localStorage.getItem(settingsKey())));
-	}
 
 	function resetForces(): void {
-		const defaults = defaultGraphSettings();
-		nodeScale = defaults.nodeScale;
-		repulse = defaults.repulse;
-		linkForce = defaults.linkForce;
-		linkDist = defaults.linkDist;
-		centerForce = defaults.centerForce;
+		graphSettings.resetForces();
 	}
 	function resetFilters(): void {
-		const defaults = defaultGraphSettings();
-		hideOrphans = defaults.hideOrphans;
-		searchQuery = defaults.searchQuery;
+		graphSettings.resetFilters();
 	}
 
 	$effect(() => {
-		const snapshot = currentSettings();
-		if (!settingsHydrated || typeof localStorage === 'undefined') return;
-		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
+		graphSettings.persist();
 	});
 
 	// --- Filter projection ---------------------------------------------
 	const graphProjection = $derived.by(() => buildGraphProjection(
 		nodes,
 		edges,
-		{ hideOrphans, searchQuery },
+		{ hideOrphans: settings.hideOrphans, searchQuery: settings.searchQuery },
 		selectedPaths
 	));
 	const visiblePaths = $derived(graphProjection.visiblePaths);
@@ -163,7 +123,12 @@
 		const tick = (now: number): void => {
 			const dt = Math.min(32, now - lastTick) / 16; // normalize to ~60fps
 			lastTick = now;
-			simulateStep(nodes, edges, dt, { repulse, linkForce, linkDist, centerForce });
+			simulateStep(nodes, edges, dt, {
+				repulse: settings.repulse,
+				linkForce: settings.linkForce,
+				linkDist: settings.linkDist,
+				centerForce: settings.centerForce
+			});
 			nodes = nodes; // nudge reactivity — sim mutates in place
 			rafId = requestAnimationFrame(tick);
 		};
@@ -372,8 +337,7 @@
 	}
 
 	onMount(() => {
-		hydrateSettings();
-		settingsHydrated = true;
+		graphSettings.hydrate();
 		void loadGraph();
 		const offs = [
 			onBus('note:created', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
@@ -418,7 +382,7 @@
 			{viewX}
 			{viewY}
 			{viewScale}
-			{nodeScale}
+			nodeScale={settings.nodeScale}
 			{hoverPath}
 			{selectedPaths}
 			{selectionBox}
@@ -436,23 +400,23 @@
 		/>
 	{/if}
 
-	{#if panelOpen}
+			{#if panelOpen}
 		<GraphSettingsPanel
-			{nodeScale}
-			{repulse}
-			{linkForce}
-			{linkDist}
-			{centerForce}
-			{hideOrphans}
-			{searchQuery}
+			nodeScale={settings.nodeScale}
+			repulse={settings.repulse}
+			linkForce={settings.linkForce}
+			linkDist={settings.linkDist}
+			centerForce={settings.centerForce}
+			hideOrphans={settings.hideOrphans}
+			searchQuery={settings.searchQuery}
 			{filtersActive}
-			onSetNodeScale={(v) => (nodeScale = v)}
-			onSetRepulse={(v) => (repulse = v)}
-			onSetLinkForce={(v) => (linkForce = v)}
-			onSetLinkDist={(v) => (linkDist = v)}
-			onSetCenterForce={(v) => (centerForce = v)}
-			onSetHideOrphans={(v) => (hideOrphans = v)}
-			onSetSearchQuery={(v) => (searchQuery = v)}
+			onSetNodeScale={(v) => (settings.nodeScale = v)}
+			onSetRepulse={(v) => (settings.repulse = v)}
+			onSetLinkForce={(v) => (settings.linkForce = v)}
+			onSetLinkDist={(v) => (settings.linkDist = v)}
+			onSetCenterForce={(v) => (settings.centerForce = v)}
+			onSetHideOrphans={(v) => (settings.hideOrphans = v)}
+			onSetSearchQuery={(v) => (settings.searchQuery = v)}
 			onResetForces={resetForces}
 			onResetFilters={resetFilters}
 			onClose={() => (panelOpen = false)}

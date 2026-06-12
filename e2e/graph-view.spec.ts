@@ -2,9 +2,13 @@ import { test, expect } from '@playwright/test';
 import type { GNode, GEdge } from '../src/lib/graph/sim';
 import { buildGraphSimulationData } from '../src/lib/graph/data';
 import {
+	applyGraphSettings,
 	defaultGraphSettings,
 	graphSettingsStorageKey,
-	parseGraphSettings
+	graphSettingsSnapshot,
+	parseGraphSettings,
+	resetGraphFilterSettings,
+	resetGraphForceSettings
 } from '../src/lib/graph/settings';
 import {
 	buildGraphProjection,
@@ -148,6 +152,36 @@ test.describe('graph view helpers', () => {
 			hideOrphans: true,
 			searchQuery: 'daily'
 		});
+
+		const settings = defaultGraphSettings();
+		applyGraphSettings(settings, {
+			nodeScale: 1.8,
+			repulse: 900,
+			linkForce: 0.2,
+			linkDist: 140,
+			centerForce: 0.04,
+			hideOrphans: true,
+			searchQuery: 'project'
+		});
+		expect(graphSettingsSnapshot(settings)).toEqual({
+			nodeScale: 1.8,
+			repulse: 900,
+			linkForce: 0.2,
+			linkDist: 140,
+			centerForce: 0.04,
+			hideOrphans: true,
+			searchQuery: 'project'
+		});
+
+		resetGraphForceSettings(settings);
+		expect(graphSettingsSnapshot(settings)).toEqual({
+			...defaultGraphSettings(),
+			hideOrphans: true,
+			searchQuery: 'project'
+		});
+
+		resetGraphFilterSettings(settings);
+		expect(settings).toEqual(defaultGraphSettings());
 	});
 
 	test('selects visible nodes inside the drag box without disturbing tiny drags', () => {

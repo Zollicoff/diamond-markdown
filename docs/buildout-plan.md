@@ -136,6 +136,9 @@ Use small, pushable slices:
    stale-revision protection.
 - **Canvas board split.** Move Canvas SVG edge rendering and node-card layout
    out of `CanvasView` into a focused presentational board component.
+- **Graph settings state extraction.** Move graph setting hydration,
+   persistence, snapshots, and reset helpers out of `GraphView` into focused
+   graph state modules with deterministic coverage.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion
    and dangling-edge filtering out of `GraphView` into a pure helper with
    deterministic tests.

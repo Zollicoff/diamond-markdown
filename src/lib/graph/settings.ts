@@ -18,6 +18,46 @@ export function defaultGraphSettings(): GraphSettingsSnapshot {
 	};
 }
 
+export function graphSettingsSnapshot(settings: GraphSettingsSnapshot): GraphSettingsSnapshot {
+	return {
+		nodeScale: settings.nodeScale,
+		repulse: settings.repulse,
+		linkForce: settings.linkForce,
+		linkDist: settings.linkDist,
+		centerForce: settings.centerForce,
+		hideOrphans: settings.hideOrphans,
+		searchQuery: settings.searchQuery
+	};
+}
+
+export function applyGraphSettings(
+	target: GraphSettingsSnapshot,
+	settings: Partial<GraphSettingsSnapshot>
+): void {
+	if (settings.nodeScale !== undefined) target.nodeScale = settings.nodeScale;
+	if (settings.repulse !== undefined) target.repulse = settings.repulse;
+	if (settings.linkForce !== undefined) target.linkForce = settings.linkForce;
+	if (settings.linkDist !== undefined) target.linkDist = settings.linkDist;
+	if (settings.centerForce !== undefined) target.centerForce = settings.centerForce;
+	if (settings.hideOrphans !== undefined) target.hideOrphans = settings.hideOrphans;
+	if (settings.searchQuery !== undefined) target.searchQuery = settings.searchQuery;
+}
+
+export function resetGraphForceSettings(settings: GraphSettingsSnapshot): void {
+	const defaults = defaultGraphSettings();
+	settings.nodeScale = defaults.nodeScale;
+	settings.repulse = defaults.repulse;
+	settings.linkForce = defaults.linkForce;
+	settings.linkDist = defaults.linkDist;
+	settings.centerForce = defaults.centerForce;
+}
+
+export function resetGraphFilterSettings(settings: GraphSettingsSnapshot): void {
+	const defaults = defaultGraphSettings();
+	settings.hideOrphans = defaults.hideOrphans;
+	settings.searchQuery = defaults.searchQuery;
+}
+
 export function graphSettingsStorageKey(vaultId: string): string {
 	return `diamondmd:graph-settings:${vaultId}`;
 }
