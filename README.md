@@ -119,7 +119,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ### Versioning
 - Git auto-commit on save (debounced, per-vault repo)
-- Per-note history viewer with diff
+- Per-note history viewer with diff, snapshot copy, and git-backed restore
 - GitHub sync panel in Settings — configure a GitHub remote, check reachability, fetch status, pull fast-forward updates, and push local commits
 
 ### Daily notes

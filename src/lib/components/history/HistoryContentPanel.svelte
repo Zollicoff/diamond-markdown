@@ -12,8 +12,11 @@
 		viewMode: HistoryViewMode;
 		diffRows: HistoryDiffRow[];
 		diffSummary: HistoryDiffSummary;
+		canRestore: boolean;
+		restoring: boolean;
 		onViewModeChange: (mode: HistoryViewMode) => void;
 		onCopy: () => void;
+		onRestore: () => void;
 	}
 
 	let {
@@ -25,8 +28,11 @@
 		viewMode,
 		diffRows,
 		diffSummary,
+		canRestore,
+		restoring,
 		onViewModeChange,
-		onCopy
+		onCopy,
+		onRestore
 	}: Props = $props();
 
 	const diffReady = $derived(selectedContent != null && currentContent != null && !loadingContent && !loadingCurrent);
@@ -64,6 +70,9 @@
 					onclick={() => onViewModeChange('snapshot')}
 				>Snapshot</button>
 			</div>
+			<button class="mini restore" onclick={onRestore} disabled={!canRestore || restoring}>
+				{restoring ? 'Restoring...' : 'Restore'}
+			</button>
 			<button class="mini" onclick={onCopy} disabled={!selectedContent}>Copy</button>
 		</div>
 	</header>
@@ -146,6 +155,10 @@
 	}
 	.mini {
 		border-color: var(--border);
+	}
+	.restore:not(:disabled) {
+		border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+		color: var(--accent);
 	}
 	.mini:hover:not(:disabled),
 	.mode-switch button:hover {

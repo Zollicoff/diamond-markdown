@@ -3,6 +3,7 @@
 	import HistoryContentPanel from './history/HistoryContentPanel.svelte';
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
+	import { confirmDialog, notify } from '$lib/dialogs';
 	import { buildHistoryLineDiff, summarizeHistoryDiff } from '$lib/history/diff';
 
 	interface Props {
@@ -31,7 +32,9 @@
 	let selectedContent = $state<string | null>(null);
 	let loadingContent = $state(false);
 	let currentContent = $state<string | null>(null);
+	let currentRevision = $state<string | null>(null);
 	let loadingCurrent = $state(false);
+	let restoring = $state(false);
 	let viewMode = $state<HistoryViewMode>('diff');
 
 	const diffRows = $derived(
@@ -40,6 +43,17 @@
 			: []
 	);
 	const diffSummary = $derived(summarizeHistoryDiff(diffRows));
+	const canRestore = $derived(
+		!!path &&
+		!!selectedSha &&
+		selectedContent != null &&
+		currentContent != null &&
+		currentRevision != null &&
+		selectedContent !== currentContent &&
+		!loadingContent &&
+		!loadingCurrent &&
+		!restoring
+	);
 
 	function close(): void {
 		open = false;
@@ -48,12 +62,16 @@
 		selectedSha = null;
 		selectedContent = null;
 		currentContent = null;
+		currentRevision = null;
+		restoring = false;
 	}
 
 	async function loadLog(p: string): Promise<void> {
 		loadingLog = true;
 		loadingCurrent = true;
 		err = null;
+		currentContent = null;
+		currentRevision = null;
 		try {
 			const [nextLog, note] = await Promise.all([
 				api.history(vaultId, p),
@@ -61,6 +79,7 @@
 			]);
 			log = nextLog;
 			currentContent = note.content;
+			currentRevision = note.revision;
 			if (log.length > 0) {
 				selectedSha = log[0].sha;
 				await loadContent(p, log[0].sha);
@@ -83,6 +102,42 @@
 			selectedContent = null;
 		} finally {
 			loadingContent = false;
+		}
+	}
+
+	async function restoreSelectedSnapshot(): Promise<void> {
+		if (!path || !selectedSha || selectedContent == null || currentRevision == null || restoring) return;
+		const shortSha = selectedSha.slice(0, 7);
+		const confirmed = await confirmDialog({
+			title: 'Restore history snapshot',
+			message: `Restore "${path}" to commit ${shortSha}?\n\nThis will save the selected snapshot as a new git commit.`,
+			confirmLabel: 'Restore',
+			cancelLabel: 'Cancel'
+		});
+		if (!confirmed) return;
+
+		restoring = true;
+		err = null;
+		try {
+			const res = await api.saveNote(vaultId, path, selectedContent, currentRevision);
+			currentContent = selectedContent;
+			currentRevision = res.revision;
+			notify({
+				title: 'History restored',
+				message: `${path} restored to ${shortSha}.`,
+				tone: 'success'
+			});
+			viewMode = 'diff';
+			await loadLog(path);
+		} catch (e) {
+			err = (e as Error).message;
+			notify({
+				title: 'Restore failed',
+				message: err,
+				tone: 'danger'
+			});
+		} finally {
+			restoring = false;
 		}
 	}
 
@@ -125,6 +180,8 @@
 			selectedSha = null;
 			selectedContent = null;
 			currentContent = null;
+			currentRevision = null;
+			restoring = false;
 			viewMode = 'diff';
 			void loadLog(e.path);
 		});
@@ -189,8 +246,11 @@
 					{viewMode}
 					{diffRows}
 					{diffSummary}
+					{canRestore}
+					{restoring}
 					onViewModeChange={(mode) => (viewMode = mode)}
 					onCopy={copyToClipboard}
+					onRestore={restoreSelectedSnapshot}
 				/>
 			</div>
 			<footer class="hint">

@@ -39,7 +39,7 @@ test.describe('history diff helpers', () => {
 	});
 });
 
-test('history viewer shows a line diff between a selected commit and the current note', async ({ page, request }) => {
+test('history viewer diffs and restores a selected commit against the current note', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'history-diff-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
@@ -79,4 +79,15 @@ test('history viewer shows a line diff between a selected commit and the current
 	await dialog.getByRole('tab', { name: 'Snapshot' }).click();
 	await expect(dialog.locator('.viewer')).toContainText('Old line');
 	await expect(dialog.locator('.viewer')).not.toContainText('Added line');
+
+	await dialog.getByRole('button', { name: 'Restore' }).click();
+	const confirm = page.getByRole('alertdialog', { name: 'Restore history snapshot' });
+	await expect(confirm).toContainText('This will save the selected snapshot as a new git commit.');
+	await confirm.getByRole('button', { name: 'Restore' }).click();
+
+	await expect(page.getByText('History restored')).toBeVisible();
+	await expect.poll(() => fs.readFileSync(notePath, 'utf-8')).toBe('# History Diff\n\nOld line\nKeep me\n');
+	expect(git(vaultDir, ['log', '--oneline', '-1'])).toContain('edit: History Diff.md');
+	await expect(dialog.getByRole('button', { name: /edit: History Diff\.md/ })).toBeVisible();
+	await expect(dialog.locator('.diff-summary')).toContainText('no changes vs current');
 });
