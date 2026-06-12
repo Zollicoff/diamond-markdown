@@ -105,7 +105,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ### Search
 - Fuzzy quick-switcher
-- Ranked, index-backed full-text search across the vault with quoted phrases, field filters, and exclusions
+- Ranked, index-backed full-text search across the vault with quoted phrases, field filters, exclusions, and virtualized results
 - Command palette (⌘P)
 
 ### Graph view

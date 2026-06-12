@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { api } from '$lib/vault-api';
+	import { searchResultRowStyle, visibleSearchWindow } from '$lib/search/view';
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import type { SearchHit, SearchResponse } from '$lib/types';
@@ -14,19 +15,36 @@
 	let { vaultId, query, onQueryChange }: Props = $props();
 
 	let inputEl: HTMLInputElement | null = $state(null);
+	let resultsEl: HTMLDivElement | null = $state(null);
 	// svelte-ignore state_referenced_locally
 	let q = $state(query);
 	let fullText = $state(false);
 	let results = $state<SearchHit[]>([]);
+	let scrollTop = $state(0);
+	let viewportHeight = $state(0);
 	let meta = $state<SearchResponse | null>(null);
 	let loading = $state(false);
 	let err = $state<string | null>(null);
 	let controller: AbortController | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let resultWindow = $derived(visibleSearchWindow(results, scrollTop, viewportHeight));
 
 	onMount(() => {
 		setTimeout(() => inputEl?.focus(), 0);
 		if (q.trim()) void runSearch(q);
+		const measure = () => {
+			viewportHeight = resultsEl?.clientHeight ?? 0;
+		};
+		const observer = typeof ResizeObserver === 'undefined'
+			? null
+			: new ResizeObserver(measure);
+		if (resultsEl) observer?.observe(resultsEl);
+		window.addEventListener('resize', measure);
+		setTimeout(measure, 0);
+		return () => {
+			observer?.disconnect();
+			window.removeEventListener('resize', measure);
+		};
 	});
 
 	function runSearchDebounced(): void {
@@ -41,6 +59,7 @@
 		if (!trimmed) {
 			results = [];
 			meta = null;
+			resetResultWindow();
 			loading = false;
 			err = null;
 			return;
@@ -52,15 +71,17 @@
 		try {
 			const response = await api.searchWithMeta(vaultId, trimmed, {
 				full: fullText,
-				limit: fullText ? 100 : 50,
+				limit: fullText ? 200 : 100,
 				signal: controller.signal
 			});
 			results = response.results;
 			meta = response;
+			resetResultWindow();
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			results = [];
 			meta = null;
+			resetResultWindow();
 		} finally {
 			loading = false;
 		}
@@ -69,6 +90,15 @@
 	function onInput(e: Event): void {
 		q = (e.target as HTMLInputElement).value;
 		runSearchDebounced();
+	}
+
+	function onResultsScroll(): void {
+		scrollTop = resultsEl?.scrollTop ?? 0;
+	}
+
+	function resetResultWindow(): void {
+		scrollTop = 0;
+		if (resultsEl) resultsEl.scrollTop = 0;
 	}
 
 	function toggleFullText(): void {
@@ -138,21 +168,24 @@
 		</p>
 	</header>
 
-	<div class="results">
-		{#each results as hit (hit.path)}
-			<button
-				type="button"
-				class="result"
-				onclick={(e) => open(hit, e)}
-				onkeydown={(e) => onResultKey(e, hit)}
-			>
-				<div class="title">{hit.title || hit.path}</div>
-				<div class="path">{hit.path}</div>
-				{#if hit.snippet}
-					<div class="snippet">{hit.snippet}</div>
-				{/if}
-			</button>
-		{/each}
+	<div class="results" bind:this={resultsEl} onscroll={onResultsScroll}>
+		<div class="result-spacer" style={`height: ${resultWindow.totalHeight}px;`}>
+			{#each resultWindow.visibleResults as row (row.hit.path)}
+				<button
+					type="button"
+					class="result"
+					style={searchResultRowStyle(row)}
+					onclick={(e) => open(row.hit, e)}
+					onkeydown={(e) => onResultKey(e, row.hit)}
+				>
+					<div class="title">{row.hit.title || row.hit.path}</div>
+					<div class="path">{row.hit.path}</div>
+					{#if row.hit.snippet}
+						<div class="snippet">{row.hit.snippet}</div>
+					{/if}
+				</button>
+			{/each}
+		</div>
 	</div>
 </div>
 
@@ -219,15 +252,22 @@
 		overflow-y: auto;
 		padding: 6px 12px 18px;
 	}
+	.result-spacer {
+		position: relative;
+		min-height: 100%;
+	}
 	.result {
 		display: block;
-		width: 100%;
+		position: absolute;
+		left: 0;
+		right: 0;
+		height: calc(var(--search-result-row-height) - 4px);
 		text-align: left;
 		background: transparent;
 		border: 0;
 		border-radius: 6px;
 		padding: 10px 12px;
-		margin: 2px 0;
+		overflow: hidden;
 		cursor: pointer;
 		color: inherit;
 		font: inherit;
@@ -242,18 +282,29 @@
 		font-weight: 600;
 		font-size: 0.95rem;
 		font-family: 'Bricolage Grotesque', var(--sans);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.path {
 		color: var(--fg-dim);
 		font-size: 0.78rem;
 		margin-top: 2px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.snippet {
 		color: var(--fg-muted);
 		font-size: 0.82rem;
 		margin-top: 6px;
 		line-height: 1.45;
-		white-space: pre-wrap;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		white-space: normal;
 		word-break: break-word;
 	}
 </style>

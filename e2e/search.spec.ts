@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
 import { clampSearchLimit, searchFullTextIndex } from '../src/lib/server/search';
+import { searchResultRowStyle, visibleSearchWindow } from '../src/lib/search/view';
 
 function emptyIndex(): VaultIndex {
 	return {
@@ -95,4 +96,26 @@ test('indexed full-text search supports filters, quoted phrases, and exclusions'
 	expect(searchFullTextIndex(idx, 'content:roof -tag:client/water', 10).results.map((hit) => hit.path)).toEqual([
 		'Projects/Solar Plan.md'
 	]);
+});
+
+test('search result view helpers virtualize large returned result sets', () => {
+	const results = Array.from({ length: 120 }, (_, i) => ({
+		path: `Notes/Result ${String(i).padStart(3, '0')}.md`,
+		title: `Result ${i}`,
+		snippet: `snippet ${i}`
+	}));
+
+	const first = visibleSearchWindow(results, 0, 90, 30, 2);
+	expect(first.totalHeight).toBe(3600);
+	expect(first.startIndex).toBe(0);
+	expect(first.endIndex).toBe(7);
+	expect(first.visibleResults.map((row) => row.index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+
+	const middle = visibleSearchWindow(results, 900, 90, 30, 2);
+	expect(middle.startIndex).toBe(28);
+	expect(middle.endIndex).toBe(35);
+	expect(middle.visibleResults[0].hit.path).toBe('Notes/Result 028.md');
+	expect(searchResultRowStyle(middle.visibleResults[0], 30)).toBe(
+		'--search-result-row-height: 30px; transform: translateY(840px);'
+	);
 });

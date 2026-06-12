@@ -300,14 +300,17 @@ Use small, pushable slices:
 - **Desktop release preflight.** Add `npm run verify:desktop-release` plus
    `docs/desktop-release.md` so current-host desktop bundle inputs, sidecars,
    signing inputs, and artifact expectations are checked before packaging.
+- **Search result virtualization.** Render large returned search result sets
+   through a virtual window in the search tab, backed by pure view helpers and
+   browser coverage for scrolling from the first to last returned match.
 
 ## Next Implementation Slices
 
 1. **Desktop release CI.** Add and verify a matrix workflow for desktop
    preflight/build/artifact upload once a GitHub credential with `workflow`
    scope is available.
-2. **Search result virtualization.** Render very large result sets without
-   relying on a fixed capped list as the only scale control.
+2. **Search pagination beyond capped results.** Add a server/client paging path
+   for result sets larger than the current bounded response window.
 3. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without

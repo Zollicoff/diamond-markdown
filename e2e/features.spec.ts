@@ -271,6 +271,43 @@ test('search rail icon opens a search tab; results fire on input', async ({ page
 	await expect(search.locator('.result').first()).toContainText(/Frontmatter/i);
 });
 
+test('search tab virtualizes large full-text result sets while preserving scroll access', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'search-virtual-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	for (let i = 0; i < 140; i += 1) {
+		const padded = String(i).padStart(3, '0');
+		fs.writeFileSync(
+			path.join(vaultDir, `Virtual ${padded}.md`),
+			`# Virtual ${padded}\n\nvirtualneedle result ${padded}\n`
+		);
+	}
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Search Virtual Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}`);
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.rail .r-btn[aria-label="Search"]').click();
+	const search = page.locator('.search-view');
+	await search.getByRole('button', { name: 'Title' }).click();
+	await search.locator('input[type="text"]').fill('virtualneedle');
+	await expect(search.locator('.hint')).toContainText('140 results', { timeout: 5_000 });
+	await expect(search.locator('.result').first()).toContainText('Virtual 000');
+
+	const rendered = await search.locator('.result').count();
+	expect(rendered).toBeLessThan(60);
+
+	await search.locator('.results').evaluate((el) => {
+		el.scrollTop = el.scrollHeight;
+		el.dispatchEvent(new Event('scroll'));
+	});
+	await expect(search.locator('.result').filter({ hasText: 'Virtual 139' })).toBeVisible({ timeout: 4_000 });
+});
+
 test('new note command uses an in-app name dialog', async ({ page, request }) => {
 	const notePath = 'Dialog Created Note.md';
 	const abs = path.join(FIXTURE_PATHS.VAULT_DIR, notePath);
