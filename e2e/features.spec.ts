@@ -142,6 +142,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Templates'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Snippet Bank'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		attachmentFolderPath: 'Attachments',
 		newFileLocation: 'folder',
@@ -157,6 +158,12 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		template: 'Templates/Daily Template',
 		format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
 		privateDailySetting: 'do-not-render-this-daily-config-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'templates.json'), JSON.stringify({
+		folder: 'Snippet Bank',
+		dateFormat: 'dddd, MMMM D, YYYY',
+		timeFormat: 'HH:mm:ss',
+		privateTemplatesSetting: 'do-not-render-this-template-config-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['dataview']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview', 'manifest.json'), JSON.stringify({
@@ -206,6 +213,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			format?: string;
 			formatStatus: string;
 			plannedPath: string;
+			settings: { id: string; label: string; value: string; level: string; detail: string }[];
+			warnings: string[];
+		};
+		obsidianTemplates: {
+			status: string;
+			folderPath?: string;
+			folderStatus: string;
+			dateFormat?: string;
+			dateFormatStatus: string;
+			timeFormat?: string;
+			timeFormatStatus: string;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
@@ -268,6 +286,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianDailyNotes.settings.map((setting) => setting.id)).toEqual(['folder', 'template', 'format']);
 	expect(body.obsidianDailyNotes.plannedPath).toMatch(/^Journal\/\d{4}\/[A-Za-z]+\/\d{4}-\d{2}-\d{2}-[A-Za-z]{3}\.md$/);
 	expect(JSON.stringify(body.obsidianDailyNotes)).not.toContain('do-not-render-this-daily-config-value');
+	expect(body.obsidianTemplates).toMatchObject({
+		status: 'present',
+		folderPath: 'Snippet Bank',
+		folderStatus: 'safe',
+		dateFormat: 'dddd, MMMM D, YYYY',
+		dateFormatStatus: 'safe',
+		timeFormat: 'HH:mm:ss',
+		timeFormatStatus: 'safe'
+	});
+	expect(body.obsidianTemplates.settings.map((setting) => setting.id)).toEqual(['folder', 'dateFormat', 'timeFormat']);
+	expect(JSON.stringify(body.obsidianTemplates)).not.toContain('do-not-render-this-template-config-value');
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
 	expect(body.obsidianPlugins[0]).toMatchObject({
 		id: 'dataview',
@@ -284,6 +313,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.markdownExamples).toContain('Daily.md');
 	expect(body.canvasExamples).toContain('Board.canvas');
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
+	expect(body.checklist.find((row) => row.id === 'obsidian-templates')?.detail).toContain('templates load from Snippet Bank');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
@@ -309,6 +339,12 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		template: 'Templates/Daily Template',
 		format: 'YYYY/MMMM/YYYY-MM-DD-ddd',
 		privateDailySetting: 'do-not-render-this-daily-config-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'templates.json'), JSON.stringify({
+		folder: 'Snippet Bank',
+		dateFormat: 'dddd, MMMM D, YYYY',
+		timeFormat: 'HH:mm:ss',
+		privateTemplatesSetting: 'do-not-render-this-template-config-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'community-plugins.json'), JSON.stringify(['obsidian-kanban']));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban', 'manifest.json'), JSON.stringify({
@@ -361,6 +397,16 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Daily note date format');
 	await expect(page.locator('.import-card')).toContainText('YYYY/MMMM/YYYY-MM-DD-ddd');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-daily-config-value');
+	await expect(page.locator('.import-card')).toContainText('Templates settings');
+	await expect(page.locator('.import-card')).toContainText('3 Templates settings found');
+	await expect(page.locator('.import-card')).toContainText('Obsidian Templates');
+	await expect(page.locator('.import-card')).toContainText('Template folder');
+	await expect(page.locator('.import-card')).toContainText('Snippet Bank');
+	await expect(page.locator('.import-card')).toContainText('Template date format');
+	await expect(page.locator('.import-card')).toContainText('dddd, MMMM D, YYYY');
+	await expect(page.locator('.import-card')).toContainText('Template time format');
+	await expect(page.locator('.import-card')).toContainText('HH:mm:ss');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-template-config-value');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');
@@ -612,6 +658,66 @@ test('daily note command honors safe Obsidian daily-note settings', async ({ req
 	expect(reopened.ok(), await reopened.text()).toBe(true);
 	expect(await reopened.json()).toMatchObject({ path: expectedPath, created: false });
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+});
+
+test('template command honors safe Obsidian Templates settings', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-templates-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Snippet Bank', 'Meetings'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'templates.json'), JSON.stringify({
+		folder: 'Snippet Bank/',
+		dateFormat: '[Template date default]',
+		timeFormat: '[Template time default]'
+	}, null, 2));
+	fs.writeFileSync(
+		path.join(vaultDir, 'Snippet Bank', 'Meeting.md'),
+		'---\nkind: template\n---\n# {{title}}\nDate={{date}}\nTime={{time}}\nExplicit={{date:YYYY-MM-DD}}\n{{cursor}}\n'
+	);
+	fs.writeFileSync(
+		path.join(vaultDir, 'Snippet Bank', 'Meetings', 'Weekly.md'),
+		'# Weekly\n'
+	);
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nSeed note.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Templates Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const listed = await request.get(`/api/vaults/${vault.id}/templates`);
+	expect(listed.ok(), await listed.text()).toBe(true);
+	const listedBody = await listed.json() as { folder: string; templates: { name: string; path: string }[] };
+	expect(listedBody.folder).toBe('Snippet Bank');
+	expect(listedBody.templates).toEqual([
+		{ name: 'Meeting', path: 'Snippet Bank/Meeting.md' },
+		{ name: 'Meetings/Weekly', path: 'Snippet Bank/Meetings/Weekly.md' }
+	]);
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/templates?path=${encodeURIComponent('Snippet Bank/Meeting.md')}&title=${encodeURIComponent('Kickoff')}`);
+	expect(loaded.ok(), await loaded.text()).toBe(true);
+	const loadedBody = await loaded.json() as { name: string; path: string; content: string };
+	const now = new Date();
+	expect(loadedBody).toMatchObject({
+		name: 'Meeting',
+		path: 'Snippet Bank/Meeting.md'
+	});
+	expect(loadedBody.content).toContain('# Kickoff');
+	expect(loadedBody.content).toContain('Date=Template date default');
+	expect(loadedBody.content).toContain('Time=Template time default');
+	expect(loadedBody.content).toContain(`Explicit=${formatDate(now, 'YYYY-MM-DD')}`);
+	expect(loadedBody.content).toContain('{{cursor}}');
+	expect(loadedBody.content).not.toContain('kind: template');
+
+	const legacyLoaded = await request.get(`/api/vaults/${vault.id}/templates?name=${encodeURIComponent('Meeting')}&title=${encodeURIComponent('Legacy')}`);
+	expect(legacyLoaded.ok(), await legacyLoaded.text()).toBe(true);
+	const legacyBody = await legacyLoaded.json() as { path: string; content: string };
+	expect(legacyBody.path).toBe('Snippet Bank/Meeting.md');
+	expect(legacyBody.content).toContain('# Legacy');
+
+	const outside = await request.get(`/api/vaults/${vault.id}/templates?path=${encodeURIComponent('Templates/Meeting.md')}`);
+	expect(outside.status()).toBe(400);
 });
 
 test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {

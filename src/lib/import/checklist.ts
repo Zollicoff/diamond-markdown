@@ -1,6 +1,7 @@
 import type {
 	ObsidianAppConfigInfo,
 	ObsidianDailyNotesInfo,
+	ObsidianTemplatesInfo,
 	ObsidianPluginInfo,
 	ObsidianPluginJsonStatus,
 	VaultImportAnalysis,
@@ -99,6 +100,13 @@ export function obsidianDailyNotesSummary(config: ObsidianDailyNotesInfo): strin
 	if (config.status === 'invalid') return '.obsidian/daily-notes.json is present but invalid.';
 	if (config.settings.length === 0) return `.obsidian/daily-notes.json found; today's note resolves to ${config.plannedPath}.`;
 	return `${config.settings.length} Daily Notes setting${config.settings.length === 1 ? '' : 's'} found; today's note resolves to ${config.plannedPath}.`;
+}
+
+export function obsidianTemplatesSummary(config: ObsidianTemplatesInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/templates.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/templates.json is present but invalid.';
+	if (config.settings.length === 0) return '.obsidian/templates.json found; no supported Templates settings were recognized.';
+	return `${config.settings.length} Templates setting${config.settings.length === 1 ? '' : 's'} found; templates load from ${config.folderPath ?? 'Templates'}.`;
 }
 
 function formatBytes(bytes: number | undefined): string {

@@ -137,8 +137,11 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
   `{{cursor}}` substitutions
 
 ### Templates
-- General templates from `Templates/` folder, ⌘⇧T to insert
-- Variables: `{{date}}`, `{{time}}`, `{{title}}`
+- General templates from `Templates/` or a safe Obsidian-configured Templates
+  folder, ⌘⇧T to insert
+- Safe `.obsidian/templates.json` folder plus default date/time formats are
+  reused for the insert-template picker
+- Variables: `{{date}}`, `{{time}}`, `{{title}}`, `{{cursor}}`
 
 ### Excluded folders
 - Per-vault folder ignore list (right-click a folder → Exclude from index)

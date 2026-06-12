@@ -357,6 +357,10 @@ Use small, pushable slices:
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.
+- **Obsidian Templates settings.** Reuse safe `.obsidian/templates.json`
+  `folder`, `dateFormat`, and `timeFormat` settings for the insert-template
+  picker, with unsafe settings falling back to Diamond defaults and the import
+  preflight surfacing supported fields only.
 - **Git sync incoming-file recovery.** Populate remote changed paths for
   behind-only sync states and show incoming file names beside the recovery
   controls before users pull or run one-click sync.

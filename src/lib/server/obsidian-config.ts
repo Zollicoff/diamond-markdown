@@ -47,6 +47,8 @@ export function safeVaultFolder(input: unknown): string | null {
 	} catch {
 		return null;
 	}
+	rel = rel.replace(/\/+$/g, '');
+	if (!rel || rel === '.') return null;
 
 	const segments = rel.split('/');
 	if (segments.some((segment) => segment.startsWith('.') || EXCLUDED_DIRS.has(segment))) return null;

@@ -82,6 +82,8 @@ export function formatDate(d: Date, fmt: string): string {
 export interface TemplateVars {
 	title?: string;
 	now?: Date;
+	dateFormat?: string;
+	timeFormat?: string;
 }
 
 const DATE_TOKEN_RE = /\{\{(date|time)([+-]\d+d)?(?::([^}]+))?\}\}/g;
@@ -103,7 +105,9 @@ export function expandTemplate(body: string, vars: TemplateVars = {}): string {
 				const days = parseInt(offset.replace('d', ''), 10);
 				if (!Number.isNaN(days)) d.setDate(d.getDate() + days);
 			}
-			const defaultFmt = kind === 'time' ? 'HH:mm' : 'YYYY-MM-DD';
+			const defaultFmt = kind === 'time'
+				? vars.timeFormat ?? 'HH:mm'
+				: vars.dateFormat ?? 'YYYY-MM-DD';
 			return formatDate(d, fmt && fmt.trim() ? fmt : defaultFmt);
 		}
 	);

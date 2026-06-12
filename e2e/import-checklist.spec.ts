@@ -8,11 +8,13 @@ import {
 	importSummary,
 	obsidianDailyNotesSummary,
 	obsidianAppConfigSummary,
+	obsidianTemplatesSummary,
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
 import { preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
+import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
 function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnalysis {
@@ -39,6 +41,14 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			templateStatus: 'missing',
 			formatStatus: 'missing',
 			plannedPath: 'Daily Notes/2026-06-12.md',
+			settings: [],
+			warnings: []
+		},
+		obsidianTemplates: {
+			status: 'missing',
+			folderStatus: 'missing',
+			dateFormatStatus: 'missing',
+			timeFormatStatus: 'missing',
 			settings: [],
 			warnings: []
 		},
@@ -149,9 +159,100 @@ test.describe('import checklist helpers', () => {
 		})).toBe("1 Daily Notes setting found; today's note resolves to Journal/2026/June/2026-06-12-Fri.md.");
 	});
 
+	test('summarizes Obsidian Templates config without raw JSON', () => {
+		expect(obsidianTemplatesSummary(analysis().obsidianTemplates)).toBe('No .obsidian/templates.json file was found.');
+		expect(obsidianTemplatesSummary({
+			path: '.obsidian/templates.json',
+			status: 'invalid',
+			bytes: 12,
+			folderStatus: 'missing',
+			dateFormatStatus: 'missing',
+			timeFormatStatus: 'missing',
+			settings: [],
+			warnings: ['invalid']
+		})).toBe('.obsidian/templates.json is present but invalid.');
+		expect(obsidianTemplatesSummary({
+			path: '.obsidian/templates.json',
+			status: 'present',
+			bytes: 96,
+			folderPath: 'Snippet Bank',
+			folderStatus: 'safe',
+			dateFormat: 'dddd, MMMM D, YYYY',
+			dateFormatStatus: 'safe',
+			timeFormat: 'HH:mm:ss',
+			timeFormatStatus: 'safe',
+			settings: [
+				{
+					id: 'folder',
+					label: 'Template folder',
+					value: 'Snippet Bank',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				}
+			],
+			warnings: []
+		})).toBe('1 Templates setting found; templates load from Snippet Bank.');
+	});
+
+	test('uses safe Obsidian Templates settings for template runtime defaults', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-templates-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'templates.json'), JSON.stringify({
+			folder: 'Snippet Bank/',
+			dateFormat: 'dddd, MMMM D, YYYY',
+			timeFormat: 'HH:mm:ss',
+			privateTemplateSetting: 'do-not-render-this-template-config-value'
+		}));
+
+		const config = readObsidianTemplatesConfig(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			folderPath: 'Snippet Bank',
+			folderStatus: 'safe',
+			dateFormat: 'dddd, MMMM D, YYYY',
+			dateFormatStatus: 'safe',
+			timeFormat: 'HH:mm:ss',
+			timeFormatStatus: 'safe'
+		});
+		expect(config.settings.map((setting) => setting.id)).toEqual(['folder', 'dateFormat', 'timeFormat']);
+		expect(JSON.stringify(config)).not.toContain('do-not-render-this-template-config-value');
+		expect(templateRuntimeSettings(vaultDir)).toEqual({
+			folder: 'Snippet Bank',
+			dateFormat: 'dddd, MMMM D, YYYY',
+			timeFormat: 'HH:mm:ss',
+			source: 'obsidian-templates'
+		});
+	});
+
+	test('falls back from unsafe Obsidian Templates settings', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-templates-unsafe-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'templates.json'), JSON.stringify({
+			folder: '../outside',
+			dateFormat: '',
+			timeFormat: 'x'.repeat(121)
+		}));
+
+		const config = readObsidianTemplatesConfig(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			folderStatus: 'unsafe',
+			dateFormatStatus: 'unsafe',
+			timeFormatStatus: 'unsafe'
+		});
+		expect(templateRuntimeSettings(vaultDir)).toEqual({
+			folder: 'Templates',
+			dateFormat: 'YYYY-MM-DD',
+			timeFormat: 'HH:mm',
+			source: 'obsidian-templates'
+		});
+	});
+
 	test('guards Obsidian configured vault folders before reuse', () => {
 		expect(safeVaultFolder('Media/Uploads')).toBe('Media/Uploads');
+		expect(safeVaultFolder('Media/Uploads/')).toBe('Media/Uploads');
 		expect(safeVaultFolder('./Media/Uploads')).toBe('Media/Uploads');
+		expect(safeVaultFolder('Media/Uploads/')).toBe('Media/Uploads');
 		expect(safeVaultFolder('../outside')).toBeNull();
 		expect(safeVaultFolder('/tmp/uploads')).toBeNull();
 		expect(safeVaultFolder('Media\\Uploads')).toBeNull();

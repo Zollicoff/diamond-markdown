@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type {
+	ObsidianTemplatesInfo,
 	ObsidianPluginInfo,
 	ObsidianPluginJsonStatus,
 	VaultImportAnalysis,
@@ -9,6 +10,7 @@ import type {
 } from '$lib/types';
 import { readObsidianAppConfig } from './obsidian-config';
 import { readObsidianDailyNotesConfig } from './obsidian-daily';
+import { readObsidianTemplatesConfig } from './obsidian-templates';
 
 const CONFIG_FOLDERS = new Set(['.obsidian', '.diamondmd']);
 const IGNORED_FOLDERS = new Set(['.git', '.diamond-publish', 'node_modules']);
@@ -62,6 +64,19 @@ function item(id: string, label: string, detail: string, level: VaultImportCheck
 	return { id, label, detail, level };
 }
 
+function obsidianTemplatesDetail(config: ObsidianTemplatesInfo): string {
+	if (config.status === 'present' && config.settings.length === 0) {
+		return '.obsidian/templates.json found; no supported Templates settings were recognized.';
+	}
+	if (config.status === 'present') {
+		return `${config.settings.length} Templates setting${config.settings.length === 1 ? '' : 's'} found; templates load from ${config.folderPath ?? 'Templates'}.`;
+	}
+	if (config.status === 'invalid') {
+		return '.obsidian/templates.json is invalid; Diamond will use default template picker behavior.';
+	}
+	return 'No Obsidian Templates settings were found.';
+}
+
 export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (!inputPath?.trim()) throw new Error('path required');
 	const root = expandHome(inputPath);
@@ -88,6 +103,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	let diamondConfig = fs.existsSync(path.join(root, '.diamondmd'));
 	const obsidianAppConfig = readObsidianAppConfig(root);
 	const obsidianDailyNotes = readObsidianDailyNotesConfig(root);
+	const obsidianTemplates = readObsidianTemplatesConfig(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
@@ -185,6 +201,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (skippedSymlinks > 0) warnings.push(`${skippedSymlinks} symlink${skippedSymlinks === 1 ? '' : 's'} skipped during inspection.`);
 	warnings.push(...obsidianAppConfig.warnings);
 	warnings.push(...obsidianDailyNotes.warnings);
+	warnings.push(...obsidianTemplates.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
 	const attachmentDetail = likelyAttachmentFolders.length > 0
@@ -236,6 +253,14 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				: obsidianDailyNotes.status === 'present' ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-templates',
+			'Templates settings',
+			obsidianTemplatesDetail(obsidianTemplates),
+			obsidianTemplates.status === 'invalid' || obsidianTemplates.settings.some((setting) => setting.level === 'warn')
+				? 'warn'
+				: obsidianTemplates.status === 'present' ? 'info' : 'ok'
+		),
+		item(
 			'canvas',
 			'Canvas files',
 			canvasFiles > 0
@@ -277,6 +302,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		likelyAttachmentFolders,
 		obsidianAppConfig,
 		obsidianDailyNotes,
+		obsidianTemplates,
 		obsidianPluginFolders,
 		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),
