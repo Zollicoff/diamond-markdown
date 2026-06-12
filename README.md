@@ -105,7 +105,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ### Search
 - Fuzzy quick-switcher
-- Full-text search across the vault
+- Index-backed full-text search across the vault
 - Command palette (⌘P)
 
 ### Graph view

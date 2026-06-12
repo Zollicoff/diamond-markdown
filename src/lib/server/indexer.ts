@@ -6,6 +6,7 @@
  *   - `linksOut`   — notePath → set of outgoing notePaths
  *   - `backlinks`  — notePath → set of incoming notePaths
  *   - `tagIndex`   — tag → set of notePaths
+ *   - `searchDocs` — notePath → normalized note body text
  *
  * All state is keyed by vault-relative path with forward slashes.
  */
@@ -28,6 +29,15 @@ export interface NoteMeta {
 	stem: string;
 }
 
+export interface SearchDocument {
+	/** Vault-relative path matching the note metadata key. */
+	notePath: string;
+	/** Whitespace-normalized markdown body text, excluding frontmatter. */
+	text: string;
+	/** Lowercase copy kept in memory so search does not recase every query. */
+	textLower: string;
+}
+
 export interface VaultIndex {
 	/** All notes. */
 	notes: Map<string, NoteMeta>;
@@ -41,6 +51,8 @@ export interface VaultIndex {
 	backlinks: Map<string, Set<string>>;
 	/** tag → set of note paths. */
 	tagIndex: Map<string, Set<string>>;
+	/** notePath → indexed body text for full-vault search. */
+	searchDocs: Map<string, SearchDocument>;
 }
 
 interface FileSnapshot {
@@ -61,9 +73,10 @@ interface IndexCacheFile {
 	files: FileSnapshot[];
 	notes: NoteMeta[];
 	linksOutRaw: { notePath: string; targets: string[] }[];
+	searchDocs: { notePath: string; text: string }[];
 }
 
-const INDEX_CACHE_VERSION = 1;
+const INDEX_CACHE_VERSION = 2;
 const indexes = new Map<string, VaultIndex>();
 
 export function getIndex(vault: Vault): VaultIndex {
@@ -107,6 +120,7 @@ export function upsertNote(vault: Vault, notePath: string, body: string): void {
 	const idx = getIndex(vault);
 	idx.notes.delete(notePath);
 	idx.linksOutRaw.delete(notePath);
+	idx.searchDocs.delete(notePath);
 	ingestNote(idx, notePath, body);
 	rebuildDerivedIndexes(idx);
 	writeIndexCache(vault, idx);
@@ -114,10 +128,11 @@ export function upsertNote(vault: Vault, notePath: string, body: string): void {
 
 export function removeNote(vault: Vault, notePath: string, opts: { skipCache?: boolean } = {}): void {
 	const idx = getIndex(vault);
-	const existed = idx.notes.has(notePath) || idx.linksOutRaw.has(notePath);
+	const existed = idx.notes.has(notePath) || idx.linksOutRaw.has(notePath) || idx.searchDocs.has(notePath);
 	if (!existed) return;
 	idx.notes.delete(notePath);
 	idx.linksOutRaw.delete(notePath);
+	idx.searchDocs.delete(notePath);
 	rebuildDerivedIndexes(idx);
 	if (!opts.skipCache) writeIndexCache(vault, idx);
 }
@@ -134,6 +149,8 @@ function ingestNote(idx: VaultIndex, notePath: string, body: string): void {
 	const rawOut = new Set<string>();
 	for (const link of parseWikilinks(main)) rawOut.add(link.target);
 	idx.linksOutRaw.set(notePath, rawOut);
+	const text = normalizeSearchText(main);
+	idx.searchDocs.set(notePath, { notePath, text, textLower: text.toLowerCase() });
 }
 
 function emptyIndex(): VaultIndex {
@@ -143,7 +160,8 @@ function emptyIndex(): VaultIndex {
 		linksOutRaw: new Map(),
 		linksOut: new Map(),
 		backlinks: new Map(),
-		tagIndex: new Map()
+		tagIndex: new Map(),
+		searchDocs: new Map()
 	};
 }
 
@@ -252,7 +270,9 @@ function tryLoadIndexCache(
 		if (cache.vaultPath !== path.resolve(vault.path)) return null;
 		if (!sameStringArray(cache.excludedFolders, excludedFolders)) return null;
 		if (!sameFileSnapshot(cache.files, cacheFileSnapshot(files))) return null;
-		if (!Array.isArray(cache.notes) || !Array.isArray(cache.linksOutRaw)) return null;
+		if (!Array.isArray(cache.notes) || !Array.isArray(cache.linksOutRaw) || !Array.isArray(cache.searchDocs)) return null;
+		const searchDocPaths = new Set(cache.searchDocs.map((doc) => doc.notePath));
+		if (cache.notes.some((meta) => !searchDocPaths.has(meta.notePath))) return null;
 		return hydrateIndex(cache);
 	} catch {
 		return null;
@@ -273,6 +293,14 @@ function hydrateIndex(cache: IndexCacheFile): VaultIndex {
 	for (const entry of cache.linksOutRaw) {
 		idx.linksOutRaw.set(entry.notePath, new Set(Array.isArray(entry.targets) ? entry.targets : []));
 	}
+	for (const doc of cache.searchDocs) {
+		if (typeof doc.notePath !== 'string' || typeof doc.text !== 'string') continue;
+		idx.searchDocs.set(doc.notePath, {
+			notePath: doc.notePath,
+			text: doc.text,
+			textLower: doc.text.toLowerCase()
+		});
+	}
 	rebuildDerivedIndexes(idx);
 	return idx;
 }
@@ -290,6 +318,9 @@ function writeIndexCache(vault: Vault, idx: VaultIndex, files?: MarkdownFile[]):
 			notes: [...idx.notes.values()].sort((a, b) => a.notePath.localeCompare(b.notePath)),
 			linksOutRaw: [...idx.linksOutRaw.entries()]
 				.map(([notePath, targets]) => ({ notePath, targets: [...targets].sort() }))
+				.sort((a, b) => a.notePath.localeCompare(b.notePath)),
+			searchDocs: [...idx.searchDocs.values()]
+				.map(({ notePath, text }) => ({ notePath, text }))
 				.sort((a, b) => a.notePath.localeCompare(b.notePath))
 		};
 		const target = indexCachePath(vault);
@@ -314,6 +345,10 @@ function sameFileSnapshot(a: FileSnapshot[], b: FileSnapshot[]): boolean {
 		if (a[i].mtimeMs !== b[i].mtimeMs) return false;
 	}
 	return true;
+}
+
+function normalizeSearchText(text: string): string {
+	return text.replace(/\s+/g, ' ').trim();
 }
 
 /** Recursive .md walker, skipping hidden dirs + node_modules. */

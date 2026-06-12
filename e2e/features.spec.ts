@@ -71,6 +71,10 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	expect(search.ok()).toBe(true);
 	const searchBody = await search.json() as { results: { path: string }[] };
 	expect(searchBody.results.some((r) => r.path === 'Cache Seed.md')).toBe(true);
+	const fullSearch = await request.get(`/api/vaults/${vault.id}/search?q=${encodeURIComponent('Links to')}&full=1`);
+	expect(fullSearch.ok()).toBe(true);
+	const fullSearchBody = await fullSearch.json() as { results: { path: string; snippet: string }[] };
+	expect(fullSearchBody.results.find((r) => r.path === 'Cache Seed.md')?.snippet).toContain('Links to');
 
 	const cacheFiles = fs.readdirSync(cacheDir)
 		.filter((name) => name.endsWith('.json'))
@@ -82,6 +86,7 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 		files: { rel: string }[];
 		notes: { notePath: string }[];
 		linksOutRaw: { notePath: string; targets: string[] }[];
+		searchDocs: { notePath: string; text: string }[];
 	};
 
 	const cacheEntries = cacheFiles.map((cachePath) => ({
@@ -92,12 +97,13 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	expect(matchingCaches).toHaveLength(1);
 	const { cachePath, body: cache } = matchingCaches[0];
 	const updatedCache = (): CacheEntry => JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as CacheEntry;
-	expect(cache.version).toBe(1);
+	expect(cache.version).toBe(2);
 	expect(cache.vaultId).toBe(vault.id);
 	expect(cache.vaultPath).toBe(path.resolve(vaultDir));
 	expect(cache.files.map((f) => f.rel)).toContain('Cache Seed.md');
 	expect(cache.notes.map((n) => n.notePath)).toContain('Cache Seed.md');
 	expect(cache.linksOutRaw.find((row) => row.notePath === 'Cache Seed.md')?.targets).toContain('Second Note');
+	expect(cache.searchDocs.find((row) => row.notePath === 'Cache Seed.md')?.text).toContain('Links to [[Second Note]].');
 
 	const saved = await request.post(`/api/vaults/${vault.id}/note`, {
 		data: { path: 'Cache Added.md', content: '# Cache Added\n\nMore cache text.\n', commitNow: false }
@@ -106,6 +112,11 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	const updated = updatedCache();
 	expect(updated.files.map((f) => f.rel)).toContain('Cache Added.md');
 	expect(updated.notes.map((n) => n.notePath)).toContain('Cache Added.md');
+	expect(updated.searchDocs.find((row) => row.notePath === 'Cache Added.md')?.text).toContain('More cache text.');
+	const addedSearch = await request.get(`/api/vaults/${vault.id}/search?q=${encodeURIComponent('More cache text')}&full=1`);
+	expect(addedSearch.ok()).toBe(true);
+	const addedSearchBody = await addedSearch.json() as { results: { path: string; snippet: string }[] };
+	expect(addedSearchBody.results.find((r) => r.path === 'Cache Added.md')?.snippet).toContain('More cache text');
 });
 
 test('Obsidian import check reports vault readiness without changing files', async ({ request }) => {

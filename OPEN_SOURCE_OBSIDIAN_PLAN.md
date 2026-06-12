@@ -74,10 +74,10 @@ Risks:
 
 ### 5. Scale Large Vaults
 
-- Add persisted index cache keyed by file mtimes and content hashes.
+- Keep the persisted vault index cache warm across restarts.
 - Virtualize the file tree and search results.
-- Replace full-text substring scans with an indexed search backend when vaults
-  exceed a configurable threshold.
+- Improve search ranking and consider a token/inverted index if real-world
+  vaults outgrow the current indexed body corpus.
 - Replace graph O(n^2)-style interactions with spatial indexing for large
   graphs.
 

@@ -287,11 +287,14 @@ Use small, pushable slices:
 - **Safe one-click GitHub sync.** Add a `sync` action that fetches first, pulls
    fast-forward remote-only changes, pushes local-only commits or first-time
    remote branches, and stops on dirty, conflicted, or diverged states.
+- **Index-backed full-text search.** Persist normalized note body text in the
+   vault index cache and serve full-text queries from that index instead of
+   reading every markdown file on each search request.
 
 ## Next Implementation Slices
 
-1. **Large-vault search upgrade.** Add an indexed search path or at least a
-   thresholded warning/plan so full-text search does not overclaim scale.
+1. **Search ranking and result scale.** Improve full-text ranking and
+   large-result rendering now that searches use the persisted index corpus.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support, attachment folder
    organization, and deeper plugin-settings migration guidance without
