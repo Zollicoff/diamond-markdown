@@ -28,6 +28,8 @@
 		savingNodeId: string | null;
 		movingNodeId: string | null;
 		moveSavingNodeId: string | null;
+		resizingNodeId: string | null;
+		resizeSavingNodeId: string | null;
 		deletingNodeId: string | null;
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
@@ -43,6 +45,7 @@
 		onOpenRefNode: (node: CanvasNode) => void;
 		onDeleteNode: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
+		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
 
 	let {
@@ -60,6 +63,8 @@
 		savingNodeId,
 		movingNodeId,
 		moveSavingNodeId,
+		resizingNodeId,
+		resizeSavingNodeId,
 		deletingNodeId,
 		savingEdgeId,
 		deletingEdgeId,
@@ -74,7 +79,8 @@
 		onSaveRefNode,
 		onOpenRefNode,
 		onDeleteNode,
-		onMovePointerDown
+		onMovePointerDown,
+		onResizePointerDown
 	}: Props = $props();
 </script>
 
@@ -111,6 +117,8 @@
 		{savingNodeId}
 		{movingNodeId}
 		{moveSavingNodeId}
+		{resizingNodeId}
+		{resizeSavingNodeId}
 		{deletingNodeId}
 		{savingEdgeId}
 		{deletingEdgeId}
@@ -123,6 +131,7 @@
 		onOpenRef={onOpenRefNode}
 		onDelete={onDeleteNode}
 		{onMovePointerDown}
+		{onResizePointerDown}
 	/>
 {/if}
 

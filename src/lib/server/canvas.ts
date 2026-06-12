@@ -56,6 +56,7 @@ export type CanvasEditAction =
 	| 'update-group-label'
 	| 'update-node-reference'
 	| 'move-node'
+	| 'resize-node'
 	| 'delete-node'
 	| 'add-edge'
 	| 'update-edge-label'
@@ -351,6 +352,14 @@ function requiredBoundedNumber(value: unknown, name: string, min: number, max: n
 	return boundedNumber(value, value, min, max);
 }
 
+function minCanvasNodeHeight(type: unknown): number {
+	return type === 'file' || type === 'link' ? 150 : type === 'group' ? 120 : 80;
+}
+
+function minCanvasNodeWidth(type: unknown): number {
+	return type === 'file' || type === 'link' ? 140 : type === 'group' ? 160 : 120;
+}
+
 function createCanvasNodeId(nodes: unknown[], prefix: string): string {
 	const used = new Set(nodes.map((node) => nodeRecord(node)?.id).filter((id): id is string => Boolean(id)));
 	for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -501,6 +510,12 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		node.x = requiredBoundedNumber(input.x, 'x', -100_000, 100_000);
 		node.y = requiredBoundedNumber(input.y, 'y', -100_000, 100_000);
+	} else if (input.action === 'resize-node') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		const node = nodes.map(nodeRecord).find((candidate) => candidate?.id === input.nodeId);
+		if (!node) throw new CanvasFileError('canvas node not found', 404);
+		node.width = requiredBoundedNumber(input.width, 'width', minCanvasNodeWidth(node.type), 1_600);
+		node.height = requiredBoundedNumber(input.height, 'height', minCanvasNodeHeight(node.type), 1_200);
 	} else if (input.action === 'delete-node') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		const index = nodes.findIndex((node) => nodeRecord(node)?.id === input.nodeId);

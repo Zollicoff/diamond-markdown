@@ -17,11 +17,13 @@
 		canSaveCanvasGroupLabel,
 		canvasEdgeSummaries,
 		canvasNodePositionChanged,
+		canvasNodeSizeChanged,
 		canvasNodeOptions,
 		canvasFileOpenTarget,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
+		canvasNodesWithSize,
 		canvasTextDrafts,
 		canSaveCanvasNodeRefDraft,
 		edgeLines,
@@ -35,10 +37,15 @@
 	} from '$lib/canvas/view';
 	import {
 		canvasNodeDragPosition,
+		canvasNodeResizeSize,
 		createCanvasNodeDragState,
+		createCanvasNodeResizeState,
 		isCanvasNodeDragPointer,
+		isCanvasNodeResizePointer,
 		updateCanvasNodeDragState,
-		type CanvasNodeDragState
+		updateCanvasNodeResizeState,
+		type CanvasNodeDragState,
+		type CanvasNodeResizeState
 	} from '$lib/canvas/drag';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
@@ -61,6 +68,8 @@
 	let savingNodeId = $state<string | null>(null);
 	let movingNodeId = $state<string | null>(null);
 	let moveSavingNodeId = $state<string | null>(null);
+	let resizingNodeId = $state<string | null>(null);
+	let resizeSavingNodeId = $state<string | null>(null);
 	let deletingNodeId = $state<string | null>(null);
 	let savingEdgeId = $state<string | null>(null);
 	let deletingEdgeId = $state<string | null>(null);
@@ -69,10 +78,15 @@
 	let edgeToNodeId = $state('');
 	let edgeLabel = $state('');
 	let dragState = $state<CanvasNodeDragState | null>(null);
+	let resizeState = $state<CanvasNodeResizeState | null>(null);
 
-	const displayNodes = $derived(canvasNodesWithPosition(
+	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
 		dragState ? canvasNodeDragPosition(dragState) : null
+	));
+	const displayNodes = $derived(canvasNodesWithSize(
+		movedNodes,
+		resizeState ? canvasNodeResizeSize(resizeState) : null
 	));
 	const displayDoc = $derived(doc ? { ...doc, nodes: displayNodes } : null);
 	const bounds = $derived(canvasBounds(displayNodes));
@@ -214,7 +228,7 @@
 	}
 
 	async function deleteNode(node: CanvasNode): Promise<void> {
-		if (!doc || deletingNodeId || savingNodeId || movingNodeId || moveSavingNodeId || savingEdgeId || deletingEdgeId) return;
+		if (!doc || deletingNodeId || savingNodeId || movingNodeId || moveSavingNodeId || resizingNodeId || resizeSavingNodeId || savingEdgeId || deletingEdgeId) return;
 		deletingNodeId = node.id;
 		error = null;
 		try {
@@ -293,9 +307,20 @@
 		window.removeEventListener('pointercancel', handleMovePointerCancel);
 	}
 
+	function cleanupResizeListeners(): void {
+		window.removeEventListener('pointermove', resizeNodePointer);
+		window.removeEventListener('pointerup', handleResizePointerUp);
+		window.removeEventListener('pointercancel', handleResizePointerCancel);
+	}
+
 	function moveNodePointer(event: PointerEvent): void {
 		if (!isCanvasNodeDragPointer(dragState, event)) return;
 		dragState = updateCanvasNodeDragState(dragState, event);
+	}
+
+	function resizeNodePointer(event: PointerEvent): void {
+		if (!isCanvasNodeResizePointer(resizeState, event)) return;
+		resizeState = updateCanvasNodeResizeState(resizeState, event);
 	}
 
 	async function finishMovePointer(event: PointerEvent): Promise<void> {
@@ -349,12 +374,67 @@
 		window.addEventListener('pointercancel', handleMovePointerCancel);
 	}
 
+	async function finishResizePointer(event: PointerEvent): Promise<void> {
+		if (!isCanvasNodeResizePointer(resizeState, event)) return;
+		const finished = resizeState;
+		cleanupResizeListeners();
+		resizeState = null;
+		resizingNodeId = null;
+
+		const node = doc?.nodes.find((candidate) => candidate.id === finished.nodeId);
+		if (!doc || !node || !canvasNodeSizeChanged(node, finished.currentWidth, finished.currentHeight)) return;
+
+		resizeSavingNodeId = node.id;
+		error = null;
+		try {
+			const res = await api.resizeCanvasNode(
+				vaultId,
+				path,
+				node.id,
+				finished.currentWidth,
+				finished.currentHeight,
+				doc.revision
+			);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas node resized', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			resizeSavingNodeId = null;
+		}
+	}
+
+	function handleResizePointerUp(event: PointerEvent): void {
+		void finishResizePointer(event);
+	}
+
+	function handleResizePointerCancel(event: PointerEvent): void {
+		if (!isCanvasNodeResizePointer(resizeState, event)) return;
+		cleanupResizeListeners();
+		resizeState = null;
+		resizingNodeId = null;
+	}
+
+	function startResizeNode(node: CanvasNode, event: PointerEvent): void {
+		if (!doc || resizeSavingNodeId) return;
+		event.preventDefault();
+		event.stopPropagation();
+		resizingNodeId = node.id;
+		resizeState = createCanvasNodeResizeState(node, event);
+		window.addEventListener('pointermove', resizeNodePointer);
+		window.addEventListener('pointerup', handleResizePointerUp);
+		window.addEventListener('pointercancel', handleResizePointerCancel);
+	}
+
 	$effect(() => {
 		const currentPath = path;
 		let alive = true;
 		cleanupDragListeners();
+		cleanupResizeListeners();
 		dragState = null;
+		resizeState = null;
 		movingNodeId = null;
+		resizingNodeId = null;
 		loading = true;
 		error = null;
 		doc = null;
@@ -370,11 +450,14 @@
 			.finally(() => {
 				if (!alive || currentPath !== path) return;
 				loading = false;
-			});
+		});
 		return () => { alive = false; };
 	});
 
-	$effect(() => cleanupDragListeners);
+	$effect(() => () => {
+		cleanupDragListeners();
+		cleanupResizeListeners();
+	});
 </script>
 
 <section class="canvas-view">
@@ -412,6 +495,8 @@
 		{savingNodeId}
 		{movingNodeId}
 		{moveSavingNodeId}
+		{resizingNodeId}
+		{resizeSavingNodeId}
 		{deletingNodeId}
 		{savingEdgeId}
 		{deletingEdgeId}
@@ -427,6 +512,7 @@
 		onOpenRefNode={openRefNode}
 		onDeleteNode={deleteNode}
 		onMovePointerDown={startMoveNode}
+		onResizePointerDown={startResizeNode}
 	/>
 </section>
 

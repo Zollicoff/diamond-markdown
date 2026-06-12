@@ -336,6 +336,9 @@ Use small, pushable slices:
 - **Git sync incoming-file recovery.** Populate remote changed paths for
   behind-only sync states and show incoming file names beside the recovery
   controls before users pull or run one-click sync.
+- **Canvas node resizing.** Resize Canvas cards from the board, preview the
+  dimensions while dragging, and persist clamped width/height updates through
+  the same git-backed stale-revision mutation path as moves and edits.
 
 ## Next Implementation Slices
 

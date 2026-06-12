@@ -33,6 +33,8 @@
 		savingNodeId: string | null;
 		movingNodeId: string | null;
 		moveSavingNodeId: string | null;
+		resizingNodeId: string | null;
+		resizeSavingNodeId: string | null;
 		deletingNodeId: string | null;
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
@@ -45,6 +47,7 @@
 		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
+		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
 
 	let {
@@ -57,6 +60,8 @@
 		savingNodeId,
 		movingNodeId,
 		moveSavingNodeId,
+		resizingNodeId,
+		resizeSavingNodeId,
 		deletingNodeId,
 		savingEdgeId,
 		deletingEdgeId,
@@ -68,7 +73,8 @@
 		onSaveRef,
 		onOpenRef,
 		onDelete,
-		onMovePointerDown
+		onMovePointerDown,
+		onResizePointerDown
 	}: Props = $props();
 
 	const disableNodeDelete = $derived(
@@ -76,6 +82,8 @@
 		savingNodeId !== null ||
 		movingNodeId !== null ||
 		moveSavingNodeId !== null ||
+		resizingNodeId !== null ||
+		resizeSavingNodeId !== null ||
 		savingEdgeId !== null ||
 		deletingEdgeId !== null
 	);
@@ -152,6 +160,7 @@
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
 				saving={savingNodeId === node.id}
 				moving={movingNodeId === node.id || moveSavingNodeId === node.id}
+				resizing={resizingNodeId === node.id || resizeSavingNodeId === node.id}
 				deleting={deletingNodeId === node.id}
 				disableDelete={disableNodeDelete}
 				onDraftChange={onDraftChange}
@@ -163,6 +172,7 @@
 				onOpenRef={onOpenRef}
 				onDelete={onDelete}
 				onMovePointerDown={onMovePointerDown}
+				onResizePointerDown={onResizePointerDown}
 			/>
 		{/each}
 	</div>

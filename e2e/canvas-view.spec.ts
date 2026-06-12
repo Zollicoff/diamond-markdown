@@ -48,8 +48,10 @@ import {
 	canvasNodeRefDraftFor,
 	canvasNodeRefDrafts,
 	canvasNodeRefValue,
+	canvasNodeSizeChanged,
 	canvasNodeTitle,
 	canvasNodesWithPosition,
+	canvasNodesWithSize,
 	canvasSvgEdgeStroke,
 	canvasSvgNodeColors,
 	canvasSummary,
@@ -62,9 +64,14 @@ import {
 } from '../src/lib/canvas/view';
 import {
 	canvasNodeDragPosition,
+	canvasNodeMinSize,
+	canvasNodeResizeSize,
 	createCanvasNodeDragState,
+	createCanvasNodeResizeState,
 	isCanvasNodeDragPointer,
-	updateCanvasNodeDragState
+	isCanvasNodeResizePointer,
+	updateCanvasNodeDragState,
+	updateCanvasNodeResizeState
 } from '../src/lib/canvas/drag';
 
 const canvasJson = JSON.stringify({
@@ -253,6 +260,10 @@ test.describe('canvas view helpers', () => {
 		const moved = canvasNodesWithPosition(doc.nodes, { nodeId: 'b', x: 360, y: 90 });
 		expect(moved.find((node) => node.id === 'b')).toMatchObject({ x: 360, y: 90 });
 		expect(doc.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 320, y: 40 });
+		expect(canvasNodeSizeChanged(doc.nodes[1], 280, 180)).toBe(true);
+		const resized = canvasNodesWithSize(doc.nodes, { nodeId: 'b', width: 280, height: 180 });
+		expect(resized.find((node) => node.id === 'b')).toMatchObject({ width: 280, height: 180 });
+		expect(doc.nodes.find((node) => node.id === 'b')).toMatchObject({ width: 220, height: 100 });
 		const dragStart = createCanvasNodeDragState(doc.nodes[1], {
 			pointerId: 7,
 			clientX: 100,
@@ -271,6 +282,31 @@ test.describe('canvas view helpers', () => {
 			clientY: 150.6
 		});
 		expect(canvasNodeDragPosition(dragMoved)).toEqual({ nodeId: 'b', x: 380, y: 71 });
+		expect(canvasNodeMinSize(doc.nodes[1])).toEqual({ width: 140, height: 150 });
+		const resizeStart = createCanvasNodeResizeState(doc.nodes[1], {
+			pointerId: 8,
+			clientX: 200,
+			clientY: 240
+		});
+		expect(canvasNodeResizeSize(resizeStart)).toEqual({ nodeId: 'b', width: 220, height: 100 });
+		expect(isCanvasNodeResizePointer(resizeStart, { pointerId: 99 })).toBe(false);
+		expect(updateCanvasNodeResizeState(resizeStart, {
+			pointerId: 99,
+			clientX: 20,
+			clientY: 20
+		})).toBe(resizeStart);
+		const resizeGrown = updateCanvasNodeResizeState(resizeStart, {
+			pointerId: 8,
+			clientX: 275.4,
+			clientY: 315.6
+		});
+		expect(canvasNodeResizeSize(resizeGrown)).toEqual({ nodeId: 'b', width: 295, height: 176 });
+		const resizeClamped = updateCanvasNodeResizeState(resizeStart, {
+			pointerId: 8,
+			clientX: -200,
+			clientY: -200
+		});
+		expect(canvasNodeResizeSize(resizeClamped)).toEqual({ nodeId: 'b', width: 140, height: 150 });
 		expect(canvasNodeOptions(doc.nodes)).toEqual([
 			{ id: 'a', label: 'text (text)' },
 			{ id: 'b', label: 'Home.md (file)' }
@@ -725,6 +761,37 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(movedBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ x: 440, y: 120 });
 	expect(gitStatus(vaultDir)).toBe('');
 
+	const resized = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'resize-node',
+			nodeId: 'b',
+			width: 310,
+			height: 190,
+			expectedRevision: movedBody.doc.revision
+		}
+	});
+	expect(resized.ok(), await resized.text()).toBe(true);
+	const resizedBody = await resized.json() as { sha: string | null; doc: CanvasDoc };
+	expect(resizedBody.sha).toBeTruthy();
+	expect(resizedBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ width: 310, height: 190 });
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const clamped = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'resize-node',
+			nodeId: 'b',
+			width: 20,
+			height: 20,
+			expectedRevision: resizedBody.doc.revision
+		}
+	});
+	expect(clamped.ok(), await clamped.text()).toBe(true);
+	const clampedBody = await clamped.json() as { sha: string | null; doc: CanvasDoc };
+	expect(clampedBody.doc.nodes.find((node) => node.id === 'b')).toMatchObject({ width: 140, height: 150 });
+	expect(gitStatus(vaultDir)).toBe('');
+
 	const edgeAdded = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
 			path: 'Board.canvas',
@@ -732,7 +799,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			fromNode: 'b',
 			toNode: 'a',
 			label: 'returns',
-			expectedRevision: movedBody.doc.revision
+			expectedRevision: clampedBody.doc.revision
 		}
 	});
 	expect(edgeAdded.ok(), await edgeAdded.text()).toBe(true);
@@ -1016,6 +1083,7 @@ test('canvas view drags nodes and saves positions to the Canvas file', async ({ 
 	await page.mouse.down();
 	await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 4 });
 	await page.mouse.up();
+	await expect(page.getByText('Canvas node moved')).toBeVisible({ timeout: 10_000 });
 
 	await expect.poll(async () => {
 		const saved = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
@@ -1023,6 +1091,47 @@ test('canvas view drags nodes and saves positions to the Canvas file', async ({ 
 		const moved = body.nodes.find((node) => node.id === 'b');
 		return moved ? { x: moved.x, y: moved.y } : null;
 	}).toEqual({ x: original.x + 60, y: original.y + 30 });
+	await expect.poll(() => gitStatus(vaultDir)).toBe('');
+});
+
+test('canvas view resizes nodes and saves dimensions to the Canvas file', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-resize-ui-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), canvasJson);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Canvas Resize UI Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const loaded = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+	const before = await loaded.json() as CanvasDoc;
+	const original = before.nodes.find((node) => node.id === 'b');
+	expect(original).toBeTruthy();
+
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
+	const resizeHandle = page.getByRole('button', { name: 'Resize canvas node Home.md', exact: true });
+	await expect(resizeHandle).toBeVisible();
+	const box = await resizeHandle.boundingBox();
+	expect(box).toBeTruthy();
+	if (!box || !original) throw new Error('resize handle or original node missing');
+
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 45, { steps: 4 });
+	await page.mouse.up();
+	await expect(page.getByText('Canvas node resized')).toBeVisible({ timeout: 10_000 });
+
+	await expect.poll(async () => {
+		const saved = await request.get(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+		const body = await saved.json() as CanvasDoc;
+		const resized = body.nodes.find((node) => node.id === 'b');
+		return resized ? { width: resized.width, height: resized.height } : null;
+	}).toEqual({ width: original.width + 80, height: original.height + 45 });
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 

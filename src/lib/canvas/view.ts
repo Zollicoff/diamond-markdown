@@ -27,6 +27,12 @@ export interface CanvasNodePosition {
 	y: number;
 }
 
+export interface CanvasNodeSize {
+	nodeId: string;
+	width: number;
+	height: number;
+}
+
 export interface CanvasNodeOption {
 	id: string;
 	label: string;
@@ -565,6 +571,10 @@ export function canvasNodePositionChanged(node: CanvasNode, x: number, y: number
 	return Math.round(node.x) !== Math.round(x) || Math.round(node.y) !== Math.round(y);
 }
 
+export function canvasNodeSizeChanged(node: CanvasNode, width: number, height: number): boolean {
+	return Math.round(node.width) !== Math.round(width) || Math.round(node.height) !== Math.round(height);
+}
+
 export function canvasNodesWithPosition(nodes: CanvasNode[], position: CanvasNodePosition | null): CanvasNode[] {
 	if (!position) return nodes;
 	let changed = false;
@@ -572,6 +582,17 @@ export function canvasNodesWithPosition(nodes: CanvasNode[], position: CanvasNod
 		if (node.id !== position.nodeId) return node;
 		changed = true;
 		return { ...node, x: Math.round(position.x), y: Math.round(position.y) };
+	});
+	return changed ? next : nodes;
+}
+
+export function canvasNodesWithSize(nodes: CanvasNode[], size: CanvasNodeSize | null): CanvasNode[] {
+	if (!size) return nodes;
+	let changed = false;
+	const next = nodes.map((node) => {
+		if (node.id !== size.nodeId) return node;
+		changed = true;
+		return { ...node, width: Math.round(size.width), height: Math.round(size.height) };
 	});
 	return changed ? next : nodes;
 }

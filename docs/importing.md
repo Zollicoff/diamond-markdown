@@ -80,8 +80,8 @@ you should verify embeds after opening it.
 Obsidian Canvas files (`.canvas`) and Obsidian plugin settings are preserved on
 disk. Diamond Markdown opens Canvas files as visual boards and can rename,
 move, delete, export the `.canvas` files as SVG snapshots, and add or edit text
-cards, file cards, URL cards, group labels, node positions, edge connections,
-edge labels, and node or edge deletion with git-backed commits. Canvas text
+cards, file cards, URL cards, group labels, node positions and dimensions,
+edge connections, edge labels, and node or edge deletion with git-backed commits. Canvas text
 cards show a safe markdown-aware preview while preserving the raw editable text.
 Canvas group nodes are rendered behind cards and can be created from the Canvas toolbar.
 Canvas node and edge colors are preserved and rendered in the board and SVG export. Canvas edge

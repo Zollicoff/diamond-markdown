@@ -25,6 +25,7 @@
 		refCanSave: boolean;
 		saving: boolean;
 		moving: boolean;
+		resizing: boolean;
 		deleting: boolean;
 		disableDelete: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
@@ -36,6 +37,7 @@
 		onOpenRef: (node: CanvasNode) => void;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
+		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 	}
 
 	let {
@@ -51,6 +53,7 @@
 		refCanSave,
 		saving,
 		moving,
+		resizing,
 		deleting,
 		disableDelete,
 		onDraftChange,
@@ -61,13 +64,14 @@
 		onSaveRef,
 		onOpenRef,
 		onDelete,
-		onMovePointerDown
+		onMovePointerDown,
+		onResizePointerDown
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
 </script>
 
-<article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={canvasNodeStyle(node, bounds)}>
+<article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}${resizing ? ' resizing' : ''}`} style={canvasNodeStyle(node, bounds)}>
 	<div class="node-topline">
 		<button
 			type="button"
@@ -156,6 +160,13 @@
 			</button>
 		</div>
 	{/if}
+	<button
+		type="button"
+		class="node-resize-handle"
+		aria-label={`Resize canvas node ${title}`}
+		title="Resize canvas node"
+		onpointerdown={(event) => onResizePointerDown(node, event)}
+	></button>
 </article>
 
 <style>
@@ -180,6 +191,11 @@
 		z-index: 3;
 		border-color: var(--accent);
 		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--accent), transparent 50%);
+	}
+	.canvas-node.resizing {
+		z-index: 3;
+		border-color: var(--brand-cyan);
+		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--brand-cyan), transparent 50%);
 	}
 	.canvas-node-file {
 		border-color: var(--canvas-node-border, var(--border-strong));
@@ -240,6 +256,27 @@
 	}
 	.node-drag-handle:active {
 		cursor: grabbing;
+	}
+	.node-resize-handle {
+		position: absolute;
+		right: 5px;
+		bottom: 5px;
+		width: 18px;
+		height: 18px;
+		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 20%);
+		border-radius: 4px;
+		background:
+			linear-gradient(135deg, transparent 47%, var(--fg-dim) 48%, var(--fg-dim) 54%, transparent 55%),
+			color-mix(in srgb, var(--bg), transparent 8%);
+		cursor: nwse-resize;
+	}
+	.node-resize-handle:hover,
+	.node-resize-handle:focus-visible {
+		border-color: var(--brand-cyan);
+		background:
+			linear-gradient(135deg, transparent 47%, var(--brand-cyan) 48%, var(--brand-cyan) 54%, transparent 55%),
+			color-mix(in srgb, var(--bg), transparent 2%);
+		outline: none;
 	}
 	.node-type {
 		align-self: flex-start;
