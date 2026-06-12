@@ -80,9 +80,9 @@ Use small, pushable slices:
 - **Graph view projection extraction.** Move graph filtering, visible-edge
    projection, selection-box math, and screen-to-graph coordinate conversion
    into pure helpers with focused tests.
-- **Read-only Canvas preview.** Show `.canvas` files in the tree, open them in
-   workspace tabs and panes, parse Obsidian Canvas JSON server-side, and render
-   a read-only node/edge board.
+- **Canvas preview.** Show `.canvas` files in the tree, open them in workspace
+   tabs and panes, parse Obsidian Canvas JSON server-side, and render node/edge
+   boards.
 - **Canvas file operations.** Rename, move, and delete `.canvas` files through
    the same git-backed file tree flow as notes and folders.
 - **File tree toolbar split.** Move new-note/new-folder, sort, auto-reveal,
@@ -112,8 +112,8 @@ Use small, pushable slices:
 - **Graph interaction helper extraction.** Move zoom, pan, drag-threshold,
    selection-toggle, and node-open title logic out of `GraphView` into pure
    graph helpers with focused tests.
-- **Canvas SVG export.** Export read-only Obsidian Canvas boards as sanitized
-   SVG snapshots from the server and expose the download action in Canvas tabs.
+- **Canvas SVG export.** Export Obsidian Canvas boards as sanitized SVG
+   snapshots from the server and expose the download action in Canvas tabs.
 - **Canvas text-card editing.** Add and edit Obsidian Canvas text cards through
    git-backed server mutations with stale-revision protection.
 - **Graph data adapter extraction.** Move API-to-simulation graph conversion

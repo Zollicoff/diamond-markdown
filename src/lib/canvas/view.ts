@@ -17,6 +17,8 @@ export interface CanvasEdgeLine {
 	y2: number;
 }
 
+export type CanvasTextDrafts = Record<string, string>;
+
 const PADDING = 80;
 
 export function canvasBounds(nodes: CanvasNode[]): CanvasBounds {
@@ -58,6 +60,10 @@ export function nodeStyle(node: CanvasNode, bounds: CanvasBounds): string {
 	].join('; ');
 }
 
+export function canvasNodeClass(node: CanvasNode): string {
+	return `canvas-node canvas-node-${node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown'}`;
+}
+
 function center(node: CanvasNode, bounds: CanvasBounds): { x: number; y: number } {
 	return {
 		x: node.x - bounds.minX + node.width / 2,
@@ -94,6 +100,22 @@ export function canvasNodeBody(node: CanvasNode): string {
 	if (node.file) return node.file;
 	if (node.url) return node.url;
 	return '';
+}
+
+export function canvasTextDrafts(nodes: CanvasNode[]): CanvasTextDrafts {
+	return Object.fromEntries(
+		nodes
+			.filter((node) => node.type === 'text')
+			.map((node) => [node.id, node.text ?? ''])
+	);
+}
+
+export function canvasDraftFor(node: CanvasNode, drafts: CanvasTextDrafts): string {
+	return drafts[node.id] ?? node.text ?? '';
+}
+
+export function canvasDraftChanged(node: CanvasNode, drafts: CanvasTextDrafts): boolean {
+	return canvasDraftFor(node, drafts) !== (node.text ?? '');
 }
 
 function plural(count: number, singular: string): string {

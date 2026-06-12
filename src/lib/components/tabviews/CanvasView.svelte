@@ -4,12 +4,14 @@
 	import { emit } from '$lib/events';
 	import {
 		canvasBounds,
-		canvasNodeBody,
-		canvasNodeTitle,
+		canvasDraftChanged,
+		canvasDraftFor,
 		canvasSummary,
+		canvasTextDrafts,
 		edgeLines,
-		nodeStyle
+		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import CanvasNodeCard from './canvas/CanvasNodeCard.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -21,7 +23,7 @@
 	let doc = $state<CanvasDoc | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-	let textDrafts = $state<Record<string, string>>({});
+	let textDrafts = $state<CanvasTextDrafts>({});
 	let addingText = $state(false);
 	let savingNodeId = $state<string | null>(null);
 
@@ -30,29 +32,13 @@
 	const exportHref = $derived(`/api/vaults/${vaultId}/canvas/export?path=${encodeURIComponent(path)}`);
 	const exportName = $derived(`${path.split('/').pop()?.replace(/\.canvas$/i, '') || 'canvas'}.svg`);
 
-	function nodeClass(node: CanvasNode): string {
-		return `canvas-node canvas-node-${node.type.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'unknown'}`;
-	}
-
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
-		textDrafts = Object.fromEntries(
-			next.nodes
-				.filter((node) => node.type === 'text')
-				.map((node) => [node.id, node.text ?? ''])
-		);
-	}
-
-	function draftFor(node: CanvasNode): string {
-		return textDrafts[node.id] ?? node.text ?? '';
+		textDrafts = canvasTextDrafts(next.nodes);
 	}
 
 	function setDraft(node: CanvasNode, value: string): void {
 		textDrafts = { ...textDrafts, [node.id]: value };
-	}
-
-	function draftChanged(node: CanvasNode): boolean {
-		return draftFor(node) !== (node.text ?? '');
 	}
 
 	async function addTextNode(): Promise<void> {
@@ -71,11 +57,11 @@
 	}
 
 	async function saveTextNode(node: CanvasNode): Promise<void> {
-		if (!doc || savingNodeId || !draftChanged(node)) return;
+		if (!doc || savingNodeId || !canvasDraftChanged(node, textDrafts)) return;
 		savingNodeId = node.id;
 		error = null;
 		try {
-			const res = await api.updateCanvasTextNode(vaultId, path, node.id, draftFor(node), doc.revision);
+			const res = await api.updateCanvasTextNode(vaultId, path, node.id, canvasDraftFor(node, textDrafts), doc.revision);
 			setDoc(res.doc);
 			emit('toast:show', { title: 'Text card saved', tone: 'success' });
 		} catch (e) {
@@ -161,31 +147,15 @@
 				</svg>
 
 				{#each doc.nodes as node (node.id)}
-					<article class={nodeClass(node)} style={nodeStyle(node, bounds)}>
-						<div class="node-type">{node.type}</div>
-						<h3 title={canvasNodeTitle(node)}>{canvasNodeTitle(node)}</h3>
-						{#if node.type === 'text'}
-							<textarea
-								class="node-editor"
-								aria-label={`Canvas text for ${node.id}`}
-								value={draftFor(node)}
-								oninput={(event) => setDraft(node, (event.currentTarget as HTMLTextAreaElement).value)}
-							></textarea>
-							<div class="node-actions">
-								<button
-									class="mini node-save"
-									disabled={savingNodeId === node.id || !draftChanged(node)}
-									onclick={() => void saveTextNode(node)}
-								>
-									{savingNodeId === node.id ? 'Saving…' : 'Save text'}
-								</button>
-							</div>
-						{:else if canvasNodeBody(node)}
-							<p>{canvasNodeBody(node)}</p>
-						{:else}
-							<p class="empty">No preview content</p>
-						{/if}
-					</article>
+					<CanvasNodeCard
+						{node}
+						{bounds}
+						draft={canvasDraftFor(node, textDrafts)}
+						changed={canvasDraftChanged(node, textDrafts)}
+						saving={savingNodeId === node.id}
+						onDraftChange={setDraft}
+						onSave={saveTextNode}
+					/>
 				{/each}
 			</div>
 		</div>
@@ -277,85 +247,9 @@
 		stroke-width: 4px;
 		stroke-linejoin: round;
 	}
-	.canvas-node {
-		position: absolute;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		overflow: hidden;
-		padding: 12px;
-		border: 1px solid var(--border-strong);
-		border-radius: 7px;
-		background: color-mix(in srgb, var(--bg-elev), var(--bg) 20%);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
-	}
-	.canvas-node-text {
-		border-color: color-mix(in srgb, var(--accent), var(--border-strong) 70%);
-	}
-	.canvas-node-file {
-		border-style: dashed;
-	}
-	.canvas-node-link {
-		border-color: color-mix(in srgb, var(--brand-cyan), var(--border-strong) 60%);
-	}
-	.node-type {
-		align-self: flex-start;
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		padding: 1px 7px;
-		color: var(--fg-dim);
-		font-family: var(--mono);
-		font-size: 0.65rem;
-		text-transform: uppercase;
-	}
-	h3 {
-		margin: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 0.86rem;
-	}
-	.canvas-node p {
-		margin: 0;
-		overflow: hidden;
-		color: var(--fg-muted);
-		font-size: 0.78rem;
-		line-height: 1.35;
-		white-space: pre-wrap;
-	}
-	.node-editor {
-		flex: 1;
-		min-height: 0;
-		width: 100%;
-		resize: none;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 7px 8px;
-		background: color-mix(in srgb, var(--bg), transparent 8%);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.78rem;
-		line-height: 1.35;
-	}
-	.node-editor:focus {
-		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
-		border-color: var(--accent);
-	}
-	.node-actions {
-		display: flex;
-		justify-content: flex-end;
-	}
-	.node-save {
-		padding: 2px 7px;
-		font-size: 0.7rem;
-	}
 	.mini:disabled {
 		cursor: not-allowed;
 		opacity: 0.55;
-	}
-	.canvas-node p.empty {
-		color: var(--fg-dim);
-		font-style: italic;
 	}
 	.warnings {
 		margin: 0;

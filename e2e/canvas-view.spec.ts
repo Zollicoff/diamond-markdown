@@ -6,9 +6,13 @@ import { FIXTURE_PATHS } from './setup-fixture';
 import type { CanvasDoc } from '../src/lib/types';
 import {
 	canvasBounds,
+	canvasDraftChanged,
+	canvasDraftFor,
+	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeTitle,
 	canvasSummary,
+	canvasTextDrafts,
 	edgeLines,
 	nodeStyle
 } from '../src/lib/canvas/view';
@@ -46,11 +50,16 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
+		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
 		expect(canvasSummary(doc)).toBe('2 nodes · 1 edge');
 		expect(nodeStyle(doc.nodes[0], bounds)).toContain('left: 80px');
 		expect(edgeLines(doc, bounds)).toEqual([
 			{ edge: doc.edges[0], x1: 190, y1: 140, x2: 510, y2: 170 }
 		]);
+		const drafts = canvasTextDrafts(doc.nodes);
+		expect(canvasDraftFor(doc.nodes[0], drafts)).toBe('Hello canvas');
+		expect(canvasDraftChanged(doc.nodes[0], drafts)).toBe(false);
+		expect(canvasDraftChanged(doc.nodes[0], { ...drafts, a: 'Edited' })).toBe(true);
 	});
 });
 

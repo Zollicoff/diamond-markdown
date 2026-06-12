@@ -1,16 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
-import { buildFixture, FIXTURE_PATHS } from './e2e/setup-fixture';
+import { FIXTURE_PATHS } from './e2e/setup-fixture';
 
 const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '4173', 10);
 const PORT = Number.isFinite(configuredPort) ? configuredPort : 4173;
 const FIXTURE_ROOT = FIXTURE_PATHS.FIXTURE_ROOT;
 const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-
-// Build a clean test vault before the webServer boots. Playwright may import
-// this config inside restarted test workers after a failure; those workers must
-// not delete the fixture while the already-running webServer still points at it.
-if (!process.env.TEST_WORKER_INDEX) buildFixture();
 
 /**
  * Isolated test runtime. The `webServer` boots the production adapter-node
@@ -41,7 +36,7 @@ export default defineConfig({
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }
 	],
 	webServer: {
-		command: `npm run preview:e2e`,
+		command: `node e2e/setup-fixture.mjs && (test -f build/handler.js || npm run build -- --logLevel warn) && npm run preview:e2e`,
 		url: `http://127.0.0.1:${PORT}/`,
 		reuseExistingServer: false,
 		timeout: 60_000,

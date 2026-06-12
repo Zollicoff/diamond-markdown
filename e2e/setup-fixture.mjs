@@ -1,10 +1,3 @@
-/**
- * Pre-build the test fixture before Playwright spins up the webServer.
- * Copies the bundled sample-vault into e2e/.fixture-root/vault and
- * writes a config.json that registers it. This sidesteps relying on
- * the app's first-run bootstrap during test runs.
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +9,7 @@ const CONFIG_DIR = path.join(FIXTURE_ROOT, 'config');
 const VAULT_DIR = path.join(FIXTURE_ROOT, 'vault');
 const SAMPLE = path.join(REPO, 'sample-vault');
 
-function copyTree(src: string, dest: string): void {
+function copyTree(src, dest) {
 	fs.mkdirSync(dest, { recursive: true });
 	for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
 		if (entry.name === '.git' || entry.name === '.diamond-publish') continue;
@@ -27,7 +20,7 @@ function copyTree(src: string, dest: string): void {
 	}
 }
 
-export function buildFixture(): void {
+function buildFixture() {
 	if (fs.existsSync(FIXTURE_ROOT)) fs.rmSync(FIXTURE_ROOT, { recursive: true, force: true });
 	fs.mkdirSync(CONFIG_DIR, { recursive: true });
 	copyTree(SAMPLE, VAULT_DIR);
@@ -38,11 +31,5 @@ export function buildFixture(): void {
 	fs.writeFileSync(path.join(CONFIG_DIR, 'config.json'), JSON.stringify(config, null, 2));
 }
 
-export const FIXTURE_PATHS = { FIXTURE_ROOT, CONFIG_DIR, VAULT_DIR };
-
-// The Playwright webServer uses setup-fixture.mjs so fixture cleanup happens
-// exactly once before the preview server starts, not during worker retries.
-if (import.meta.url === `file://${process.argv[1]}`) {
-	buildFixture();
-	console.log(`Fixture ready at ${FIXTURE_ROOT}`);
-}
+buildFixture();
+console.log(`Fixture ready at ${FIXTURE_ROOT}`);
