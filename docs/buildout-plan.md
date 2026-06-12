@@ -264,6 +264,9 @@ Use small, pushable slices:
 - **Graph canvas layer split.** Move SVG edge and node rendering out of
    `GraphCanvas` into focused `GraphEdgeLayer` and `GraphNodeLayer`
    components so the canvas wrapper owns only the SVG shell.
+- **Canvas edge endpoint compatibility.** Preserve JSON Canvas `fromEnd` and
+   `toEnd` metadata and render endpoint arrows in both the live board and SVG
+   export, including the spec default arrow at the target endpoint.
 
 ## Next Implementation Slices
 

@@ -18,6 +18,8 @@ export interface CanvasEdgeLine {
 }
 
 export type CanvasEdgeSide = 'top' | 'right' | 'bottom' | 'left' | 'center';
+export type CanvasEdgeEnd = 'none' | 'arrow';
+export type CanvasEdgeMarkerPosition = 'from' | 'to';
 
 export interface CanvasNodePosition {
 	nodeId: string;
@@ -181,6 +183,11 @@ export function canvasEdgeStyle(edge: Pick<CanvasEdge, 'color'>): string {
 	return color ? `stroke: ${color.accent};` : '';
 }
 
+export function canvasEdgeMarkerStyle(edge: Pick<CanvasEdge, 'color'>): string {
+	const color = canvasDisplayColor(edge.color);
+	return color ? `fill: ${color.accent};` : '';
+}
+
 export function canvasSvgNodeColors(node: CanvasNode): { fill: string; stroke: string } {
 	const color = canvasDisplayColor(node.color);
 	if (color) return { fill: color.fill, stroke: color.accent };
@@ -217,6 +224,32 @@ export function canvasLayeredNodes(nodes: CanvasNode[]): CanvasNode[] {
 export function canvasEdgeSide(value: string | undefined): CanvasEdgeSide {
 	if (value === 'top' || value === 'right' || value === 'bottom' || value === 'left') return value;
 	return 'center';
+}
+
+export function canvasEdgeEnd(value: string | undefined, fallback: CanvasEdgeEnd): CanvasEdgeEnd {
+	if (value === 'none' || value === 'arrow') return value;
+	return fallback;
+}
+
+export function canvasEdgeEndpoint(edge: Pick<CanvasEdge, 'fromEnd' | 'toEnd'>, position: CanvasEdgeMarkerPosition): CanvasEdgeEnd {
+	return position === 'from'
+		? canvasEdgeEnd(edge.fromEnd, 'none')
+		: canvasEdgeEnd(edge.toEnd, 'arrow');
+}
+
+export function canvasEdgeMarkerId(edge: Pick<CanvasEdge, 'id'>, position: CanvasEdgeMarkerPosition): string {
+	let hash = 0;
+	for (const char of edge.id) {
+		hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+	}
+	const safeId = edge.id.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'edge';
+	return `canvas-edge-${safeId}-${hash.toString(36)}-${position}`;
+}
+
+export function canvasEdgeMarkerUrl(edge: Pick<CanvasEdge, 'id' | 'fromEnd' | 'toEnd'>, position: CanvasEdgeMarkerPosition): string | null {
+	return canvasEdgeEndpoint(edge, position) === 'arrow'
+		? `url(#${canvasEdgeMarkerId(edge, position)})`
+		: null;
 }
 
 export function canvasNodeAnchor(

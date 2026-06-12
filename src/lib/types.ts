@@ -147,7 +147,9 @@ export interface CanvasEdge {
 	fromNode: string;
 	toNode: string;
 	fromSide?: string;
+	fromEnd?: string;
 	toSide?: string;
+	toEnd?: string;
 	label?: string;
 	color?: string;
 }

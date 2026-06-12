@@ -63,11 +63,11 @@ cards, file cards, URL cards, node positions, edge connections, edge labels, and
 node or edge deletion with git-backed commits. Canvas group nodes are rendered
 behind cards and can be created from the Canvas toolbar. Canvas node and edge
 colors are preserved and rendered in the board and SVG export. Canvas edge
-side anchors (`fromSide`/`toSide`) are respected when drawing board and SVG
-connections. Canvas file cards can open their referenced Markdown notes or
-Canvas files in workspace tabs, unsupported asset file cards remain editable
-but non-openable, and URL cards expose safe `http`/`https` links. Obsidian
-plugin execution is not implemented yet.
+side anchors (`fromSide`/`toSide`) and endpoint arrows (`fromEnd`/`toEnd`) are
+respected when drawing board and SVG connections. Canvas file cards can open
+their referenced Markdown notes or Canvas files in workspace tabs, unsupported
+asset file cards remain editable but non-openable, and URL cards expose safe
+`http`/`https` links. Obsidian plugin execution is not implemented yet.
 
 ## GitHub Sync
 

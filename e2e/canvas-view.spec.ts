@@ -12,10 +12,15 @@ import {
 	canvasAddNodeButtonLabel,
 	canvasAddNodePlaceholder,
 	canvasDisplayColor,
+	canvasEdgeEnd,
 	canvasEdgeStyle,
 	canvasEdgeLabelChanged,
 	canvasEdgeLabelDraftFor,
 	canvasEdgeLabelDrafts,
+	canvasEdgeMarkerId,
+	canvasEdgeMarkerStyle,
+	canvasEdgeMarkerUrl,
+	canvasEdgeEndpoint,
 	canvasEdgeSide,
 	canSubmitCanvasAddNode,
 	canConnectCanvasNodes,
@@ -62,7 +67,7 @@ const canvasJson = JSON.stringify({
 		{ id: 'b', type: 'file', x: 320, y: 40, width: 220, height: 100, file: 'Home.md', color: '#22c55e' }
 	],
 	edges: [
-		{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens', color: '6' }
+		{ id: 'edge-a-b', fromNode: 'a', fromEnd: 'arrow', toNode: 'b', toEnd: 'none', label: 'opens', color: '6' }
 	]
 }, null, 2);
 
@@ -109,6 +114,7 @@ test.describe('canvas view helpers', () => {
 		expect(canvasSvgNodeColors({ ...doc.nodes[0], color: undefined })).toEqual({ fill: '#fffbeb', stroke: '#d97706' });
 		expect(canvasSvgNodeColors({ ...groupNode, color: undefined })).toEqual({ fill: '#e2e8f0', stroke: '#64748b' });
 		expect(canvasEdgeStyle(doc.edges[0])).toBe('stroke: #0891b2;');
+		expect(canvasEdgeMarkerStyle(doc.edges[0])).toBe('fill: #0891b2;');
 		expect(canvasSvgEdgeStroke(doc.edges[0])).toBe('#0891b2');
 		expect(canvasSvgEdgeStroke({ ...doc.edges[0], color: 'bad' })).toBe('#94a3b8');
 		expect(canvasSummary(doc)).toBe('2 nodes · 1 edge');
@@ -118,6 +124,15 @@ test.describe('canvas view helpers', () => {
 		]);
 		expect(canvasEdgeSide('right')).toBe('right');
 		expect(canvasEdgeSide('sideways')).toBe('center');
+		expect(canvasEdgeEnd('arrow', 'none')).toBe('arrow');
+		expect(canvasEdgeEnd('sideways', 'arrow')).toBe('arrow');
+		expect(canvasEdgeEndpoint(doc.edges[0], 'from')).toBe('none');
+		expect(canvasEdgeEndpoint(doc.edges[0], 'to')).toBe('arrow');
+		expect(canvasEdgeEndpoint({ ...doc.edges[0], fromEnd: 'arrow', toEnd: 'none' }, 'from')).toBe('arrow');
+		expect(canvasEdgeEndpoint({ ...doc.edges[0], fromEnd: 'arrow', toEnd: 'none' }, 'to')).toBe('none');
+		expect(canvasEdgeMarkerUrl(doc.edges[0], 'from')).toBeNull();
+		expect(canvasEdgeMarkerUrl(doc.edges[0], 'to')).toBe(`url(#${canvasEdgeMarkerId(doc.edges[0], 'to')})`);
+		expect(canvasEdgeMarkerId({ ...doc.edges[0], id: 'weird edge/id' }, 'to')).toMatch(/^canvas-edge-weird-edge-id-[a-z0-9]+-to$/);
 		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'top')).toEqual({ x: 190, y: 80 });
 		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'right')).toEqual({ x: 300, y: 140 });
 		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'bottom')).toEqual({ x: 190, y: 200 });
@@ -263,6 +278,8 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	expect(body.edges).toHaveLength(1);
 	expect(body.nodes.find((node) => node.id === 'a')?.color).toBe('1');
 	expect(body.edges[0].color).toBe('6');
+	expect(body.edges[0].fromEnd).toBe('arrow');
+	expect(body.edges[0].toEnd).toBe('none');
 
 	await page.goto(`/vault/${vault.id}`);
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
@@ -275,6 +292,8 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await expect(page.locator('.canvas-node-text textarea').first()).toHaveValue('Canvas text card');
 	await expect(page.locator('.canvas-node-text').first()).toHaveAttribute('style', /--canvas-node-border: #dc2626/);
 	await expect(page.locator('.canvas-view .edge').first()).toHaveAttribute('style', /stroke: rgb\(147, 51, 234\)/);
+	await expect(page.locator('.canvas-view .edge').first()).toHaveAttribute('marker-start', /^url\(#canvas-edge-edge-a-b-[a-z0-9]+-from\)$/);
+	await expect(page.locator('.canvas-view .edge').first()).not.toHaveAttribute('marker-end', /.*/);
 	await expect(page.locator('.canvas-view')).toContainText('Home.md');
 	await expect(page.getByRole('button', { name: 'Add text' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Download SVG' })).toHaveAttribute(
@@ -398,7 +417,7 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 			{ id: 'a', type: 'text', x: 0, y: 0, width: 260, height: 140, text: 'Canvas <script>alert(1)</script> & text' },
 			{ id: 'b', type: 'file', x: 340, y: 50, width: 220, height: 100, file: 'Home.md', color: '4' }
 		],
-		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', fromSide: 'right', toSide: 'left', label: 'opens <bad>', color: '#0ea5e9' }]
+		edges: [{ id: 'edge-a-b', fromNode: 'a', fromSide: 'right', fromEnd: 'arrow', toNode: 'b', toSide: 'left', label: 'opens <bad>', color: '#0ea5e9' }]
 	}, null, 2));
 
 	const created = await request.post('/api/vaults', {
@@ -419,6 +438,10 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	expect(svg).toContain('stroke="#16a34a"');
 	expect(svg).toContain('stroke="#0ea5e9"');
 	expect(svg).toContain('x1="340" y1="150" x2="420" y2="205"');
+	expect(svg).toMatch(/<marker id="canvas-edge-edge-a-b-[a-z0-9]+-from"/);
+	expect(svg).toMatch(/<marker id="canvas-edge-edge-a-b-[a-z0-9]+-to"/);
+	expect(svg).toMatch(/marker-start="url\(#canvas-edge-edge-a-b-[a-z0-9]+-from\)"/);
+	expect(svg).toMatch(/marker-end="url\(#canvas-edge-edge-a-b-[a-z0-9]+-to\)"/);
 	expect(svg).toContain('opens &lt;bad&gt;');
 	expect(svg).toContain('Canvas &lt;script&gt;alert(1)&lt;/script&gt;');
 	expect(svg).toContain('&amp; text');

@@ -2,7 +2,17 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CanvasDoc, CanvasEdge, CanvasMutationResult, CanvasNode } from '$lib/types';
-import { canvasBounds, canvasLayeredNodes, canvasNodeBody, canvasNodeTitle, canvasSvgEdgeStroke, canvasSvgNodeColors, edgeLines } from '$lib/canvas/view';
+import {
+	canvasBounds,
+	canvasEdgeMarkerId,
+	canvasEdgeMarkerUrl,
+	canvasLayeredNodes,
+	canvasNodeBody,
+	canvasNodeTitle,
+	canvasSvgEdgeStroke,
+	canvasSvgNodeColors,
+	edgeLines
+} from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -156,7 +166,9 @@ function normalizeEdge(value: unknown, index: number, knownNodeIds: Set<string>,
 		fromNode,
 		toNode,
 		fromSide: text(edge.fromSide),
+		fromEnd: text(edge.fromEnd),
 		toSide: text(edge.toSide),
+		toEnd: text(edge.toEnd),
 		label: text(edge.label),
 		color: text(edge.color)
 	};
@@ -239,8 +251,19 @@ export function canvasToSvg(doc: CanvasDoc): string {
 		const label = line.edge.label
 			? `<text class="edge-label" x="${(line.x1 + line.x2) / 2}" y="${(line.y1 + line.y2) / 2 - 8}">${escHtml(line.edge.label)}</text>`
 			: '';
-		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${canvasSvgEdgeStroke(line.edge)}"></line>${label}`;
+		const markerStart = canvasEdgeMarkerUrl(line.edge, 'from') ? ` marker-start="url(#${canvasEdgeMarkerId(line.edge, 'from')})"` : '';
+		const markerEnd = canvasEdgeMarkerUrl(line.edge, 'to') ? ` marker-end="url(#${canvasEdgeMarkerId(line.edge, 'to')})"` : '';
+		return `<line class="edge" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${canvasSvgEdgeStroke(line.edge)}"${markerStart}${markerEnd}></line>${label}`;
 	}).join('');
+
+	const markerMarkup = lines.flatMap((line) => ([
+		canvasEdgeMarkerUrl(line.edge, 'from')
+			? `<marker id="${canvasEdgeMarkerId(line.edge, 'from')}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="${canvasSvgEdgeStroke(line.edge)}"></path></marker>`
+			: '',
+		canvasEdgeMarkerUrl(line.edge, 'to')
+			? `<marker id="${canvasEdgeMarkerId(line.edge, 'to')}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="${canvasSvgEdgeStroke(line.edge)}"></path></marker>`
+			: ''
+	])).filter(Boolean).join('');
 
 	const nodeMarkup = canvasLayeredNodes(doc.nodes).map((node) => {
 		const colors = canvasSvgNodeColors(node);
@@ -279,6 +302,7 @@ svg { background: #f8fafc; color: #0f172a; font-family: Inter, ui-sans-serif, sy
 </style>
 <title>${escHtml(doc.title)} Canvas export</title>
 <desc>${doc.nodes.length} nodes and ${doc.edges.length} edges exported from Diamond Markdown.</desc>
+${markerMarkup ? `<defs>${markerMarkup}</defs>` : ''}
 ${edgeMarkup}
 ${nodeMarkup}
 </svg>`;
