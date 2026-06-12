@@ -5,7 +5,6 @@
 	import { openNote } from '$lib/workspace/actions';
 	import {
 		simulateStep,
-		nodeRadius,
 		SIM_DEFAULTS,
 		type GNode,
 		type GEdge
@@ -15,6 +14,7 @@
 		selectNodesInBox,
 		selectionBoxFromPoints
 	} from '$lib/graph/view';
+	import GraphCanvas from './GraphCanvas.svelte';
 	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
 
 	interface Props {
@@ -404,63 +404,29 @@
 	{:else if nodes.length === 0}
 		<p class="status">No notes yet — add some and come back.</p>
 	{:else}
-		<svg
-			bind:this={svgEl}
-			class="canvas"
-			role="img"
-			aria-label="Vault graph"
-			onwheel={onWheel}
-			onpointerdown={onPointerDownBG}
-			onpointermove={onPointerMoveBG}
-			onpointerup={onPointerUpBG}
-			onpointercancel={onPointerUpBG}
-		>
-			<g transform={`translate(${viewX}, ${viewY}) scale(${viewScale})`}>
-				{#each visibleEdges as e, i (i)}
-					{@const a = nodes.find((n) => n.path === e.from)}
-					{@const b = nodes.find((n) => n.path === e.to)}
-					{#if a && b}
-						<line
-							x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-							class="edge"
-							class:hl={hoverPath === e.from || hoverPath === e.to}
-							class:selected={selectedPaths.includes(e.from) && selectedPaths.includes(e.to)}
-						/>
-					{/if}
-				{/each}
-				{#each visibleNodes as n (n.path)}
-					<g
-						class="node"
-						class:hl={hoverPath === n.path}
-						class:selected={selectedPaths.includes(n.path)}
-						transform={`translate(${n.x}, ${n.y})`}
-						onpointerdown={(e) => onNodePointerDown(e, n)}
-						onpointermove={onNodePointerMove}
-						onpointerup={(e) => onNodePointerUp(e, n)}
-						onpointercancel={(e) => onNodePointerUp(e, n)}
-						onclick={(e) => onNodeClick(e, n)}
-						onkeydown={(e) => onNodeKeydown(e, n)}
-						onmouseenter={() => (hoverPath = n.path)}
-						onmouseleave={() => (hoverPath = null)}
-						role="button"
-						tabindex="0"
-						aria-pressed={selectedPaths.includes(n.path)}
-					>
-						<circle r={nodeRadius(n, nodeScale)} />
-						<text dy="-8">{n.title}</text>
-					</g>
-				{/each}
-			</g>
-			{#if selectionBox}
-				<rect
-					class="selection-box"
-					x={selectionBox.x}
-					y={selectionBox.y}
-					width={selectionBox.width}
-					height={selectionBox.height}
-				/>
-			{/if}
-		</svg>
+		<GraphCanvas
+			{nodes}
+			{visibleNodes}
+			{visibleEdges}
+			{viewX}
+			{viewY}
+			{viewScale}
+			{nodeScale}
+			{hoverPath}
+			{selectedPaths}
+			{selectionBox}
+			onSvgMount={(element) => (svgEl = element)}
+			onWheelGraph={onWheel}
+			onPointerDownBackground={onPointerDownBG}
+			onPointerMoveGraph={onPointerMoveBG}
+			onPointerUpGraph={onPointerUpBG}
+			{onNodePointerDown}
+			{onNodePointerMove}
+			{onNodePointerUp}
+			{onNodeClick}
+			{onNodeKeydown}
+			onHoverPath={(path) => (hoverPath = path)}
+		/>
 	{/if}
 
 	{#if panelOpen}
@@ -535,63 +501,6 @@
 	}
 	.mini:hover { color: var(--accent); border-color: var(--accent); }
 	.mini.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-
-	.canvas {
-		flex: 1;
-		min-height: 0;
-		display: block;
-		background: var(--bg);
-		cursor: grab;
-		user-select: none;
-		touch-action: none;
-	}
-	.canvas:active { cursor: grabbing; }
-
-	.edge {
-		stroke: var(--border-strong);
-		stroke-width: 1;
-		opacity: 0.55;
-		pointer-events: none;
-	}
-	.edge.hl { stroke: var(--brand-cyan); opacity: 1; stroke-width: 1.4; }
-	.edge.selected { stroke: var(--accent); opacity: 0.9; stroke-width: 1.5; }
-
-	.node circle {
-		fill: var(--fg-muted);
-		stroke: var(--bg);
-		stroke-width: 1.5;
-		transition: fill 0.15s;
-	}
-	.node text {
-		font-family: var(--sans);
-		font-size: 11px;
-		fill: var(--fg-dim);
-		text-anchor: middle;
-		pointer-events: none;
-		paint-order: stroke;
-		stroke: var(--bg);
-		stroke-width: 3px;
-		stroke-linejoin: round;
-	}
-	.node:hover circle, .node.hl circle {
-		fill: var(--brand-cyan);
-		cursor: pointer;
-	}
-	.node.selected circle {
-		fill: var(--accent);
-		stroke: var(--fg);
-		stroke-width: 2;
-	}
-	.node:hover text, .node.hl text { fill: var(--fg); }
-	.node.selected text { fill: var(--fg); }
-
-	.selection-box {
-		fill: var(--accent-soft);
-		stroke: var(--accent);
-		stroke-width: 1;
-		stroke-dasharray: 4 3;
-		pointer-events: none;
-	}
 
 	.status, .err {
 		padding: 2rem;

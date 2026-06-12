@@ -88,6 +88,9 @@ Use small, pushable slices:
 - **File tree toolbar split.** Move new-note/new-folder, sort, auto-reveal,
    and expand/collapse controls out of `FileTreePanel` into a presentational
    toolbar component.
+- **Graph canvas split.** Move SVG node/edge/selection-box rendering out of
+   `GraphView` into `GraphCanvas` so the graph tab keeps state, simulation,
+   and pointer logic separate from rendering.
 
 ## Next Implementation Slices
 
