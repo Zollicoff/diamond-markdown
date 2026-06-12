@@ -139,6 +139,9 @@ Use small, pushable slices:
 - **Attachment upload affordance.** Drop or paste local files into the editor
    to copy them into `Attachments/`, commit them to vault git history, and
    insert Obsidian-style embed links.
+- **Git sync recovery view split.** Move recovery headers, command blocks,
+   file lists, and diverged-change view models out of the recovery panel so
+   future GitHub conflict flows can stay small and testable.
 
 ## Next Implementation Slices
 

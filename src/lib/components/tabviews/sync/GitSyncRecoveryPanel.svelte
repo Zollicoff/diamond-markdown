@@ -2,6 +2,14 @@
 	import type { GitSyncStatus } from '$lib/types';
 	import type { GitSyncRecoveryCopy } from '$lib/sync/recovery';
 	import type { GitSyncRecoveryKind } from '$lib/sync/status';
+	import {
+		buildGitSyncDivergedSections,
+		buildGitSyncLocalChangeItems,
+		buildGitSyncPathItems
+	} from '$lib/sync/recovery-view';
+	import GitSyncCommandBlock from './GitSyncCommandBlock.svelte';
+	import GitSyncFileList from './GitSyncFileList.svelte';
+	import GitSyncRecoveryHeader from './GitSyncRecoveryHeader.svelte';
 
 	interface Props {
 		status: GitSyncStatus | null;
@@ -26,142 +34,73 @@
 		onPull,
 		onRefresh
 	}: Props = $props();
+
+	const localChangeItems = $derived(buildGitSyncLocalChangeItems(status?.files ?? []));
+	const conflictItems = $derived(buildGitSyncPathItems(status?.conflicted ?? []));
+	const divergedSections = $derived.by(() => status ? buildGitSyncDivergedSections(status) : []);
 </script>
 
-{#if recovery === 'setup'}
+{#if recovery === 'setup' && copy}
 	<div class="sync-block">
-		<header class="panel-head">
-			<div>
-				<div class="panel-title">{copy?.title}</div>
-				<div class="panel-subtitle">{copy?.subtitle}</div>
-			</div>
-			<span class="badge">{copy?.badge}</span>
-		</header>
-		{@render commandBlock(setupCommands)}
+		<GitSyncRecoveryHeader {copy} />
+		<GitSyncCommandBlock commands={setupCommands} />
 	</div>
 {/if}
 
-{#if recovery === 'remote-changes' && status}
+{#if recovery === 'remote-changes' && status && copy}
 	<div class="sync-block">
-		<header class="panel-head">
-			<div>
-				<div class="panel-title">{copy?.title}</div>
-				<div class="panel-subtitle">{copy?.subtitle}</div>
-			</div>
-			<span class="badge">{copy?.badge}</span>
-		</header>
-		<p>{copy?.body}</p>
+		<GitSyncRecoveryHeader {copy} />
+		<p>{copy.body}</p>
 		<div class="panel-actions">
 			<button class="action-btn primary" onclick={onPull} disabled={!canPull}>Pull now</button>
 			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh</button>
 		</div>
-		{@render commandBlock(resolutionCommands)}
+		<GitSyncCommandBlock commands={resolutionCommands} />
 	</div>
 {/if}
 
-{#if recovery === 'local-changes' && status}
+{#if recovery === 'local-changes' && status && copy}
 	<div class="sync-block">
-		<header class="panel-head">
-			<div>
-				<div class="panel-title">{copy?.title}</div>
-				<div class="panel-subtitle">{copy?.subtitle}</div>
-			</div>
-			<span class="badge">{copy?.badge}</span>
-		</header>
-		<p>{copy?.body}</p>
+		<GitSyncRecoveryHeader {copy} />
+		<p>{copy.body}</p>
 		<div class="panel-actions">
 			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh after commit or stash</button>
 		</div>
-		{@render commandBlock(resolutionCommands)}
+		<GitSyncCommandBlock commands={resolutionCommands} />
 		<div class="change-box local local-files">
 			<h3>Uncommitted files</h3>
-			{@render fileStatusList(status.files)}
+			<GitSyncFileList items={localChangeItems} empty="No uncommitted files reported." />
 		</div>
 	</div>
 {/if}
 
-{#if recovery === 'conflicts' && status}
+{#if recovery === 'conflicts' && status && copy}
 	<div class="sync-block danger-block">
-		<header class="panel-head">
-			<div>
-				<div class="panel-title">{copy?.title}</div>
-				<div class="panel-subtitle">{copy?.subtitle}</div>
-			</div>
-			<span class="badge">{copy?.badge}</span>
-		</header>
-		<ul class="file-list">
-			{#each status.conflicted as file (file)}
-				<li class="mono">{file}</li>
-			{/each}
-		</ul>
-		{@render commandBlock(resolutionCommands)}
+		<GitSyncRecoveryHeader {copy} />
+		<GitSyncFileList items={conflictItems} empty="No conflicted files reported." boxed danger />
+		<GitSyncCommandBlock commands={resolutionCommands} />
 	</div>
 {/if}
 
-{#if recovery === 'diverged' && status}
+{#if recovery === 'diverged' && status && copy}
 	<div class="sync-block diverged-panel">
-		<header class="panel-head">
-			<div>
-				<div class="panel-title">{copy?.title}</div>
-				<div class="panel-subtitle">{copy?.subtitle}</div>
-			</div>
-			<span class="badge">{copy?.badge}</span>
-		</header>
-		<p>{copy?.body}</p>
+		<GitSyncRecoveryHeader {copy} />
+		<p>{copy.body}</p>
 		<div class="panel-actions">
 			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh after resolve</button>
 		</div>
-		{@render commandBlock(resolutionCommands)}
+		<GitSyncCommandBlock commands={resolutionCommands} />
 
 		<div class="change-grid">
-			<div class="change-box local">
-				<h3>Local only</h3>
-				{@render fileList(status.localChanges, 'No local file changes reported.')}
-			</div>
-			<div class="change-box remote">
-				<h3>Remote only</h3>
-				{@render fileList(status.remoteChanges, 'No remote file changes reported.')}
-			</div>
-			<div class="change-box overlap" class:hot={status.conflictCandidates.length > 0}>
-				<h3>Overlapping files</h3>
-				{@render fileList(status.conflictCandidates, 'No same-path overlap detected.')}
-			</div>
+			{#each divergedSections as section (section.id)}
+				<div class="change-box" class:local={section.tone === 'local'} class:remote={section.tone === 'remote'} class:overlap={section.tone === 'overlap'} class:hot={section.hot}>
+					<h3>{section.title}</h3>
+					<GitSyncFileList items={section.items} empty={section.empty} />
+				</div>
+			{/each}
 		</div>
 	</div>
 {/if}
-
-{#snippet fileList(files: string[], empty: string)}
-	{#if files.length > 0}
-		<ul class="change-list">
-			{#each files as file (file)}
-				<li class="mono" title={file}>{file}</li>
-			{/each}
-		</ul>
-	{:else}
-		<div class="empty">{empty}</div>
-	{/if}
-{/snippet}
-
-{#snippet fileStatusList(files: GitSyncStatus['files'])}
-	{#if files.length > 0}
-		<ul class="change-list">
-			{#each files as file (file.path)}
-				<li class="mono" title={`${file.index}${file.workingDir} ${file.path}`}>
-					<span class="status-code">{file.index}{file.workingDir}</span>
-					<span>{file.path}</span>
-				</li>
-			{/each}
-		</ul>
-	{:else}
-		<div class="empty">No uncommitted files reported.</div>
-	{/if}
-{/snippet}
-
-{#snippet commandBlock(commands: string)}
-	{#if commands}
-		<pre class="command-block mono"><code>{commands}</code></pre>
-	{/if}
-{/snippet}
 
 <style>
 	.sync-block {
@@ -173,31 +112,6 @@
 	}
 	.danger-block {
 		border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
-	}
-	.panel-head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 12px;
-	}
-	.panel-title {
-		font-size: 0.9rem;
-		font-weight: 700;
-		color: var(--fg);
-	}
-	.panel-subtitle {
-		font-size: 0.72rem;
-		color: var(--fg-dim);
-		margin-top: 2px;
-	}
-	.badge {
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		color: var(--accent);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		padding: 3px 7px;
 	}
 	p {
 		color: var(--fg-muted);
@@ -237,27 +151,6 @@
 		border-color: var(--border);
 		color: var(--fg-muted);
 	}
-	.file-list {
-		margin: 10px 0;
-		padding: 8px 12px 8px 26px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		color: var(--danger);
-		background: var(--bg);
-		font-size: 0.78rem;
-	}
-	.command-block {
-		margin: 10px 0;
-		padding: 9px 10px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg-elev);
-		color: var(--fg);
-		font-size: 0.72rem;
-		line-height: 1.45;
-		overflow-x: auto;
-		white-space: pre;
-	}
 	.change-grid {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -284,31 +177,6 @@
 		letter-spacing: 0.08em;
 		color: var(--fg-muted);
 	}
-	.change-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: grid;
-		gap: 3px;
-	}
-	.change-list li {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 0.72rem;
-		color: var(--fg);
-	}
-	.status-code {
-		display: inline-block;
-		min-width: 3ch;
-		margin-right: 6px;
-		color: var(--fg-muted);
-	}
-	.empty {
-		color: var(--fg-dim);
-		font-size: 0.72rem;
-	}
-	.mono { font-family: var(--mono); }
 
 	@media (max-width: 760px) {
 		.change-grid {

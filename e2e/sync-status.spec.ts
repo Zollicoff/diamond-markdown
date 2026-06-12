@@ -7,6 +7,11 @@ import {
 } from '../src/lib/sync/status';
 import { buildGitSyncRecoveryCopy } from '../src/lib/sync/recovery';
 import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '../src/lib/sync/commands';
+import {
+	buildGitSyncDivergedSections,
+	buildGitSyncLocalChangeItems,
+	buildGitSyncPathItems
+} from '../src/lib/sync/recovery-view';
 
 function status(overrides: Partial<GitSyncStatus> = {}): GitSyncStatus {
 	return {
@@ -133,5 +138,51 @@ test.describe('git sync UI state', () => {
 			badge: 'Blocked'
 		});
 		expect(buildGitSyncResolutionCommands(diverged, '/vault')).toContain("git merge 'origin/main'");
+	});
+
+	test('builds recovery file-list view models without Svelte state', () => {
+		expect(buildGitSyncLocalChangeItems([
+			{ path: 'Draft.md', index: ' ', workingDir: 'M' },
+			{ path: 'New.md', index: 'A', workingDir: ' ' }
+		])).toEqual([
+			{ path: 'Draft.md', statusCode: ' M', title: ' M Draft.md' },
+			{ path: 'New.md', statusCode: 'A ', title: 'A  New.md' }
+		]);
+
+		expect(buildGitSyncPathItems(['Shared.md'])).toEqual([
+			{ path: 'Shared.md', title: 'Shared.md' }
+		]);
+
+		const diverged = status({
+			localChanges: ['Local.md'],
+			remoteChanges: ['Remote.md'],
+			conflictCandidates: ['Shared.md']
+		});
+		expect(buildGitSyncDivergedSections(diverged)).toEqual([
+			{
+				id: 'local',
+				title: 'Local only',
+				items: [{ path: 'Local.md', title: 'Local.md' }],
+				empty: 'No local file changes reported.',
+				tone: 'local',
+				hot: false
+			},
+			{
+				id: 'remote',
+				title: 'Remote only',
+				items: [{ path: 'Remote.md', title: 'Remote.md' }],
+				empty: 'No remote file changes reported.',
+				tone: 'remote',
+				hot: false
+			},
+			{
+				id: 'overlap',
+				title: 'Overlapping files',
+				items: [{ path: 'Shared.md', title: 'Shared.md' }],
+				empty: 'No same-path overlap detected.',
+				tone: 'overlap',
+				hot: true
+			}
+		]);
 	});
 });
