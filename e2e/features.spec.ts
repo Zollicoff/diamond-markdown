@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 
@@ -492,8 +493,7 @@ export function activate(api) {
 });
 
 test('plugin install replacement overwrites files and commits a clean edit', async ({ page, request }) => {
-	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'plugin-replace-vault');
-	fs.rmSync(vaultDir, { recursive: true, force: true });
+	const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-plugin-replace-'));
 	fs.mkdirSync(vaultDir, { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n');
 	const pluginFiles = {
@@ -558,6 +558,7 @@ test('plugin install replacement overwrites files and commits a clean edit', asy
 		expect(syncBody.files).toHaveLength(0);
 	} finally {
 		await remote.close();
+		fs.rmSync(vaultDir, { recursive: true, force: true });
 	}
 });
 
