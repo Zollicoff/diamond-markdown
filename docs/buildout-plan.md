@@ -255,6 +255,9 @@ Use small, pushable slices:
 - **Graph viewport helper extraction.** Move graph centering and client-to-SVG
    viewport coordinate math out of `GraphView` into pure interaction helpers
    with deterministic graph helper coverage.
+- **Canvas edge-side compatibility.** Respect imported Obsidian Canvas
+   `fromSide` and `toSide` anchors when drawing board and SVG export
+   connections, while keeping center anchors as the fallback.
 
 ## Next Implementation Slices
 

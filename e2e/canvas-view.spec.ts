@@ -16,6 +16,7 @@ import {
 	canvasEdgeLabelChanged,
 	canvasEdgeLabelDraftFor,
 	canvasEdgeLabelDrafts,
+	canvasEdgeSide,
 	canSubmitCanvasAddNode,
 	canConnectCanvasNodes,
 	canOpenCanvasNode,
@@ -30,6 +31,7 @@ import {
 	canvasNodeClass,
 	canvasNodeBody,
 	canvasNodeColorStyle,
+	canvasNodeAnchor,
 	canvasOpenNodeLabel,
 	canvasNodeOptions,
 	canvasNodePositionChanged,
@@ -113,6 +115,24 @@ test.describe('canvas view helpers', () => {
 		expect(nodeStyle(doc.nodes[0], bounds)).toContain('left: 80px');
 		expect(edgeLines(doc, bounds)).toEqual([
 			{ edge: doc.edges[0], x1: 190, y1: 140, x2: 510, y2: 170 }
+		]);
+		expect(canvasEdgeSide('right')).toBe('right');
+		expect(canvasEdgeSide('sideways')).toBe('center');
+		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'top')).toEqual({ x: 190, y: 80 });
+		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'right')).toEqual({ x: 300, y: 140 });
+		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'bottom')).toEqual({ x: 190, y: 200 });
+		expect(canvasNodeAnchor(doc.nodes[0], bounds, 'left')).toEqual({ x: 80, y: 140 });
+		expect(edgeLines({
+			...doc,
+			edges: [{ ...doc.edges[0], fromSide: 'right', toSide: 'left' }]
+		}, bounds)).toEqual([
+			{
+				edge: { ...doc.edges[0], fromSide: 'right', toSide: 'left' },
+				x1: 300,
+				y1: 140,
+				x2: 400,
+				y2: 170
+			}
 		]);
 		const drafts = canvasTextDrafts(doc.nodes);
 		expect(canvasDraftFor(doc.nodes[0], drafts)).toBe('Hello canvas');
@@ -378,7 +398,7 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 			{ id: 'a', type: 'text', x: 0, y: 0, width: 260, height: 140, text: 'Canvas <script>alert(1)</script> & text' },
 			{ id: 'b', type: 'file', x: 340, y: 50, width: 220, height: 100, file: 'Home.md', color: '4' }
 		],
-		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', label: 'opens <bad>', color: '#0ea5e9' }]
+		edges: [{ id: 'edge-a-b', fromNode: 'a', toNode: 'b', fromSide: 'right', toSide: 'left', label: 'opens <bad>', color: '#0ea5e9' }]
 	}, null, 2));
 
 	const created = await request.post('/api/vaults', {
@@ -398,6 +418,7 @@ test('canvas API exports a safe SVG snapshot', async ({ request }) => {
 	expect(svg).toContain('fill="#dcfce7"');
 	expect(svg).toContain('stroke="#16a34a"');
 	expect(svg).toContain('stroke="#0ea5e9"');
+	expect(svg).toContain('x1="340" y1="150" x2="420" y2="205"');
 	expect(svg).toContain('opens &lt;bad&gt;');
 	expect(svg).toContain('Canvas &lt;script&gt;alert(1)&lt;/script&gt;');
 	expect(svg).toContain('&amp; text');

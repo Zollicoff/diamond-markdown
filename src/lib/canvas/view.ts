@@ -17,6 +17,8 @@ export interface CanvasEdgeLine {
 	y2: number;
 }
 
+export type CanvasEdgeSide = 'top' | 'right' | 'bottom' | 'left' | 'center';
+
 export interface CanvasNodePosition {
 	nodeId: string;
 	x: number;
@@ -212,11 +214,35 @@ export function canvasLayeredNodes(nodes: CanvasNode[]): CanvasNode[] {
 	];
 }
 
-function center(node: CanvasNode, bounds: CanvasBounds): { x: number; y: number } {
-	return {
-		x: node.x - bounds.minX + node.width / 2,
-		y: node.y - bounds.minY + node.height / 2
-	};
+export function canvasEdgeSide(value: string | undefined): CanvasEdgeSide {
+	if (value === 'top' || value === 'right' || value === 'bottom' || value === 'left') return value;
+	return 'center';
+}
+
+export function canvasNodeAnchor(
+	node: CanvasNode,
+	bounds: CanvasBounds,
+	side: string | undefined
+): { x: number; y: number } {
+	const left = node.x - bounds.minX;
+	const top = node.y - bounds.minY;
+	const right = left + node.width;
+	const bottom = top + node.height;
+	const centerX = left + node.width / 2;
+	const centerY = top + node.height / 2;
+
+	switch (canvasEdgeSide(side)) {
+		case 'top':
+			return { x: centerX, y: top };
+		case 'right':
+			return { x: right, y: centerY };
+		case 'bottom':
+			return { x: centerX, y: bottom };
+		case 'left':
+			return { x: left, y: centerY };
+		default:
+			return { x: centerX, y: centerY };
+	}
 }
 
 export function edgeLines(doc: CanvasDoc, bounds: CanvasBounds): CanvasEdgeLine[] {
@@ -226,8 +252,8 @@ export function edgeLines(doc: CanvasDoc, bounds: CanvasBounds): CanvasEdgeLine[
 		const from = byId.get(edge.fromNode);
 		const to = byId.get(edge.toNode);
 		if (!from || !to) continue;
-		const a = center(from, bounds);
-		const b = center(to, bounds);
+		const a = canvasNodeAnchor(from, bounds, edge.fromSide);
+		const b = canvasNodeAnchor(to, bounds, edge.toSide);
 		lines.push({ edge, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
 	}
 	return lines;
