@@ -20,6 +20,7 @@ import markedFootnote from 'marked-footnote';
 import katex from 'katex';
 import hljs from 'highlight.js';
 import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
+import { embedImageAttrs } from './embed';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
@@ -99,8 +100,7 @@ function renderInner(
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
 				const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
-				const alt = e.alt ?? e.target.split('/').pop() ?? '';
-				return `<img src="${src}" alt="${escAttr(alt)}" class="embed-image" loading="lazy">`;
+				return `<img src="${src}" ${embedImageAttrs(e)}>`;
 			}
 			// Note embed — try to resolve to a markdown note + inline its body.
 			const resolved = resolveTarget(idx, e.target);

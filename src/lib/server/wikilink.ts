@@ -75,23 +75,46 @@ export function parseInlineTags(body: string): string[] {
 }
 
 /**
- * Embed syntax: `![[path/to/image.png]]` or `![[image.png|alt text]]`.
+ * Embed syntax: `![[path/to/image.png]]`, `![[image.png|alt text]]`,
+ * `![[image.png|300]]`, or `![[image.png|300x200]]`.
  * No heading anchors for embeds.
  */
 export interface ParsedEmbed {
 	raw: string;
 	target: string;
 	alt: string | null;
+	width: number | null;
+	height: number | null;
 }
 
 const EMBED_RE = /!\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
 
+function parseEmbedMeta(raw: string | undefined): Pick<ParsedEmbed, 'alt' | 'width' | 'height'> {
+	const meta = raw?.trim();
+	if (!meta) return { alt: null, width: null, height: null };
+
+	const size = meta.match(/^(\d{1,5})(?:\s*x\s*(\d{1,5}))?$/i);
+	if (!size) return { alt: meta, width: null, height: null };
+
+	const width = Number.parseInt(size[1], 10);
+	const height = size[2] ? Number.parseInt(size[2], 10) : null;
+	if (!Number.isFinite(width) || width <= 0 || (height != null && (!Number.isFinite(height) || height <= 0))) {
+		return { alt: meta, width: null, height: null };
+	}
+	return {
+		alt: null,
+		width,
+		height
+	};
+}
+
 export function replaceEmbeds(body: string, render: (e: ParsedEmbed) => string): string {
-	return body.replace(EMBED_RE, (raw, target, alt) => {
+	return body.replace(EMBED_RE, (raw, target, meta) => {
+		const parsed = parseEmbedMeta(meta as string | undefined);
 		return render({
 			raw,
 			target: (target as string).trim(),
-			alt: (alt as string | undefined)?.trim() ?? null
+			...parsed
 		});
 	});
 }

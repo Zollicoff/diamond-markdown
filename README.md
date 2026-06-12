@@ -88,7 +88,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Code highlighting (highlight.js, server-rendered, language auto-detect)
 - Mermaid diagrams (lazy-loaded client-side)
 - Footnotes — standard `[^1]` references with back-links
-- Note embeds (`![[Note]]`), image embeds (`![[image.png]]`)
+- Note embeds (`![[Note]]`), image embeds (`![[image.png]]`, `![[image.png|300]]`, `![[image.png|300x200]]`)
 
 ### Workspace
 - Tabs + split panes (recursive layout tree)

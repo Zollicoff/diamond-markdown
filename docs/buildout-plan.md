@@ -91,6 +91,9 @@ Use small, pushable slices:
 - **Graph canvas split.** Move SVG node/edge/selection-box rendering out of
    `GraphView` into `GraphCanvas` so the graph tab keeps state, simulation,
    and pointer logic separate from rendering.
+- **Obsidian image embed sizing.** Support image embed pipe metadata such as
+   `![[image.png|300]]` and `![[image.png|300x200]]` in read mode and static
+   publish output.
 
 ## Next Implementation Slices
 

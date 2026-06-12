@@ -25,7 +25,8 @@ import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { getIndex, resolveTarget } from './indexer';
 import { purify } from './sanitize';
-import { slugify, escHtml, escAttr } from '$lib/util/strings';
+import { embedImageAttrs } from './embed';
+import { slugify, escHtml } from '$lib/util/strings';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -171,11 +172,10 @@ function renderBodyForPublish(
 					imagesCopied.add(e.target);
 				}
 			} catch { /* ignore */ }
-			const alt = e.alt ?? path.basename(e.target);
 			if (!copied) {
 				return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
 			}
-			return `<img src="images/${encodeURI(copied)}" alt="${escAttr(alt)}" loading="lazy">`;
+			return `<img src="images/${encodeURI(copied)}" ${embedImageAttrs(e)}>`;
 		});
 		const withLinks = replaceWikilinks(withEmbeds, (link) => {
 			const resolved = resolveTarget(idx, link.target);
