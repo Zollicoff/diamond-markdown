@@ -1,16 +1,14 @@
 <script lang="ts">
 	import type { CanvasNode } from '$lib/types';
 	import {
-		canOpenCanvasNode,
-		canvasLinkNodeHref,
 		canvasNodeBody,
 		canvasNodeClass,
-		canvasOpenNodeLabel,
 		canvasNodeStyle,
 		canvasNodeTitle,
 		type CanvasBounds,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
+	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';
 
 	interface Props {
 		node: CanvasNode;
@@ -55,20 +53,6 @@
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
-	const openNodeLabel = $derived(canvasOpenNodeLabel(node));
-	const linkHref = $derived(canvasLinkNodeHref(node));
-	const canOpenReference = $derived(canOpenCanvasNode(node));
-	const refKind = $derived(node.type === 'file' ? 'file' : 'URL');
-	const refValueLabel = $derived(`Canvas ${refKind} ${node.type === 'file' ? 'path' : 'target'} for ${title}`);
-	const refSaveLabel = $derived(`Save canvas ${refKind} node ${title}`);
-
-	function updateRefValue(value: string): void {
-		onRefDraftChange(node, { ...refDraft, value });
-	}
-
-	function updateRefLabel(label: string): void {
-		onRefDraftChange(node, { ...refDraft, label });
-	}
 </script>
 
 <article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}`} style={canvasNodeStyle(node, bounds)}>
@@ -108,65 +92,19 @@
 			</button>
 		</div>
 	{:else if node.type === 'file' || node.type === 'link'}
-		<div class="node-ref-fields">
-			<label>
-				<span>{node.type === 'file' ? 'Path' : 'URL'}</span>
-				<input
-					class="node-input"
-					aria-label={refValueLabel}
-					value={refDraft.value}
-					oninput={(event) => updateRefValue((event.currentTarget as HTMLInputElement).value)}
-				/>
-			</label>
-			<label>
-				<span>Label</span>
-				<input
-					class="node-input"
-					aria-label={`Canvas label for ${title}`}
-					placeholder="optional"
-					value={refDraft.label}
-					oninput={(event) => updateRefLabel((event.currentTarget as HTMLInputElement).value)}
-				/>
-			</label>
-		</div>
-		<div class="node-actions">
-			{#if node.type === 'file'}
-				<button
-					class="mini node-open"
-					aria-label={openNodeLabel}
-					disabled={!canOpenReference}
-					onclick={() => onOpenRef(node)}
-				>
-					Open note
-				</button>
-			{:else if linkHref}
-				<a
-					class="mini node-open"
-					aria-label={openNodeLabel}
-					href={linkHref}
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					Open URL
-				</a>
-			{/if}
-			<button
-				class="mini node-save"
-				aria-label={refSaveLabel}
-				disabled={saving || !refChanged || !refCanSave}
-				onclick={() => void onSaveRef(node)}
-			>
-				{saving ? 'Saving...' : `Save ${node.type === 'file' ? 'file' : 'URL'}`}
-			</button>
-			<button
-				class="mini node-remove"
-				aria-label={`Remove canvas node ${title}`}
-				disabled={disableDelete}
-				onclick={() => void onDelete(node)}
-			>
-				{deleting ? 'Removing...' : 'Remove'}
-			</button>
-		</div>
+		<CanvasNodeReferenceEditor
+			{node}
+			{refDraft}
+			{refChanged}
+			{refCanSave}
+			{saving}
+			{deleting}
+			{disableDelete}
+			{onRefDraftChange}
+			{onSaveRef}
+			{onOpenRef}
+			{onDelete}
+		/>
 	{:else if canvasNodeBody(node)}
 		<p>{canvasNodeBody(node)}</p>
 		<div class="node-actions">
@@ -313,44 +251,12 @@
 		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
 		border-color: var(--accent);
 	}
-	.node-ref-fields {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		min-height: 0;
-	}
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		min-width: 0;
-		color: var(--fg-dim);
-		font-size: 0.66rem;
-		text-transform: uppercase;
-	}
-	.node-input {
-		width: 100%;
-		min-width: 0;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 5px 7px;
-		background: color-mix(in srgb, var(--bg), transparent 8%);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.74rem;
-		text-transform: none;
-	}
-	.node-input:focus {
-		outline: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
-		border-color: var(--accent);
-	}
 	.node-actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
 	}
-	.node-open,
 	.node-save,
 	.node-remove {
 		padding: 2px 7px;
