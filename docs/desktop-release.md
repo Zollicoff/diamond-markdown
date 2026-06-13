@@ -112,8 +112,9 @@ DMG packaging runs Finder AppleScript and belongs with the signed release
 publishing step. The release verifier is runner-shell neutral: Playwright
 fixture setup and the preview server are launched through
 `scripts/playwright-webserver.mjs`, full-suite Playwright runs are batched
-through `scripts/verify-playwright-batches.mjs`, and `scripts/verify-release.mjs`
-resolves `npm.cmd` on Windows.
+through `scripts/verify-playwright-batches.mjs`, system Chrome/Edge is used
+when available instead of downloading Playwright browsers in CI, and
+`scripts/verify-release.mjs` resolves `npm.cmd` on Windows.
 
 The workflow does not make a signed public release by itself. Signing,
 notarization, release-note generation, and attaching artifacts to a GitHub

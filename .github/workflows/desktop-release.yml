@@ -88,14 +88,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        if: runner.os != 'Linux'
-        run: npx playwright install chromium
-
-      - name: Install Playwright browsers and Linux dependencies
-        if: runner.os == 'Linux'
-        run: npx playwright install --with-deps chromium
-
       - name: Verify web release gate
         run: npm run verify:release
 

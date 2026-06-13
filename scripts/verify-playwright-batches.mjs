@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
-const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const DEFAULT_SPLIT_TESTS_PER_BATCH = 1;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const e2eDir = 'e2e';
@@ -18,6 +17,31 @@ const batchFixtureRunRoot = path.resolve(e2eDir, '.fixture-root', 'batches', `${
 function commandFor(command) {
 	if (process.platform === 'win32' && command === 'npm') return 'npm.cmd';
 	return command;
+}
+
+function browserCandidates() {
+	if (process.platform === 'darwin') {
+		return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
+	}
+	if (process.platform === 'win32') {
+		return [
+			path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
+			path.join(process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+			path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Microsoft\\Edge\\Application\\msedge.exe'),
+			path.join(process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)', 'Microsoft\\Edge\\Application\\msedge.exe')
+		];
+	}
+	return [
+		'/usr/bin/google-chrome',
+		'/usr/bin/google-chrome-stable',
+		'/usr/bin/chromium',
+		'/usr/bin/chromium-browser',
+		'/snap/bin/chromium'
+	];
+}
+
+function systemBrowserPath() {
+	return browserCandidates().find((candidate) => fs.existsSync(candidate));
 }
 
 function parsePositiveInt(value, fallback) {
@@ -49,8 +73,9 @@ async function playwrightEnv(batchIndex) {
 		DIAMOND_REQUIRE_EXISTING_BUILD: '1',
 		PLAYWRIGHT_PORT: String(await pickFreeLoopbackPort())
 	};
-	if (!process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && process.platform === 'darwin' && fs.existsSync(macChrome)) {
-		env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = macChrome;
+	if (!process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+		const browserPath = systemBrowserPath();
+		if (browserPath) env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = browserPath;
 	}
 	return env;
 }
