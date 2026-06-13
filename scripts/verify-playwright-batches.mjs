@@ -8,9 +8,9 @@ const DEFAULT_SPLIT_TESTS_PER_BATCH = 1;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const e2eDir = 'e2e';
 const splitSpecFiles = new Set([
-	path.join(e2eDir, 'attachments.spec.ts'),
-	path.join(e2eDir, 'canvas-view.spec.ts'),
-	path.join(e2eDir, 'features.spec.ts')
+	`${e2eDir}/attachments.spec.ts`,
+	`${e2eDir}/canvas-view.spec.ts`,
+	`${e2eDir}/features.spec.ts`
 ]);
 const requiredBuildOutput = ['build/handler.js', 'build/server/manifest.js'];
 const batchFixtureRunRoot = path.resolve(e2eDir, '.fixture-root', 'batches', `${process.pid}-${Date.now()}`);
@@ -153,7 +153,7 @@ function listSpecFiles() {
 	return fs
 		.readdirSync(e2eDir)
 		.filter((file) => file.endsWith('.spec.ts'))
-		.map((file) => path.join(e2eDir, file))
+		.map((file) => `${e2eDir}/${file}`)
 		.sort();
 }
 
