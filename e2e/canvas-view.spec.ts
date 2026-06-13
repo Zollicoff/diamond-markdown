@@ -39,8 +39,11 @@ import {
 	canvasEdgeSummaries,
 	canvasFileAssetKind,
 	canvasFileAssetPreview,
+	canvasFileNodeDisplayPath,
+	canvasFileNodeFragment,
 	canvasFileOpenTarget,
 	canvasFileNodePath,
+	canvasFileNodeSubpath,
 	canvasFileNodeTitle,
 	canvasLinkNodeHref,
 	canvasContentNodes,
@@ -70,6 +73,7 @@ import {
 	canvasNodeStyle,
 	canvasPaletteColorValue,
 	canvasRawAssetHref,
+	normalizeCanvasFileSubpath,
 	normalizeCanvasColor,
 	nodeStyle
 } from '../src/lib/canvas/view';
@@ -165,6 +169,17 @@ test.describe('canvas view helpers', () => {
 		expect(canSaveCanvasGroupLabel(doc.nodes[0], groupDrafts)).toBe(false);
 		expect(canvasNodeBody(doc.nodes[0])).toBe('Hello canvas');
 		expect(canvasNodeBody({ ...doc.nodes[1], label: 'Home note' })).toBe('Home.md');
+		const subpathFileNode = { ...doc.nodes[1], subpath: '#Install Steps' };
+		const blockSubpathFileNode = { ...doc.nodes[1], subpath: '#^install-steps' };
+		expect(normalizeCanvasFileSubpath('#Install Steps')).toBe('#Install Steps');
+		expect(normalizeCanvasFileSubpath('Install Steps')).toBeNull();
+		expect(normalizeCanvasFileSubpath('#^install-steps')).toBe('#^install-steps');
+		expect(normalizeCanvasFileSubpath('#')).toBeNull();
+		expect(normalizeCanvasFileSubpath('#Bad\nHeading')).toBeNull();
+		expect(canvasFileNodeSubpath(subpathFileNode)).toBe('#Install Steps');
+		expect(canvasFileNodeFragment(subpathFileNode)).toBe('#install-steps');
+		expect(canvasFileNodeFragment(blockSubpathFileNode)).toBe('#^install-steps');
+		expect(canvasFileNodeDisplayPath(subpathFileNode)).toBe('Home.md#Install Steps');
 		expect(canvasNodeClass(doc.nodes[0])).toBe('canvas-node canvas-node-text');
 		expect(canvasDisplayColor('1')).toEqual({ accent: '#dc2626', fill: '#fee2e2', text: '#7f1d1d', label: 'red' });
 		expect(canvasDisplayColor('purple')?.accent).toBe('#9333ea');
@@ -240,11 +255,12 @@ test.describe('canvas view helpers', () => {
 		expect(canvasDraftChanged(doc.nodes[0], { ...drafts, a: 'Edited' })).toBe(true);
 		const refDrafts = canvasNodeRefDrafts(doc.nodes);
 		expect(canvasNodeRefValue(doc.nodes[1])).toBe('Home.md');
-		expect(canvasNodeRefDraftFor(doc.nodes[1], refDrafts)).toEqual({ value: 'Home.md', label: '' });
+		expect(canvasNodeRefDraftFor(doc.nodes[1], refDrafts)).toEqual({ value: 'Home.md', label: '', subpath: '' });
 		expect(canvasNodeRefDraftChanged(doc.nodes[1], refDrafts)).toBe(false);
-		expect(canvasNodeRefDraftChanged(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
-		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: '', label: 'Home note' } })).toBe(false);
-		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note' } })).toBe(true);
+		expect(canvasNodeRefDraftChanged(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note', subpath: '#Install Steps' } })).toBe(true);
+		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: '', label: 'Home note', subpath: '' } })).toBe(false);
+		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note', subpath: 'Install Steps' } })).toBe(false);
+		expect(canSaveCanvasNodeRefDraft(doc.nodes[1], { ...refDrafts, b: { value: 'Notes/Home.md', label: 'Home note', subpath: '#Install Steps' } })).toBe(true);
 		expect(canvasFileNodePath(doc.nodes[1])).toBe('Home.md');
 		expect(canvasFileNodeTitle(doc.nodes[1])).toBe('Home');
 		expect(canvasFileNodeTitle({ ...doc.nodes[1], label: 'Home note' })).toBe('Home note');
@@ -252,7 +268,17 @@ test.describe('canvas view helpers', () => {
 			kind: 'note',
 			path: 'Home.md',
 			title: 'Home',
-			actionLabel: 'Open note'
+			actionLabel: 'Open note',
+			subpath: null,
+			hash: null
+		});
+		expect(canvasFileOpenTarget(subpathFileNode)).toEqual({
+			kind: 'note',
+			path: 'Home.md',
+			title: 'Home',
+			actionLabel: 'Open note',
+			subpath: '#Install Steps',
+			hash: 'install-steps'
 		});
 		expect(canvasOpenNodeLabel(doc.nodes[1])).toBe('Open canvas file node Home.md');
 		expect(canOpenCanvasNode(doc.nodes[1])).toBe(true);
@@ -262,7 +288,9 @@ test.describe('canvas view helpers', () => {
 			kind: 'canvas',
 			path: 'Boards/Ideas.canvas',
 			title: 'Ideas',
-			actionLabel: 'Open Canvas'
+			actionLabel: 'Open Canvas',
+			subpath: null,
+			hash: null
 		});
 		expect(canOpenCanvasNode(canvasFileNode)).toBe(true);
 		const assetFileNode = { ...doc.nodes[1], id: 'asset-file', file: 'Images/roof.png' };
@@ -560,11 +588,11 @@ test('canvas view renders and creates Obsidian Canvas groups', async ({ page, re
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 
-test('canvas file cards route notes, Canvas files, and vault assets explicitly', async ({ page, request }) => {
+test('canvas file cards route notes with subpaths, Canvas files, and vault assets explicitly', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-file-routing-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
-	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nMarkdown target\n');
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n## Markdown target\n\nTarget section\n');
 	fs.writeFileSync(path.join(vaultDir, 'Nested.canvas'), JSON.stringify({
 		nodes: [{ id: 'nested-a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Nested Canvas card' }],
 		edges: []
@@ -578,7 +606,7 @@ test('canvas file cards route notes, Canvas files, and vault assets explicitly',
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
 		nodes: [
 			{ id: 'a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Routing board' },
-			{ id: 'b', type: 'file', x: 280, y: 0, width: 220, height: 110, file: 'Home.md' },
+			{ id: 'b', type: 'file', x: 280, y: 0, width: 220, height: 110, file: 'Home.md', subpath: '#Markdown target' },
 			{ id: 'c', type: 'file', x: 560, y: 0, width: 220, height: 110, file: 'Nested.canvas' },
 			{ id: 'd', type: 'file', x: 840, y: 0, width: 240, height: 220, file: 'Images/roof.svg' }
 		],
@@ -594,6 +622,7 @@ test('canvas file cards route notes, Canvas files, and vault assets explicitly',
 	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
+	await expect(page.getByLabel('Canvas file subpath for Home.md')).toHaveValue('#Markdown target');
 	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
 	await expect(page.getByRole('img', { name: 'Canvas file preview Images/roof.svg' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Preview raw canvas asset Images/roof.svg' })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
@@ -602,6 +631,7 @@ test('canvas file cards route notes, Canvas files, and vault assets explicitly',
 	await page.getByRole('button', { name: 'Open canvas file node Home.md' }).click();
 	await expect(page.getByRole('tab', { name: /Home/ })).toHaveAttribute('aria-selected', 'true');
 	await expect(page.locator('.note-view')).toContainText('Markdown target');
+	expect(new URL(page.url()).hash).toBe('#markdown-target');
 
 	await page.getByRole('tab', { name: /Board/ }).click();
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue('Routing board');
@@ -782,6 +812,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			action: 'update-node-reference',
 			nodeId: addedFileNode?.id,
 			file: 'References/Home.md',
+			subpath: '#Install Steps',
 			label: 'Home reference',
 			expectedRevision: groupUpdatedBody.doc.revision
 		}
@@ -792,11 +823,48 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(fileUpdatedBody.doc.nodes.find((node) => node.id === addedFileNode?.id)).toMatchObject({
 		type: 'file',
 		file: 'References/Home.md',
+		subpath: '#Install Steps',
 		label: 'Home reference'
 	});
 	expect(gitStatus(vaultDir)).toBe('');
 
-	const addedLinkNode = fileUpdatedBody.doc.nodes.find((node) => node.type === 'link' && node.url === 'https://example.com/research');
+	const invalidFileSubpath = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-reference',
+			nodeId: addedFileNode?.id,
+			file: 'References/Home.md',
+			subpath: 'Install Steps',
+			label: 'Home reference',
+			expectedRevision: fileUpdatedBody.doc.revision
+		}
+	});
+	expect(invalidFileSubpath.status()).toBe(400);
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const clearedFileSubpath = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'update-node-reference',
+			nodeId: addedFileNode?.id,
+			file: 'References/Home.md',
+			subpath: '',
+			label: 'Home reference',
+			expectedRevision: fileUpdatedBody.doc.revision
+		}
+	});
+	expect(clearedFileSubpath.ok(), await clearedFileSubpath.text()).toBe(true);
+	const clearedFileSubpathBody = await clearedFileSubpath.json() as { sha: string | null; doc: CanvasDoc };
+	expect(clearedFileSubpathBody.sha).toBeTruthy();
+	expect(clearedFileSubpathBody.doc.nodes.find((node) => node.id === addedFileNode?.id)).toMatchObject({
+		type: 'file',
+		file: 'References/Home.md',
+		label: 'Home reference'
+	});
+	expect(clearedFileSubpathBody.doc.nodes.find((node) => node.id === addedFileNode?.id)?.subpath).toBeUndefined();
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const addedLinkNode = clearedFileSubpathBody.doc.nodes.find((node) => node.type === 'link' && node.url === 'https://example.com/research');
 	expect(addedLinkNode).toBeTruthy();
 	const linkUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
@@ -805,7 +873,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			nodeId: addedLinkNode?.id,
 			url: 'https://example.com/updated',
 			label: 'Updated research',
-			expectedRevision: fileUpdatedBody.doc.revision
+			expectedRevision: clearedFileSubpathBody.doc.revision
 		}
 	});
 	expect(linkUpdated.ok(), await linkUpdated.text()).toBe(true);
@@ -1097,13 +1165,14 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	expect(gitStatus(vaultDir)).toBe('');
 
 	const raw = JSON.parse(fs.readFileSync(path.join(vaultDir, 'Board.canvas'), 'utf-8')) as {
-		nodes: { id?: string; type?: string; text?: string; file?: string; url?: string; label?: string; x?: number; y?: number }[];
+		nodes: { id?: string; type?: string; text?: string; file?: string; subpath?: string; url?: string; label?: string; x?: number; y?: number }[];
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
 	};
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
 	expect(raw.nodes.some((node) => node.type === 'group' && node.label === 'Renamed API group')).toBe(true);
 	expect(raw.nodes.some((node) => node.file === 'References/Home.md' && node.label === 'Home reference')).toBe(true);
+	expect(raw.nodes.some((node) => node.file === 'References/Home.md' && node.subpath)).toBe(false);
 	expect(raw.nodes.some((node) => node.url === 'https://example.com/updated' && node.label === 'Updated research')).toBe(true);
 	expect(raw.nodes.some((node) => node.id === 'b')).toBe(false);
 	expect(raw.edges.some((edge) => edge.fromNode === 'b' || edge.toNode === 'b')).toBe(false);
@@ -1155,6 +1224,7 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 
 	const addedFileCard = page.locator('.canvas-node-file').filter({ hasText: 'Home.md' }).last();
 	await addedFileCard.getByLabel('Canvas file path for Home.md').fill('References/Home.md');
+	await addedFileCard.getByLabel('Canvas file subpath for Home.md').fill('#Install Steps');
 	await addedFileCard.getByLabel('Canvas label for Home.md').fill('Home reference');
 	const saveFileButton = addedFileCard.getByRole('button', { name: 'Save canvas file node Home.md' });
 	await expect(saveFileButton).toBeEnabled();
@@ -1191,7 +1261,7 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 			text: body.nodes.find((node) => node.id === 'a')?.text,
 			homeColor: body.nodes.find((node) => node.id === 'b')?.color,
 			hasFile: body.nodes.some((node) => node.type === 'file' && node.file === 'Home.md'),
-			hasEditedFile: body.nodes.some((node) => node.type === 'file' && node.file === 'References/Home.md' && node.label === 'Home reference'),
+			hasEditedFile: body.nodes.some((node) => node.type === 'file' && node.file === 'References/Home.md' && node.subpath === '#Install Steps' && node.label === 'Home reference'),
 			hasEditedLink: body.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/updated' && node.label === 'Updated research')
 		};
 	}).toEqual({ text: 'Edited through UI', homeColor: '5', hasFile: true, hasEditedFile: true, hasEditedLink: true });

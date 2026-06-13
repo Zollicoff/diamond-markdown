@@ -55,6 +55,10 @@
 	function updateRefLabel(label: string): void {
 		onRefDraftChange(node, { ...refDraft, label });
 	}
+
+	function updateRefSubpath(subpath: string): void {
+		onRefDraftChange(node, { ...refDraft, subpath });
+	}
 </script>
 
 {#if assetPreview}
@@ -93,6 +97,18 @@
 			oninput={(event) => updateRefLabel((event.currentTarget as HTMLInputElement).value)}
 		/>
 	</label>
+	{#if node.type === 'file'}
+		<label>
+			<span>Subpath</span>
+			<input
+				class="node-input"
+				aria-label={`Canvas file subpath for ${title}`}
+				placeholder="#Heading or #^block-id"
+				value={refDraft.subpath}
+				oninput={(event) => updateRefSubpath((event.currentTarget as HTMLInputElement).value)}
+			/>
+		</label>
+	{/if}
 </div>
 <div class="node-actions">
 	{#if node.type === 'file'}

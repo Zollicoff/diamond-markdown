@@ -3,6 +3,7 @@
 	import type { CanvasDoc, CanvasNode } from '$lib/types';
 	import { emit } from '$lib/events';
 	import { openCanvas, openNote } from '$lib/workspace/actions';
+	import { replaceLocationHash } from '$lib/workspace/hash';
 	import {
 		canvasBounds,
 		canvasConnectionDraft,
@@ -159,6 +160,7 @@
 		if (target.kind === 'canvas') {
 			openCanvas(vaultId, target.path, target.title, 'new-tab');
 		} else {
+			replaceLocationHash(target.hash);
 			openNote(vaultId, target.path, target.title, 'new-tab');
 		}
 	}
@@ -228,6 +230,7 @@
 				node.type,
 				draft.value,
 				draft.label,
+				draft.subpath,
 				doc.revision
 			);
 			setDoc(res.doc);

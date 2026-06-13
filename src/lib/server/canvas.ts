@@ -14,6 +14,7 @@ import {
 	canvasSvgEdgeStroke,
 	canvasSvgNodeColors,
 	edgeLines,
+	normalizeCanvasFileSubpath,
 	normalizeCanvasColor
 } from '$lib/canvas/view';
 import type { CanvasEdgeEnd, CanvasEdgeSide } from '$lib/canvas/view';
@@ -85,6 +86,7 @@ export interface MutateCanvasInput {
 	label?: string;
 	text?: string;
 	file?: string;
+	subpath?: string;
 	url?: string;
 	color?: string;
 	x?: number;
@@ -153,6 +155,7 @@ function normalizeNode(value: unknown, index: number, warnings: string[]): Canva
 		height: Math.max(minHeight, number(node.height, type === 'text' ? 120 : type === 'group' ? 240 : minHeight)),
 		text: text(node.text),
 		file: text(node.file),
+		subpath: normalizeCanvasFileSubpath(text(node.subpath)) ?? undefined,
 		url: text(node.url),
 		label: text(node.label),
 		color: text(node.color)
@@ -475,6 +478,16 @@ function cleanCanvasUrl(value: unknown): string {
 	return parsed.toString();
 }
 
+function cleanCanvasSubpath(value: unknown): string | null {
+	if (value === undefined || value === null) return null;
+	if (typeof value !== 'string') throw new CanvasFileError('subpath must be a string');
+	const trimmed = value.trim();
+	if (!trimmed) return null;
+	const subpath = normalizeCanvasFileSubpath(trimmed);
+	if (!subpath) throw new CanvasFileError('subpath must start with # and fit on one line');
+	return subpath;
+}
+
 function canvasNodeType(value: unknown): 'text' | 'file' | 'link' | 'group' {
 	if (value === undefined || value === 'text') return 'text';
 	if (value === 'file' || value === 'link' || value === 'group') return value;
@@ -521,6 +534,8 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 			node.text = typeof input.text === 'string' && input.text.trim() ? input.text : 'New text card';
 		} else if (type === 'file') {
 			node.file = normalizeVaultPath(requiredText(input.file, 'file', 500));
+			const subpath = cleanCanvasSubpath(input.subpath);
+			if (subpath) node.subpath = subpath;
 			const label = cleanOptionalLabel(input.label);
 			if (label) node.label = label;
 		} else if (type === 'link') {
@@ -553,8 +568,12 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 		if (!node) throw new CanvasFileError('canvas node not found', 404);
 		if (node.type === 'file') {
 			node.file = normalizeVaultPath(requiredText(input.file, 'file', 500));
+			const subpath = cleanCanvasSubpath(input.subpath);
+			if (subpath) node.subpath = subpath;
+			else delete node.subpath;
 		} else if (node.type === 'link') {
 			node.url = cleanCanvasUrl(input.url);
+			delete node.subpath;
 		} else {
 			throw new CanvasFileError('only file and link canvas nodes can edit references inline');
 		}

@@ -319,6 +319,7 @@ export interface CanvasNode {
 	height: number;
 	text?: string;
 	file?: string;
+	subpath?: string;
 	url?: string;
 	label?: string;
 	color?: string;

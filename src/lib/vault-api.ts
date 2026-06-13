@@ -140,6 +140,7 @@ export const api = {
 		nodeType: 'file' | 'link',
 		value: string,
 		label: string,
+		subpath: string,
 		expectedRevision: string
 	): Promise<CanvasMutationResult> {
 		const payload: Record<string, unknown> = {
@@ -149,7 +150,10 @@ export const api = {
 			label,
 			expectedRevision
 		};
-		if (nodeType === 'file') payload.file = value;
+		if (nodeType === 'file') {
+			payload.file = value;
+			payload.subpath = subpath;
+		}
 		else payload.url = value;
 		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
 			method: 'POST',

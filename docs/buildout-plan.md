@@ -410,6 +410,9 @@ Use small, pushable slices:
 - **Canvas node resizing.** Resize Canvas cards from the board, preview the
   dimensions while dragging, and persist clamped width/height updates through
   the same git-backed stale-revision mutation path as moves and edits.
+- **Canvas file-card subpaths.** Preserve JSON Canvas file-node `subpath`
+  values, expose them in the file-card editor, and route Markdown file cards to
+  heading or block anchors without changing asset or nested-Canvas handling.
 
 ## Next Implementation Slices
 
