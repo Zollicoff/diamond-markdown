@@ -16,6 +16,8 @@ an existing Obsidian vault. The preflight reports:
   preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
+- `.obsidian/appearance.json` theme settings and CSS snippet filenames as
+  read-only migration guidance
 - Obsidian `bookmarks.json` or legacy `starred.json` note bookmarks that can
   seed Diamond's git-backed bookmarks
 - Obsidian plugin folders plus read-only manifest/settings migration guidance
@@ -56,6 +58,12 @@ plugin manifests plus the top-level keys in each plugin `data.json`, then shows
 per-plugin migration notes for enabled state, manifest health, settings-file
 health, preserved file location, and manual migration action. It does not expose
 full plugin setting values in the preview.
+
+When `.obsidian/appearance.json` or `.obsidian/snippets/*.css` is present,
+Diamond surfaces theme names, base font size, accent color, enabled snippet
+names, missing enabled snippets, and snippet filenames as read-only migration
+guidance. It does not load Obsidian community themes, execute CSS snippets, or
+show CSS file contents during import preview.
 
 When `.obsidian/bookmarks.json` or legacy `.obsidian/starred.json` is present,
 Diamond imports visible Markdown file bookmarks into `.diamondmd/bookmarks.json`
@@ -136,6 +144,7 @@ initial state of the imported vault is captured explicitly.
 
 - It does not import or execute Obsidian plugins.
 - It does not automatically migrate Obsidian plugin settings into Diamond plugins.
+- It does not load Obsidian community themes or CSS snippets.
 - It does not convert Obsidian search bookmarks, bookmark groups, or non-note
   bookmarks into Diamond bookmarks.
 - It does not automatically apply every `.obsidian/app.json` UI preference.

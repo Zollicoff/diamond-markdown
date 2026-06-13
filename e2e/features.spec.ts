@@ -139,6 +139,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'dataview'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'snippets'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Templates'), { recursive: true });
@@ -165,6 +166,15 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		timeFormat: 'HH:mm:ss',
 		privateTemplatesSetting: 'do-not-render-this-template-config-value'
 	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'appearance.json'), JSON.stringify({
+		theme: 'moonstone',
+		cssTheme: 'Minimal',
+		baseFontSize: 16,
+		accentColor: '#0f766e',
+		enabledCssSnippets: ['cards'],
+		privateAppearanceSetting: 'do-not-render-this-appearance-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
 		items: [
 			{ type: 'file', path: 'Notes/Home.md', title: 'Home bookmark' },
@@ -231,6 +241,18 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			dateFormatStatus: string;
 			timeFormat?: string;
 			timeFormatStatus: string;
+			settings: { id: string; label: string; value: string; level: string; detail: string }[];
+			warnings: string[];
+		};
+		obsidianAppearance: {
+			status: string;
+			theme?: string;
+			cssTheme?: string;
+			baseFontSize?: number;
+			accentColor?: string;
+			enabledCssSnippets: string[];
+			snippetFiles: string[];
+			missingEnabledSnippets: string[];
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
@@ -311,6 +333,26 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	});
 	expect(body.obsidianTemplates.settings.map((setting) => setting.id)).toEqual(['folder', 'dateFormat', 'timeFormat']);
 	expect(JSON.stringify(body.obsidianTemplates)).not.toContain('do-not-render-this-template-config-value');
+	expect(body.obsidianAppearance).toMatchObject({
+		status: 'present',
+		theme: 'moonstone',
+		cssTheme: 'Minimal',
+		baseFontSize: 16,
+		accentColor: '#0f766e',
+		enabledCssSnippets: ['cards'],
+		snippetFiles: ['cards'],
+		missingEnabledSnippets: []
+	});
+	expect(body.obsidianAppearance.settings.map((setting) => setting.id)).toEqual([
+		'cssSnippetFiles',
+		'theme',
+		'cssTheme',
+		'baseFontSize',
+		'accentColor',
+		'enabledCssSnippets'
+	]);
+	expect(JSON.stringify(body.obsidianAppearance)).not.toContain('do-not-render-this-appearance-value');
+	expect(JSON.stringify(body.obsidianAppearance)).not.toContain('do-not-render-this-css-value');
 	expect(body.obsidianBookmarks).toMatchObject({
 		status: 'present',
 		source: 'bookmarks',
@@ -334,6 +376,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.canvasExamples).toContain('Board.canvas');
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
 	expect(body.checklist.find((row) => row.id === 'obsidian-templates')?.detail).toContain('templates load from Snippet Bank');
+	expect(body.checklist.find((row) => row.id === 'obsidian-appearance')?.detail).toContain('6 Appearance settings found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 bookmark item can seed Diamond bookmarks');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
@@ -345,6 +388,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-ui-import-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'plugins', 'kanban'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian', 'snippets'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		attachmentFolderPath: 'Media/Uploads',
 		newFileLocation: 'folder',
@@ -367,6 +411,15 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		timeFormat: 'HH:mm:ss',
 		privateTemplatesSetting: 'do-not-render-this-template-config-value'
 	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'appearance.json'), JSON.stringify({
+		theme: 'moonstone',
+		cssTheme: 'Minimal',
+		baseFontSize: 16,
+		accentColor: '#0f766e',
+		enabledCssSnippets: ['cards'],
+		privateAppearanceSetting: 'do-not-render-this-appearance-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
 		items: [
 			{
@@ -440,6 +493,17 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Template time format');
 	await expect(page.locator('.import-card')).toContainText('HH:mm:ss');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-template-config-value');
+	await expect(page.locator('.import-card')).toContainText('Appearance settings');
+	await expect(page.locator('.import-card')).toContainText('6 Appearance settings found');
+	await expect(page.locator('.import-card')).toContainText('Obsidian Appearance');
+	await expect(page.locator('.import-card')).toContainText('Community theme');
+	await expect(page.locator('.import-card')).toContainText('Minimal');
+	await expect(page.locator('.import-card')).toContainText('CSS snippet files');
+	await expect(page.locator('.import-card')).toContainText('cards.css');
+	await expect(page.locator('.import-card')).toContainText('Enabled CSS snippets');
+	await expect(page.locator('.import-card')).toContainText('cards');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-appearance-value');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-css-value');
 	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
 	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');
 	await expect(page.locator('.import-card')).toContainText('Home.md');

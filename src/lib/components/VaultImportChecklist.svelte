@@ -7,6 +7,7 @@
 		importReadiness,
 		importSummary,
 		obsidianAppConfigSummary,
+		obsidianAppearanceSummary,
 		obsidianBookmarksSummary,
 		obsidianDailyNotesSummary,
 		obsidianTemplatesSummary,
@@ -129,6 +130,31 @@
 		{#if analysis.obsidianTemplates.settings.length > 0}
 			<ul class="config-settings" aria-label="Obsidian Templates settings">
 				{#each analysis.obsidianTemplates.settings as setting (setting.id)}
+					<li class={`config-row ${setting.level}`}>
+						<div class="config-main">
+							<div>
+								<div class="config-name">{setting.label}</div>
+								<div class="config-detail">{setting.detail}</div>
+							</div>
+							<span class="config-value mono">{setting.value}</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if analysis.obsidianAppearance.status !== 'missing' || analysis.obsidianAppearance.snippetFiles.length > 0}
+		<div class="note">
+			<span class="note-label">Obsidian Appearance</span>
+			<span>{obsidianAppearanceSummary(analysis.obsidianAppearance)}</span>
+			{#if analysis.obsidianAppearance.path}
+				<span class="mono">{analysis.obsidianAppearance.path}</span>
+			{/if}
+		</div>
+		{#if analysis.obsidianAppearance.settings.length > 0}
+			<ul class="config-settings" aria-label="Obsidian Appearance settings">
+				{#each analysis.obsidianAppearance.settings as setting (setting.id)}
 					<li class={`config-row ${setting.level}`}>
 						<div class="config-main">
 							<div>

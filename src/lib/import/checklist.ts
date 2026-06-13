@@ -1,5 +1,6 @@
 import type {
 	ObsidianAppConfigInfo,
+	ObsidianAppearanceInfo,
 	ObsidianBookmarksInfo,
 	ObsidianDailyNotesInfo,
 	ObsidianTemplatesInfo,
@@ -108,6 +109,20 @@ export function obsidianTemplatesSummary(config: ObsidianTemplatesInfo): string 
 	if (config.status === 'invalid') return '.obsidian/templates.json is present but invalid.';
 	if (config.settings.length === 0) return '.obsidian/templates.json found; no supported Templates settings were recognized.';
 	return `${config.settings.length} Templates setting${config.settings.length === 1 ? '' : 's'} found; templates load from ${config.folderPath ?? 'Templates'}.`;
+}
+
+export function obsidianAppearanceSummary(config: ObsidianAppearanceInfo): string {
+	const snippetText = config.snippetFiles.length > 0
+		? `${config.snippetFiles.length} CSS snippet file${config.snippetFiles.length === 1 ? '' : 's'} preserved`
+		: '';
+	if (config.status === 'missing') {
+		return snippetText
+			? `No .obsidian/appearance.json file was found; ${snippetText}.`
+			: 'No .obsidian/appearance.json file was found.';
+	}
+	if (config.status === 'invalid') return '.obsidian/appearance.json is present but invalid.';
+	if (config.settings.length === 0) return '.obsidian/appearance.json found; no supported Appearance settings were recognized.';
+	return `${config.settings.length} Appearance setting${config.settings.length === 1 ? '' : 's'} found${snippetText ? `; ${snippetText}` : ''}.`;
 }
 
 export function obsidianBookmarksSummary(config: ObsidianBookmarksInfo): string {

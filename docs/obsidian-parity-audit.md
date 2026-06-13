@@ -53,7 +53,7 @@ The main remaining product risks are:
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
 | GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, incoming-file review, divergence/recovery UI, git-backed bookmarks and saved searches | Background sync and conflict resolution remain manual by design |
-| Import from Obsidian | Partial | `.obsidian` detection, supported `app.json`, Daily Notes, Templates, and bookmark migration notes, safe attachment-folder reuse, safe configured new-note folder defaults, `useMarkdownLinks` editor insertion preference, safe Daily Notes folder/template/date-format reuse, safe Templates folder/default date-time format reuse, note-level Obsidian bookmark seeding, `alwaysUpdateLinks` rename behavior, plugin settings migration guidance, Canvas preservation | No full plugin migration or execution; some Obsidian UI preferences remain guidance-only |
+| Import from Obsidian | Partial | `.obsidian` detection, supported `app.json`, Daily Notes, Templates, Appearance/CSS snippet guidance, and bookmark migration notes, safe attachment-folder reuse, safe configured new-note folder defaults, `useMarkdownLinks` editor insertion preference, safe Daily Notes folder/template/date-format reuse, safe Templates folder/default date-time format reuse, note-level Obsidian bookmark seeding, `alwaysUpdateLinks` rename behavior, plugin settings migration guidance, Canvas preservation | No full plugin/theme migration or execution; some Obsidian UI preferences remain guidance-only |
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
@@ -68,7 +68,7 @@ The main remaining product risks are:
    scope is available.
 2. **Canvas/import polish.** Continue daily-driver compatibility work around
    deeper Canvas interaction parity and remaining Obsidian config edge cases
-   without executing Obsidian plugins.
+   without executing Obsidian plugins, themes, or CSS snippets.
 3. **Verification hardening.** Keep expanding targeted coverage around
    dialog-driven destructive actions, sync recovery flows, and release-facing
    claim changes while keeping the release suite batchable.

@@ -427,7 +427,7 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	expect(body.edges[0].fromEnd).toBe('arrow');
 	expect(body.edges[0].toEnd).toBe('none');
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	const boardLink = page.locator('.tree .file-link').filter({ hasText: 'Board' }).first();
 	await expect(boardLink).toBeVisible({ timeout: 10_000 });
@@ -484,7 +484,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
@@ -522,7 +522,7 @@ test('canvas view renders and creates Obsidian Canvas groups', async ({ page, re
 		color: '5'
 	});
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.locator('.canvas-node-group').filter({ hasText: 'Research cluster' })).toBeVisible();
 	await expect(page.locator('.canvas-node-group').first()).toHaveAttribute('style', /--canvas-node-border: #0891b2/);
@@ -591,7 +591,7 @@ test('canvas file cards route notes, Canvas files, and vault assets explicitly',
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
 	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
@@ -1124,7 +1124,7 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await page.getByRole('button', { name: 'Set canvas node Home.md color cyan' }).click();
 	await expect(page.getByText('Canvas node color saved')).toBeVisible({ timeout: 10_000 });
@@ -1211,7 +1211,7 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await page.getByRole('button', { name: 'Set canvas edge text to Home.md: opens color green' }).click();
 	await expect(page.getByText('Canvas edge color saved')).toBeVisible({ timeout: 10_000 });
@@ -1287,7 +1287,7 @@ test('canvas view removes nodes and connected edges from the board', async ({ pa
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
 	await expect(page.getByLabel('Canvas edges')).toContainText('Home.md');
@@ -1326,7 +1326,7 @@ test('canvas view drags nodes and saves positions to the Canvas file', async ({ 
 	const original = before.nodes.find((node) => node.id === 'b');
 	expect(original).toBeTruthy();
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const moveHandle = page.getByRole('button', { name: 'Move canvas node Home.md', exact: true });
 	await expect(moveHandle).toBeVisible();
@@ -1367,7 +1367,7 @@ test('canvas view resizes nodes and saves dimensions to the Canvas file', async 
 	const original = before.nodes.find((node) => node.id === 'b');
 	expect(original).toBeTruthy();
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`);
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const resizeHandle = page.getByRole('button', { name: 'Resize canvas node Home.md', exact: true });
 	await expect(resizeHandle).toBeVisible();
@@ -1442,7 +1442,7 @@ test('canvas file context menu deletes through an in-app confirmation dialog', a
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	const boardLink = page.locator('.tree .file-link').filter({ hasText: 'Board' }).first();
 	await expect(boardLink).toBeVisible({ timeout: 10_000 });

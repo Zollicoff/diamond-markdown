@@ -375,6 +375,9 @@ Use small, pushable slices:
    settings during import preflight, surface safe attachment-folder behavior
    and migration notes for new-note/link/delete preferences, and reuse the same
    safe folder parser for attachment uploads and attachment organization.
+- **Obsidian Appearance guidance.** Surface `.obsidian/appearance.json` theme,
+   font, accent, and CSS snippet filenames as read-only migration guidance
+   without loading Obsidian community themes, CSS snippets, or raw CSS contents.
 - **Obsidian configured new-note folder.** Use a safe
    `.obsidian/app.json` `newFileLocation: "folder"` plus
    `newFileFolderPath` as the default destination for generic new-note

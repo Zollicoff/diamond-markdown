@@ -97,6 +97,29 @@ export interface ObsidianTemplatesInfo {
 	warnings: string[];
 }
 
+export interface ObsidianAppearanceSetting {
+	id: string;
+	label: string;
+	value: string;
+	detail: string;
+	level: VaultImportCheckLevel;
+}
+
+export interface ObsidianAppearanceInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	theme?: string;
+	cssTheme?: string;
+	baseFontSize?: number;
+	accentColor?: string;
+	enabledCssSnippets: string[];
+	snippetFiles: string[];
+	missingEnabledSnippets: string[];
+	settings: ObsidianAppearanceSetting[];
+	warnings: string[];
+}
+
 export interface ObsidianBookmarksInfo {
 	path?: string;
 	status: JsonFileStatus;
@@ -149,6 +172,7 @@ export interface VaultImportAnalysis {
 	obsidianAppConfig: ObsidianAppConfigInfo;
 	obsidianDailyNotes: ObsidianDailyNotesInfo;
 	obsidianTemplates: ObsidianTemplatesInfo;
+	obsidianAppearance: ObsidianAppearanceInfo;
 	obsidianBookmarks: ObsidianBookmarksInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];

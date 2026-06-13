@@ -8,6 +8,7 @@ import type {
 	VaultImportAnalysis,
 	VaultImportCheckItem
 } from '$lib/types';
+import { readObsidianAppearanceConfig } from './obsidian-appearance';
 import { readObsidianAppConfig } from './obsidian-config';
 import { readObsidianBookmarks } from './obsidian-bookmarks';
 import { readObsidianDailyNotesConfig } from './obsidian-daily';
@@ -92,6 +93,23 @@ function obsidianBookmarksDetail(config: ReturnType<typeof readObsidianBookmarks
 	return `${config.path ?? '.obsidian/bookmarks.json'} found, but no visible Markdown note bookmarks were recognized.`;
 }
 
+function obsidianAppearanceDetail(config: ReturnType<typeof readObsidianAppearanceConfig>): string {
+	if (config.status === 'invalid') {
+		return '.obsidian/appearance.json is invalid; Diamond will preserve it but cannot summarize appearance settings.';
+	}
+	if (config.status === 'present') {
+		const snippetText = config.snippetFiles.length > 0
+			? ` ${config.snippetFiles.length} CSS snippet file${config.snippetFiles.length === 1 ? '' : 's'} preserved.`
+			: '';
+		if (config.settings.length === 0) return `.obsidian/appearance.json found; no supported Appearance settings were recognized.${snippetText}`;
+		return `${config.settings.length} Appearance setting${config.settings.length === 1 ? '' : 's'} found.${snippetText}`;
+	}
+	if (config.snippetFiles.length > 0) {
+		return `${config.snippetFiles.length} CSS snippet file${config.snippetFiles.length === 1 ? '' : 's'} preserved; no .obsidian/appearance.json file was found.`;
+	}
+	return 'No Obsidian Appearance settings were found.';
+}
+
 export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (!inputPath?.trim()) throw new Error('path required');
 	const root = expandHome(inputPath);
@@ -119,6 +137,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const obsidianAppConfig = readObsidianAppConfig(root);
 	const obsidianDailyNotes = readObsidianDailyNotesConfig(root);
 	const obsidianTemplates = readObsidianTemplatesConfig(root);
+	const obsidianAppearance = readObsidianAppearanceConfig(root);
 	const obsidianBookmarks = readObsidianBookmarks(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
@@ -218,6 +237,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	warnings.push(...obsidianAppConfig.warnings);
 	warnings.push(...obsidianDailyNotes.warnings);
 	warnings.push(...obsidianTemplates.warnings);
+	warnings.push(...obsidianAppearance.warnings);
 	warnings.push(...obsidianBookmarks.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
@@ -278,6 +298,15 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				: obsidianTemplates.status === 'present' ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-appearance',
+			'Appearance settings',
+			obsidianAppearanceDetail(obsidianAppearance),
+			obsidianAppearance.status === 'invalid'
+				|| obsidianAppearance.settings.some((setting) => setting.level === 'warn')
+				? 'warn'
+				: obsidianAppearance.status === 'present' || obsidianAppearance.snippetFiles.length > 0 ? 'info' : 'ok'
+		),
+		item(
 			'obsidian-bookmarks',
 			'Obsidian bookmarks',
 			obsidianBookmarksDetail(obsidianBookmarks),
@@ -328,6 +357,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		obsidianAppConfig,
 		obsidianDailyNotes,
 		obsidianTemplates,
+		obsidianAppearance,
 		obsidianBookmarks,
 		obsidianPluginFolders,
 		obsidianPlugins,

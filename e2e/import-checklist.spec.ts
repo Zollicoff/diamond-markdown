@@ -7,6 +7,7 @@ import {
 	importReadiness,
 	importSummary,
 	obsidianDailyNotesSummary,
+	obsidianAppearanceSummary,
 	obsidianAppConfigSummary,
 	obsidianBookmarksSummary,
 	obsidianTemplatesSummary,
@@ -16,6 +17,7 @@ import {
 import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
 import { editorLinkPreference, preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
+import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
 import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
@@ -51,6 +53,14 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			folderStatus: 'missing',
 			dateFormatStatus: 'missing',
 			timeFormatStatus: 'missing',
+			settings: [],
+			warnings: []
+		},
+		obsidianAppearance: {
+			status: 'missing',
+			enabledCssSnippets: [],
+			snippetFiles: [],
+			missingEnabledSnippets: [],
 			settings: [],
 			warnings: []
 		},
@@ -233,6 +243,96 @@ test.describe('import checklist helpers', () => {
 			paths: ['Legacy.md'],
 			warnings: []
 		})).toBe('1 Obsidian legacy starred item can seed Diamond bookmarks.');
+	});
+
+	test('summarizes Obsidian Appearance settings without loading CSS snippets', () => {
+		expect(obsidianAppearanceSummary(analysis().obsidianAppearance)).toBe('No .obsidian/appearance.json file was found.');
+		expect(obsidianAppearanceSummary({
+			path: '.obsidian/appearance.json',
+			status: 'invalid',
+			bytes: 12,
+			enabledCssSnippets: [],
+			snippetFiles: [],
+			missingEnabledSnippets: [],
+			settings: [],
+			warnings: ['invalid']
+		})).toBe('.obsidian/appearance.json is present but invalid.');
+		expect(obsidianAppearanceSummary({
+			path: '.obsidian/appearance.json',
+			status: 'present',
+			bytes: 160,
+			theme: 'moonstone',
+			cssTheme: 'Minimal',
+			baseFontSize: 16,
+			enabledCssSnippets: ['cards'],
+			snippetFiles: ['cards', 'dashboard'],
+			missingEnabledSnippets: [],
+			settings: [
+				{
+					id: 'cssTheme',
+					label: 'Community theme',
+					value: 'Minimal',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				},
+				{
+					id: 'cssSnippetFiles',
+					label: 'CSS snippet files',
+					value: 'cards.css, dashboard.css',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				}
+			],
+			warnings: []
+		})).toBe('2 Appearance settings found; 2 CSS snippet files preserved.');
+		expect(obsidianAppearanceSummary({
+			status: 'missing',
+			enabledCssSnippets: [],
+			snippetFiles: ['cards'],
+			missingEnabledSnippets: [],
+			settings: [],
+			warnings: []
+		})).toBe('No .obsidian/appearance.json file was found; 1 CSS snippet file preserved.');
+	});
+
+	test('reads Obsidian Appearance settings and snippet filenames without exposing CSS contents', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-appearance-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian', 'snippets'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'appearance.json'), JSON.stringify({
+			theme: 'moonstone',
+			cssTheme: 'Minimal',
+			baseFontSize: 16,
+			accentColor: '#0f766e',
+			enabledCssSnippets: ['cards', 'missing', '../unsafe'],
+			privateAppearanceSetting: 'do-not-render-this-appearance-value'
+		}));
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'dashboard.css'), '.dashboard { color: red; }');
+
+		const config = readObsidianAppearanceConfig(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			theme: 'moonstone',
+			cssTheme: 'Minimal',
+			baseFontSize: 16,
+			accentColor: '#0f766e',
+			enabledCssSnippets: ['cards', 'missing'],
+			snippetFiles: ['cards', 'dashboard'],
+			missingEnabledSnippets: ['missing']
+		});
+		expect(config.settings.map((setting) => setting.id)).toEqual([
+			'cssSnippetFiles',
+			'theme',
+			'cssTheme',
+			'baseFontSize',
+			'accentColor',
+			'enabledCssSnippets',
+			'missingEnabledCssSnippets'
+		]);
+		expect(config.warnings).toContain('Obsidian appearance enables CSS snippets that were not found in .obsidian/snippets.');
+		expect(config.warnings).toContain('1 Obsidian CSS snippet name ignored because it was unsafe.');
+		expect(JSON.stringify(config)).not.toContain('do-not-render-this-css-value');
+		expect(JSON.stringify(config)).not.toContain('do-not-render-this-appearance-value');
 	});
 
 	test('uses safe Obsidian Templates settings for template runtime defaults', () => {
