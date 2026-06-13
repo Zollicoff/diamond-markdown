@@ -1,0 +1,17 @@
+name: Desktop Release CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-index-bootstrap:
+    name: Workflow index bootstrap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain bootstrap workflow
+        run: |
+          echo "This default-branch workflow exists so GitHub indexes desktop-release.yml."
+          echo "Run the feature-branch workflow with --ref codex/diamond-buildout."
