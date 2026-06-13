@@ -3,6 +3,7 @@
 	import {
 		canvasNodeTitle,
 		canvasTextPreviewBlocks,
+		type CanvasTextPreviewBlock,
 		type CanvasTextPreviewInline
 	} from '$lib/canvas/view';
 
@@ -52,44 +53,65 @@
 	{/each}
 {/snippet}
 
+{#snippet previewBlock(block: CanvasTextPreviewBlock)}
+	{#if block.type === 'heading'}
+		<p class={`preview-heading level-${block.level}`}>
+			{@render inline(block.inline)}
+		</p>
+	{:else if block.type === 'paragraph'}
+		<p>
+			{@render inline(block.inline)}
+		</p>
+	{:else if block.type === 'quote'}
+		<blockquote>
+			{@render inline(block.inline)}
+		</blockquote>
+	{:else if block.type === 'callout'}
+		<div class={`preview-callout callout-${block.kind}`} data-fold={block.fold ?? 'none'}>
+			<div class="callout-title">
+				<span class="callout-kind">{block.kind}</span>
+				<span>{@render inline(block.title)}</span>
+				{#if block.fold}
+					<span class="callout-fold" aria-label={`${block.fold} callout`}>{block.fold === 'closed' ? '-' : '+'}</span>
+				{/if}
+			</div>
+			{#if block.fold !== 'closed' && block.body.length > 0}
+				<div class="callout-body">
+					{#each block.body as child}
+						{@render previewBlock(child)}
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{:else if block.type === 'unordered-list'}
+		<ul>
+			{#each block.items as item}
+				<li class:checked={item.checked === true} class:unchecked={item.checked === false}>
+					{#if item.checked !== undefined}
+						<span class="task-state" aria-hidden="true">{item.checked ? 'x' : ''}</span>
+					{/if}
+					<span>{@render inline(item.inline)}</span>
+				</li>
+			{/each}
+		</ul>
+	{:else if block.type === 'ordered-list'}
+		<ol>
+			{#each block.items as item}
+				<li>
+					<span>{@render inline(item.inline)}</span>
+				</li>
+			{/each}
+		</ol>
+	{:else if block.type === 'code'}
+		<pre data-language={block.language}><code>{block.code}</code></pre>
+	{/if}
+{/snippet}
+
 <div class="text-node-content">
 	<div class="canvas-text-preview" aria-label={`Canvas text preview for ${node.id}`}>
 		{#if previewBlocks.length > 0}
 			{#each previewBlocks as block}
-				{#if block.type === 'heading'}
-					<p class={`preview-heading level-${block.level}`}>
-						{@render inline(block.inline)}
-					</p>
-				{:else if block.type === 'paragraph'}
-					<p>
-						{@render inline(block.inline)}
-					</p>
-				{:else if block.type === 'quote'}
-					<blockquote>
-						{@render inline(block.inline)}
-					</blockquote>
-				{:else if block.type === 'unordered-list'}
-					<ul>
-						{#each block.items as item}
-							<li class:checked={item.checked === true} class:unchecked={item.checked === false}>
-								{#if item.checked !== undefined}
-									<span class="task-state" aria-hidden="true">{item.checked ? 'x' : ''}</span>
-								{/if}
-								<span>{@render inline(item.inline)}</span>
-							</li>
-						{/each}
-					</ul>
-				{:else if block.type === 'ordered-list'}
-					<ol>
-						{#each block.items as item}
-							<li>
-								<span>{@render inline(item.inline)}</span>
-							</li>
-						{/each}
-					</ol>
-				{:else if block.type === 'code'}
-					<pre data-language={block.language}><code>{block.code}</code></pre>
-				{/if}
+				{@render previewBlock(block)}
 			{/each}
 		{:else}
 			<p class="empty-preview">Empty text card</p>
@@ -176,6 +198,45 @@
 		border-left: 2px solid var(--canvas-node-border, var(--accent));
 		padding-left: 7px;
 		color: var(--fg-dim);
+	}
+	.preview-callout {
+		display: grid;
+		gap: 5px;
+		margin: 0 0 5px;
+		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--accent)), transparent 45%);
+		border-left-width: 3px;
+		border-radius: 6px;
+		padding: 6px 7px;
+		background: color-mix(in srgb, var(--canvas-node-border, var(--accent)), transparent 90%);
+	}
+	.preview-callout:last-child {
+		margin-bottom: 0;
+	}
+	.callout-title {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		min-width: 0;
+		color: var(--fg);
+		font-weight: 700;
+	}
+	.callout-kind {
+		flex: 0 0 auto;
+		color: var(--canvas-node-border, var(--accent));
+		font-family: var(--mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+	.callout-fold {
+		margin-left: auto;
+		color: var(--fg-dim);
+		font-family: var(--mono);
+		font-size: 0.68rem;
+	}
+	.callout-body {
+		min-width: 0;
+		color: var(--fg-muted);
 	}
 	ul,
 	ol {

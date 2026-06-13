@@ -174,6 +174,8 @@ test.describe('canvas view helpers', () => {
 			'- [x] Capture **utility bill**',
 			'- [ ] Upload [[Roof Photos]]',
 			'> Refer questions',
+			'> [!WARNING]- Site survey',
+			'> Capture **main panel** photos',
 			'```txt',
 			'main panel',
 			'```'
@@ -187,7 +189,14 @@ test.describe('canvas view helpers', () => {
 			]
 		});
 		expect(previewBlocks[2]).toMatchObject({ type: 'quote', inline: [{ kind: 'text', text: 'Refer questions' }] });
-		expect(previewBlocks[3]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
+		expect(previewBlocks[3]).toMatchObject({
+			type: 'callout',
+			kind: 'warning',
+			title: [{ kind: 'text', text: 'Site survey' }],
+			fold: 'closed',
+			body: [{ type: 'paragraph', inline: [{ kind: 'text', text: 'Capture ' }, { kind: 'strong', text: 'main panel' }, { kind: 'text', text: ' photos' }] }]
+		});
+		expect(previewBlocks[4]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
 		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
 		expect(canvasGroupLabelChanged(groupNode, groupDrafts)).toBe(false);
@@ -553,6 +562,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'- [x] Capture **utility bill**',
 					'- [ ] Upload [[Roof Photos]]',
 					'> Refer homeowner questions',
+					'> [!TIP]+ Site survey',
+					'> Capture **main panel** photos',
 					'```txt',
 					'main panel',
 					'```'
@@ -572,9 +583,12 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
-	await expect(preview.locator('strong')).toHaveText('utility bill');
+	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('.wikilink')).toHaveText('[[Roof Photos]]');
 	await expect(preview.locator('blockquote')).toContainText('Refer homeowner questions');
+	await expect(preview.locator('.preview-callout')).toContainText('tip');
+	await expect(preview.locator('.preview-callout')).toContainText('Site survey');
+	await expect(preview.locator('.preview-callout strong')).toHaveText('main panel');
 	await expect(preview.locator('pre')).toContainText('main panel');
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue(/# Launch plan/);
 });

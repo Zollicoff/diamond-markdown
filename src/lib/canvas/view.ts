@@ -104,6 +104,7 @@ export interface CanvasFileAssetPreview {
 }
 
 export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'code' | 'wikilink' | 'link';
+export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
 
 export interface CanvasTextPreviewInline {
 	kind: CanvasTextPreviewInlineKind;
@@ -120,6 +121,13 @@ export type CanvasTextPreviewBlock =
 	| { type: 'heading'; level: 1 | 2 | 3; inline: CanvasTextPreviewInline[] }
 	| { type: 'paragraph'; inline: CanvasTextPreviewInline[] }
 	| { type: 'quote'; inline: CanvasTextPreviewInline[] }
+	| {
+		type: 'callout';
+		kind: string;
+		title: CanvasTextPreviewInline[];
+		fold: CanvasTextPreviewCalloutFold;
+		body: CanvasTextPreviewBlock[];
+	}
 	| { type: 'unordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'ordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'code'; language: string; code: string };
@@ -466,13 +474,15 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 		codeLines = [];
 	}
 
-	for (const line of lines) {
+	for (let index = 0; index < lines.length;) {
+		const line = lines[index];
 		if (codeLanguage !== null) {
 			if (/^\s*```/.test(line)) {
 				flushCode();
 			} else {
 				codeLines.push(line);
 			}
+			index += 1;
 			continue;
 		}
 
@@ -482,12 +492,14 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 			flushList();
 			codeLanguage = fence[1] ?? '';
 			codeLines = [];
+			index += 1;
 			continue;
 		}
 
 		if (!line.trim()) {
 			flushParagraph();
 			flushList();
+			index += 1;
 			continue;
 		}
 
@@ -500,6 +512,30 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 				level: heading[1].length as 1 | 2 | 3,
 				inline: canvasTextPreviewInlines(heading[2].trim())
 			});
+			index += 1;
+			continue;
+		}
+
+		const callout = line.match(/^\s{0,3}>\s?\[!([a-z][a-z0-9_-]*)](?:([+-])?)\s*(.*)$/i);
+		if (callout) {
+			flushParagraph();
+			flushList();
+			const bodyLines: string[] = [];
+			index += 1;
+			while (index < lines.length) {
+				const body = lines[index].match(/^\s{0,3}>\s?(.*)$/);
+				if (!body) break;
+				bodyLines.push(body[1]);
+				index += 1;
+			}
+			const kind = canvasCalloutKind(callout[1]);
+			blocks.push({
+				type: 'callout',
+				kind,
+				title: canvasTextPreviewInlines(canvasCalloutTitle(kind, callout[3])),
+				fold: callout[2] === '-' ? 'closed' : callout[2] === '+' ? 'open' : null,
+				body: canvasTextPreviewBlocks(bodyLines.join('\n'))
+			});
 			continue;
 		}
 
@@ -508,6 +544,7 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 			flushParagraph();
 			flushList();
 			blocks.push({ type: 'quote', inline: canvasTextPreviewInlines(quote[1].trim()) });
+			index += 1;
 			continue;
 		}
 
@@ -525,11 +562,13 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 				inline: canvasTextPreviewInlines((task?.[2] ?? unordered?.[1] ?? ordered?.[1] ?? '').trim()),
 				checked: task ? task[1].toLowerCase() === 'x' : undefined
 			});
+			index += 1;
 			continue;
 		}
 
 		flushList();
 		paragraphLines.push(line.trim());
+		index += 1;
 	}
 
 	if (codeLanguage !== null) flushCode();
@@ -852,6 +891,16 @@ export function canvasEdgeRoutingChanged(edge: CanvasEdgeSummary, drafts: Canvas
 
 function plural(count: number, singular: string): string {
 	return count === 1 ? singular : `${singular}s`;
+}
+
+function canvasCalloutKind(value: string): string {
+	return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-') || 'note';
+}
+
+function canvasCalloutTitle(kind: string, title: string | undefined): string {
+	const cleanedTitle = title?.trim();
+	if (cleanedTitle) return cleanedTitle;
+	return kind.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function firstInlineMatch(value: string): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {

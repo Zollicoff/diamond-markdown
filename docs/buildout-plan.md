@@ -416,6 +416,9 @@ Use small, pushable slices:
 - **Canvas viewport zoom.** Add Canvas zoom in/out/reset/fit controls with a
   scaled board shell and zoom-aware node drag/resize math so board navigation
   is closer to the Obsidian Canvas daily-driver workflow.
+- **Canvas text-card callouts.** Render Obsidian `> [!TYPE]` callout blocks in
+  the lightweight Canvas text-card preview, preserving open/closed fold markers
+  while leaving raw card text editable.
 
 ## Next Implementation Slices
 
