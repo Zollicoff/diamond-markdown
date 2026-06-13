@@ -120,6 +120,45 @@ export interface ObsidianAppearanceInfo {
 	warnings: string[];
 }
 
+export type ObsidianCorePluginSupport = 'supported' | 'partial' | 'manual' | 'unknown';
+
+export interface ObsidianCorePluginEntry {
+	id: string;
+	label: string;
+	support: ObsidianCorePluginSupport;
+	level: VaultImportCheckLevel;
+	detail: string;
+}
+
+export interface ObsidianCorePluginsInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	enabledPlugins: string[];
+	entries: ObsidianCorePluginEntry[];
+	supportedCount: number;
+	partialCount: number;
+	manualCount: number;
+	unknownCount: number;
+	warnings: string[];
+}
+
+export interface ObsidianHotkeyCommand {
+	commandId: string;
+	bindings: string[];
+}
+
+export interface ObsidianHotkeysInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	commandCount: number;
+	bindingCount: number;
+	commands: ObsidianHotkeyCommand[];
+	omittedCommands: number;
+	warnings: string[];
+}
+
 export interface ObsidianBookmarksInfo {
 	path?: string;
 	status: JsonFileStatus;
@@ -173,6 +212,8 @@ export interface VaultImportAnalysis {
 	obsidianDailyNotes: ObsidianDailyNotesInfo;
 	obsidianTemplates: ObsidianTemplatesInfo;
 	obsidianAppearance: ObsidianAppearanceInfo;
+	obsidianCorePlugins: ObsidianCorePluginsInfo;
+	obsidianHotkeys: ObsidianHotkeysInfo;
 	obsidianBookmarks: ObsidianBookmarksInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];

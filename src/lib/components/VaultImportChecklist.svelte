@@ -9,7 +9,9 @@
 		obsidianAppConfigSummary,
 		obsidianAppearanceSummary,
 		obsidianBookmarksSummary,
+		obsidianCorePluginsSummary,
 		obsidianDailyNotesSummary,
+		obsidianHotkeysSummary,
 		obsidianTemplatesSummary,
 		obsidianPluginMigrationNotes,
 		obsidianPluginSummary
@@ -162,6 +164,59 @@
 								<div class="config-detail">{setting.detail}</div>
 							</div>
 							<span class="config-value mono">{setting.value}</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if analysis.obsidianCorePlugins.status !== 'missing'}
+		<div class="note">
+			<span class="note-label">Obsidian core plugins</span>
+			<span>{obsidianCorePluginsSummary(analysis.obsidianCorePlugins)}</span>
+			{#if analysis.obsidianCorePlugins.path}
+				<span class="mono">{analysis.obsidianCorePlugins.path}</span>
+			{/if}
+		</div>
+		{#if analysis.obsidianCorePlugins.entries.length > 0}
+			<ul class="config-settings" aria-label="Obsidian core plugin migration guidance">
+				{#each analysis.obsidianCorePlugins.entries as plugin (plugin.id)}
+					<li class={`config-row ${plugin.level}`}>
+						<div class="config-main">
+							<div>
+								<div class="config-name">{plugin.label}</div>
+								<div class="config-detail">{plugin.detail}</div>
+							</div>
+							<span class="config-value mono">{plugin.support}</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if analysis.obsidianHotkeys.status !== 'missing'}
+		<div class="note">
+			<span class="note-label">Obsidian hotkeys</span>
+			<span>{obsidianHotkeysSummary(analysis.obsidianHotkeys)}</span>
+			{#if analysis.obsidianHotkeys.path}
+				<span class="mono">{analysis.obsidianHotkeys.path}</span>
+			{/if}
+			{#if analysis.obsidianHotkeys.omittedCommands > 0}
+				<span>{analysis.obsidianHotkeys.omittedCommands} more command{analysis.obsidianHotkeys.omittedCommands === 1 ? '' : 's'} omitted from preview.</span>
+			{/if}
+		</div>
+		{#if analysis.obsidianHotkeys.commands.length > 0}
+			<ul class="config-settings" aria-label="Obsidian hotkey migration guidance">
+				{#each analysis.obsidianHotkeys.commands as command (command.commandId)}
+					<li class="config-row info">
+						<div class="config-main">
+							<div>
+								<div class="config-name">{command.commandId}</div>
+								<div class="config-detail">Custom Obsidian shortcut preserved as manual Diamond shortcut guidance.</div>
+							</div>
+							<span class="config-value mono">{compactPathList(command.bindings, 2)}</span>
 						</div>
 					</li>
 				{/each}

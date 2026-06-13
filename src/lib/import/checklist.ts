@@ -2,7 +2,9 @@ import type {
 	ObsidianAppConfigInfo,
 	ObsidianAppearanceInfo,
 	ObsidianBookmarksInfo,
+	ObsidianCorePluginsInfo,
 	ObsidianDailyNotesInfo,
+	ObsidianHotkeysInfo,
 	ObsidianTemplatesInfo,
 	ObsidianPluginInfo,
 	ObsidianPluginJsonStatus,
@@ -123,6 +125,20 @@ export function obsidianAppearanceSummary(config: ObsidianAppearanceInfo): strin
 	if (config.status === 'invalid') return '.obsidian/appearance.json is present but invalid.';
 	if (config.settings.length === 0) return '.obsidian/appearance.json found; no supported Appearance settings were recognized.';
 	return `${config.settings.length} Appearance setting${config.settings.length === 1 ? '' : 's'} found${snippetText ? `; ${snippetText}` : ''}.`;
+}
+
+export function obsidianCorePluginsSummary(config: ObsidianCorePluginsInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/core-plugins.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/core-plugins.json is present but invalid.';
+	if (config.enabledPlugins.length === 0) return '.obsidian/core-plugins.json found; no enabled core plugins were recognized.';
+	return `${config.enabledPlugins.length} enabled core plugin${config.enabledPlugins.length === 1 ? '' : 's'} found: ${config.supportedCount} supported, ${config.partialCount} partial, ${config.manualCount + config.unknownCount} manual review.`;
+}
+
+export function obsidianHotkeysSummary(config: ObsidianHotkeysInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/hotkeys.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/hotkeys.json is present but invalid.';
+	if (config.commandCount === 0) return '.obsidian/hotkeys.json found; no custom hotkey bindings were recognized.';
+	return `${config.bindingCount} custom hotkey binding${config.bindingCount === 1 ? '' : 's'} across ${config.commandCount} command${config.commandCount === 1 ? '' : 's'} found.`;
 }
 
 export function obsidianBookmarksSummary(config: ObsidianBookmarksInfo): string {

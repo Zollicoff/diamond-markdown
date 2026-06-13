@@ -10,6 +10,8 @@ import {
 	obsidianAppearanceSummary,
 	obsidianAppConfigSummary,
 	obsidianBookmarksSummary,
+	obsidianCorePluginsSummary,
+	obsidianHotkeysSummary,
 	obsidianTemplatesSummary,
 	obsidianPluginMigrationNotes,
 	obsidianPluginSummary
@@ -18,6 +20,7 @@ import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-inserti
 import { editorLinkPreference, preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
+import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
 import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
@@ -62,6 +65,24 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			snippetFiles: [],
 			missingEnabledSnippets: [],
 			settings: [],
+			warnings: []
+		},
+		obsidianCorePlugins: {
+			status: 'missing',
+			enabledPlugins: [],
+			entries: [],
+			supportedCount: 0,
+			partialCount: 0,
+			manualCount: 0,
+			unknownCount: 0,
+			warnings: []
+		},
+		obsidianHotkeys: {
+			status: 'missing',
+			commandCount: 0,
+			bindingCount: 0,
+			commands: [],
+			omittedCommands: 0,
 			warnings: []
 		},
 		obsidianBookmarks: {
@@ -333,6 +354,81 @@ test.describe('import checklist helpers', () => {
 		expect(config.warnings).toContain('1 Obsidian CSS snippet name ignored because it was unsafe.');
 		expect(JSON.stringify(config)).not.toContain('do-not-render-this-css-value');
 		expect(JSON.stringify(config)).not.toContain('do-not-render-this-appearance-value');
+	});
+
+	test('summarizes and classifies Obsidian core plugin settings', () => {
+		expect(obsidianCorePluginsSummary(analysis().obsidianCorePlugins)).toBe('No .obsidian/core-plugins.json file was found.');
+		expect(obsidianCorePluginsSummary({
+			path: '.obsidian/core-plugins.json',
+			status: 'invalid',
+			bytes: 8,
+			enabledPlugins: [],
+			entries: [],
+			supportedCount: 0,
+			partialCount: 0,
+			manualCount: 0,
+			unknownCount: 0,
+			warnings: ['invalid']
+		})).toBe('.obsidian/core-plugins.json is present but invalid.');
+
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-core-plugins-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'core-plugins.json'), JSON.stringify([
+			'file-explorer',
+			'global-search',
+			'canvas',
+			'markdown-importer',
+			'unknown-plugin',
+			'../unsafe'
+		]));
+
+		const config = readObsidianCorePlugins(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			enabledPlugins: ['canvas', 'file-explorer', 'global-search', 'markdown-importer', 'unknown-plugin'],
+			supportedCount: 2,
+			partialCount: 1,
+			manualCount: 1,
+			unknownCount: 1
+		});
+		expect(config.entries.map((entry) => `${entry.id}:${entry.support}`)).toEqual([
+			'canvas:partial',
+			'file-explorer:supported',
+			'global-search:supported',
+			'markdown-importer:manual',
+			'unknown-plugin:unknown'
+		]);
+		expect(config.warnings).toContain('1 Obsidian core plugin id ignored because it was unsafe.');
+		expect(obsidianCorePluginsSummary(config)).toBe('5 enabled core plugins found: 2 supported, 1 partial, 2 manual review.');
+	});
+
+	test('summarizes Obsidian hotkeys as manual shortcut guidance', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-hotkeys-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
+			'app:go-back': [{ modifiers: ['Mod', 'Alt'], key: 'ArrowLeft' }],
+			'editor:toggle-bold': [
+				{ modifiers: ['Mod'], key: 'B' },
+				{ modifiers: ['Mod', 'Shift'], key: 'B' }
+			],
+			'unsafe:command': [{ modifiers: ['Mod'], key: '\u0000' }],
+			privateHotkeySetting: 'do-not-render-this-hotkey-value'
+		}));
+
+		const config = readObsidianHotkeys(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			commandCount: 2,
+			bindingCount: 3,
+			commands: [
+				{ commandId: 'app:go-back', bindings: ['Mod+Alt+ArrowLeft'] },
+				{ commandId: 'editor:toggle-bold', bindings: ['Mod+B', 'Mod+Shift+B'] }
+			],
+			omittedCommands: 0
+		});
+		expect(config.warnings).toContain('1 Obsidian hotkey binding ignored because it was invalid or unsafe.');
+		expect(JSON.stringify(config)).not.toContain('do-not-render-this-hotkey-value');
+		expect(obsidianHotkeysSummary(config)).toBe('3 custom hotkey bindings across 2 commands found.');
 	});
 
 	test('uses safe Obsidian Templates settings for template runtime defaults', () => {

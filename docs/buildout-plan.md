@@ -18,9 +18,9 @@ Diamond Markdown already has the right foundation:
   iframe UI panels, markdown postprocessors, commands, and editor commands.
 - Obsidian-vault import preflight that preserves markdown unchanged, detects
   `.obsidian`, attachment folders, media outside named attachment folders,
-  supported Obsidian app settings, Obsidian plugin folders with manual
-  settings-migration guidance, Canvas files, and Git readiness before
-  registration.
+  supported Obsidian app settings, core-plugin and hotkey migration guidance,
+  Obsidian plugin folders with manual settings-migration guidance, Canvas files,
+  and Git readiness before registration.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and batched full-suite Playwright e2e.
 
@@ -378,6 +378,10 @@ Use small, pushable slices:
 - **Obsidian Appearance guidance.** Surface `.obsidian/appearance.json` theme,
    font, accent, and CSS snippet filenames as read-only migration guidance
    without loading Obsidian community themes, CSS snippets, or raw CSS contents.
+- **Obsidian core-plugin and hotkey guidance.** Surface
+   `.obsidian/core-plugins.json` support levels and sanitized
+   `.obsidian/hotkeys.json` shortcut summaries as manual migration guidance
+   without enabling/disabling features or remapping shortcuts automatically.
 - **Obsidian configured new-note folder.** Use a safe
    `.obsidian/app.json` `newFileLocation: "folder"` plus
    `newFileFolderPath` as the default destination for generic new-note

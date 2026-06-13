@@ -18,6 +18,9 @@ an existing Obsidian vault. The preflight reports:
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
   read-only migration guidance
+- `.obsidian/core-plugins.json` support notes for enabled Obsidian core plugins
+- `.obsidian/hotkeys.json` custom shortcut summaries as manual migration
+  guidance
 - Obsidian `bookmarks.json` or legacy `starred.json` note bookmarks that can
   seed Diamond's git-backed bookmarks
 - Obsidian plugin folders plus read-only manifest/settings migration guidance
@@ -64,6 +67,14 @@ Diamond surfaces theme names, base font size, accent color, enabled snippet
 names, missing enabled snippets, and snippet filenames as read-only migration
 guidance. It does not load Obsidian community themes, execute CSS snippets, or
 show CSS file contents during import preview.
+
+When `.obsidian/core-plugins.json` or `.obsidian/hotkeys.json` is present,
+Diamond surfaces enabled core-plugin support levels and custom shortcut
+bindings as migration guidance. Supported core plugins are called out where
+Diamond already has an equivalent workflow, partial/manual plugins are marked
+for review, and hotkeys are shown as command IDs plus sanitized key bindings.
+Diamond does not enable or disable app features from Obsidian's core-plugin
+list and does not automatically remap Obsidian shortcuts.
 
 When `.obsidian/bookmarks.json` or legacy `.obsidian/starred.json` is present,
 Diamond imports visible Markdown file bookmarks into `.diamondmd/bookmarks.json`
@@ -145,6 +156,9 @@ initial state of the imported vault is captured explicitly.
 - It does not import or execute Obsidian plugins.
 - It does not automatically migrate Obsidian plugin settings into Diamond plugins.
 - It does not load Obsidian community themes or CSS snippets.
+- It does not automatically enable/disable features from Obsidian core-plugin
+  settings.
+- It does not automatically remap Obsidian hotkeys into Diamond shortcuts.
 - It does not convert Obsidian search bookmarks, bookmark groups, or non-note
   bookmarks into Diamond bookmarks.
 - It does not automatically apply every `.obsidian/app.json` UI preference.

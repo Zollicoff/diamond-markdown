@@ -11,6 +11,7 @@ import type {
 import { readObsidianAppearanceConfig } from './obsidian-appearance';
 import { readObsidianAppConfig } from './obsidian-config';
 import { readObsidianBookmarks } from './obsidian-bookmarks';
+import { readObsidianCorePlugins, readObsidianHotkeys } from './obsidian-core';
 import { readObsidianDailyNotesConfig } from './obsidian-daily';
 import { readObsidianTemplatesConfig } from './obsidian-templates';
 
@@ -110,6 +111,24 @@ function obsidianAppearanceDetail(config: ReturnType<typeof readObsidianAppearan
 	return 'No Obsidian Appearance settings were found.';
 }
 
+function obsidianCorePluginsDetail(config: ReturnType<typeof readObsidianCorePlugins>): string {
+	if (config.status === 'invalid') {
+		return '.obsidian/core-plugins.json is invalid; Diamond will preserve it but cannot summarize enabled core plugins.';
+	}
+	if (config.status === 'missing') return 'No Obsidian core plugin list was found.';
+	if (config.enabledPlugins.length === 0) return '.obsidian/core-plugins.json found, but no enabled core plugins were recognized.';
+	return `${config.enabledPlugins.length} enabled core plugin${config.enabledPlugins.length === 1 ? '' : 's'} found: ${config.supportedCount} supported, ${config.partialCount} partial, ${config.manualCount + config.unknownCount} manual review.`;
+}
+
+function obsidianHotkeysDetail(config: ReturnType<typeof readObsidianHotkeys>): string {
+	if (config.status === 'invalid') {
+		return '.obsidian/hotkeys.json is invalid; Diamond will preserve it but cannot summarize custom hotkeys.';
+	}
+	if (config.status === 'missing') return 'No Obsidian custom hotkeys file was found.';
+	if (config.commandCount === 0) return '.obsidian/hotkeys.json found, but no custom hotkey bindings were recognized.';
+	return `${config.bindingCount} custom hotkey binding${config.bindingCount === 1 ? '' : 's'} across ${config.commandCount} command${config.commandCount === 1 ? '' : 's'} found for manual shortcut recreation.`;
+}
+
 export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (!inputPath?.trim()) throw new Error('path required');
 	const root = expandHome(inputPath);
@@ -138,6 +157,8 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const obsidianDailyNotes = readObsidianDailyNotesConfig(root);
 	const obsidianTemplates = readObsidianTemplatesConfig(root);
 	const obsidianAppearance = readObsidianAppearanceConfig(root);
+	const obsidianCorePlugins = readObsidianCorePlugins(root);
+	const obsidianHotkeys = readObsidianHotkeys(root);
 	const obsidianBookmarks = readObsidianBookmarks(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
@@ -238,6 +259,8 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	warnings.push(...obsidianDailyNotes.warnings);
 	warnings.push(...obsidianTemplates.warnings);
 	warnings.push(...obsidianAppearance.warnings);
+	warnings.push(...obsidianCorePlugins.warnings);
+	warnings.push(...obsidianHotkeys.warnings);
 	warnings.push(...obsidianBookmarks.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
@@ -307,6 +330,22 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				: obsidianAppearance.status === 'present' || obsidianAppearance.snippetFiles.length > 0 ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-core-plugins',
+			'Core plugins',
+			obsidianCorePluginsDetail(obsidianCorePlugins),
+			obsidianCorePlugins.status === 'invalid'
+				? 'warn'
+				: obsidianCorePlugins.status === 'present' && obsidianCorePlugins.enabledPlugins.length > 0 ? 'info' : 'ok'
+		),
+		item(
+			'obsidian-hotkeys',
+			'Custom hotkeys',
+			obsidianHotkeysDetail(obsidianHotkeys),
+			obsidianHotkeys.status === 'invalid'
+				? 'warn'
+				: obsidianHotkeys.status === 'present' && obsidianHotkeys.commandCount > 0 ? 'info' : 'ok'
+		),
+		item(
 			'obsidian-bookmarks',
 			'Obsidian bookmarks',
 			obsidianBookmarksDetail(obsidianBookmarks),
@@ -358,6 +397,8 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		obsidianDailyNotes,
 		obsidianTemplates,
 		obsidianAppearance,
+		obsidianCorePlugins,
+		obsidianHotkeys,
 		obsidianBookmarks,
 		obsidianPluginFolders,
 		obsidianPlugins,

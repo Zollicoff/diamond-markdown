@@ -174,6 +174,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		enabledCssSnippets: ['cards'],
 		privateAppearanceSetting: 'do-not-render-this-appearance-value'
 	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'core-plugins.json'), JSON.stringify([
+		'file-explorer',
+		'global-search',
+		'canvas',
+		'markdown-importer'
+	]));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
+		'app:go-back': [{ modifiers: ['Mod'], key: 'ArrowLeft' }],
+		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
+		privateHotkeySetting: 'do-not-render-this-hotkey-value'
+	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
 		items: [
@@ -254,6 +265,24 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			snippetFiles: string[];
 			missingEnabledSnippets: string[];
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
+			warnings: string[];
+		};
+		obsidianCorePlugins: {
+			status: string;
+			enabledPlugins: string[];
+			entries: { id: string; label: string; support: string; level: string; detail: string }[];
+			supportedCount: number;
+			partialCount: number;
+			manualCount: number;
+			unknownCount: number;
+			warnings: string[];
+		};
+		obsidianHotkeys: {
+			status: string;
+			commandCount: number;
+			bindingCount: number;
+			commands: { commandId: string; bindings: string[] }[];
+			omittedCommands: number;
 			warnings: string[];
 		};
 		obsidianBookmarks: {
@@ -353,6 +382,31 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	]);
 	expect(JSON.stringify(body.obsidianAppearance)).not.toContain('do-not-render-this-appearance-value');
 	expect(JSON.stringify(body.obsidianAppearance)).not.toContain('do-not-render-this-css-value');
+	expect(body.obsidianCorePlugins).toMatchObject({
+		status: 'present',
+		enabledPlugins: ['canvas', 'file-explorer', 'global-search', 'markdown-importer'],
+		supportedCount: 2,
+		partialCount: 1,
+		manualCount: 1,
+		unknownCount: 0
+	});
+	expect(body.obsidianCorePlugins.entries.map((entry) => `${entry.id}:${entry.support}`)).toEqual([
+		'canvas:partial',
+		'file-explorer:supported',
+		'global-search:supported',
+		'markdown-importer:manual'
+	]);
+	expect(body.obsidianHotkeys).toMatchObject({
+		status: 'present',
+		commandCount: 2,
+		bindingCount: 2,
+		commands: [
+			{ commandId: 'app:go-back', bindings: ['Mod+ArrowLeft'] },
+			{ commandId: 'editor:toggle-bold', bindings: ['Mod+B'] }
+		],
+		omittedCommands: 0
+	});
+	expect(JSON.stringify(body.obsidianHotkeys)).not.toContain('do-not-render-this-hotkey-value');
 	expect(body.obsidianBookmarks).toMatchObject({
 		status: 'present',
 		source: 'bookmarks',
@@ -377,6 +431,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.checklist.find((row) => row.id === 'obsidian-plugins')?.level).toBe('info');
 	expect(body.checklist.find((row) => row.id === 'obsidian-templates')?.detail).toContain('templates load from Snippet Bank');
 	expect(body.checklist.find((row) => row.id === 'obsidian-appearance')?.detail).toContain('6 Appearance settings found');
+	expect(body.checklist.find((row) => row.id === 'obsidian-core-plugins')?.detail).toContain('4 enabled core plugins found');
+	expect(body.checklist.find((row) => row.id === 'obsidian-hotkeys')?.detail).toContain('2 custom hotkey bindings across 2 commands found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 bookmark item can seed Diamond bookmarks');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
@@ -418,6 +474,17 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		accentColor: '#0f766e',
 		enabledCssSnippets: ['cards'],
 		privateAppearanceSetting: 'do-not-render-this-appearance-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'core-plugins.json'), JSON.stringify([
+		'file-explorer',
+		'global-search',
+		'canvas',
+		'markdown-importer'
+	]));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
+		'app:go-back': [{ modifiers: ['Mod'], key: 'ArrowLeft' }],
+		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
+		privateHotkeySetting: 'do-not-render-this-hotkey-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
@@ -504,6 +571,22 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('cards');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-appearance-value');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-css-value');
+	await expect(page.locator('.import-card')).toContainText('Obsidian core plugins');
+	await expect(page.locator('.import-card')).toContainText('4 enabled core plugins found');
+	await expect(page.locator('.import-card')).toContainText('File explorer');
+	await expect(page.locator('.import-card')).toContainText('Search');
+	await expect(page.locator('.import-card')).toContainText('Canvas');
+	await expect(page.locator('.import-card')).toContainText('Markdown importer');
+	await expect(page.locator('.import-card')).toContainText('supported');
+	await expect(page.locator('.import-card')).toContainText('partial');
+	await expect(page.locator('.import-card')).toContainText('manual');
+	await expect(page.locator('.import-card')).toContainText('Obsidian hotkeys');
+	await expect(page.locator('.import-card')).toContainText('2 custom hotkey bindings across 2 commands found');
+	await expect(page.locator('.import-card')).toContainText('app:go-back');
+	await expect(page.locator('.import-card')).toContainText('Mod+ArrowLeft');
+	await expect(page.locator('.import-card')).toContainText('editor:toggle-bold');
+	await expect(page.locator('.import-card')).toContainText('Mod+B');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-hotkey-value');
 	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
 	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');
 	await expect(page.locator('.import-card')).toContainText('Home.md');
