@@ -73,8 +73,10 @@ Diamond surfaces enabled core-plugin support levels and custom shortcut
 bindings as migration guidance. Supported core plugins are called out where
 Diamond already has an equivalent workflow, partial/manual plugins are marked
 for review, and hotkeys are shown as command IDs plus sanitized key bindings.
-Diamond does not enable or disable app features from Obsidian's core-plugin
-list and does not automatically remap Obsidian shortcuts.
+When a known Obsidian command has a Diamond equivalent, the preview names the
+Diamond command beside the imported binding. Diamond does not enable or disable
+app features from Obsidian's core-plugin list and does not automatically remap
+Obsidian shortcuts.
 
 When `.obsidian/bookmarks.json` or legacy `.obsidian/starred.json` is present,
 Diamond imports visible Markdown file bookmarks into `.diamondmd/bookmarks.json`

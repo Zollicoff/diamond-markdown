@@ -214,9 +214,14 @@
 						<div class="config-main">
 							<div>
 								<div class="config-name">{command.commandId}</div>
-								<div class="config-detail">Custom Obsidian shortcut preserved as manual Diamond shortcut guidance.</div>
+								<div class="config-detail">
+									{command.detail}
+									{#if command.diamondCommandTitle}
+										<span class="mono">Diamond: {command.diamondCommandTitle}</span>
+									{/if}
+								</div>
 							</div>
-							<span class="config-value mono">{compactPathList(command.bindings, 2)}</span>
+							<span class="config-value mono">{command.support}: {compactPathList(command.bindings, 2)}</span>
 						</div>
 					</li>
 				{/each}

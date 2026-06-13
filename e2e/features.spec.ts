@@ -181,7 +181,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'markdown-importer'
 	]));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
-		'app:go-back': [{ modifiers: ['Mod'], key: 'ArrowLeft' }],
+		'switcher:open': [{ modifiers: ['Mod'], key: 'K' }],
 		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
 		privateHotkeySetting: 'do-not-render-this-hotkey-value'
 	}));
@@ -401,8 +401,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		commandCount: 2,
 		bindingCount: 2,
 		commands: [
-			{ commandId: 'app:go-back', bindings: ['Mod+ArrowLeft'] },
-			{ commandId: 'editor:toggle-bold', bindings: ['Mod+B'] }
+			{ commandId: 'editor:toggle-bold', bindings: ['Mod+B'], support: 'manual' },
+			{ commandId: 'switcher:open', bindings: ['Mod+K'], support: 'mapped', diamondCommandId: 'switcher.open' }
 		],
 		omittedCommands: 0
 	});
@@ -482,7 +482,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		'markdown-importer'
 	]));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
-		'app:go-back': [{ modifiers: ['Mod'], key: 'ArrowLeft' }],
+		'switcher:open': [{ modifiers: ['Mod'], key: 'K' }],
 		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
 		privateHotkeySetting: 'do-not-render-this-hotkey-value'
 	}));
@@ -582,10 +582,11 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('manual');
 	await expect(page.locator('.import-card')).toContainText('Obsidian hotkeys');
 	await expect(page.locator('.import-card')).toContainText('2 custom hotkey bindings across 2 commands found');
-	await expect(page.locator('.import-card')).toContainText('app:go-back');
-	await expect(page.locator('.import-card')).toContainText('Mod+ArrowLeft');
+	await expect(page.locator('.import-card')).toContainText('switcher:open');
+	await expect(page.locator('.import-card')).toContainText('Diamond: Quick switcher');
+	await expect(page.locator('.import-card')).toContainText('mapped: Mod+K');
 	await expect(page.locator('.import-card')).toContainText('editor:toggle-bold');
-	await expect(page.locator('.import-card')).toContainText('Mod+B');
+	await expect(page.locator('.import-card')).toContainText('manual: Mod+B');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-hotkey-value');
 	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
 	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');

@@ -9,6 +9,7 @@ import type {
 	ObsidianHotkeysInfo,
 	VaultImportCheckLevel
 } from '$lib/types';
+import { diamondCommandForObsidian } from '$lib/shortcuts/obsidian';
 
 const MAX_HOTKEY_COMMANDS = 40;
 const SAFE_COMMAND_ID = /^[A-Za-z0-9:_./-]{1,120}$/;
@@ -309,7 +310,17 @@ export function readObsidianHotkeys(root: string): ObsidianHotkeysInfo {
 			.map(hotkeyBinding)
 			.filter((binding): binding is string => Boolean(binding));
 		ignoredBindings += rawBindings.length - bindings.length;
-		if (bindings.length > 0) commands.push({ commandId, bindings });
+		if (bindings.length > 0) {
+			const alias = diamondCommandForObsidian(commandId);
+			commands.push({
+				commandId,
+				bindings,
+				support: alias ? 'mapped' : 'manual',
+				detail: alias?.detail ?? 'No direct Diamond command is mapped yet; recreate or skip this shortcut manually.',
+				diamondCommandId: alias?.diamondCommandId,
+				diamondCommandTitle: alias?.diamondTitle
+			});
+		}
 	}
 
 	const sorted = commands.sort((a, b) => a.commandId.localeCompare(b.commandId));

@@ -406,7 +406,7 @@ test.describe('import checklist helpers', () => {
 		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-hotkeys-'));
 		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'hotkeys.json'), JSON.stringify({
-			'app:go-back': [{ modifiers: ['Mod', 'Alt'], key: 'ArrowLeft' }],
+			'switcher:open': [{ modifiers: ['Mod', 'Alt'], key: 'ArrowLeft' }],
 			'editor:toggle-bold': [
 				{ modifiers: ['Mod'], key: 'B' },
 				{ modifiers: ['Mod', 'Shift'], key: 'B' }
@@ -421,8 +421,19 @@ test.describe('import checklist helpers', () => {
 			commandCount: 2,
 			bindingCount: 3,
 			commands: [
-				{ commandId: 'app:go-back', bindings: ['Mod+Alt+ArrowLeft'] },
-				{ commandId: 'editor:toggle-bold', bindings: ['Mod+B', 'Mod+Shift+B'] }
+				{
+					commandId: 'editor:toggle-bold',
+					bindings: ['Mod+B', 'Mod+Shift+B'],
+					support: 'manual',
+					detail: 'No direct Diamond command is mapped yet; recreate or skip this shortcut manually.'
+				},
+				{
+					commandId: 'switcher:open',
+					bindings: ['Mod+Alt+ArrowLeft'],
+					support: 'mapped',
+					diamondCommandId: 'switcher.open',
+					diamondCommandTitle: 'Quick switcher'
+				}
 			],
 			omittedCommands: 0
 		});

@@ -37,6 +37,26 @@ export function registerViewCommands(): void {
 	});
 
 	register({
+		id: 'switcher.open',
+		title: 'Quick switcher',
+		shortcut: '⌘K',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			emit('switcher:open', { vaultId: ctx.vaultId!, fullText: false });
+		}
+	});
+
+	register({
+		id: 'search.quick-open',
+		title: 'Full-text search',
+		shortcut: '⌘⇧F',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			emit('switcher:open', { vaultId: ctx.vaultId!, fullText: true });
+		}
+	});
+
+	register({
 		id: 'tags.open',
 		title: 'Show tags',
 		icon: '#',

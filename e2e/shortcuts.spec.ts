@@ -2,6 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
+import { bindings, comboToDisplay } from '../src/lib/commands/keymap';
+import { diamondCommandForObsidian } from '../src/lib/shortcuts/obsidian';
+import { buildShortcutRows, groupShortcutRows } from '../src/lib/shortcuts/view';
+import type { CommandDef } from '../src/lib/commands/registry';
 
 /**
  * Hotkey spec — every shortcut in the global keymap fires its actual
@@ -10,6 +14,39 @@ import { FIXTURE_PATHS } from './setup-fixture';
  */
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+const commandFixtures: CommandDef[] = [
+	{ id: 'switcher.open', title: 'Quick switcher', shortcut: '⌘K', category: 'view', exec() {} },
+	{ id: 'search.quick-open', title: 'Full-text search', shortcut: '⌘⇧F', category: 'view', exec() {} },
+	{ id: 'palette.open', title: 'Open command palette', shortcut: '⌘P', category: 'view', exec() {} },
+	{ id: 'daily.open', title: "Open today's daily note", shortcut: '⌘⇧D', category: 'file', exec() {} },
+	{ id: 'tabs.close', title: 'Close tab', shortcut: '⌘W', category: 'tabs', exec() {} }
+];
+
+test('shortcut helpers expose global keymap rows and Obsidian command aliases', () => {
+	const rows = buildShortcutRows(commandFixtures, bindings).map((row) => ({
+		...row,
+		shortcut: row.source === 'global' ? comboToDisplay(row.shortcut) : row.shortcut
+	}));
+	const switcher = rows.find((row) => row.commandId === 'switcher.open');
+	expect(switcher).toMatchObject({
+		title: 'Quick switcher',
+		shortcut: '⌘K',
+		category: 'view',
+		source: 'global',
+		obsidianCommandIds: ['switcher:open']
+	});
+	expect(rows.find((row) => row.commandId === 'search.quick-open')).toMatchObject({
+		title: 'Full-text search',
+		shortcut: '⌘⇧F',
+		obsidianCommandIds: ['global-search:open']
+	});
+	expect(diamondCommandForObsidian('command-palette:open')).toMatchObject({
+		diamondCommandId: 'palette.open',
+		diamondTitle: 'Open command palette'
+	});
+	expect(groupShortcutRows(rows).get('view')?.map((row) => row.title)).toContain('Quick switcher');
+});
 
 async function openVault(page: Page): Promise<void> {
 	await page.goto('/vault/default');

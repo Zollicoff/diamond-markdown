@@ -146,6 +146,10 @@ export interface ObsidianCorePluginsInfo {
 export interface ObsidianHotkeyCommand {
 	commandId: string;
 	bindings: string[];
+	support: 'mapped' | 'manual';
+	detail: string;
+	diamondCommandId?: string;
+	diamondCommandTitle?: string;
 }
 
 export interface ObsidianHotkeysInfo {

@@ -380,8 +380,9 @@ Use small, pushable slices:
    without loading Obsidian community themes, CSS snippets, or raw CSS contents.
 - **Obsidian core-plugin and hotkey guidance.** Surface
    `.obsidian/core-plugins.json` support levels and sanitized
-   `.obsidian/hotkeys.json` shortcut summaries as manual migration guidance
-   without enabling/disabling features or remapping shortcuts automatically.
+   `.obsidian/hotkeys.json` shortcut summaries as migration guidance, mapping
+   known Obsidian command IDs to Diamond command equivalents without
+   enabling/disabling features or remapping shortcuts automatically.
 - **Obsidian configured new-note folder.** Use a safe
    `.obsidian/app.json` `newFileLocation: "folder"` plus
    `newFileFolderPath` as the default destination for generic new-note

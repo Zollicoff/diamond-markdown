@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/vault-api';
+	import { on as onBus } from '$lib/events';
 	import type { SearchHit } from '$lib/types';
 
 	interface Props {
@@ -18,28 +19,16 @@
 	let inputEl: HTMLInputElement | null = $state(null);
 	let controller: AbortController | null = null;
 
+	function show(nextFullText: boolean): void {
+		open = true;
+		fullText = nextFullText;
+		query = '';
+		selectedIdx = 0;
+		results = [];
+		setTimeout(() => inputEl?.focus(), 0);
+	}
+
 	function handleKey(e: KeyboardEvent): void {
-		const mod = e.metaKey || e.ctrlKey;
-		if (mod && e.key === 'k' && !e.shiftKey) {
-			e.preventDefault();
-			open = true;
-			fullText = false;
-			query = '';
-			selectedIdx = 0;
-			results = [];
-			setTimeout(() => inputEl?.focus(), 0);
-			return;
-		}
-		if (mod && e.key === 'F' && e.shiftKey) {
-			e.preventDefault();
-			open = true;
-			fullText = true;
-			query = '';
-			selectedIdx = 0;
-			results = [];
-			setTimeout(() => inputEl?.focus(), 0);
-			return;
-		}
 		if (open && e.key === 'Escape') {
 			open = false;
 			return;
@@ -61,8 +50,15 @@
 	}
 
 	onMount(() => {
+		const offSwitcher = onBus('switcher:open', (event) => {
+			if (event.vaultId !== vaultId) return;
+			show(Boolean(event.fullText));
+		});
 		window.addEventListener('keydown', handleKey);
-		return () => window.removeEventListener('keydown', handleKey);
+		return () => {
+			offSwitcher();
+			window.removeEventListener('keydown', handleKey);
+		};
 	});
 
 	async function runSearch(): Promise<void> {
