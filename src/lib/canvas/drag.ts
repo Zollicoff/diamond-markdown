@@ -10,6 +10,7 @@ export interface CanvasDragPointer {
 export interface CanvasNodeDragState {
 	nodeId: string;
 	pointerId: number;
+	scale: number;
 	startClientX: number;
 	startClientY: number;
 	originX: number;
@@ -21,6 +22,7 @@ export interface CanvasNodeDragState {
 export interface CanvasNodeResizeState {
 	nodeId: string;
 	pointerId: number;
+	scale: number;
 	startClientX: number;
 	startClientY: number;
 	originWidth: number;
@@ -33,11 +35,13 @@ export interface CanvasNodeResizeState {
 
 export function createCanvasNodeDragState(
 	node: Pick<CanvasNode, 'id' | 'x' | 'y'>,
-	pointer: CanvasDragPointer
+	pointer: CanvasDragPointer,
+	scale = 1
 ): CanvasNodeDragState {
 	return {
 		nodeId: node.id,
 		pointerId: pointer.pointerId,
+		scale: normalizedInteractionScale(scale),
 		startClientX: pointer.clientX,
 		startClientY: pointer.clientY,
 		originX: node.x,
@@ -61,8 +65,8 @@ export function updateCanvasNodeDragState(
 	if (!isCanvasNodeDragPointer(state, pointer)) return state;
 	return {
 		...state,
-		currentX: Math.round(state.originX + pointer.clientX - state.startClientX),
-		currentY: Math.round(state.originY + pointer.clientY - state.startClientY)
+		currentX: Math.round(state.originX + (pointer.clientX - state.startClientX) / state.scale),
+		currentY: Math.round(state.originY + (pointer.clientY - state.startClientY) / state.scale)
 	};
 }
 
@@ -82,12 +86,14 @@ export function canvasNodeMinSize(node: Pick<CanvasNode, 'type'>): { width: numb
 
 export function createCanvasNodeResizeState(
 	node: Pick<CanvasNode, 'id' | 'type' | 'width' | 'height'>,
-	pointer: CanvasDragPointer
+	pointer: CanvasDragPointer,
+	scale = 1
 ): CanvasNodeResizeState {
 	const min = canvasNodeMinSize(node);
 	return {
 		nodeId: node.id,
 		pointerId: pointer.pointerId,
+		scale: normalizedInteractionScale(scale),
 		startClientX: pointer.clientX,
 		startClientY: pointer.clientY,
 		originWidth: node.width,
@@ -113,8 +119,8 @@ export function updateCanvasNodeResizeState(
 	if (!isCanvasNodeResizePointer(state, pointer)) return state;
 	return {
 		...state,
-		currentWidth: Math.max(state.minWidth, Math.round(state.originWidth + pointer.clientX - state.startClientX)),
-		currentHeight: Math.max(state.minHeight, Math.round(state.originHeight + pointer.clientY - state.startClientY))
+		currentWidth: Math.max(state.minWidth, Math.round(state.originWidth + (pointer.clientX - state.startClientX) / state.scale)),
+		currentHeight: Math.max(state.minHeight, Math.round(state.originHeight + (pointer.clientY - state.startClientY) / state.scale))
 	};
 }
 
@@ -124,4 +130,8 @@ export function canvasNodeResizeSize(state: CanvasNodeResizeState): CanvasNodeSi
 		width: state.currentWidth,
 		height: state.currentHeight
 	};
+}
+
+function normalizedInteractionScale(scale: number): number {
+	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }

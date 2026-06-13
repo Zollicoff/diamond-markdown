@@ -413,6 +413,9 @@ Use small, pushable slices:
 - **Canvas file-card subpaths.** Preserve JSON Canvas file-node `subpath`
   values, expose them in the file-card editor, and route Markdown file cards to
   heading or block anchors without changing asset or nested-Canvas handling.
+- **Canvas viewport zoom.** Add Canvas zoom in/out/reset/fit controls with a
+  scaled board shell and zoom-aware node drag/resize math so board navigation
+  is closer to the Obsidian Canvas daily-driver workflow.
 
 ## Next Implementation Slices
 

@@ -88,6 +88,18 @@ import {
 	updateCanvasNodeDragState,
 	updateCanvasNodeResizeState
 } from '../src/lib/canvas/drag';
+import {
+	canZoomCanvasIn,
+	canZoomCanvasOut,
+	canvasBoardZoomStyle,
+	canvasGridBackgroundSize,
+	canvasZoomLabel,
+	canvasZoomLayerStyle,
+	fitCanvasZoom,
+	normalizeCanvasZoom,
+	scaledCanvasLength,
+	stepCanvasZoom
+} from '../src/lib/canvas/viewport';
 
 const canvasJson = JSON.stringify({
 	nodes: [
@@ -118,6 +130,21 @@ test.describe('canvas view helpers', () => {
 			warnings: []
 		} satisfies CanvasDoc;
 		const bounds = canvasBounds(doc.nodes);
+		expect(normalizeCanvasZoom(9)).toBe(2);
+		expect(normalizeCanvasZoom(0.1)).toBe(0.25);
+		expect(normalizeCanvasZoom(Number.NaN)).toBe(1);
+		expect(canvasZoomLabel(1.25)).toBe('125%');
+		expect(canZoomCanvasIn(1.99)).toBe(true);
+		expect(canZoomCanvasIn(2)).toBe(false);
+		expect(canZoomCanvasOut(0.26)).toBe(true);
+		expect(canZoomCanvasOut(0.25)).toBe(false);
+		expect(stepCanvasZoom(1, 'in')).toBe(1.25);
+		expect(stepCanvasZoom(1, 'out')).toBe(0.8);
+		expect(fitCanvasZoom({ width: 1000, height: 500 }, 564, 314)).toBe(0.5);
+		expect(scaledCanvasLength(640, 1.25)).toBe(800);
+		expect(canvasZoomLayerStyle({ width: 640, height: 360 }, 1.25)).toBe('width: 800px; height: 450px');
+		expect(canvasBoardZoomStyle({ width: 640, height: 360 }, 0.8)).toBe('width: 640px; height: 360px; transform: scale(0.8)');
+		expect(canvasGridBackgroundSize(0.5)).toBe('18px 18px');
 
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');
@@ -359,6 +386,16 @@ test.describe('canvas view helpers', () => {
 			clientY: 150.6
 		});
 		expect(canvasNodeDragPosition(dragMoved)).toEqual({ nodeId: 'b', x: 380, y: 71 });
+		const zoomedDragMoved = updateCanvasNodeDragState(createCanvasNodeDragState(doc.nodes[1], {
+			pointerId: 17,
+			clientX: 100,
+			clientY: 120
+		}, 2), {
+			pointerId: 17,
+			clientX: 160,
+			clientY: 150
+		});
+		expect(canvasNodeDragPosition(zoomedDragMoved)).toEqual({ nodeId: 'b', x: 350, y: 55 });
 		expect(canvasNodeMinSize(doc.nodes[1])).toEqual({ width: 140, height: 150 });
 		const resizeStart = createCanvasNodeResizeState(doc.nodes[1], {
 			pointerId: 8,
@@ -378,6 +415,16 @@ test.describe('canvas view helpers', () => {
 			clientY: 315.6
 		});
 		expect(canvasNodeResizeSize(resizeGrown)).toEqual({ nodeId: 'b', width: 295, height: 176 });
+		const zoomedResizeGrown = updateCanvasNodeResizeState(createCanvasNodeResizeState(doc.nodes[1], {
+			pointerId: 18,
+			clientX: 200,
+			clientY: 240
+		}, 2), {
+			pointerId: 18,
+			clientX: 280,
+			clientY: 300
+		});
+		expect(canvasNodeResizeSize(zoomedResizeGrown)).toEqual({ nodeId: 'b', width: 260, height: 150 });
 		const resizeClamped = updateCanvasNodeResizeState(resizeStart, {
 			pointerId: 8,
 			clientX: -200,
@@ -468,6 +515,15 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 	await expect(page.locator('.canvas-view .edge').first()).toHaveAttribute('style', /stroke: rgb\(147, 51, 234\)/);
 	await expect(page.locator('.canvas-view .edge').first()).toHaveAttribute('marker-start', /^url\(#canvas-edge-edge-a-b-[a-z0-9]+-from\)$/);
 	await expect(page.locator('.canvas-view .edge').first()).not.toHaveAttribute('marker-end', /.*/);
+	const zoomControls = page.getByRole('group', { name: 'Canvas zoom controls' });
+	await expect(zoomControls.locator('.zoom-value')).toHaveText('100%');
+	await zoomControls.getByRole('button', { name: 'Zoom in Canvas' }).click();
+	await expect(zoomControls.locator('.zoom-value')).toHaveText('125%');
+	await expect(page.locator('.canvas-board')).toHaveAttribute('style', /transform: scale\(1\.25\)/);
+	await zoomControls.getByRole('button', { name: 'Zoom out Canvas' }).click();
+	await expect(zoomControls.locator('.zoom-value')).toHaveText('100%');
+	await zoomControls.getByRole('button', { name: 'Reset Canvas zoom' }).click();
+	await expect(page.locator('.canvas-board')).toHaveAttribute('style', /transform: scale\(1\)/);
 	await expect(page.locator('.canvas-view')).toContainText('Home.md');
 	await expect(page.getByRole('button', { name: 'Add text' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Download SVG' })).toHaveAttribute(

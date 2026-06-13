@@ -37,6 +37,10 @@
 		deletingNodeId: string | null;
 		savingEdgeId: string | null;
 		deletingEdgeId: string | null;
+		zoom: number;
+		zoomLabel: string;
+		canZoomIn: boolean;
+		canZoomOut: boolean;
 		onEdgeLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
 		onEdgeRoutingDraftChange: (edge: CanvasEdgeSummary, draft: CanvasEdgeRoutingDraft) => void;
 		onSaveEdgeLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
@@ -54,6 +58,10 @@
 		onDeleteNode: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
+		onZoomIn: () => void;
+		onZoomOut: () => void;
+		onZoomReset: () => void;
+		onZoomFit: (viewportWidth: number, viewportHeight: number) => void;
 	}
 
 	let {
@@ -78,6 +86,10 @@
 		deletingNodeId,
 		savingEdgeId,
 		deletingEdgeId,
+		zoom,
+		zoomLabel,
+		canZoomIn,
+		canZoomOut,
 		onEdgeLabelDraftChange,
 		onEdgeRoutingDraftChange,
 		onSaveEdgeLabel,
@@ -94,7 +106,11 @@
 		onSaveNodeColor,
 		onDeleteNode,
 		onMovePointerDown,
-		onResizePointerDown
+		onResizePointerDown,
+		onZoomIn,
+		onZoomOut,
+		onZoomReset,
+		onZoomFit
 	}: Props = $props();
 </script>
 
@@ -141,6 +157,10 @@
 		{deletingNodeId}
 		{savingEdgeId}
 		{deletingEdgeId}
+		{zoom}
+		{zoomLabel}
+		{canZoomIn}
+		{canZoomOut}
 		onDraftChange={onDraftChange}
 		onGroupLabelDraftChange={onGroupLabelDraftChange}
 		onRefDraftChange={onRefDraftChange}
@@ -152,6 +172,10 @@
 		onDelete={onDeleteNode}
 		{onMovePointerDown}
 		{onResizePointerDown}
+		{onZoomIn}
+		{onZoomOut}
+		{onZoomReset}
+		{onZoomFit}
 	/>
 {/if}
 

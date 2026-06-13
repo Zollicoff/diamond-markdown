@@ -53,6 +53,14 @@
 		type CanvasNodeDragState,
 		type CanvasNodeResizeState
 	} from '$lib/canvas/drag';
+	import {
+		canZoomCanvasIn,
+		canZoomCanvasOut,
+		canvasZoomLabel,
+		fitCanvasZoom,
+		normalizeCanvasZoom,
+		stepCanvasZoom
+	} from '$lib/canvas/viewport';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
 
@@ -86,6 +94,7 @@
 	let edgeLabel = $state('');
 	let dragState = $state<CanvasNodeDragState | null>(null);
 	let resizeState = $state<CanvasNodeResizeState | null>(null);
+	let canvasZoom = $state(1);
 
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
@@ -108,6 +117,29 @@
 	));
 	const exportHref = $derived(`/api/vaults/${vaultId}/canvas/export?path=${encodeURIComponent(path)}`);
 	const exportName = $derived(`${path.split('/').pop()?.replace(/\.canvas$/i, '') || 'canvas'}.svg`);
+	const zoomLabel = $derived(canvasZoomLabel(canvasZoom));
+	const canZoomIn = $derived(canZoomCanvasIn(canvasZoom));
+	const canZoomOut = $derived(canZoomCanvasOut(canvasZoom));
+
+	function setCanvasZoom(zoom: number): void {
+		canvasZoom = normalizeCanvasZoom(zoom);
+	}
+
+	function zoomCanvasIn(): void {
+		setCanvasZoom(stepCanvasZoom(canvasZoom, 'in'));
+	}
+
+	function zoomCanvasOut(): void {
+		setCanvasZoom(stepCanvasZoom(canvasZoom, 'out'));
+	}
+
+	function resetCanvasZoom(): void {
+		setCanvasZoom(1);
+	}
+
+	function fitCanvasToViewport(viewportWidth: number, viewportHeight: number): void {
+		setCanvasZoom(fitCanvasZoom(bounds, viewportWidth, viewportHeight));
+	}
 
 	function setDoc(next: CanvasDoc): void {
 		doc = next;
@@ -434,7 +466,7 @@
 		if (!doc || moveSavingNodeId) return;
 		event.preventDefault();
 		movingNodeId = node.id;
-		dragState = createCanvasNodeDragState(node, event);
+		dragState = createCanvasNodeDragState(node, event, canvasZoom);
 		window.addEventListener('pointermove', moveNodePointer);
 		window.addEventListener('pointerup', handleMovePointerUp);
 		window.addEventListener('pointercancel', handleMovePointerCancel);
@@ -486,7 +518,7 @@
 		event.preventDefault();
 		event.stopPropagation();
 		resizingNodeId = node.id;
-		resizeState = createCanvasNodeResizeState(node, event);
+		resizeState = createCanvasNodeResizeState(node, event, canvasZoom);
 		window.addEventListener('pointermove', resizeNodePointer);
 		window.addEventListener('pointerup', handleResizePointerUp);
 		window.addEventListener('pointercancel', handleResizePointerCancel);
@@ -501,6 +533,7 @@
 		resizeState = null;
 		movingNodeId = null;
 		resizingNodeId = null;
+		canvasZoom = 1;
 		loading = true;
 		error = null;
 		doc = null;
@@ -568,6 +601,10 @@
 		{deletingNodeId}
 		{savingEdgeId}
 		{deletingEdgeId}
+		zoom={canvasZoom}
+		{zoomLabel}
+		{canZoomIn}
+		{canZoomOut}
 		onEdgeLabelDraftChange={setEdgeLabelDraft}
 		onEdgeRoutingDraftChange={setEdgeRoutingDraft}
 		onSaveEdgeLabel={saveEdgeLabel}
@@ -585,6 +622,10 @@
 		onDeleteNode={deleteNode}
 		onMovePointerDown={startMoveNode}
 		onResizePointerDown={startResizeNode}
+		onZoomIn={zoomCanvasIn}
+		onZoomOut={zoomCanvasOut}
+		onZoomReset={resetCanvasZoom}
+		onZoomFit={fitCanvasToViewport}
 	/>
 </section>
 
