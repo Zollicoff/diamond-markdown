@@ -44,9 +44,9 @@ the next convenient subsystem slice.
    that never hide git conflicts.
 4. **Plugin API must stay small.** Obsidian compatibility pressure can easily
    turn into a maintenance trap.
-5. **Desktop distribution is not finished.** Local self-contained builds exist;
-   cross-platform release automation needs GitHub workflow publishing with a
-   credential that has `workflow` scope.
+5. **Desktop distribution is not finished.** Local self-contained builds and
+   unsigned GitHub Actions artifact builds exist; signed/notarized release
+   publishing still needs release credentials and policy.
 6. **Roadmap claims need to mean verified behavior.** If a feature is marked
    done, it should either have coverage or a documented verification path.
 
@@ -422,13 +422,15 @@ Use small, pushable slices:
 - **Canvas text-card tables.** Render simple Markdown pipe tables in the
   lightweight Canvas text-card preview, with inline formatting inside cells and
   compact overflow handling.
+- **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
+  run the web release gate, desktop preflight, self-contained Tauri build, and
+  unsigned bundle artifact upload across macOS, Windows, and Linux.
 
 ## Next Implementation Slices
 
-1. **Desktop release CI.** Add and verify a matrix workflow for desktop
-   preflight/build/artifact upload once a GitHub credential with `workflow`
-   scope is available; the local release verifier no longer depends on Unix
-   shell syntax.
+1. **Signed desktop release publishing.** Configure signing/notarization
+   secrets, release notes, and GitHub Release attachment policy once Zach is
+   ready to publish public desktop installers.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support and remaining
    Obsidian config interpretation without executing Obsidian plugins.

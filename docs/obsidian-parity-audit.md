@@ -23,9 +23,10 @@ The main remaining product risks are:
 1. **Sync ergonomics are improving but still conservative.** GitHub sync has
    safe primitives and a one-click sync path, but it intentionally stops short
    of automatic background merge/conflict handling.
-2. **Desktop release is not a shipped cross-platform story.** The Tauri shell
-   exists and current-host release inputs have a preflight, but matrix CI,
-   signing, notarization, and upload remain unfinished.
+2. **Desktop release is only partially automated.** The Tauri shell exists,
+   current-host release inputs have a preflight, and GitHub Actions can build
+   unsigned matrix artifacts, but signing, notarization, and GitHub Release
+   publishing remain unfinished.
 3. **Plugin compatibility is intentionally small.** Diamond can support useful
    plugins, but it is not and should not claim full Obsidian plugin parity.
 4. **Large-vault search is improving.** Tree and graph have scale work, and
@@ -57,7 +58,7 @@ The main remaining product risks are:
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
-| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, and documented release matrix | Cross-platform workflow run, signing/notarization, and artifact upload are not done |
+| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, and unsigned GitHub Actions artifact matrix | Signing/notarization and GitHub Release publishing are not done |
 | Plugins | Partial | Manifest/catalog install, workers, iframes, command/editor/markdown/settings hooks | Full Obsidian plugin API parity is deferred/non-goal |
 | Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, and batched full-suite Playwright | Keep expanding targeted coverage as features land |
 

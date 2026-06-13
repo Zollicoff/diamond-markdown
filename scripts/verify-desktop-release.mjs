@@ -88,6 +88,7 @@ for (const script of [
 	'build',
 	'desktop:prepare-node-sidecar',
 	'desktop:build:self-contained',
+	'desktop:build:self-contained:all',
 	'desktop:build:self-contained:debug'
 ]) {
 	requireScript(pkg, script);
@@ -100,6 +101,9 @@ if (tauri.productName !== 'Diamond Markdown') errors.push('Tauri productName mus
 if (!tauri.identifier) errors.push('Tauri identifier is required for signed desktop releases.');
 if (tauri.bundle?.active !== true) errors.push('Tauri bundle.active must be true for release builds.');
 if (tauri.bundle?.targets !== 'all') errors.push('Tauri bundle.targets should remain "all" for release builds.');
+if (pkg.scripts?.['desktop:build:self-contained'] !== 'node scripts/build-desktop-artifacts.mjs') {
+	errors.push('desktop:build:self-contained must use scripts/build-desktop-artifacts.mjs for CI-safe bundle target selection.');
+}
 
 if (tauri.bundle?.resources?.['../build/'] !== 'backend/build') {
 	errors.push('Tauri bundle resources must map ../build/ to backend/build.');
@@ -113,6 +117,7 @@ for (const rel of [
 	'build/handler.js',
 	'build/server/manifest.js',
 	'sample-vault/README.md',
+	'scripts/build-desktop-artifacts.mjs',
 	'src-tauri/icons/icon.icns',
 	'src-tauri/icons/icon.ico',
 	'src-tauri/icons/icon.png'

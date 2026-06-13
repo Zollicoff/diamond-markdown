@@ -175,7 +175,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
   bundles it through Tauri
 - `npm run verify:desktop-release` checks current-host bundle inputs before
   building; the release verifier uses a cross-platform preview launcher, and
-  the cross-platform release plan is in
+  the GitHub Actions desktop workflow builds unsigned bundle artifacts across
+  the configured matrix. The signed release plan is in
   [docs/desktop-release.md](./docs/desktop-release.md)
 
 ### Plugins
@@ -191,7 +192,7 @@ See [ROADMAP.md](./ROADMAP.md) — summary:
 - **v0.2** ✓ Obsidian-style core notes workflow shipped 2026-04-25
 - **v0.3** ✓ Polish, service worker, mobile gestures
 - **v0.4** ✓ Git sync and large-vault scale work
-- **v0.5** Partial — plugin API, Tauri desktop wrapper, and current-host sidecar-ready desktop runtime are present; cross-platform desktop release automation remains open
+- **v0.5** Partial — plugin API, Tauri desktop wrapper, current-host sidecar-ready desktop runtime, and unsigned desktop artifact CI are present; signed cross-platform release publishing remains open
 
 The open-source replacement track is broken out in
 [OPEN_SOURCE_OBSIDIAN_PLAN.md](./OPEN_SOURCE_OBSIDIAN_PLAN.md).

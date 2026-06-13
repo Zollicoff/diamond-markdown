@@ -26,7 +26,7 @@ For a full Tauri bundle:
 npm run desktop:build
 ```
 
-For a self-contained bundle on the current host platform:
+For a self-contained unsigned artifact on the current host platform:
 
 ```sh
 npm run desktop:build:self-contained
@@ -41,10 +41,17 @@ npm run verify:desktop-release
 
 The self-contained build prepares `src-tauri/binaries/node-<target-triple>` and
 builds with `src-tauri/tauri.sidecar.conf.json`, which adds the prepared runtime
-as a Tauri sidecar. On macOS and Linux, the prep script defaults to the official
-Node.js runtime for the current Node version so the bundle does not depend on a
-Homebrew/system Node install. Run the command separately on each release target,
-or provide the target-specific sidecar binaries before cross-compiling.
+as a Tauri sidecar. It defaults to CI-safe unsigned bundle targets for the host
+platform: `app` on macOS, `nsis` on Windows, and `deb,appimage` on Linux.
+Override the list with `DIAMOND_DESKTOP_BUNDLES`, or use
+`npm run desktop:build:self-contained:all` for Tauri's configured all-target
+bundle set. On macOS, all-target bundling includes DMG packaging, which may
+require Finder/AppleScript access.
+
+On macOS and Linux, the prep script defaults to the official Node.js runtime for
+the current Node version so the bundle does not depend on a Homebrew/system Node
+install. Run the command separately on each release target, or provide the
+target-specific sidecar binaries before cross-compiling.
 
 ## Environment
 

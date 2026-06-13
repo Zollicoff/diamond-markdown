@@ -5,8 +5,8 @@ The current claim boundary lives in
 [docs/obsidian-parity-audit.md](./docs/obsidian-parity-audit.md): Diamond can
 claim an Obsidian-style core notes workflow, conservative GitHub sync, and broad
 Canvas compatibility, but not full Obsidian plugin parity, full Canvas
-whiteboard parity, automatic proprietary-sync replacement, or shipped
-cross-platform desktop release automation.
+whiteboard parity, automatic proprietary-sync replacement, or signed
+cross-platform desktop release publishing.
 
 ## v0.1 — MVP ✓ (shipped 2026-04-22)
 
@@ -99,7 +99,8 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] **Tauri v2 desktop wrapper** — native desktop shell that launches the existing built SvelteKit/Node backend on loopback and opens a Tauri webview, reusing 100% of current app behavior.
 - [x] **Current-platform self-contained desktop runtime** — optional Tauri sidecar config plus `desktop:prepare-node-sidecar` / `desktop:build:self-contained` scripts bundle the current host's Node runtime instead of requiring system Node.
 - [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
-- [ ] **Cross-platform desktop release automation** — prepare/sign/upload Node sidecars or native Rust backend builds for every published macOS / Windows / Linux target.
+- [x] **Unsigned desktop artifact CI** — `.github/workflows/desktop-release.yml` runs the web release gate, desktop preflight, self-contained Tauri build, and unsigned bundle artifact upload on macOS / Windows / Linux.
+- [ ] **Signed cross-platform release publishing** — configure signing/notarization secrets, release notes, and GitHub Release attachment policy for every published macOS / Windows / Linux target.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much
 rewriting. Diamond has useful plugin extension points, but full Obsidian plugin

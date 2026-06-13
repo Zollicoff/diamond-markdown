@@ -23,11 +23,27 @@ This command:
 - runs the prepared sidecar with `--version`
 - confirms generated sidecar binaries are git-ignored
 
-After it passes, build the current-host self-contained desktop bundle:
+After it passes, build the current-host unsigned self-contained desktop
+artifact:
 
 ```sh
 npm run desktop:build:self-contained
 ```
+
+The build script uses CI-safe default bundle targets per host:
+
+| Host | Default unsigned bundle target |
+| --- | --- |
+| macOS | `app` |
+| Windows | `nsis` |
+| Linux | `deb,appimage` |
+
+Override the target list with `DIAMOND_DESKTOP_BUNDLES`, for example
+`DIAMOND_DESKTOP_BUNDLES=dmg npm run desktop:build:self-contained`.
+The legacy all-target command is still available as
+`npm run desktop:build:self-contained:all`; on macOS that includes DMG
+packaging, which may require Finder/AppleScript access and is therefore not
+used by CI.
 
 ## Release Matrix
 
@@ -75,28 +91,34 @@ Windows signing should use the certificate mechanism selected by the release
 runner or signing provider. Record the provider and certificate thumbprint in
 the release notes.
 
-## GitHub Actions Plan
+## GitHub Actions Workflow
 
-The release verifier is runner-shell neutral: Playwright fixture setup and the
-preview server are launched through `scripts/playwright-webserver.mjs`,
-full-suite Playwright runs are batched through
-`scripts/verify-playwright-batches.mjs`, and `scripts/verify-release.mjs`
+The desktop release workflow lives at
+`.github/workflows/desktop-release.yml`. It runs on manual dispatch, pull
+requests that touch release-relevant files, and pushes to `main` that touch
+release-relevant files.
+
+Each matrix entry runs on macOS, Windows, and Linux:
+
+- `npm ci`
+- `npm run verify:release`
+- `npm run verify:desktop-release`
+- `npm run desktop:build:self-contained` with an explicit
+  `DIAMOND_DESKTOP_BUNDLES` value from the matrix
+
+The workflow uploads `src-tauri/target/release/bundle/**` as unsigned desktop
+artifacts for each platform. The macOS CI target is `.app`, not `.dmg`, because
+DMG packaging runs Finder AppleScript and belongs with the signed release
+publishing step. The release verifier is runner-shell neutral: Playwright
+fixture setup and the preview server are launched through
+`scripts/playwright-webserver.mjs`, full-suite Playwright runs are batched
+through `scripts/verify-playwright-batches.mjs`, and `scripts/verify-release.mjs`
 resolves `npm.cmd` on Windows.
 
-A publish workflow should run this sequence per matrix entry:
-
-```sh
-npm ci
-npm run verify:release
-npm run verify:desktop-release
-npm run desktop:build:self-contained
-```
-
-Then upload `src-tauri/target/release/bundle/**`.
-
-Adding `.github/workflows/*` requires a GitHub credential with `workflow` scope.
-Until that credential is available, keep this document and
-`npm run verify:desktop-release` as the canonical desktop release plan.
+The workflow does not make a signed public release by itself. Signing,
+notarization, release-note generation, and attaching artifacts to a GitHub
+Release remain explicit release-runner responsibilities until those credentials
+and policies are configured.
 
 ## Claim Boundary
 
@@ -104,7 +126,11 @@ It is accurate to claim:
 
 - Tauri desktop shell exists.
 - Current-host self-contained bundle inputs can be verified.
+- GitHub Actions is configured to build and upload unsigned self-contained
+  desktop artifacts across the configured matrix.
 - The release plan identifies required sidecars, signing inputs, and artifacts.
 
-Do not claim cross-platform desktop release automation is shipped until the
-matrix workflow is committed, pushed, and verified on macOS, Windows, and Linux.
+Do not claim signed cross-platform desktop release publishing is shipped until
+the matrix workflow is verified with the required signing/notarization secrets,
+DMG or installer policy is finalized, and artifacts are attached to a GitHub
+Release.
