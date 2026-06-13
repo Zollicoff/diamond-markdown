@@ -1,16 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-
-function commandFor(command) {
-	if (process.platform === 'win32' && command === 'npm') return 'npm.cmd';
-	return command;
-}
+import { commandSpec } from './command-runner.mjs';
 
 function runCommand(label, command, args, env = {}, options = {}) {
+	const spec = commandSpec(command, args);
 	console.log(`\n==> ${label}`);
-	console.log(`$ ${[command, ...args].join(' ')}`);
-	return spawnSync(commandFor(command), args, {
+	console.log(`$ ${spec.display}`);
+	return spawnSync(spec.command, spec.args, {
 		stdio: 'inherit',
 		env: { ...process.env, ...env },
 		timeout: options.timeoutMs,

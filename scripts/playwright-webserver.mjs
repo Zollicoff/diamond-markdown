@@ -1,13 +1,14 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { commandSpec } from './command-runner.mjs';
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const REQUIRED_BUILD_OUTPUT = ['build/handler.js', 'build/server/manifest.js'];
 const REQUIRE_EXISTING_BUILD = process.env.DIAMOND_REQUIRE_EXISTING_BUILD === '1';
 
 function run(command, args, options = {}) {
-	const result = spawnSync(command, args, {
+	const spec = commandSpec(command, args);
+	const result = spawnSync(spec.command, spec.args, {
 		stdio: 'inherit',
 		env: process.env,
 		timeout: options.timeoutMs,
@@ -46,7 +47,7 @@ function ensureBuildOutput() {
 			console.error(`Production build output incomplete (${missing.join(', ')}); retrying build.`);
 		}
 		cleanBuildOutput();
-		run(npmCommand, ['run', 'build', '--', '--logLevel', 'warn'], { timeoutMs: 90_000 });
+		run('npm', ['run', 'build', '--', '--logLevel', 'warn'], { timeoutMs: 90_000 });
 		missing = missingBuildOutput();
 	}
 	if (missing.length > 0) {

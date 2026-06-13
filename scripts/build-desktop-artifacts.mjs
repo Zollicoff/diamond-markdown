@@ -1,22 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { commandSpec, formatCommand } from './command-runner.mjs';
 
 const defaultBundlesByPlatform = {
 	darwin: 'app',
 	win32: 'nsis',
 	linux: 'deb,appimage'
 };
-
-function commandFor(command) {
-	if (process.platform === 'win32') {
-		if (command === 'npm') return 'npm.cmd';
-		if (command === 'npx') return 'npx.cmd';
-	}
-	return command;
-}
-
-function formatCommand(command, args) {
-	return [command, ...args].join(' ');
-}
 
 function failStatus(result) {
 	if (result.error) return result.error.message;
@@ -26,9 +15,10 @@ function failStatus(result) {
 }
 
 function run(label, command, args) {
+	const spec = commandSpec(command, args);
 	console.log(`\n==> ${label}`);
 	console.log(`$ ${formatCommand(command, args)}`);
-	const result = spawnSync(commandFor(command), args, {
+	const result = spawnSync(spec.command, spec.args, {
 		stdio: 'inherit',
 		env: process.env
 	});

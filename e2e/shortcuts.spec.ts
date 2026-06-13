@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
-import { bindings, comboToDisplay } from '../src/lib/commands/keymap';
+import { bindings, comboFromEvent, comboToDisplay } from '../src/lib/commands/keymap';
 import { diamondCommandForObsidian } from '../src/lib/shortcuts/obsidian';
 import { buildShortcutRows, groupShortcutRows } from '../src/lib/shortcuts/view';
 import type { CommandDef } from '../src/lib/commands/registry';
@@ -46,6 +46,22 @@ test('shortcut helpers expose global keymap rows and Obsidian command aliases', 
 		diamondTitle: 'Open command palette'
 	});
 	expect(groupShortcutRows(rows).get('view')?.map((row) => row.title)).toContain('Quick switcher');
+	expect(comboFromEvent({
+		altKey: false,
+		code: 'KeyK',
+		ctrlKey: true,
+		key: 'K',
+		metaKey: false,
+		shiftKey: false
+	})).toBe('mod+k');
+	expect(comboFromEvent({
+		altKey: false,
+		code: 'Backslash',
+		ctrlKey: false,
+		key: 'Dead',
+		metaKey: true,
+		shiftKey: false
+	})).toBe('mod+\\');
 });
 
 async function openVault(page: Page): Promise<void> {

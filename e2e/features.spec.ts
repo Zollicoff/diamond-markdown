@@ -15,7 +15,7 @@ import { formatDate } from '../src/lib/server/templates';
  */
 
 async function openVault(page: Page): Promise<void> {
-	await page.goto('/vault/default');
+	await page.goto('/vault/default', { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 }
 
@@ -514,7 +514,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n![[roof.png]]\n');
 	fs.writeFileSync(path.join(vaultDir, 'roof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
-	await page.goto('/');
+	await page.goto('/', { waitUntil: 'domcontentloaded' });
 	await page.getByRole('button', { name: /Add vault/ }).click();
 	await page.getByLabel('Display name').fill('Obsidian UI Import');
 	await page.getByLabel('Absolute path').fill(vaultDir);
@@ -631,7 +631,7 @@ test('search tab saves, restores, and deletes vault-local saved searches', async
 	expect(created.ok(), await created.text()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();
 	const search = page.locator('.search-view');
@@ -815,7 +815,7 @@ test('search tab virtualizes large full-text result sets while preserving scroll
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();
 	const search = page.locator('.search-view');
@@ -853,7 +853,7 @@ test('search tab groups results by folder without breaking virtualized result ro
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.locator('.rail .r-btn[aria-label="Search"]').click();
 	const search = page.locator('.search-view');
@@ -906,7 +906,7 @@ test('right panel shows unlinked note mentions beside backlinks', async ({ page,
 	expect(body.backlinks).toEqual([{ path: 'Linked.md', title: 'Linked' }]);
 	expect(body.unlinkedMentions).toEqual([{ path: 'Mentioner.md', title: 'Mentioner' }]);
 
-	await page.goto(`/vault/${vault.id}/note/Home.md`);
+	await page.goto(`/vault/${vault.id}/note/Home.md`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.right-col')).toContainText('Unlinked mentions');
 	await expect(page.locator('.right-col')).toContainText('Mentioner');
 });
@@ -953,7 +953,7 @@ test('generic new note command honors safe Obsidian configured folder', async ({
 		source: 'obsidian-app-config'
 	});
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }).click();
 	const dialog = page.getByRole('dialog', { name: 'New note' });
@@ -1100,7 +1100,7 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 		source: 'obsidian-app-config'
 	});
 
-	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`);
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
 	await page.getByRole('tab', { name: 'Source' }).click();
 	await expect(page.getByRole('button', { name: 'Markdown link' })).toBeVisible();
@@ -1163,7 +1163,7 @@ test('delete folder command confirms before removing non-empty folders', async (
 	expect(created.ok(), await created.text()).toBe(true);
 	expect(fs.existsSync(path.join(vaultDir, notePath))).toBe(true);
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	const folderRow = page.locator('.dir-head').filter({ hasText: folder }).first();
 	await expect(folderRow).toBeVisible();
@@ -1203,7 +1203,7 @@ test('broken wikilinks use an in-app create confirmation dialog', async ({ page,
 	});
 	expect(saved.ok()).toBe(true);
 
-	await page.goto(`/vault/default/note/${encodeURIComponent(sourcePath)}`);
+	await page.goto(`/vault/default/note/${encodeURIComponent(sourcePath)}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
 	await page.locator('.cm-line').filter({ hasText: 'Broken Wikilink Dialog' }).first().click();
 	const link = page.locator('.cm-wikilink--broken').filter({ hasText: target }).first();
@@ -1331,7 +1331,7 @@ export function activate(api) {
 	expect(moduleRes.ok()).toBe(true);
 	expect(moduleRes.headers()['content-type']).toContain('application/javascript');
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginActivated)).toBe('boot-test');
 	await page.locator('.tree .file-link').filter({ hasText: 'Home' }).click();
@@ -1403,7 +1403,7 @@ export function activate(api) {
 		expect(created.ok()).toBe(true);
 		const { vault } = await created.json() as { vault: { id: string } };
 
-		await page.goto(`/vault/${vault.id}`);
+		await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByLabel('Settings').click();
 		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
@@ -1459,7 +1459,7 @@ test('plugin install replacement overwrites files and commits a clean edit', asy
 		expect(created.ok()).toBe(true);
 		const { vault } = await created.json() as { vault: { id: string } };
 
-		await page.goto(`/vault/${vault.id}`);
+		await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 		await page.getByLabel('Settings').click();
 		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
@@ -1565,7 +1565,7 @@ test('plugin catalog installs curated worker plugins', async ({ page, request })
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
 	await expect(page.getByRole('heading', { name: 'Plugin catalog' })).toBeVisible();
@@ -1625,7 +1625,7 @@ export function activate(api) {
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker activated worker-test'))).toBe(true);
 	await page.getByLabel('Settings').click();
@@ -1686,7 +1686,7 @@ export function activate(api) {
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-files] worker files ready'))).toBe(true);
 	await page.keyboard.press('Meta+P');
@@ -1738,7 +1738,7 @@ export function activate(api) {
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(
 		() => logs.some((line) => line.includes('[plugin:worker-editor] worker editor ready')),
@@ -1800,7 +1800,7 @@ export function activate(api) {
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
 	await expect(page.getByText('Worker Frames Plugin')).toBeVisible();
@@ -1840,7 +1840,7 @@ test('file tree virtualizes large vaults while preserving scroll access', async 
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	const renderedAtTop = await page.locator('.tree .file-link').count();
 	expect(renderedAtTop).toBeGreaterThan(0);
@@ -1871,7 +1871,7 @@ test('large graph opens with the scale simulation path', async ({ page, request 
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Graph').click();
 	await expect(page.locator('text=/220 nodes · 219 edges/').first()).toBeVisible({ timeout: 5_000 });
@@ -1917,7 +1917,7 @@ test('wikilink fragments render cleanly from live preview and navigate in read m
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.locator('.tree .file-link').filter({ hasText: 'Source' }).click();
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
@@ -1930,7 +1930,7 @@ test('wikilink fragments render cleanly from live preview and navigate in read m
 	expect(url.pathname).toBe(`/vault/${vault.id}/note/Target.md`);
 	expect(decodeURIComponent(url.hash)).toBe('#^install-steps');
 
-	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Source.md')}`);
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Source.md')}`, { waitUntil: 'domcontentloaded' });
 	await page.getByRole('tab', { name: 'Read' }).click();
 	const readLink = page.locator('.preview a.wikilink').filter({ hasText: 'details heading' }).first();
 	await expect(readLink).toHaveAttribute('href', /\/vault\/.+\/note\/Target\.md#details$/);
@@ -1986,7 +1986,7 @@ test('settings shows local git changes recovery guidance before sync actions', a
 
 	fs.writeFileSync(path.join(vaultDir, 'Dirty.md'), '# Dirty\n\nExternal edit.\n');
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
 	const recovery = page.locator('.sync-block').filter({ hasText: 'Uncommitted files' });
@@ -2165,7 +2165,7 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 	expect(await blockedSave.text()).toContain('resolve sync before editing vault files');
 	expect(fs.existsSync(path.join(vaultDir, 'After Divergence.md'))).toBe(false);
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
 	await expect(page.getByText('Diverged history')).toBeVisible();
@@ -2225,7 +2225,7 @@ test('vault writes are blocked until fetched remote commits are pulled', async (
 	expect(status.canPush).toBe(false);
 	expect(status.remoteChanges).toEqual(['RemoteOnly.md']);
 
-	await page.goto(`/vault/${vault.id}`);
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
 	const recovery = page.locator('.sync-block').filter({ hasText: 'Remote changes waiting' });

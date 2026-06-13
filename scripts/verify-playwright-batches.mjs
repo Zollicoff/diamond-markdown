@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { commandSpec } from './command-runner.mjs';
 
 const DEFAULT_SPLIT_TESTS_PER_BATCH = 1;
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -13,11 +14,6 @@ const splitSpecFiles = new Set([
 ]);
 const requiredBuildOutput = ['build/handler.js', 'build/server/manifest.js'];
 const batchFixtureRunRoot = path.resolve(e2eDir, '.fixture-root', 'batches', `${process.pid}-${Date.now()}`);
-
-function commandFor(command) {
-	if (process.platform === 'win32' && command === 'npm') return 'npm.cmd';
-	return command;
-}
 
 function browserCandidates() {
 	if (process.platform === 'darwin') {
@@ -122,7 +118,8 @@ function missingProductionBuildFiles() {
 function runBuildAttempt(attempt) {
 	if (attempt > 1) console.log(`Retrying production build (${attempt}/2)...`);
 	cleanProductionBuildOutput();
-	const result = spawnSync(commandFor('npm'), ['run', 'build', '--', '--logLevel', 'warn'], {
+	const spec = commandSpec('npm', ['run', 'build', '--', '--logLevel', 'warn']);
+	const result = spawnSync(spec.command, spec.args, {
 		stdio: 'inherit',
 		env: { ...process.env, CI: '1' },
 		timeout: 90_000,
@@ -201,7 +198,8 @@ async function runBatch(batch, batchIndex, batchCount, timeoutMs) {
 	console.log(`\n==> Playwright e2e batch ${batchIndex}/${batchCount}: ${batch.label}`);
 	console.log(`$ npm ${args.join(' ')}`);
 	const env = await playwrightEnv(batchIndex);
-	const result = spawnSync(commandFor('npm'), args, {
+	const spec = commandSpec('npm', args);
+	const result = spawnSync(spec.command, spec.args, {
 		stdio: 'inherit',
 		env: { ...process.env, ...env },
 		timeout: timeoutMs,
