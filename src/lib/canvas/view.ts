@@ -117,6 +117,15 @@ export interface CanvasTextPreviewListItem {
 	checked?: boolean;
 }
 
+export interface CanvasTextPreviewTableCell {
+	inline: CanvasTextPreviewInline[];
+}
+
+export interface CanvasTextPreviewTable {
+	headers: CanvasTextPreviewTableCell[];
+	rows: CanvasTextPreviewTableCell[][];
+}
+
 export type CanvasTextPreviewBlock =
 	| { type: 'heading'; level: 1 | 2 | 3; inline: CanvasTextPreviewInline[] }
 	| { type: 'paragraph'; inline: CanvasTextPreviewInline[] }
@@ -130,6 +139,7 @@ export type CanvasTextPreviewBlock =
 	}
 	| { type: 'unordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'ordered-list'; items: CanvasTextPreviewListItem[] }
+	| { type: 'table'; table: CanvasTextPreviewTable }
 	| { type: 'code'; language: string; code: string };
 
 export type CanvasTextDrafts = Record<string, string>;
@@ -513,6 +523,15 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 				inline: canvasTextPreviewInlines(heading[2].trim())
 			});
 			index += 1;
+			continue;
+		}
+
+		const table = canvasTablePreviewAt(lines, index);
+		if (table) {
+			flushParagraph();
+			flushList();
+			blocks.push({ type: 'table', table: table.table });
+			index = table.nextIndex;
 			continue;
 		}
 
@@ -901,6 +920,55 @@ function canvasCalloutTitle(kind: string, title: string | undefined): string {
 	const cleanedTitle = title?.trim();
 	if (cleanedTitle) return cleanedTitle;
 	return kind.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function canvasTablePreviewAt(
+	lines: string[],
+	index: number
+): { table: CanvasTextPreviewTable; nextIndex: number } | null {
+	const header = canvasTableRow(lines[index]);
+	const separator = canvasTableSeparator(lines[index + 1]);
+	if (!header || !separator || header.length < 2) return null;
+
+	const columnCount = header.length;
+	const rows: CanvasTextPreviewTableCell[][] = [];
+	let nextIndex = index + 2;
+	while (nextIndex < lines.length) {
+		const row = canvasTableRow(lines[nextIndex]);
+		if (!row) break;
+		rows.push(canvasTableCells(row, columnCount));
+		nextIndex += 1;
+	}
+
+	return {
+		table: {
+			headers: canvasTableCells(header, columnCount),
+			rows
+		},
+		nextIndex
+	};
+}
+
+function canvasTableRow(line: string | undefined): string[] | null {
+	if (!line || !line.includes('|')) return null;
+	const trimmed = line.trim();
+	if (!trimmed || /^[-:|\s]+$/.test(trimmed)) return null;
+	const body = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+	const cells = body.split('|').map((cell) => cell.trim());
+	return cells.length >= 2 ? cells : null;
+}
+
+function canvasTableSeparator(line: string | undefined): boolean {
+	if (!line || !line.includes('|')) return false;
+	const body = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+	const cells = body.split('|').map((cell) => cell.trim());
+	return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function canvasTableCells(values: string[], columnCount: number): CanvasTextPreviewTableCell[] {
+	return Array.from({ length: columnCount }, (_, index) => ({
+		inline: canvasTextPreviewInlines(values[index] ?? '')
+	}));
 }
 
 function firstInlineMatch(value: string): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {

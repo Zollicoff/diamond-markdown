@@ -419,6 +419,9 @@ Use small, pushable slices:
 - **Canvas text-card callouts.** Render Obsidian `> [!TYPE]` callout blocks in
   the lightweight Canvas text-card preview, preserving open/closed fold markers
   while leaving raw card text editable.
+- **Canvas text-card tables.** Render simple Markdown pipe tables in the
+  lightweight Canvas text-card preview, with inline formatting inside cells and
+  compact overflow handling.
 
 ## Next Implementation Slices
 

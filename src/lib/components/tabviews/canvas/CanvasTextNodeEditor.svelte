@@ -102,6 +102,27 @@
 				</li>
 			{/each}
 		</ol>
+	{:else if block.type === 'table'}
+		<div class="table-scroll">
+			<table>
+				<thead>
+					<tr>
+						{#each block.table.headers as cell}
+							<th>{@render inline(cell.inline)}</th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each block.table.rows as row}
+						<tr>
+							{#each row as cell}
+								<td>{@render inline(cell.inline)}</td>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{:else if block.type === 'code'}
 		<pre data-language={block.language}><code>{block.code}</code></pre>
 	{/if}
@@ -243,6 +264,37 @@
 		display: grid;
 		gap: 3px;
 		padding-left: 17px;
+	}
+	.table-scroll {
+		max-width: 100%;
+		margin: 0 0 5px;
+		overflow: auto;
+		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 48%);
+		border-radius: 6px;
+	}
+	.table-scroll:last-child {
+		margin-bottom: 0;
+	}
+	table {
+		width: 100%;
+		min-width: 180px;
+		border-collapse: collapse;
+		font-size: 0.7rem;
+	}
+	th,
+	td {
+		border-bottom: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 62%);
+		padding: 4px 6px;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		background: color-mix(in srgb, var(--canvas-node-border, var(--accent)), transparent 88%);
+		color: var(--fg);
+		font-weight: 700;
+	}
+	tr:last-child td {
+		border-bottom: 0;
 	}
 	li {
 		min-width: 0;
