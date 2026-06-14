@@ -442,6 +442,10 @@ Use small, pushable slices:
   `![[Note.md#Heading]]` and `![[Board.canvas]]` lines as internal preview
   chips in Canvas text cards, preserving safe heading/block subpaths and
   leaving alias-only unresolved embeds conservative.
+- **Canvas text-card explicit wikilinks.** Render explicit inline
+  `[[Note.md#Heading|label]]` and `[[Board.canvas|label]]` links as internal
+  preview navigation targets in Canvas text cards while leaving alias-only
+  links conservative.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

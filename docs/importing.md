@@ -152,10 +152,12 @@ dimensions, node and edge colors, edge connections, edge labels, and node or
 edge deletion with git-backed commits. Canvas text cards show a safe
 markdown-aware preview while preserving the raw editable text.
 Canvas text cards preview common Markdown plus Obsidian callout blocks,
-highlights, strikethrough, simple Markdown tables, explicit note/canvas embed
-chips such as `![[Home.md#Install Steps]]` and `![[Boards/Map.canvas]]`, and
-safe vault-local asset embed lines such as `![[Images/roof.png]]` or
-`![Roof](Images/roof.png)`, while leaving the raw card text editable. Canvas group
+highlights, strikethrough, simple Markdown tables, explicit note/canvas inline
+wikilinks such as `[[Home.md#Install Steps|Launch link]]` and
+`[[Boards/Map.canvas|Map board]]`, explicit note/canvas embed chips such as
+`![[Home.md#Install Steps]]` and `![[Boards/Map.canvas]]`, and safe vault-local
+asset embed lines such as `![[Images/roof.png]]` or `![Roof](Images/roof.png)`,
+while leaving the raw card text editable. Canvas group
 nodes are rendered behind cards and can be created from the Canvas toolbar.
 Canvas node and edge colors
 are preserved, edited, and rendered in the board and SVG export. Canvas edge

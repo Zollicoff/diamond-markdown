@@ -107,10 +107,19 @@ export interface CanvasFileAssetPreview {
 export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link';
 export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
 
+export interface CanvasTextInlineTarget {
+	kind: 'note' | 'canvas';
+	path: string;
+	title: string;
+	subpath: string | null;
+	hash: string | null;
+}
+
 export interface CanvasTextPreviewInline {
 	kind: CanvasTextPreviewInlineKind;
 	text: string;
 	href?: string;
+	target?: CanvasTextInlineTarget;
 }
 
 export interface CanvasTextPreviewListItem {
@@ -752,23 +761,61 @@ export function canvasTextEmbedHref(
 
 export function canvasTextEmbedOpenTarget(embed: CanvasTextPreviewEmbed): CanvasTextEmbedOpenTarget | null {
 	if (embed.kind !== 'note' && embed.kind !== 'canvas') return null;
-	const subpath = embed.suffix ? normalizeCanvasFileSubpath(embed.suffix) : null;
-	if (embed.suffix && !subpath) return null;
-	return {
-		kind: embed.kind,
-		path: embed.path,
-		title: embed.title,
-		subpath,
-		hash: embed.kind === 'note' && subpath ? wikilinkFragment(parseWikilinkSubpath(subpath.slice(1))).slice(1) || null : null
-	};
+	return canvasTextInternalTarget(embed.kind, embed.path, embed.suffix, embed.title);
 }
 
 export function canvasTextEmbedRouteHref(vaultId: string, embed: CanvasTextPreviewEmbed): string | null {
 	const target = canvasTextEmbedOpenTarget(embed);
-	if (!target) return null;
+	return target ? canvasTextInternalTargetHref(vaultId, target) : null;
+}
+
+export function canvasTextInlineTargetHref(vaultId: string, inline: CanvasTextPreviewInline): string | null {
+	return inline.target ? canvasTextInternalTargetHref(vaultId, inline.target) : null;
+}
+
+function canvasTextInternalTargetHref(vaultId: string, target: CanvasTextInlineTarget): string {
 	const encodedPath = target.path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
 	const base = `/vault/${encodeURIComponent(vaultId)}/${target.kind === 'canvas' ? 'canvas' : 'note'}/${encodedPath}`;
 	return target.hash ? `${base}#${encodeURIComponent(target.hash)}` : base;
+}
+
+function canvasTextInternalTarget(
+	kind: 'note' | 'canvas',
+	path: string,
+	suffix: string,
+	title: string
+): CanvasTextInlineTarget | null {
+	if (!isCanvasVaultRelativeAssetPath(path)) return null;
+	const subpath = suffix ? normalizeCanvasFileSubpath(suffix) : null;
+	if (suffix && !subpath) return null;
+	if (kind === 'canvas' && subpath) return null;
+	return {
+		kind,
+		path,
+		title,
+		subpath,
+		hash: kind === 'note' && subpath ? wikilinkFragment(parseWikilinkSubpath(subpath.slice(1))).slice(1) || null : null
+	};
+}
+
+function canvasTextInlineTargetFromWikilink(target: string, label: string | undefined): CanvasTextInlineTarget | null {
+	if (target.includes('?')) return null;
+	const ref = splitCanvasWikilinkTarget(target);
+	if (!ref.path) return null;
+	const title = label?.trim() || ref.path.split('/').pop()?.replace(/\.(md|markdown|canvas)$/i, '') || ref.path;
+	if (/\.(md|markdown)$/i.test(ref.path)) return canvasTextInternalTarget('note', ref.path, ref.suffix, title);
+	if (/\.canvas$/i.test(ref.path)) return canvasTextInternalTarget('canvas', ref.path, ref.suffix, title);
+	return null;
+}
+
+function splitCanvasWikilinkTarget(target: string): { path: string; suffix: string } {
+	const normalized = target.trim().replace(/\\/g, '/');
+	const marker = normalized.indexOf('#');
+	if (marker < 0) return { path: normalized, suffix: '' };
+	return {
+		path: normalized.slice(0, marker),
+		suffix: normalized.slice(marker)
+	};
 }
 
 export function canvasLinkNodeHref(node: CanvasNode): string | null {
@@ -1146,10 +1193,16 @@ function firstInlineMatch(value: string): { index: number; raw: string; inline: 
 			text: match[1],
 			href: match[2]
 		})),
-		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => ({
-			kind: 'wikilink',
-			text: match[2] ?? match[1]
-		})),
+		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
+			const rawTarget = match[1].trim();
+			const label = match[2]?.trim();
+			const target = canvasTextInlineTargetFromWikilink(rawTarget, label);
+			return {
+				kind: 'wikilink',
+				text: label || rawTarget,
+				...(target ? { target } : {})
+			};
+		}),
 		inlineCandidate(value, /\*([^*\n]+)\*/, (match) => ({ kind: 'emphasis', text: match[1] }))
 	].filter((candidate): candidate is { index: number; raw: string; inline: CanvasTextPreviewInline } => Boolean(candidate));
 

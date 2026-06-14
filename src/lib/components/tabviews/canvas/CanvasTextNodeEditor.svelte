@@ -8,6 +8,7 @@
 		canvasTextEmbedHref,
 		canvasTextEmbedOpenTarget,
 		canvasTextEmbedRouteHref,
+		canvasTextInlineTargetHref,
 		canvasTextPreviewBlocks,
 		type CanvasTextPreviewBlock,
 		type CanvasTextPreviewEmbed,
@@ -54,6 +55,18 @@
 		replaceLocationHash(target.hash);
 		openNote(vaultId, target.path, target.title, openModeForPointer(event));
 	}
+
+	function openInternalInline(part: CanvasTextPreviewInline, event: MouseEvent): void {
+		const target = part.target;
+		if (!target) return;
+		event.preventDefault();
+		if (target.kind === 'canvas') {
+			openCanvas(vaultId, target.path, target.title, openModeForPointer(event));
+			return;
+		}
+		replaceLocationHash(target.hash);
+		openNote(vaultId, target.path, target.title, openModeForPointer(event));
+	}
 </script>
 
 {#snippet inline(parts: CanvasTextPreviewInline[])}
@@ -69,7 +82,12 @@
 		{:else if part.kind === 'highlight'}
 			<mark>{part.text}</mark>
 		{:else if part.kind === 'wikilink'}
-			<span class="wikilink">[[{part.text}]]</span>
+			{@const href = canvasTextInlineTargetHref(vaultId, part)}
+			{#if href}
+				<a class="wikilink" href={href} onclick={(event) => openInternalInline(part, event)}>[[{part.text}]]</a>
+			{:else}
+				<span class="wikilink">[[{part.text}]]</span>
+			{/if}
 		{:else if part.kind === 'link' && part.href}
 			<a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
 		{:else}

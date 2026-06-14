@@ -67,6 +67,7 @@ import {
 	canvasSvgNodeColors,
 	canvasSummary,
 	canvasTextEmbedHref,
+	canvasTextInlineTargetHref,
 	canvasTextEmbedOpenTarget,
 	canvasTextEmbedRouteHref,
 	canvasTextPreviewBlocks,
@@ -175,6 +176,40 @@ test.describe('canvas view helpers', () => {
 			{ kind: 'text', text: ' ' },
 			{ kind: 'link', text: 'site', href: 'https://example.com' }
 		]);
+		const explicitInlineTargets = canvasTextPreviewInlines(
+			'Review [[Home.md#Install Steps|Launch link]] and [[Boards/Map.canvas|Map board]] plus [[Roof Photos]]'
+		);
+		expect(explicitInlineTargets).toEqual([
+			{ kind: 'text', text: 'Review ' },
+			{
+				kind: 'wikilink',
+				text: 'Launch link',
+				target: {
+					kind: 'note',
+					path: 'Home.md',
+					title: 'Launch link',
+					subpath: '#Install Steps',
+					hash: 'install-steps'
+				}
+			},
+			{ kind: 'text', text: ' and ' },
+			{
+				kind: 'wikilink',
+				text: 'Map board',
+				target: {
+					kind: 'canvas',
+					path: 'Boards/Map.canvas',
+					title: 'Map board',
+					subpath: null,
+					hash: null
+				}
+			},
+			{ kind: 'text', text: ' plus ' },
+			{ kind: 'wikilink', text: 'Roof Photos' }
+		]);
+		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[1])).toBe('/vault/vault%20id/note/Home.md#install-steps');
+		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
+		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[5])).toBeNull();
 		const previewBlocks = canvasTextPreviewBlocks([
 			'# Launch plan',
 			'',
@@ -705,6 +740,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
+					'Review [[Home.md#Launch Plan|Launch link]] and [[Boards/Map.canvas|Map board]]',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'> Refer homeowner questions',
@@ -739,9 +775,11 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');
 	await expect(preview.getByRole('link', { name: /Panel packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel\.pdf#page=2$/);
+	await expect(preview.getByRole('link', { name: /\[\[Launch link\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
+	await expect(preview.getByRole('link', { name: /\[\[Map board\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('del')).toHaveText('old bill');
-	await expect(preview.locator('.wikilink').first()).toHaveText('[[Roof Photos]]');
+	await expect(preview.locator('.wikilink').filter({ hasText: '[[Roof Photos]]' })).toHaveCount(1);
 	await expect(preview.locator('blockquote')).toContainText('Refer homeowner questions');
 	await expect(preview.locator('.preview-callout')).toContainText('tip');
 	await expect(preview.locator('.preview-callout')).toContainText('Site survey');
@@ -753,6 +791,9 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('table mark')).toHaveText('Runner');
 	await expect(preview.locator('pre')).toContainText('main panel');
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue(/# Launch plan/);
+	await preview.getByRole('link', { name: /\[\[Launch link\]\]/ }).click();
+	await expect(page.getByRole('tab', { name: /Launch link/ })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.locator('.note-view')).toContainText('Home details.');
 });
 
 test('canvas view renders and creates Obsidian Canvas groups', async ({ page, request }) => {
