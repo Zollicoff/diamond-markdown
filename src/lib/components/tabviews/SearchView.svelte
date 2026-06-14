@@ -8,6 +8,17 @@
 		searchModeFromFullText
 	} from '$lib/search/saved';
 	import {
+		canLoadMoreSearch,
+		canSaveCurrentSearch,
+		isSearchAbortError,
+		mergeSearchResults,
+		savedSearchDraftAfterExternalQuery,
+		savedSearchDraftAfterQueryInput,
+		saveSearchTitle as searchSaveTitle,
+		searchRequestOptions,
+		SEARCH_DEBOUNCE_MS
+	} from '$lib/search/session';
+	import {
 		buildSearchResultRows,
 		searchFolderFacets,
 		visibleSearchRows,
@@ -62,19 +73,13 @@
 	let currentMode = $derived<SavedSearchMode>(searchModeFromFullText(fullText));
 	let searchAlreadySaved = $derived(savedSearches.some((search) => isActiveSavedSearch(search, q, currentMode)));
 	let canSaveSearch = $derived(
-		q.trim().length > 0 && !savingSearch && !searchAlreadySaved
+		canSaveCurrentSearch(q, savingSearch, searchAlreadySaved)
 	);
-	let saveSearchTitle = $derived(
-		!q.trim()
-			? 'Type a search to save it'
-			: searchAlreadySaved
-				? 'This search is already saved'
-				: 'Save current search'
-	);
+	let saveSearchTitle = $derived(searchSaveTitle(q, searchAlreadySaved));
 
 	function runSearchDebounced(): void {
 		if (debounceTimer) clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => void runSearch(q), 120);
+		debounceTimer = setTimeout(() => void runSearch(q), SEARCH_DEBOUNCE_MS);
 	}
 
 	async function runSearch(query: string, append = false): Promise<void> {
@@ -101,18 +106,17 @@
 		}
 		err = null;
 		try {
+			const requestOptions = searchRequestOptions(fullText, append, meta, results.length);
 			const response = await api.searchWithMeta(vaultId, trimmed, {
-				full: fullText,
-				limit: fullText ? 200 : 100,
-				offset: append ? meta?.nextOffset ?? results.length : 0,
+				...requestOptions,
 				signal: controller.signal
 			});
 			if (id !== requestId) return;
-			results = append ? [...results, ...response.results] : response.results;
+			results = mergeSearchResults(results, response, append);
 			meta = response;
 			if (!append) resetResultWindow();
 		} catch (e) {
-			if (id !== requestId || isAbortError(e)) return;
+			if (id !== requestId || isSearchAbortError(e)) return;
 			err = e instanceof Error ? e.message : String(e);
 			results = [];
 			meta = null;
@@ -127,9 +131,9 @@
 
 	function onQueryInput(value: string): void {
 		q = value;
-		if (!savedNameTouched || !savedName.trim() || savedName === 'Saved search') {
-			savedName = savedSearchName(q);
-		}
+		const draft = savedSearchDraftAfterQueryInput(q, savedName, savedNameTouched);
+		savedName = draft.savedName;
+		savedNameTouched = draft.savedNameTouched;
 		runSearchDebounced();
 	}
 
@@ -144,7 +148,7 @@
 	}
 
 	function loadMore(): void {
-		if (loading || loadingMore || !meta?.nextOffset) return;
+		if (!canLoadMoreSearch(loading, loadingMore, meta)) return;
 		void runSearch(q, true);
 	}
 
@@ -253,10 +257,6 @@
 		onResultKey(e, row.hit);
 	}
 
-	function isAbortError(error: unknown): boolean {
-		return error instanceof DOMException && error.name === 'AbortError';
-	}
-
 	onMount(() => {
 		savedName = savedSearchName(q);
 		if (q.trim()) void runSearch(q);
@@ -270,8 +270,9 @@
 		untrack(() => {
 			if (incoming !== q) {
 				q = incoming;
-				savedName = savedSearchName(incoming);
-				savedNameTouched = false;
+				const draft = savedSearchDraftAfterExternalQuery(incoming);
+				savedName = draft.savedName;
+				savedNameTouched = draft.savedNameTouched;
 				void runSearch(q);
 			}
 		});

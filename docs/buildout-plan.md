@@ -259,6 +259,10 @@ Use small, pushable slices:
    mutations, result paging, and virtual window orchestration in `SearchView`
    while moving header controls, saved-search chrome, and result-list DOM/CSS
    into focused presentation components.
+- **Search session helper extraction.** Move Search tab request limits,
+   pagination offsets, load-more gating, result merging, saved-search draft
+   naming, save-button state, and abort classification into a focused search
+   helper module with deterministic coverage.
 - **Shared pointer open-mode helper.** Move modifier-click and middle-click
    open-mode rules into a workspace helper used by note preview, search,
    file tree, bookmarks, and recent notes.

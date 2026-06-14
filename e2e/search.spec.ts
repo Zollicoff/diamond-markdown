@@ -13,6 +13,18 @@ import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src
 import { searchHighlightParts, searchHighlightTerms } from '../src/lib/search/highlight';
 import { isActiveSavedSearch, savedSearchButtonLabel, savedSearchModeLabel, savedSearchName, searchModeFromFullText } from '../src/lib/search/saved';
 import {
+	canLoadMoreSearch,
+	canSaveCurrentSearch,
+	isSearchAbortError,
+	mergeSearchResults,
+	savedSearchDraftAfterExternalQuery,
+	savedSearchDraftAfterQueryInput,
+	saveSearchTitle,
+	searchRequestLimit,
+	searchRequestOffset,
+	searchRequestOptions
+} from '../src/lib/search/session';
+import {
 	buildSearchResultRows,
 	searchFolderFacets,
 	searchQueryHasPathFilter,
@@ -312,4 +324,71 @@ test('saved search helpers persist sanitized vault-local search groups', () => {
 	const removed = deleteSavedSearch(vault, 'client-solar');
 	expect(removed.deleted).toBe(true);
 	expect(removed.searches).toEqual([]);
+});
+
+test('search session helpers keep SearchView orchestration deterministic', () => {
+	const firstPage = {
+		query: 'roof',
+		mode: 'full' as const,
+		limit: 200,
+		offset: 0,
+		total: 3,
+		limited: true,
+		hasMore: true,
+		nextOffset: 2,
+		results: [
+			{ path: 'Notes/Roof.md', title: 'Roof', snippet: 'roof notes' },
+			{ path: 'Notes/Meter.md', title: 'Meter', snippet: 'meter notes' }
+		]
+	};
+	const secondPage = {
+		...firstPage,
+		offset: 2,
+		hasMore: false,
+		nextOffset: null,
+		results: [{ path: 'Notes/Bill.md', title: 'Bill', snippet: 'bill notes' }]
+	};
+
+	expect(searchRequestLimit(false)).toBe(100);
+	expect(searchRequestLimit(true)).toBe(200);
+	expect(searchRequestOffset(false, firstPage, 2)).toBe(0);
+	expect(searchRequestOffset(true, firstPage, 2)).toBe(2);
+	expect(searchRequestOffset(true, null, 5)).toBe(5);
+	expect(searchRequestOptions(true, true, firstPage, 2)).toEqual({
+		full: true,
+		limit: 200,
+		offset: 2
+	});
+	expect(canLoadMoreSearch(false, false, firstPage)).toBe(true);
+	expect(canLoadMoreSearch(true, false, firstPage)).toBe(false);
+	expect(canLoadMoreSearch(false, false, secondPage)).toBe(false);
+	expect(mergeSearchResults(firstPage.results, secondPage, true).map((hit) => hit.path)).toEqual([
+		'Notes/Roof.md',
+		'Notes/Meter.md',
+		'Notes/Bill.md'
+	]);
+	expect(mergeSearchResults(firstPage.results, secondPage, false).map((hit) => hit.path)).toEqual([
+		'Notes/Bill.md'
+	]);
+	expect(canSaveCurrentSearch('  roof  ', false, false)).toBe(true);
+	expect(canSaveCurrentSearch('', false, false)).toBe(false);
+	expect(canSaveCurrentSearch('roof', true, false)).toBe(false);
+	expect(canSaveCurrentSearch('roof', false, true)).toBe(false);
+	expect(saveSearchTitle('', false)).toBe('Type a search to save it');
+	expect(saveSearchTitle('roof', true)).toBe('This search is already saved');
+	expect(saveSearchTitle('roof', false)).toBe('Save current search');
+	expect(savedSearchDraftAfterQueryInput('roof photos', 'Saved search', false)).toEqual({
+		savedName: 'roof photos',
+		savedNameTouched: false
+	});
+	expect(savedSearchDraftAfterQueryInput('roof photos', 'Custom name', true)).toEqual({
+		savedName: 'Custom name',
+		savedNameTouched: true
+	});
+	expect(savedSearchDraftAfterExternalQuery(' tag:client   roof ')).toEqual({
+		savedName: 'tag:client roof',
+		savedNameTouched: false
+	});
+	expect(isSearchAbortError({ name: 'AbortError' })).toBe(true);
+	expect(isSearchAbortError(new Error('AbortError'))).toBe(false);
 });
