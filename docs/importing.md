@@ -49,7 +49,8 @@ shows them as migration notes instead of dumping the raw JSON. It currently
 honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
 attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
 default destination for generic New Note commands, `useMarkdownLinks` for the
-editor link button's inserted syntax, `showLineNumber` for the editor
+editor link button's inserted syntax, local Markdown note links for navigation,
+backlinks, and static publish output, `showLineNumber` for the editor
 line-number gutter, `spellcheck` for the markdown editor's browser spellcheck
 attribute, safe integer `tabSize` values from 1 to 16 for editor indentation
 and tab rendering, `readableLineLength` for narrowing editor and reading
@@ -57,7 +58,8 @@ surfaces, `defaultViewMode` plus `livePreview` for the initial note view mode,
 and `alwaysUpdateLinks` for note/folder rename and move operations.
 Explicit folder context actions such as New note here still use the selected
 folder. Other app settings such as `newLinkFormat` and `trashOption` are
-reported so migration mismatches are visible before opening the vault.
+reported so migration mismatches are visible before opening the vault; Diamond
+does not rewrite existing note links during import.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same

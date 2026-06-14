@@ -74,9 +74,9 @@ function setting(
 }
 
 function linkFormatDetail(value: string): string {
-	if (value === 'relative') return 'Obsidian prefers relative links. Diamond preserves existing Markdown links and wikilinks.';
-	if (value === 'absolute') return 'Obsidian prefers vault-absolute links. Diamond preserves existing Markdown links and wikilinks.';
-	if (value === 'shortest') return 'Obsidian prefers the shortest valid link. Diamond resolves imported wikilinks without rewriting them.';
+	if (value === 'relative') return 'Obsidian prefers relative links. Diamond resolves existing relative Markdown note links and wikilinks without rewriting them.';
+	if (value === 'absolute') return 'Obsidian prefers vault-absolute links. Diamond resolves existing vault-path Markdown note links and wikilinks without rewriting them.';
+	if (value === 'shortest') return 'Obsidian prefers the shortest valid link. Diamond resolves imported note links without rewriting them.';
 	return 'Diamond preserves imported links and does not rewrite link format during import.';
 }
 
@@ -205,7 +205,7 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 			'Link style',
 			useMarkdownLinks ? 'Markdown links' : 'Wikilinks',
 			useMarkdownLinks
-				? 'Diamond renders imported Markdown links and wikilinks; the editor link button inserts Markdown link syntax.'
+				? 'Diamond resolves local Markdown note links and wikilinks; the editor link button inserts Markdown link syntax.'
 				: 'Diamond preserves and creates Obsidian-style wikilinks.'
 		));
 	}

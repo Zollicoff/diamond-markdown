@@ -82,7 +82,7 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	fs.mkdirSync(vaultDir, { recursive: true });
 	fs.writeFileSync(
 		path.join(vaultDir, 'Cache Seed.md'),
-		'---\ntitle: Cache Seed\ntags: [cache]\n---\n# Cache Seed\n\nLinks to [[Second Note]].\n'
+		'---\ntitle: Cache Seed\ntags: [cache]\n---\n# Cache Seed\n\nLinks to [[Second Note]] and [Second Note](Second%20Note.md).\n'
 	);
 	fs.writeFileSync(path.join(vaultDir, 'Second Note.md'), '# Second Note\n\nTarget.\n');
 
@@ -135,13 +135,14 @@ test('indexer writes a config-scoped warm cache and refreshes it on note save', 
 	expect(matchingCaches).toHaveLength(1);
 	const { cachePath, body: cache } = matchingCaches[0];
 	const updatedCache = (): CacheEntry => JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as CacheEntry;
-	expect(cache.version).toBe(2);
+	expect(cache.version).toBe(3);
 	expect(cache.vaultId).toBe(vault.id);
 	expect(cache.vaultPath).toBe(path.resolve(vaultDir));
 	expect(cache.files.map((f) => f.rel)).toContain('Cache Seed.md');
 	expect(cache.notes.map((n) => n.notePath)).toContain('Cache Seed.md');
 	expect(cache.linksOutRaw.find((row) => row.notePath === 'Cache Seed.md')?.targets).toContain('Second Note');
-	expect(cache.searchDocs.find((row) => row.notePath === 'Cache Seed.md')?.text).toContain('Links to [[Second Note]].');
+	expect(cache.linksOutRaw.find((row) => row.notePath === 'Cache Seed.md')?.targets).toContain('Second Note.md');
+	expect(cache.searchDocs.find((row) => row.notePath === 'Cache Seed.md')?.text).toContain('Links to [[Second Note]] and [Second Note](Second%20Note.md).');
 
 	const saved = await request.post(`/api/vaults/${vault.id}/note`, {
 		data: { path: 'Cache Added.md', content: '# Cache Added\n\nMore cache text.\n', commitNow: false }

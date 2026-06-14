@@ -5,6 +5,7 @@ import { FIXTURE_PATHS } from './setup-fixture';
 import type { NoteDoc } from '../src/lib/types';
 import { parseWikilinks, replaceEmbeds, wikilinkFragment, type ParsedEmbed } from '../src/lib/server/wikilink';
 import { resolveMarkdownImageReference, splitAssetReference } from '../src/lib/server/embed';
+import { resolveMarkdownNoteReference } from '../src/lib/server/markdown-links';
 import { parseObsidianCallout } from '../src/lib/server/callouts';
 
 function collectEmbeds(markdown: string): ParsedEmbed[] {
@@ -434,6 +435,74 @@ test.describe('Obsidian image embed variants', () => {
 		const targetHtml = fs.readFileSync(path.join(report.outDir, 'target.html'), 'utf-8');
 		expect(targetHtml).toContain('<p id="^install-steps">Important install paragraph</p>');
 		expect(targetHtml).toContain('<h2 id="details">Details</h2>');
+	});
+
+	test('resolves Markdown note links for navigation, backlinks, and static publish', async ({ request }) => {
+		expect(resolveMarkdownNoteReference('../Target.md#details', 'Notes/Source.md')).toEqual({
+			target: 'Target.md',
+			suffix: '#details'
+		});
+
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'markdown-note-link-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
+		fs.writeFileSync(
+			path.join(vaultDir, 'Target.md'),
+			[
+				'---',
+				'title: Target',
+				'public: true',
+				'---',
+				'# Target',
+				'',
+				'## Details',
+				'',
+				'Linked from Markdown syntax.'
+			].join('\n')
+		);
+		fs.writeFileSync(
+			path.join(vaultDir, 'Notes', 'Source.md'),
+			[
+				'---',
+				'title: Source',
+				'public: true',
+				'---',
+				'# Source',
+				'',
+				'Jump to [Target details](../Target.md#details) and keep [external](https://example.com) links external.',
+				'',
+				'```md',
+				'[Target details](../Target.md#details)',
+				'```'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Markdown Note Link Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const sourceRes = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Notes/Source.md')}`);
+		expect(sourceRes.ok()).toBe(true);
+		const source = await sourceRes.json() as NoteDoc;
+		expect(source.outgoingLinks).toContainEqual({ target: 'Target.md', resolved: 'Target.md' });
+		expect(source.html).toContain(`href="/vault/${vault.id}/note/Target.md#details"`);
+		expect(source.html).toContain('href="https://example.com"');
+
+		const targetRes = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Target.md')}`);
+		expect(targetRes.ok()).toBe(true);
+		const target = await targetRes.json() as NoteDoc;
+		expect(target.backlinks).toEqual([{ path: 'Notes/Source.md', title: 'Source' }]);
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(2);
+
+		const sourceHtml = fs.readFileSync(path.join(report.outDir, 'notes-source.html'), 'utf-8');
+		expect(sourceHtml).toContain('href="target.html#details"');
+		expect(sourceHtml).toContain('href="https://example.com"');
 	});
 
 	test('renders source-relative Markdown image links in read mode and static publish output', async ({ request }) => {

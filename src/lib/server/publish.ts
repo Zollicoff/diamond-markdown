@@ -25,7 +25,7 @@ import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags, wikilink
 import { splitFrontmatter } from './frontmatter';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
-import { getIndex, resolveTarget } from './indexer';
+import { getIndex, resolveTarget, type VaultIndex } from './indexer';
 import { purify } from './sanitize';
 import {
 	attachmentEmbedKind,
@@ -35,6 +35,7 @@ import {
 	resolveMarkdownImageReference,
 	splitAssetReference
 } from './embed';
+import { markdownNoteHash, resolveMarkdownNoteReference } from './markdown-links';
 import { renderObsidianCallout } from './callouts';
 import { useObsidianMarkedExtensions } from './marked-obsidian';
 import { addObsidianBlockIds } from './block-ids';
@@ -207,7 +208,7 @@ function renderBodyForPublish(
 	});
 
 	const raw = marked.parse(processed, {
-		renderer: createPublishRenderer(vault, sourcePath, imagesCopied, outDir)
+		renderer: createPublishRenderer(vault, idx, slugs, sourcePath, imagesCopied, outDir)
 	}) as string;
 	return purify.sanitize(addObsidianBlockIds(addHeadingIds(raw)), {
 		ALLOWED_ATTR: [
@@ -275,6 +276,8 @@ function copyAssetForPublish(
 
 function createPublishRenderer(
 	vault: Vault,
+	idx: VaultIndex,
+	slugs: Map<string, string>,
 	sourcePath: string,
 	imagesCopied: Map<string, string>,
 	outDir: string
@@ -300,6 +303,19 @@ function createPublishRenderer(
 			return `<span class="broken-embed">[missing: ${escHtml(localRef.path)}]</span>`;
 		}
 		return `<img src="images/${encodeURI(copied)}${escAttr(localRef.suffix)}" ${embedImageAttrs({ target: localRef.path, ...meta })}${titleAttr}>`;
+	};
+	renderer.link = ({ href, title, tokens }: Tokens.Link) => {
+		const label = renderer.parser.parseInline(tokens);
+		const ref = resolveMarkdownNoteReference(href, sourcePath);
+		if (ref) {
+			const resolved = resolveTarget(idx, ref.target);
+			if (resolved && slugs.has(resolved)) {
+				return `<a class="wikilink" href="${slugs.get(resolved)}.html${escAttr(markdownNoteHash(ref.suffix))}" data-target="${escAttr(resolved)}">${label}</a>`;
+			}
+			return `<span class="wikilink wikilink--broken" title="not published">${label}</span>`;
+		}
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		return `<a href="${escAttr(href)}"${titleAttr}>${label}</a>`;
 	};
 	return renderer;
 }

@@ -28,6 +28,7 @@ import {
 	resolveMarkdownImageReference,
 	splitAssetReference
 } from './embed';
+import { markdownNoteHash, resolveMarkdownNoteReference } from './markdown-links';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
@@ -159,7 +160,7 @@ function renderInner(
 	// 3. Marked → HTML (with our custom code renderer + footnotes ext + GFM).
 	const raw = marked.parse(processed, {
 		async: false,
-		renderer: createMarkdownRenderer(vault, sourcePath)
+		renderer: createMarkdownRenderer(vault, idx, outgoing, sourcePath)
 	}) as string;
 
 	// 4. Add id attributes to headings so `[[Note#Heading]]` deep-links work.
@@ -198,7 +199,12 @@ function renderCodeBlock({ text, lang }: Tokens.Code): string {
 	return `<pre><code class="${cls}">${highlighted}</code></pre>\n`;
 }
 
-function createMarkdownRenderer(vault: Vault, sourcePath: string | null): Renderer<string, string> {
+function createMarkdownRenderer(
+	vault: Vault,
+	idx: VaultIndex,
+	outgoing: { target: string; resolved: string | null }[],
+	sourcePath: string | null
+): Renderer<string, string> {
 	const renderer = new Renderer();
 	renderer.code = renderCodeBlock;
 	renderer.blockquote = (token) => {
@@ -213,6 +219,20 @@ function createMarkdownRenderer(vault: Vault, sourcePath: string | null): Render
 		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
 		const meta = parseMarkdownImageText(text);
 		return `<img src="${escAttr(src)}" ${embedImageAttrs({ target: localRef?.path ?? href, ...meta })}${titleAttr}>`;
+	};
+	renderer.link = ({ href, title, tokens }: Tokens.Link) => {
+		const label = renderer.parser.parseInline(tokens);
+		const ref = resolveMarkdownNoteReference(href, sourcePath);
+		if (ref) {
+			const resolved = resolveTarget(idx, ref.target);
+			outgoing.push({ target: ref.target, resolved });
+			if (resolved) {
+				const hash = markdownNoteHash(ref.suffix);
+				return `<a class="wikilink" href="/vault/${vault.id}/note/${encodeURI(resolved)}${escAttr(hash)}" data-target="${escAttr(resolved)}">${label}</a>`;
+			}
+		}
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		return `<a href="${escAttr(href)}"${titleAttr}>${label}</a>`;
 	};
 	return renderer;
 }

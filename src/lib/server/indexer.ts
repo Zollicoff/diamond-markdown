@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getConfigDir, type Vault } from './vault';
 import { parseWikilinks, parseInlineTags } from './wikilink';
+import { parseMarkdownNoteLinkTargets } from './markdown-links';
 import { splitFrontmatter, collectTags, aliasesOf } from './frontmatter';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
@@ -44,7 +45,7 @@ export interface VaultIndex {
 	notes: Map<string, NoteMeta>;
 	/** Lowercased title/alias/stem/path → notePath. Case-insensitive lookup. */
 	titleIndex: Map<string, string>;
-	/** Outgoing wikilink targets (unresolved text) per note. */
+	/** Outgoing note-link targets (unresolved wikilinks or resolved Markdown note paths) per note. */
 	linksOutRaw: Map<string, Set<string>>;
 	/** Resolved outgoing links. */
 	linksOut: Map<string, Set<string>>;
@@ -77,7 +78,7 @@ interface IndexCacheFile {
 	searchDocs: { notePath: string; text: string }[];
 }
 
-const INDEX_CACHE_VERSION = 2;
+const INDEX_CACHE_VERSION = 3;
 const indexes = new Map<string, VaultIndex>();
 
 export function getIndex(vault: Vault): VaultIndex {
@@ -150,6 +151,7 @@ function ingestNote(idx: VaultIndex, notePath: string, body: string): void {
 	idx.notes.set(notePath, meta);
 	const rawOut = new Set<string>();
 	for (const link of parseWikilinks(visibleMain)) rawOut.add(link.target);
+	for (const target of parseMarkdownNoteLinkTargets(visibleMain, notePath)) rawOut.add(target);
 	idx.linksOutRaw.set(notePath, rawOut);
 	const text = normalizeSearchText(visibleMain);
 	idx.searchDocs.set(notePath, { notePath, text, textLower: text.toLowerCase() });

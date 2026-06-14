@@ -5,6 +5,14 @@ import { commandSpec } from './command-runner.mjs';
 
 const REQUIRED_BUILD_OUTPUT = ['build/handler.js', 'build/server/manifest.js'];
 const REQUIRE_EXISTING_BUILD = process.env.DIAMOND_REQUIRE_EXISTING_BUILD === '1';
+const BUILD_INPUT_PATHS = [
+	'package.json',
+	'package-lock.json',
+	'svelte.config.js',
+	'tsconfig.json',
+	'vite.config.ts',
+	'src'
+];
 
 function run(command, args, options = {}) {
 	const spec = commandSpec(command, args);
@@ -29,6 +37,31 @@ function missingBuildOutput() {
 	return chunkRefs.filter((file) => !fs.existsSync(file));
 }
 
+function newestMtimeMs(target) {
+	let stat;
+	try {
+		stat = fs.statSync(target);
+	} catch {
+		return 0;
+	}
+	if (!stat.isDirectory()) return stat.mtimeMs;
+
+	let newest = stat.mtimeMs;
+	for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+		if (entry.name === 'node_modules' || entry.name === '.svelte-kit' || entry.name === 'build') continue;
+		newest = Math.max(newest, newestMtimeMs(path.join(target, entry.name)));
+	}
+	return newest;
+}
+
+function buildOutputStale() {
+	const manifest = 'build/server/manifest.js';
+	if (!fs.existsSync(manifest)) return true;
+	const builtAt = fs.statSync(manifest).mtimeMs;
+	const newestInput = Math.max(...BUILD_INPUT_PATHS.map(newestMtimeMs));
+	return newestInput > builtAt;
+}
+
 function cleanBuildOutput() {
 	for (const target of ['build', '.svelte-kit']) {
 		fs.rmSync(target, { recursive: true, force: true });
@@ -37,21 +70,32 @@ function cleanBuildOutput() {
 
 function ensureBuildOutput() {
 	let missing = missingBuildOutput();
-	if (missing.length === 0) return;
+	let stale = missing.length === 0 && buildOutputStale();
+	if (missing.length === 0 && !stale) return;
 	if (REQUIRE_EXISTING_BUILD) {
-		console.error(`Existing production build output is incomplete: ${missing.join(', ')}`);
+		const reason = missing.length > 0
+			? `incomplete: ${missing.join(', ')}`
+			: 'older than source inputs';
+		console.error(`Existing production build output is ${reason}`);
 		process.exit(1);
 	}
-	for (let attempt = 1; attempt <= 2 && missing.length > 0; attempt += 1) {
+	for (let attempt = 1; attempt <= 2 && (missing.length > 0 || stale); attempt += 1) {
 		if (attempt > 1) {
-			console.error(`Production build output incomplete (${missing.join(', ')}); retrying build.`);
+			const reason = missing.length > 0
+				? `incomplete (${missing.join(', ')})`
+				: 'older than source inputs';
+			console.error(`Production build output ${reason}; retrying build.`);
 		}
 		cleanBuildOutput();
 		run('npm', ['run', 'build', '--', '--logLevel', 'warn'], { timeoutMs: 90_000 });
 		missing = missingBuildOutput();
+		stale = missing.length === 0 && buildOutputStale();
 	}
-	if (missing.length > 0) {
-		console.error(`Production build output incomplete: ${missing.join(', ')}`);
+	if (missing.length > 0 || stale) {
+		const reason = missing.length > 0
+			? `incomplete: ${missing.join(', ')}`
+			: 'older than source inputs';
+		console.error(`Production build output ${reason}`);
 		process.exit(1);
 	}
 }

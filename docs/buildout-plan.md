@@ -239,7 +239,8 @@ Use small, pushable slices:
 - **Obsidian link-style preference.** Honor safe `.obsidian/app.json`
    `useMarkdownLinks` by switching the editor link toolbar action between
    Obsidian wikilinks and Markdown link syntax without changing existing note
-   content.
+   content; local Markdown note links also resolve for in-app navigation,
+   backlinks, outgoing links, and static publish output.
 - **Obsidian editor line-number preference.** Honor `.obsidian/app.json`
    `showLineNumber` by showing or hiding CodeMirror's line-number gutter per
    vault while keeping Diamond's default line numbers when the setting is
