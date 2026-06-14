@@ -4,7 +4,7 @@ import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { NoteDoc } from '../src/lib/types';
 import { parseWikilinks, replaceEmbeds, wikilinkFragment, type ParsedEmbed } from '../src/lib/server/wikilink';
-import { splitAssetReference } from '../src/lib/server/embed';
+import { resolveMarkdownImageReference, splitAssetReference } from '../src/lib/server/embed';
 import { parseObsidianCallout } from '../src/lib/server/callouts';
 
 function collectEmbeds(markdown: string): ParsedEmbed[] {
@@ -311,6 +311,11 @@ test.describe('Obsidian image embed variants', () => {
 	});
 
 	test('renders source-relative Markdown image links in read mode and static publish output', async ({ request }) => {
+		expect(resolveMarkdownImageReference('../Attachments/panel.svg?variant=thumb#detail', 'Notes/Markdown Images.md')).toEqual({
+			path: 'Attachments/panel.svg',
+			suffix: '?variant=thumb#detail'
+		});
+
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'markdown-image-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });
 		fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
@@ -318,7 +323,7 @@ test.describe('Obsidian image embed variants', () => {
 		fs.writeFileSync(path.join(vaultDir, 'Attachments', 'panel.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
 		fs.writeFileSync(
 			path.join(vaultDir, 'Notes', 'Markdown Images.md'),
-			'---\ntitle: Markdown Images\npublic: true\n---\n# Markdown Images\n\n![Main panel|240x120](../Attachments/panel.svg "Panel photo")\n\n![180](https://example.com/remote.png)\n'
+			'---\ntitle: Markdown Images\npublic: true\n---\n# Markdown Images\n\n![Main panel|240x120](../Attachments/panel.svg "Panel photo")\n\n![Panel detail](../Attachments/panel.svg?variant=thumb#detail)\n\n![180](https://example.com/remote.png)\n'
 		);
 
 		const created = await request.post('/api/vaults', {
@@ -331,7 +336,9 @@ test.describe('Obsidian image embed variants', () => {
 		expect(loaded.ok()).toBe(true);
 		const note = await loaded.json() as NoteDoc;
 		expect(note.html).toContain(`/api/vaults/${vault.id}/raw/Attachments/panel.svg`);
+		expect(note.html).toContain(`/api/vaults/${vault.id}/raw/Attachments/panel.svg?variant=thumb#detail`);
 		expect(note.html).toContain('alt="Main panel"');
+		expect(note.html).toContain('alt="Panel detail"');
 		expect(note.html).toContain('width="240"');
 		expect(note.html).toContain('height="120"');
 		expect(note.html).toContain('title="Panel photo"');
@@ -346,7 +353,9 @@ test.describe('Obsidian image embed variants', () => {
 
 		const html = fs.readFileSync(path.join(report.outDir, 'notes-markdown-images.html'), 'utf-8');
 		expect(html).toContain('src="images/panel.svg"');
+		expect(html).toContain('src="images/panel.svg?variant=thumb#detail"');
 		expect(html).toContain('alt="Main panel"');
+		expect(html).toContain('alt="Panel detail"');
 		expect(html).toContain('width="240"');
 		expect(html).toContain('height="120"');
 		expect(html).toContain('title="Panel photo"');

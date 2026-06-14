@@ -73,19 +73,23 @@ function safeDecodeUri(input: string): string {
 }
 
 export function resolveMarkdownImagePath(href: string, sourcePath: string | null): string | null {
+	return resolveMarkdownImageReference(href, sourcePath)?.path ?? null;
+}
+
+export function resolveMarkdownImageReference(href: string, sourcePath: string | null): AssetReference | null {
 	const trimmed = href.trim();
 	if (!trimmed || isExternalImageHref(trimmed) || trimmed.startsWith('/')) return null;
 
-	const withoutFragment = trimmed.split('#')[0].split('?')[0];
-	if (!withoutFragment) return null;
+	const ref = splitAssetReference(trimmed);
+	if (!ref.path) return null;
 
-	const decoded = safeDecodeUri(withoutFragment);
+	const decoded = safeDecodeUri(ref.path);
 	const baseDir = sourcePath ? path.posix.dirname(sourcePath) : '.';
 	const resolved = path.posix.normalize(path.posix.join(baseDir, decoded));
 	if (!resolved || resolved === '.' || resolved === '..' || resolved.startsWith('../')) {
 		return null;
 	}
-	return resolved;
+	return { path: resolved, suffix: ref.suffix };
 }
 
 const AUDIO_EXT_RE = /\.(?:mp3|wav|ogg|oga|m4a|flac|aac|opus)$/i;

@@ -32,7 +32,7 @@ import {
 	embedImageAttrs,
 	parseMarkdownImageText,
 	renderAttachmentEmbedHtml,
-	resolveMarkdownImagePath,
+	resolveMarkdownImageReference,
 	splitAssetReference
 } from './embed';
 import { renderObsidianCallout } from './callouts';
@@ -283,18 +283,18 @@ function createPublishRenderer(
 	};
 	renderer.image = ({ href, title, text }: Tokens.Image) => {
 		const meta = parseMarkdownImageText(text);
-		const localPath = resolveMarkdownImagePath(href, sourcePath);
+		const localRef = resolveMarkdownImageReference(href, sourcePath);
 		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
 
-		if (!localPath) {
+		if (!localRef) {
 			return `<img src="${escAttr(href)}" ${embedImageAttrs({ target: href, ...meta })}${titleAttr}>`;
 		}
 
-		const copied = copyImageForPublish(vault, localPath, imagesCopied, outDir);
+		const copied = copyImageForPublish(vault, localRef.path, imagesCopied, outDir);
 		if (!copied) {
-			return `<span class="broken-embed">[missing: ${escHtml(localPath)}]</span>`;
+			return `<span class="broken-embed">[missing: ${escHtml(localRef.path)}]</span>`;
 		}
-		return `<img src="images/${encodeURI(copied)}" ${embedImageAttrs({ target: localPath, ...meta })}${titleAttr}>`;
+		return `<img src="images/${encodeURI(copied)}${escAttr(localRef.suffix)}" ${embedImageAttrs({ target: localRef.path, ...meta })}${titleAttr}>`;
 	};
 	return renderer;
 }

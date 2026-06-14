@@ -25,7 +25,7 @@ import {
 	embedImageAttrs,
 	parseMarkdownImageText,
 	renderAttachmentEmbedHtml,
-	resolveMarkdownImagePath,
+	resolveMarkdownImageReference,
 	splitAssetReference
 } from './embed';
 import type { VaultIndex } from './indexer';
@@ -203,11 +203,11 @@ function createMarkdownRenderer(vault: Vault, sourcePath: string | null): Render
 		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
 	};
 	renderer.image = ({ href, title, text }: Tokens.Image) => {
-		const localPath = resolveMarkdownImagePath(href, sourcePath);
-		const src = localPath ? `/api/vaults/${vault.id}/raw/${encodeURI(localPath)}` : href;
+		const localRef = resolveMarkdownImageReference(href, sourcePath);
+		const src = localRef ? `/api/vaults/${vault.id}/raw/${encodeURI(localRef.path)}${localRef.suffix}` : href;
 		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
 		const meta = parseMarkdownImageText(text);
-		return `<img src="${escAttr(src)}" ${embedImageAttrs({ target: localPath ?? href, ...meta })}${titleAttr}>`;
+		return `<img src="${escAttr(src)}" ${embedImageAttrs({ target: localRef?.path ?? href, ...meta })}${titleAttr}>`;
 	};
 	return renderer;
 }

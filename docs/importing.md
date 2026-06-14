@@ -114,8 +114,9 @@ the vault.
 
 Image embeds using Obsidian wikilink syntax (`![[image.png|300x200]]`) and
 standard Markdown image syntax (`![Alt|300x200](Attachments/image.png)`) render
-from vault assets. Markdown image paths are resolved relative to the source note,
-and static publish copies local image assets into the exported `images/` folder.
+from vault assets. Markdown image paths are resolved relative to the source
+note, `?query` and `#fragment` suffixes are preserved, and static publish
+copies local image assets into the exported `images/` folder.
 Audio, video, PDF, and generic file embeds using Obsidian wikilink syntax render
 as vault-local attachments in read mode. Attachment fragments and query suffixes
 such as `![[packet.pdf#page=3|Site packet]]` are preserved in rendered links.
