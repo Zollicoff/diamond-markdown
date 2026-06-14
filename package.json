@@ -19,6 +19,7 @@
 		"desktop:build:self-contained": "node scripts/build-desktop-artifacts.mjs",
 		"desktop:build:self-contained:all": "npm run desktop:prepare-node-sidecar && tauri build --config src-tauri/tauri.sidecar.conf.json",
 		"desktop:build:self-contained:debug": "npm run desktop:prepare-node-sidecar && tauri build --debug --no-bundle --config src-tauri/tauri.sidecar.conf.json",
+		"desktop:write-artifact-manifest": "node scripts/write-desktop-artifact-manifest.mjs",
 		"test:e2e": "playwright test",
 		"test:e2e:batches": "node scripts/verify-playwright-batches.mjs",
 		"test:e2e:ui": "playwright test --ui",

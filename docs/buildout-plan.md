@@ -457,12 +457,16 @@ Use small, pushable slices:
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
+- **Desktop artifact manifests.** Generate and upload per-platform desktop
+  artifact manifests containing source commit/ref, package and Tauri versions,
+  runner platform, requested bundle targets, file sizes, and SHA-256 hashes so
+  unsigned CI bundles are ready for later GitHub Release publishing policy.
 
 ## Next Implementation Slices
 
 1. **Signed desktop release publishing.** Configure signing/notarization
-   secrets, release notes, and GitHub Release attachment policy once Zach is
-   ready to publish public desktop installers.
+   secrets, release notes, installer policy, and GitHub Release attachment
+   automation once Zach is ready to publish public desktop installers.
 2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
    import edges such as deeper Canvas formatting support and remaining
    Obsidian config interpretation without executing Obsidian plugins.

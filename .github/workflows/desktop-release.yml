@@ -99,6 +99,11 @@ jobs:
         env:
           DIAMOND_DESKTOP_BUNDLES: ${{ matrix.bundles }}
 
+      - name: Write desktop artifact manifest
+        run: npm run desktop:write-artifact-manifest
+        env:
+          DIAMOND_DESKTOP_BUNDLES: ${{ matrix.bundles }}
+
       - name: Upload desktop bundle
         uses: actions/upload-artifact@v4
         with:

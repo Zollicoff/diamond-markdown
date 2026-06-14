@@ -177,8 +177,9 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
   bundles it through Tauri
 - `npm run verify:desktop-release` checks current-host bundle inputs before
   building; the release verifier uses a cross-platform preview launcher, and
-  the GitHub Actions desktop workflow builds unsigned bundle artifacts across
-  the configured matrix. The signed release plan is in
+  the GitHub Actions desktop workflow builds unsigned bundle artifacts plus
+  per-platform SHA-256 artifact manifests across the configured matrix. The
+  signed release plan is in
   [docs/desktop-release.md](./docs/desktop-release.md)
 
 ### Plugins

@@ -58,15 +58,15 @@ The main remaining product risks are:
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |
-| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, and unsigned GitHub Actions artifact matrix | Signing/notarization and GitHub Release publishing are not done |
+| Desktop | Partial | Tauri wrapper, current-platform sidecar build scripts, `verify:desktop-release`, cross-shell release verifier launcher, unsigned GitHub Actions artifact matrix, and per-platform artifact manifests with SHA-256 hashes | Signing/notarization and GitHub Release publishing are not done |
 | Plugins | Partial | Manifest/catalog install, workers, iframes, command/editor/markdown/settings hooks | Full Obsidian plugin API parity is deferred/non-goal |
 | Verification | Done | `verify:release` runs audit, type check, clean build, auth/read-only smokes, and batched full-suite Playwright | Keep expanding targeted coverage as features land |
 
 ## Highest-Value Next Slices
 
-1. **Desktop release CI.** Add and verify a matrix workflow for desktop
-   preflight/build/artifact upload once a GitHub credential with `workflow`
-   scope is available.
+1. **Signed desktop release publishing.** Configure signing/notarization
+   secrets, installer policy, release notes, and GitHub Release attachment
+   automation once Zach is ready to publish public desktop installers.
 2. **Canvas/import polish.** Continue daily-driver compatibility work around
    deeper Canvas interaction parity and remaining Obsidian config edge cases
    without executing Obsidian plugins, themes, or CSS snippets.

@@ -99,7 +99,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] **Tauri v2 desktop wrapper** — native desktop shell that launches the existing built SvelteKit/Node backend on loopback and opens a Tauri webview, reusing 100% of current app behavior.
 - [x] **Current-platform self-contained desktop runtime** — optional Tauri sidecar config plus `desktop:prepare-node-sidecar` / `desktop:build:self-contained` scripts bundle the current host's Node runtime instead of requiring system Node.
 - [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
-- [x] **Unsigned desktop artifact CI** — `.github/workflows/desktop-release.yml` runs the web release gate, desktop preflight, self-contained Tauri build, and unsigned bundle artifact upload on macOS / Windows / Linux.
+- [x] **Unsigned desktop artifact CI** — `.github/workflows/desktop-release.yml` runs the web release gate, desktop preflight, self-contained Tauri build, SHA-256 artifact manifest generation, and unsigned bundle artifact upload on macOS / Windows / Linux.
 - [ ] **Signed cross-platform release publishing** — configure signing/notarization secrets, release notes, and GitHub Release attachment policy for every published macOS / Windows / Linux target.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much

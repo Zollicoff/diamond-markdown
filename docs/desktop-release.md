@@ -62,8 +62,17 @@ target sidecar is prepared and verified for the target triple.
 ## Artifact Expectations
 
 Tauri writes platform installers/bundles under `src-tauri/target/release/bundle/`.
-Upload the platform-specific bundle directory as the release artifact together
-with the commit hash and preflight output.
+Each release build should write `diamond-desktop-artifacts.manifest.json` into
+that bundle directory before upload:
+
+```sh
+npm run desktop:write-artifact-manifest
+```
+
+The manifest records the source commit/ref, package and Tauri versions,
+runner platform, requested bundle targets, and each artifact file's relative
+path, size, and SHA-256 hash. Upload the platform-specific bundle directory
+with this manifest as the release artifact together with the preflight output.
 
 Do not upload `src-tauri/binaries/node-*` from the repository root as a separate
 artifact. It is an input to the Tauri bundle and is intentionally git-ignored.
@@ -105,12 +114,13 @@ Each matrix entry runs on macOS, Windows, and Linux:
 - `npm run verify:desktop-release`
 - `npm run desktop:build:self-contained` with an explicit
   `DIAMOND_DESKTOP_BUNDLES` value from the matrix
+- `npm run desktop:write-artifact-manifest`
 
 The workflow uploads `src-tauri/target/release/bundle/**` as unsigned desktop
-artifacts for each platform. The macOS CI target is `.app`, not `.dmg`, because
-DMG packaging runs Finder AppleScript and belongs with the signed release
-publishing step. The release verifier is runner-shell neutral: Playwright
-fixture setup and the preview server are launched through
+artifacts for each platform, including the generated manifest. The macOS CI
+target is `.app`, not `.dmg`, because DMG packaging runs Finder AppleScript
+and belongs with the signed release publishing step. The release verifier is
+runner-shell neutral: Playwright fixture setup and the preview server are launched through
 `scripts/playwright-webserver.mjs`, full-suite Playwright runs are batched
 through `scripts/verify-playwright-batches.mjs`, system Chrome/Edge is used
 when available instead of downloading Playwright browsers in CI, and
@@ -128,8 +138,9 @@ It is accurate to claim:
 - Tauri desktop shell exists.
 - Current-host self-contained bundle inputs can be verified.
 - GitHub Actions is configured to build and upload unsigned self-contained
-  desktop artifacts across the configured matrix.
-- The release plan identifies required sidecars, signing inputs, and artifacts.
+  desktop artifacts and SHA-256 manifests across the configured matrix.
+- The release plan identifies required sidecars, signing inputs, artifact
+  manifests, and artifacts.
 
 Do not claim signed cross-platform desktop release publishing is shipped until
 the matrix workflow is verified with the required signing/notarization secrets,
