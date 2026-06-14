@@ -66,6 +66,7 @@ import {
 	canvasSvgEdgeStroke,
 	canvasSvgNodeColors,
 	canvasSummary,
+	canvasTextEmbedHref,
 	canvasTextPreviewBlocks,
 	canvasTextPreviewInlines,
 	canvasTextDrafts,
@@ -243,6 +244,44 @@ test.describe('canvas view helpers', () => {
 		expect(canvasTextPreviewBlocks('A | B without separator')).toEqual([
 			{ type: 'paragraph', inline: [{ kind: 'text', text: 'A | B without separator' }] }
 		]);
+		expect(canvasTextPreviewBlocks('![[Images/roof.svg#diagram|Roof photo|320x180]]')).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Images/roof.svg',
+					suffix: '#diagram',
+					kind: 'image',
+					title: 'Roof photo',
+					alt: 'Roof photo',
+					width: 320,
+					height: 180
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![Panel packet](Docs/panel.pdf?page=2)')).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Docs/panel.pdf',
+					suffix: '?page=2',
+					kind: 'pdf',
+					title: 'Panel packet',
+					alt: 'Panel packet',
+					width: null,
+					height: null
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![[../secret.png]]')).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[../secret.png]]' }] }
+		]);
+		expect(canvasTextPreviewBlocks('![[Home.md]]')).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[Home.md]]' }] }
+		]);
+		expect(canvasTextEmbedHref('vault id', {
+			path: 'Images/roof.svg',
+			suffix: '#diagram'
+		})).toBe('/api/vaults/vault%20id/raw/Images/roof.svg#diagram');
 		expect(previewBlocks[5]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
 		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
@@ -385,6 +424,7 @@ test.describe('canvas view helpers', () => {
 		expect(canvasFileAssetKind('Video/demo.webm')).toBe('video');
 		expect(canvasFileAssetKind('Archive/site-data.zip')).toBe('file');
 		expect(canvasRawAssetHref('vault id', 'Images/roof photo.png')).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.png');
+		expect(canvasRawAssetHref('vault id', 'Images/roof photo.svg#diagram')).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.svg#diagram');
 		expect(canvasRawAssetHref('vault', '../secret.png')).toBeNull();
 		expect(canvasRawAssetHref('vault', 'https://example.com/roof.png')).toBeNull();
 		expect(canvasFileAssetPreview(assetFileNode, 'vault id')).toEqual({
@@ -594,7 +634,15 @@ test('canvas API and file tree open an editable Obsidian Canvas preview', async 
 test('canvas text cards render a safe markdown preview while remaining editable', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-markdown-preview-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
-	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Docs'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof.svg'), [
+		'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
+		'<rect width="160" height="90" fill="#0f766e"/>',
+		'<path d="M20 62 L80 24 L140 62 Z" fill="#f8fafc"/>',
+		'</svg>'
+	].join(''));
+	fs.writeFileSync(path.join(vaultDir, 'Docs', 'panel.pdf'), '%PDF-1.4\n');
 	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
 		nodes: [
 			{
@@ -603,9 +651,11 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 				x: 0,
 				y: 0,
 				width: 340,
-				height: 260,
+				height: 320,
 				text: [
 					'# Launch plan',
+					'![[Images/roof.svg|Roof photo|160x90]]',
+					'![Panel packet](Docs/panel.pdf#page=2)',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'> Refer homeowner questions',
@@ -634,6 +684,10 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
+	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
+	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
+	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');
+	await expect(preview.getByRole('link', { name: /Panel packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel\.pdf#page=2$/);
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('del')).toHaveText('old bill');
 	await expect(preview.locator('.wikilink').first()).toHaveText('[[Roof Photos]]');

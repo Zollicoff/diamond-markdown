@@ -434,6 +434,10 @@ Use small, pushable slices:
 - **Canvas text-card highlight and strikethrough.** Render Obsidian-style
   `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
   lightweight Canvas text-card preview while leaving the raw card text editable.
+- **Canvas text-card asset embeds.** Render standalone Obsidian embeds and
+  Markdown image syntax that point at safe vault-local assets inside Canvas
+  text-card previews, using the existing raw-asset route and preserving the raw
+  editable card text.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

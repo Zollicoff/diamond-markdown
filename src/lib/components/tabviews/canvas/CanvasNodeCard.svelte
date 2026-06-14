@@ -124,6 +124,7 @@
 		</div>
 	{:else if node.type === 'text'}
 		<CanvasTextNodeEditor
+			{vaultId}
 			{node}
 			{draft}
 			{changed}

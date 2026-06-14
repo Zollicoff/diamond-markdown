@@ -126,6 +126,16 @@ export interface CanvasTextPreviewTable {
 	rows: CanvasTextPreviewTableCell[][];
 }
 
+export interface CanvasTextPreviewEmbed {
+	path: string;
+	suffix: string;
+	kind: CanvasFileAssetKind;
+	title: string;
+	alt: string | null;
+	width: number | null;
+	height: number | null;
+}
+
 export type CanvasTextPreviewBlock =
 	| { type: 'heading'; level: 1 | 2 | 3; inline: CanvasTextPreviewInline[] }
 	| { type: 'paragraph'; inline: CanvasTextPreviewInline[] }
@@ -140,6 +150,7 @@ export type CanvasTextPreviewBlock =
 	| { type: 'unordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'ordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'table'; table: CanvasTextPreviewTable }
+	| { type: 'embed'; embed: CanvasTextPreviewEmbed }
 	| { type: 'code'; language: string; code: string };
 
 export type CanvasTextDrafts = Record<string, string>;
@@ -513,6 +524,22 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 			continue;
 		}
 
+		const embed = canvasTextEmbedPreview(line);
+		if (embed) {
+			flushParagraph();
+			flushList();
+			blocks.push({ type: 'embed', embed });
+			index += 1;
+			continue;
+		}
+		if (isCanvasStandaloneEmbedSyntax(line)) {
+			flushParagraph();
+			flushList();
+			blocks.push({ type: 'paragraph', inline: [{ kind: 'text', text: line.trim() }] });
+			index += 1;
+			continue;
+		}
+
 		const heading = line.match(/^\s{0,3}(#{1,3})\s+(.+)$/);
 		if (heading) {
 			flushParagraph();
@@ -651,10 +678,11 @@ export function canvasFileOpenTarget(node: CanvasNode): CanvasFileOpenTarget | n
 }
 
 export function canvasFileAssetKind(assetPath: string): CanvasFileAssetKind {
-	if (CANVAS_IMAGE_ASSET_RE.test(assetPath)) return 'image';
-	if (CANVAS_PDF_ASSET_RE.test(assetPath)) return 'pdf';
-	if (CANVAS_AUDIO_ASSET_RE.test(assetPath)) return 'audio';
-	if (CANVAS_VIDEO_ASSET_RE.test(assetPath)) return 'video';
+	const cleanPath = splitCanvasAssetReference(assetPath).path;
+	if (CANVAS_IMAGE_ASSET_RE.test(cleanPath)) return 'image';
+	if (CANVAS_PDF_ASSET_RE.test(cleanPath)) return 'pdf';
+	if (CANVAS_AUDIO_ASSET_RE.test(cleanPath)) return 'audio';
+	if (CANVAS_VIDEO_ASSET_RE.test(cleanPath)) return 'video';
 	return 'file';
 }
 
@@ -666,11 +694,21 @@ export function isCanvasVaultRelativeAssetPath(assetPath: string): boolean {
 	return !normalized.split('/').some((segment) => segment === '..');
 }
 
+export function splitCanvasAssetReference(target: string): { path: string; suffix: string } {
+	const normalized = target.trim().replace(/\\/g, '/');
+	const marker = normalized.search(/[?#]/);
+	if (marker < 0) return { path: normalized, suffix: '' };
+	return {
+		path: normalized.slice(0, marker),
+		suffix: normalized.slice(marker)
+	};
+}
+
 export function canvasRawAssetHref(vaultId: string, assetPath: string): string | null {
-	const normalized = assetPath.trim().replace(/\\/g, '/');
-	if (!isCanvasVaultRelativeAssetPath(normalized)) return null;
-	const encodedPath = normalized.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-	return `/api/vaults/${encodeURIComponent(vaultId)}/raw/${encodedPath}`;
+	const ref = splitCanvasAssetReference(assetPath);
+	if (!isCanvasVaultRelativeAssetPath(ref.path)) return null;
+	const encodedPath = ref.path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+	return `/api/vaults/${encodeURIComponent(vaultId)}/raw/${encodedPath}${ref.suffix}`;
 }
 
 export function canvasFileAssetPreview(node: CanvasNode, vaultId: string): CanvasFileAssetPreview | null {
@@ -693,6 +731,10 @@ export function canvasFileAssetPreview(node: CanvasNode, vaultId: string): Canva
 		href,
 		actionLabel: labels[kind]
 	};
+}
+
+export function canvasTextEmbedHref(vaultId: string, embed: Pick<CanvasTextPreviewEmbed, 'path' | 'suffix'>): string | null {
+	return canvasRawAssetHref(vaultId, `${embed.path}${embed.suffix}`);
 }
 
 export function canvasLinkNodeHref(node: CanvasNode): string | null {
@@ -969,6 +1011,75 @@ function canvasTableCells(values: string[], columnCount: number): CanvasTextPrev
 	return Array.from({ length: columnCount }, (_, index) => ({
 		inline: canvasTextPreviewInlines(values[index] ?? '')
 	}));
+}
+
+function canvasImageSizeSpec(raw: string): Pick<CanvasTextPreviewEmbed, 'width' | 'height'> | null {
+	const size = raw.trim().match(/^(\d{1,5})(?:\s*x\s*(\d{1,5}))?$/i);
+	if (!size) return null;
+	const width = Number.parseInt(size[1], 10);
+	const height = size[2] ? Number.parseInt(size[2], 10) : null;
+	if (!Number.isFinite(width) || width <= 0 || (height != null && (!Number.isFinite(height) || height <= 0))) {
+		return null;
+	}
+	return { width, height };
+}
+
+function canvasObsidianEmbedMeta(raw: string | undefined): Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'> {
+	const meta = raw?.trim();
+	if (!meta) return { alt: null, width: null, height: null };
+	const parts = meta.split('|').map((part) => part.trim());
+	const size = canvasImageSizeSpec(parts.at(-1) ?? '');
+	if (!size) return { alt: meta, width: null, height: null };
+	const alt = parts.slice(0, -1).join('|').trim();
+	return { alt: alt || null, ...size };
+}
+
+function canvasMarkdownImageMeta(raw: string): Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'> {
+	const directSize = canvasImageSizeSpec(raw);
+	if (directSize) return { alt: null, ...directSize };
+	const parts = raw.split('|').map((part) => part.trim());
+	const size = parts.length > 1 ? canvasImageSizeSpec(parts.at(-1) ?? '') : null;
+	if (!size) return { alt: raw.trim() || null, width: null, height: null };
+	const alt = parts.slice(0, -1).join('|').trim();
+	return { alt: alt || null, ...size };
+}
+
+function canvasTextEmbedFromTarget(
+	target: string,
+	meta: Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'>
+): CanvasTextPreviewEmbed | null {
+	const ref = splitCanvasAssetReference(target);
+	if (!ref.path || !isCanvasVaultRelativeAssetPath(ref.path)) return null;
+	if (/\.(md|markdown|canvas)$/i.test(ref.path)) return null;
+	const kind = canvasFileAssetKind(ref.path);
+	const title = meta.alt ?? ref.path.split('/').pop() ?? ref.path;
+	return {
+		path: ref.path,
+		suffix: ref.suffix,
+		kind,
+		title,
+		...meta
+	};
+}
+
+function canvasTextEmbedPreview(line: string): CanvasTextPreviewEmbed | null {
+	const trimmed = line.trim();
+	const obsidian = trimmed.match(/^!\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?]]$/);
+	if (obsidian) {
+		return canvasTextEmbedFromTarget(obsidian[1].trim(), canvasObsidianEmbedMeta(obsidian[2]));
+	}
+
+	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\s]+)\)$/);
+	if (markdown) {
+		return canvasTextEmbedFromTarget(markdown[2].trim(), canvasMarkdownImageMeta(markdown[1]));
+	}
+
+	return null;
+}
+
+function isCanvasStandaloneEmbedSyntax(line: string): boolean {
+	const trimmed = line.trim();
+	return /^!\[\[[^\[\]\n]+]]$/.test(trimmed) || /^!\[[^\]\n]*]\([^\n)]+\)$/.test(trimmed);
 }
 
 function firstInlineMatch(value: string): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
