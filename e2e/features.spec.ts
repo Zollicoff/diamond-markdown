@@ -186,6 +186,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
 		privateHotkeySetting: 'do-not-render-this-hotkey-value'
 	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'graph.json'), JSON.stringify({
+		search: 'tag:#project path:"Notes"',
+		showOrphans: false,
+		showAttachments: true,
+		showTags: true,
+		hideUnresolved: false,
+		colorGroups: [{ query: 'tag:#urgent', color: { a: 1, rgb: 16711680 } }],
+		nodeSizeMultiplier: 1.2,
+		linkDistance: 250,
+		privateGraphSetting: 'do-not-render-this-graph-value'
+	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
 		items: [
@@ -292,6 +303,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			source: string;
 			importableBookmarks: number;
 			paths: string[];
+			warnings: string[];
+		};
+		obsidianGraph: {
+			status: string;
+			searchQuery?: string;
+			showOrphans?: boolean;
+			showAttachments?: boolean;
+			showTags?: boolean;
+			hideUnresolved?: boolean;
+			colorGroupCount: number;
+			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
 		obsidianPluginFolders: string[];
@@ -422,6 +444,27 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		importableBookmarks: 1,
 		paths: ['Notes/Home.md']
 	});
+	expect(body.obsidianGraph).toMatchObject({
+		status: 'present',
+		searchQuery: 'tag:#project path:"Notes"',
+		showOrphans: false,
+		showAttachments: true,
+		showTags: true,
+		hideUnresolved: false,
+		colorGroupCount: 1
+	});
+	expect(body.obsidianGraph.settings.map((setting) => setting.id)).toEqual([
+		'search',
+		'showOrphans',
+		'showAttachments',
+		'showTags',
+		'hideUnresolved',
+		'colorGroups',
+		'nodeSizeMultiplier',
+		'linkDistance'
+	]);
+	expect(JSON.stringify(body.obsidianGraph)).not.toContain('do-not-render-this-graph-value');
+	expect(JSON.stringify(body.obsidianGraph)).not.toContain('tag:#urgent');
 	expect(body.obsidianPluginFolders).toContain('.obsidian/plugins/dataview');
 	expect(body.obsidianPlugins[0]).toMatchObject({
 		id: 'dataview',
@@ -443,6 +486,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.checklist.find((row) => row.id === 'obsidian-core-plugins')?.detail).toContain('4 enabled core plugins found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-hotkeys')?.detail).toContain('2 custom hotkey bindings across 2 commands found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 bookmark item can seed Diamond bookmarks');
+	expect(body.checklist.find((row) => row.id === 'obsidian-graph')?.detail).toContain('8 Graph settings found');
+	expect(body.checklist.find((row) => row.id === 'obsidian-graph')?.level).toBe('warn');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.level).toBe('ok');
 	expect(body.checklist.find((row) => row.id === 'preserve')?.detail).toContain('do not rewrite markdown content');
@@ -495,6 +540,17 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		'switcher:open': [{ modifiers: ['Mod'], key: 'K' }],
 		'editor:toggle-bold': [{ modifiers: ['Mod'], key: 'B' }],
 		privateHotkeySetting: 'do-not-render-this-hotkey-value'
+	}));
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'graph.json'), JSON.stringify({
+		search: 'tag:#project path:"Notes"',
+		showOrphans: false,
+		showAttachments: true,
+		showTags: true,
+		hideUnresolved: false,
+		colorGroups: [{ query: 'tag:#urgent', color: { a: 1, rgb: 16711680 } }],
+		nodeSizeMultiplier: 1.2,
+		linkDistance: 250,
+		privateGraphSetting: 'do-not-render-this-graph-value'
 	}));
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'snippets', 'cards.css'), '.cards { content: "do-not-render-this-css-value"; }');
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'), JSON.stringify({
@@ -603,6 +659,18 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
 	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');
 	await expect(page.locator('.import-card')).toContainText('Home.md');
+	await expect(page.locator('.import-card')).toContainText('Graph settings');
+	await expect(page.locator('.import-card')).toContainText('8 Graph settings found');
+	await expect(page.locator('.import-card')).toContainText('Obsidian Graph');
+	await expect(page.locator('.import-card')).toContainText('Graph search filter');
+	await expect(page.locator('.import-card')).toContainText('tag:#project path:"Notes"');
+	await expect(page.locator('.import-card')).toContainText('Attachment graph nodes');
+	await expect(page.locator('.import-card')).toContainText('Shown in Obsidian');
+	await expect(page.locator('.import-card')).toContainText('Tag graph nodes');
+	await expect(page.locator('.import-card')).toContainText('Unresolved links');
+	await expect(page.locator('.import-card')).toContainText('Graph color groups');
+	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-graph-value');
+	await expect(page.locator('.import-card')).not.toContainText('tag:#urgent');
 	await expect(page.locator('.import-card')).toContainText('Recommended excludes');
 	await expect(page.locator('.import-card')).toContainText('.obsidian');
 	await expect(page.locator('.import-card')).toContainText('Obsidian plugin settings');

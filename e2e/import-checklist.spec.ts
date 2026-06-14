@@ -11,6 +11,7 @@ import {
 	obsidianAppConfigSummary,
 	obsidianBookmarksSummary,
 	obsidianCorePluginsSummary,
+	obsidianGraphSummary,
 	obsidianHotkeysSummary,
 	obsidianTemplatesSummary,
 	obsidianPluginMigrationNotes,
@@ -21,6 +22,7 @@ import { editorDisplayPreference, editorLinkPreference, preferredObsidianNewNote
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
 import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
+import { readObsidianGraphConfig } from '../src/lib/server/obsidian-graph';
 import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
 import type { ObsidianPluginInfo, VaultImportAnalysis } from '../src/lib/types';
 
@@ -91,6 +93,12 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			totalItems: 0,
 			importableBookmarks: 0,
 			paths: [],
+			warnings: []
+		},
+		obsidianGraph: {
+			status: 'missing',
+			colorGroupCount: 0,
+			settings: [],
 			warnings: []
 		},
 		obsidianPluginFolders: [],
@@ -264,6 +272,121 @@ test.describe('import checklist helpers', () => {
 			paths: ['Legacy.md'],
 			warnings: []
 		})).toBe('1 Obsidian legacy starred item can seed Diamond bookmarks.');
+	});
+
+	test('summarizes Obsidian graph settings as migration guidance', () => {
+		expect(obsidianGraphSummary(analysis().obsidianGraph)).toBe('No .obsidian/graph.json file was found.');
+		expect(obsidianGraphSummary({
+			path: '.obsidian/graph.json',
+			status: 'invalid',
+			bytes: 12,
+			colorGroupCount: 0,
+			settings: [],
+			warnings: ['invalid']
+		})).toBe('.obsidian/graph.json is present but invalid.');
+		expect(obsidianGraphSummary({
+			path: '.obsidian/graph.json',
+			status: 'present',
+			bytes: 160,
+			searchQuery: 'tag:#project',
+			showOrphans: false,
+			showAttachments: true,
+			showTags: true,
+			hideUnresolved: false,
+			colorGroupCount: 2,
+			settings: [
+				{
+					id: 'search',
+					label: 'Graph search filter',
+					value: 'tag:#project',
+					detail: 'Reported for migration planning.',
+					level: 'info'
+				},
+				{
+					id: 'showAttachments',
+					label: 'Attachment graph nodes',
+					value: 'Shown in Obsidian',
+					detail: 'Reported for migration planning.',
+					level: 'warn'
+				},
+				{
+					id: 'colorGroups',
+					label: 'Graph color groups',
+					value: '2 groups',
+					detail: 'Reported for migration planning.',
+					level: 'warn'
+				}
+			],
+			warnings: []
+		})).toBe('3 Graph settings found; 2 need manual review.');
+	});
+
+	test('reads Obsidian graph settings without exposing private graph config', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-graph-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'graph.json'), JSON.stringify({
+			search: 'tag:#project path:"Notes"',
+			showOrphans: false,
+			showAttachments: true,
+			showTags: true,
+			hideUnresolved: false,
+			colorGroups: [
+				{ query: 'tag:#urgent', color: { a: 1, rgb: 16711680 } },
+				{ query: 'path:Archive', color: { a: 1, rgb: 65280 } }
+			],
+			nodeSizeMultiplier: 1.2,
+			lineSizeMultiplier: 0.75,
+			textFadeMultiplier: 0.4,
+			centerStrength: 0.52,
+			repelStrength: 10,
+			linkStrength: 1,
+			linkDistance: 250,
+			scale: 0.85,
+			privateGraphSetting: 'do-not-render-this-graph-value'
+		}));
+
+		const config = readObsidianGraphConfig(vaultDir);
+		expect(config).toMatchObject({
+			status: 'present',
+			searchQuery: 'tag:#project path:"Notes"',
+			showOrphans: false,
+			showAttachments: true,
+			showTags: true,
+			hideUnresolved: false,
+			colorGroupCount: 2,
+			nodeSizeMultiplier: 1.2,
+			lineSizeMultiplier: 0.75,
+			textFadeMultiplier: 0.4,
+			centerStrength: 0.52,
+			repelStrength: 10,
+			linkStrength: 1,
+			linkDistance: 250,
+			scale: 0.85
+		});
+		expect(config.settings.map((setting) => setting.id)).toEqual([
+			'search',
+			'showOrphans',
+			'showAttachments',
+			'showTags',
+			'hideUnresolved',
+			'colorGroups',
+			'nodeSizeMultiplier',
+			'lineSizeMultiplier',
+			'textFadeMultiplier',
+			'centerStrength',
+			'repelStrength',
+			'linkStrength',
+			'linkDistance',
+			'scale'
+		]);
+		expect(config.settings.filter((setting) => setting.level === 'warn').map((setting) => setting.id)).toEqual([
+			'showAttachments',
+			'showTags',
+			'hideUnresolved',
+			'colorGroups'
+		]);
+		expect(JSON.stringify(config)).not.toContain('do-not-render-this-graph-value');
+		expect(JSON.stringify(config)).not.toContain('tag:#urgent');
 	});
 
 	test('summarizes Obsidian Appearance settings without loading CSS snippets', () => {

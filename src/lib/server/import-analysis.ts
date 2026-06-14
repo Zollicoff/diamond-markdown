@@ -13,6 +13,7 @@ import { readObsidianAppConfig } from './obsidian-config';
 import { readObsidianBookmarks } from './obsidian-bookmarks';
 import { readObsidianCorePlugins, readObsidianHotkeys } from './obsidian-core';
 import { readObsidianDailyNotesConfig } from './obsidian-daily';
+import { readObsidianGraphConfig } from './obsidian-graph';
 import { readObsidianTemplatesConfig } from './obsidian-templates';
 
 const CONFIG_FOLDERS = new Set(['.obsidian', '.diamondmd']);
@@ -129,6 +130,17 @@ function obsidianHotkeysDetail(config: ReturnType<typeof readObsidianHotkeys>): 
 	return `${config.bindingCount} custom hotkey binding${config.bindingCount === 1 ? '' : 's'} across ${config.commandCount} command${config.commandCount === 1 ? '' : 's'} found for manual shortcut recreation.`;
 }
 
+function obsidianGraphDetail(config: ReturnType<typeof readObsidianGraphConfig>): string {
+	if (config.status === 'invalid') {
+		return '.obsidian/graph.json is invalid; Diamond will preserve it but cannot summarize graph settings.';
+	}
+	if (config.status === 'missing') return 'No Obsidian graph settings were found.';
+	if (config.settings.length === 0) return '.obsidian/graph.json found; no supported graph settings were recognized.';
+	const warningCount = config.settings.filter((setting) => setting.level === 'warn').length;
+	const warningText = warningCount > 0 ? ` ${warningCount} setting${warningCount === 1 ? '' : 's'} need manual review.` : '';
+	return `${config.settings.length} Graph setting${config.settings.length === 1 ? '' : 's'} found.${warningText}`;
+}
+
 export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	if (!inputPath?.trim()) throw new Error('path required');
 	const root = expandHome(inputPath);
@@ -160,6 +172,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	const obsidianCorePlugins = readObsidianCorePlugins(root);
 	const obsidianHotkeys = readObsidianHotkeys(root);
 	const obsidianBookmarks = readObsidianBookmarks(root);
+	const obsidianGraph = readObsidianGraphConfig(root);
 	const obsidianPlugins = obsidianConfig ? listObsidianPlugins(root) : [];
 	const obsidianPluginFolders = obsidianPlugins.map((plugin) => plugin.folder);
 
@@ -262,6 +275,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 	warnings.push(...obsidianCorePlugins.warnings);
 	warnings.push(...obsidianHotkeys.warnings);
 	warnings.push(...obsidianBookmarks.warnings);
+	warnings.push(...obsidianGraph.warnings);
 
 	const likelyAttachmentFolders = sorted([...namedAttachmentFolders, ...assetFolders]);
 	const attachmentDetail = likelyAttachmentFolders.length > 0
@@ -354,6 +368,15 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 				: obsidianBookmarks.importableBookmarks > 0 ? 'info' : 'ok'
 		),
 		item(
+			'obsidian-graph',
+			'Graph settings',
+			obsidianGraphDetail(obsidianGraph),
+			obsidianGraph.status === 'invalid'
+				|| obsidianGraph.settings.some((setting) => setting.level === 'warn')
+				? 'warn'
+				: obsidianGraph.status === 'present' ? 'info' : 'ok'
+		),
+		item(
 			'canvas',
 			'Canvas files',
 			canvasFiles > 0
@@ -400,6 +423,7 @@ export function analyzeVaultImport(inputPath: string): VaultImportAnalysis {
 		obsidianCorePlugins,
 		obsidianHotkeys,
 		obsidianBookmarks,
+		obsidianGraph,
 		obsidianPluginFolders,
 		obsidianPlugins,
 		recommendedExcludedFolders: sorted(recommendedExcludedFolders),

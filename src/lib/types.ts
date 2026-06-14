@@ -175,6 +175,36 @@ export interface ObsidianBookmarksInfo {
 	warnings: string[];
 }
 
+export interface ObsidianGraphSetting {
+	id: string;
+	label: string;
+	value: string;
+	detail: string;
+	level: VaultImportCheckLevel;
+}
+
+export interface ObsidianGraphInfo {
+	path?: string;
+	status: JsonFileStatus;
+	bytes?: number;
+	searchQuery?: string;
+	showOrphans?: boolean;
+	showAttachments?: boolean;
+	showTags?: boolean;
+	hideUnresolved?: boolean;
+	colorGroupCount: number;
+	nodeSizeMultiplier?: number;
+	lineSizeMultiplier?: number;
+	textFadeMultiplier?: number;
+	centerStrength?: number;
+	repelStrength?: number;
+	linkStrength?: number;
+	linkDistance?: number;
+	scale?: number;
+	settings: ObsidianGraphSetting[];
+	warnings: string[];
+}
+
 export interface NewNoteLocation {
 	folder: string | null;
 	source: 'obsidian-app-config' | 'vault-root';
@@ -225,6 +255,7 @@ export interface VaultImportAnalysis {
 	obsidianCorePlugins: ObsidianCorePluginsInfo;
 	obsidianHotkeys: ObsidianHotkeysInfo;
 	obsidianBookmarks: ObsidianBookmarksInfo;
+	obsidianGraph: ObsidianGraphInfo;
 	obsidianPluginFolders: string[];
 	obsidianPlugins: ObsidianPluginInfo[];
 	recommendedExcludedFolders: string[];

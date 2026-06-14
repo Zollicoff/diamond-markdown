@@ -11,11 +11,13 @@
 		obsidianBookmarksSummary,
 		obsidianCorePluginsSummary,
 		obsidianDailyNotesSummary,
+		obsidianGraphSummary,
 		obsidianHotkeysSummary,
 		obsidianTemplatesSummary,
 		obsidianPluginMigrationNotes,
 		obsidianPluginSummary
 	} from '$lib/import/checklist';
+	import ImportSettingsSection from './import/ImportSettingsSection.svelte';
 
 	interface Props {
 		analysis: VaultImportAnalysis;
@@ -72,103 +74,53 @@
 	{/if}
 
 	{#if analysis.obsidianAppConfig.status !== 'missing'}
-		<div class="note">
-			<span class="note-label">Obsidian app config</span>
-			<span>{obsidianAppConfigSummary(analysis.obsidianAppConfig)}</span>
-			{#if analysis.obsidianAppConfig.path}
-				<span class="mono">{analysis.obsidianAppConfig.path}</span>
-			{/if}
-		</div>
-		{#if analysis.obsidianAppConfig.settings.length > 0}
-			<ul class="config-settings" aria-label="Obsidian app config settings">
-				{#each analysis.obsidianAppConfig.settings as setting (setting.id)}
-					<li class={`config-row ${setting.level}`}>
-						<div class="config-main">
-							<div>
-								<div class="config-name">{setting.label}</div>
-								<div class="config-detail">{setting.detail}</div>
-							</div>
-							<span class="config-value mono">{setting.value}</span>
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ImportSettingsSection
+			label="Obsidian app config"
+			summary={obsidianAppConfigSummary(analysis.obsidianAppConfig)}
+			path={analysis.obsidianAppConfig.path}
+			settings={analysis.obsidianAppConfig.settings}
+			ariaLabel="Obsidian app config settings"
+		/>
 	{/if}
 
 	{#if analysis.obsidianDailyNotes.status !== 'missing'}
-		<div class="note">
-			<span class="note-label">Obsidian Daily Notes</span>
-			<span>{obsidianDailyNotesSummary(analysis.obsidianDailyNotes)}</span>
-			{#if analysis.obsidianDailyNotes.path}
-				<span class="mono">{analysis.obsidianDailyNotes.path}</span>
-			{/if}
-		</div>
-		{#if analysis.obsidianDailyNotes.settings.length > 0}
-			<ul class="config-settings" aria-label="Obsidian Daily Notes settings">
-				{#each analysis.obsidianDailyNotes.settings as setting (setting.id)}
-					<li class={`config-row ${setting.level}`}>
-						<div class="config-main">
-							<div>
-								<div class="config-name">{setting.label}</div>
-								<div class="config-detail">{setting.detail}</div>
-							</div>
-							<span class="config-value mono">{setting.value}</span>
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ImportSettingsSection
+			label="Obsidian Daily Notes"
+			summary={obsidianDailyNotesSummary(analysis.obsidianDailyNotes)}
+			path={analysis.obsidianDailyNotes.path}
+			settings={analysis.obsidianDailyNotes.settings}
+			ariaLabel="Obsidian Daily Notes settings"
+		/>
 	{/if}
 
 	{#if analysis.obsidianTemplates.status !== 'missing'}
-		<div class="note">
-			<span class="note-label">Obsidian Templates</span>
-			<span>{obsidianTemplatesSummary(analysis.obsidianTemplates)}</span>
-			{#if analysis.obsidianTemplates.path}
-				<span class="mono">{analysis.obsidianTemplates.path}</span>
-			{/if}
-		</div>
-		{#if analysis.obsidianTemplates.settings.length > 0}
-			<ul class="config-settings" aria-label="Obsidian Templates settings">
-				{#each analysis.obsidianTemplates.settings as setting (setting.id)}
-					<li class={`config-row ${setting.level}`}>
-						<div class="config-main">
-							<div>
-								<div class="config-name">{setting.label}</div>
-								<div class="config-detail">{setting.detail}</div>
-							</div>
-							<span class="config-value mono">{setting.value}</span>
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ImportSettingsSection
+			label="Obsidian Templates"
+			summary={obsidianTemplatesSummary(analysis.obsidianTemplates)}
+			path={analysis.obsidianTemplates.path}
+			settings={analysis.obsidianTemplates.settings}
+			ariaLabel="Obsidian Templates settings"
+		/>
 	{/if}
 
 	{#if analysis.obsidianAppearance.status !== 'missing' || analysis.obsidianAppearance.snippetFiles.length > 0}
-		<div class="note">
-			<span class="note-label">Obsidian Appearance</span>
-			<span>{obsidianAppearanceSummary(analysis.obsidianAppearance)}</span>
-			{#if analysis.obsidianAppearance.path}
-				<span class="mono">{analysis.obsidianAppearance.path}</span>
-			{/if}
-		</div>
-		{#if analysis.obsidianAppearance.settings.length > 0}
-			<ul class="config-settings" aria-label="Obsidian Appearance settings">
-				{#each analysis.obsidianAppearance.settings as setting (setting.id)}
-					<li class={`config-row ${setting.level}`}>
-						<div class="config-main">
-							<div>
-								<div class="config-name">{setting.label}</div>
-								<div class="config-detail">{setting.detail}</div>
-							</div>
-							<span class="config-value mono">{setting.value}</span>
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ImportSettingsSection
+			label="Obsidian Appearance"
+			summary={obsidianAppearanceSummary(analysis.obsidianAppearance)}
+			path={analysis.obsidianAppearance.path}
+			settings={analysis.obsidianAppearance.settings}
+			ariaLabel="Obsidian Appearance settings"
+		/>
+	{/if}
+
+	{#if analysis.obsidianGraph.status !== 'missing'}
+		<ImportSettingsSection
+			label="Obsidian Graph"
+			summary={obsidianGraphSummary(analysis.obsidianGraph)}
+			path={analysis.obsidianGraph.path}
+			settings={analysis.obsidianGraph.settings}
+			ariaLabel="Obsidian Graph settings"
+		/>
 	{/if}
 
 	{#if analysis.obsidianCorePlugins.status !== 'missing'}

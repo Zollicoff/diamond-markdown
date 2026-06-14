@@ -395,6 +395,10 @@ Use small, pushable slices:
 - **Obsidian Appearance guidance.** Surface `.obsidian/appearance.json` theme,
    font, accent, and CSS snippet filenames as read-only migration guidance
    without loading Obsidian community themes, CSS snippets, or raw CSS contents.
+- **Obsidian Graph guidance.** Surface recognized `.obsidian/graph.json`
+   search, display, force, zoom, and color-group settings as read-only
+   migration guidance, marking tag/attachment/unresolved graph nodes and color
+   groups for manual review instead of importing them as hidden app state.
 - **Obsidian core-plugin and hotkey guidance.** Surface
    `.obsidian/core-plugins.json` support levels and sanitized
    `.obsidian/hotkeys.json` shortcut summaries as migration guidance, mapping

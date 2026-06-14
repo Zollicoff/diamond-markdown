@@ -30,6 +30,8 @@ an existing Obsidian vault. The preflight reports:
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
   read-only migration guidance
+- `.obsidian/graph.json` filter/display/force settings as read-only migration
+  guidance
 - `.obsidian/core-plugins.json` support notes for enabled Obsidian core plugins
 - `.obsidian/hotkeys.json` custom shortcut summaries as manual migration
   guidance
@@ -79,6 +81,13 @@ Diamond surfaces theme names, base font size, accent color, enabled snippet
 names, missing enabled snippets, and snippet filenames as read-only migration
 guidance. It does not load Obsidian community themes, execute CSS snippets, or
 show CSS file contents during import preview.
+
+When `.obsidian/graph.json` is present, Diamond surfaces recognized graph
+search, orphan visibility, attachment/tag/unresolved-node visibility, custom
+color-group count, zoom scale, and force/display tuning values as migration
+guidance. Diamond's graph remains note-link focused today, so attachment nodes,
+tag nodes, unresolved-link nodes, and Obsidian color-group rules are marked for
+manual review rather than imported as hidden app state.
 
 When `.obsidian/core-plugins.json` or `.obsidian/hotkeys.json` is present,
 Diamond surfaces enabled core-plugin support levels and custom shortcut
@@ -186,6 +195,8 @@ initial state of the imported vault is captured explicitly.
 - It does not automatically enable/disable features from Obsidian core-plugin
   settings.
 - It does not automatically remap Obsidian hotkeys into Diamond shortcuts.
+- It does not automatically apply Obsidian graph layout, color groups, tag
+  nodes, attachment nodes, or unresolved-link nodes.
 - It does not convert Obsidian search bookmarks, bookmark groups, or non-note
   bookmarks into Diamond bookmarks.
 - It does not automatically apply every `.obsidian/app.json` UI preference.

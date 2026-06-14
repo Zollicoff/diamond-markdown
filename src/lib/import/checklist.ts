@@ -4,6 +4,7 @@ import type {
 	ObsidianBookmarksInfo,
 	ObsidianCorePluginsInfo,
 	ObsidianDailyNotesInfo,
+	ObsidianGraphInfo,
 	ObsidianHotkeysInfo,
 	ObsidianTemplatesInfo,
 	ObsidianPluginInfo,
@@ -147,6 +148,15 @@ export function obsidianBookmarksSummary(config: ObsidianBookmarksInfo): string 
 	if (config.importableBookmarks === 0) return `${config.path ?? '.obsidian/bookmarks.json'} found; no visible Markdown note bookmarks were recognized.`;
 	const source = config.source === 'starred' ? 'legacy starred' : 'bookmark';
 	return `${config.importableBookmarks} Obsidian ${source} item${config.importableBookmarks === 1 ? '' : 's'} can seed Diamond bookmarks.`;
+}
+
+export function obsidianGraphSummary(config: ObsidianGraphInfo): string {
+	if (config.status === 'missing') return 'No .obsidian/graph.json file was found.';
+	if (config.status === 'invalid') return '.obsidian/graph.json is present but invalid.';
+	if (config.settings.length === 0) return '.obsidian/graph.json found; no supported graph settings were recognized.';
+	const warningCount = config.settings.filter((setting) => setting.level === 'warn').length;
+	const warningText = warningCount > 0 ? `; ${warningCount} need manual review` : '';
+	return `${config.settings.length} Graph setting${config.settings.length === 1 ? '' : 's'} found${warningText}.`;
 }
 
 function formatBytes(bytes: number | undefined): string {
