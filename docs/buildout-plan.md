@@ -519,9 +519,10 @@ Use small, pushable slices:
 - **Canvas text-card heading/rule compatibility.** Render H1-H6 headings and
   Markdown thematic breaks inside Canvas text-card previews while preserving
   the raw editable card text.
-- **Obsidian comment hiding.** Hide paired `%%...%%` comments from Read mode,
-  static publish, vault link/tag/search indexing, and Canvas text-card previews
-  while preserving source text and literal markers inside code.
+- **Obsidian comment hiding.** Hide paired `%%...%%` comments from Live Preview,
+  Read mode, static publish, vault link/tag/search indexing, and Canvas
+  text-card previews while preserving source text and literal markers inside
+  code.
 
 ## Next Implementation Slices
 

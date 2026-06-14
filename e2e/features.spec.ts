@@ -2059,6 +2059,49 @@ test('wikilink fragments render cleanly from live preview and navigate in read m
 	await expect(page.locator('.preview h2#details')).toHaveText('Details');
 });
 
+test('live preview hides Obsidian comments outside code', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'live-preview-comment-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(vaultDir, 'Comment Check.md'),
+		[
+			'# Comment Check',
+			'',
+			'Visible before %%hidden inline [[Hidden]] #private%% after.',
+			'',
+			'Code `%%kept-inline%%` stays visible.',
+			'',
+			'```txt',
+			'%% kept fence %%',
+			'```',
+			''
+		].join('\n')
+	);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Live Preview Comment Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Comment Check.md')}`, { waitUntil: 'domcontentloaded' });
+	const editor = page.locator('.cm-content').first();
+	await expect(editor).toBeVisible({ timeout: 5_000 });
+	await page.locator('.rail').first().click({ force: true });
+
+	await expect(editor).toContainText('Visible before');
+	await expect(editor).toContainText('after.');
+	await expect(editor).not.toContainText('hidden inline');
+	await expect(editor).not.toContainText('#private');
+	await expect(page.locator('a.cm-wikilink').filter({ hasText: 'Hidden' })).toHaveCount(0);
+	await expect(editor).toContainText('%%kept-inline%%');
+	await expect(editor).toContainText('%% kept fence %%');
+
+	await page.getByRole('tab', { name: 'Source' }).click();
+	await expect(editor).toContainText('hidden inline [[Hidden]] #private');
+});
+
 test('search rail icon dedupes — clicking twice activates the same tab', async ({ page }) => {
 	await openVault(page);
 	const railSearch = page.locator('.rail .r-btn[aria-label="Search"]');

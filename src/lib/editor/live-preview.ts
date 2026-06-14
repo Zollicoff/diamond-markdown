@@ -27,6 +27,11 @@ import { parseWikilinkSubpath, wikilinkFragment } from '$lib/markdown/wikilinks'
 /** Called for every [[target]] to tell us whether that note exists. */
 export type LinkResolver = (target: string) => { resolved: boolean; href?: string };
 
+interface PreviewSpan {
+	from: number;
+	to: number;
+}
+
 class WikilinkWidget extends WidgetType {
 	constructor(
 		readonly target: string,
@@ -90,6 +95,55 @@ class WikilinkWidget extends WidgetType {
 	}
 }
 
+function spansOverlap(left: PreviewSpan, right: PreviewSpan): boolean {
+	return left.from < right.to && right.from < left.to;
+}
+
+function containsSpan(spans: PreviewSpan[], from: number, to: number): boolean {
+	for (const span of spans) {
+		if (from >= span.from && to <= span.to) return true;
+	}
+	return false;
+}
+
+function overlapsSpan(spans: PreviewSpan[], from: number, to: number): boolean {
+	const candidate = { from, to };
+	for (const span of spans) {
+		if (spansOverlap(candidate, span)) return true;
+	}
+	return false;
+}
+
+function collectCodeSpans(view: EditorView): PreviewSpan[] {
+	const spans: PreviewSpan[] = [];
+	syntaxTree(view.state).iterate({
+		from: 0,
+		to: view.state.doc.length,
+		enter(node) {
+			const name = node.type.name;
+			if (name === 'FencedCode' || name === 'CodeBlock' || name === 'InlineCode') {
+				spans.push({ from: node.from, to: node.to });
+				return false;
+			}
+		}
+	});
+	return spans;
+}
+
+function collectObsidianCommentSpans(view: EditorView, codeSpans: PreviewSpan[]): PreviewSpan[] {
+	const spans: PreviewSpan[] = [];
+	const text = view.state.doc.toString();
+	const commentRe = /%%[\s\S]*?%%/g;
+	let match: RegExpExecArray | null;
+	while ((match = commentRe.exec(text))) {
+		const from = match.index;
+		const to = from + match[0].length;
+		if (overlapsSpan(codeSpans, from, to)) continue;
+		spans.push({ from, to });
+	}
+	return spans;
+}
+
 function buildDecorations(view: EditorView, resolveLink: LinkResolver): DecorationSet {
 	const ranges: Range<Decoration>[] = [];
 	const cursor = view.state.selection.main.head;
@@ -98,6 +152,8 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 
 	// Does the caret sit somewhere inside [from..to]?
 	const cursorInside = (from: number, to: number): boolean => cursor >= from && cursor <= to;
+	const codeSpans = collectCodeSpans(view);
+	const commentSpans = collectObsidianCommentSpans(view, codeSpans);
 
 	// Pre-pass: collect [[wikilink]] spans across the visible viewport.
 	// lezer-markdown parses `[[Note]]` as a literal `[` + standard Link `[Note]`
@@ -116,6 +172,7 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 			const subpath = parseWikilinkSubpath(m[2]);
 			const display = (m[3]?.trim() || target);
 			const fragment = wikilinkFragment(subpath);
+			if (overlapsSpan(commentSpans, start, end)) continue;
 			wikilinkSpans.push({ from: start, to: end, target, display, fragment });
 		}
 	}
@@ -145,6 +202,7 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 				// that would otherwise hide the inner brackets, leaving the
 				// outer pair visible as `[Note]`).
 				if (insideWikilink(node.from, node.to)) return false;
+				if (containsSpan(commentSpans, node.from, node.to)) return false;
 
 				if (name === 'HeaderMark') {
 					// `# ` prefix of an ATX heading. Hide when caret is not on the line.
@@ -197,6 +255,13 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 				}
 			}
 		});
+	}
+
+	// Hide paired Obsidian `%%...%%` comments unless the caret is inside the
+	// span, which keeps the raw text reachable for edits in Live mode.
+	for (const comment of commentSpans) {
+		if (cursorInside(comment.from, comment.to)) continue;
+		ranges.push(Decoration.replace({}).range(comment.from, comment.to));
 	}
 
 	// Wikilink pills — replace each pre-collected span with a widget unless

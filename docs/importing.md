@@ -134,10 +134,10 @@ and static publish. Wikilinks like `[[Target#^install-steps]]` preserve the
 block-reference fragment in Live Preview, Read mode, and static publish instead
 of treating it as a heading link.
 
-Paired Obsidian comments such as `%% hidden note %%` are hidden from Read mode,
-static publish, search/link/tag indexing, and Canvas text-card previews while
-remaining unchanged in source. Literal `%%` markers inside inline code and
-fenced code blocks remain visible.
+Paired Obsidian comments such as `%% hidden note %%` are hidden from Live
+Preview, Read mode, static publish, search/link/tag indexing, and Canvas
+text-card previews while remaining unchanged in source. Literal `%%` markers
+inside inline code and fenced code blocks remain visible.
 
 Frontmatter `tags` and `aliases` are read from either flow arrays
 (`tags: [project/foo, review]`) or Obsidian-style block lists, so imported
