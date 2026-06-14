@@ -5,6 +5,7 @@ import type {
 	EditorDisplayPreference,
 	EditorLinkPreference,
 	JsonFileStatus,
+	MarkdownRenderPreference,
 	NoteViewMode,
 	ObsidianAppConfigInfo,
 	ObsidianAppConfigSetting,
@@ -299,6 +300,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const strictLineBreaks = booleanValue(body.strictLineBreaks);
+	if (strictLineBreaks !== null) {
+		base.strictLineBreaks = strictLineBreaks;
+		base.settings.push(setting(
+			'strictLineBreaks',
+			'Strict line breaks',
+			strictLineBreaks ? 'Enabled' : 'Disabled',
+			strictLineBreaks
+				? 'Diamond keeps strict Markdown line-break behavior; single newlines inside paragraphs stay soft unless Markdown hard-break syntax is used.'
+				: 'Diamond renders single newlines as hard line breaks in Read mode, hover previews, and static publish for this imported vault.'
+		));
+	}
+
 	const livePreview = booleanValue(body.livePreview);
 	if (livePreview !== null) {
 		base.livePreview = livePreview;
@@ -360,6 +374,16 @@ export function editorLinkPreference(root: string): EditorLinkPreference {
 		style,
 		newLinkFormat: config.newLinkFormat ?? null,
 		source: config.useMarkdownLinks === undefined ? 'diamond-default' : 'obsidian-app-config'
+	};
+}
+
+export function markdownRenderPreference(root: string): MarkdownRenderPreference {
+	const config = readObsidianAppConfig(root);
+	const strictLineBreaks = config.strictLineBreaks !== false;
+	return {
+		strictLineBreaks,
+		softLineBreaks: !strictLineBreaks,
+		source: config.strictLineBreaks === undefined ? 'diamond-default' : 'obsidian-app-config'
 	};
 }
 

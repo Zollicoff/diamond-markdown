@@ -38,6 +38,7 @@ import { purify } from './sanitize';
 import { renderObsidianCallout } from './callouts';
 import { useObsidianMarkedExtensions } from './marked-obsidian';
 import { addObsidianBlockIds } from './block-ids';
+import { markdownRenderPreference } from './obsidian-config';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
@@ -60,12 +61,23 @@ export interface RenderResult {
 	outgoingLinks: { target: string; resolved: string | null }[];
 }
 
+export interface RenderMarkdownOptions {
+	softLineBreaks?: boolean;
+}
+
 /**
  * Render `body` (markdown without frontmatter) to sanitized HTML.
  */
-export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string, sourcePath: string | null = null): RenderResult {
+export function renderMarkdown(
+	vault: Vault,
+	idx: VaultIndex,
+	body: string,
+	sourcePath: string | null = null,
+	options: RenderMarkdownOptions = {}
+): RenderResult {
 	const outgoing: { target: string; resolved: string | null }[] = [];
-	const html = renderInner(vault, idx, body, outgoing, new Set(), sourcePath);
+	const softLineBreaks = options.softLineBreaks ?? markdownRenderPreference(vault.path).softLineBreaks;
+	const html = renderInner(vault, idx, body, outgoing, new Set(), sourcePath, softLineBreaks);
 	return { html, outgoingLinks: dedupeOutgoingLinks(outgoing) };
 }
 
@@ -89,7 +101,8 @@ function renderInner(
 	body: string,
 	outgoing: { target: string; resolved: string | null }[],
 	visited: Set<string>,
-	sourcePath: string | null
+	sourcePath: string | null,
+	softLineBreaks: boolean
 ): string {
 	const withoutComments = stripObsidianCommentsOutsideCode(body);
 
@@ -130,7 +143,7 @@ function renderInner(
 					const { body: childBody } = splitFrontmatter(raw);
 					const nextVisited = new Set(visited);
 					nextVisited.add(resolved);
-					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited, resolved);
+					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited, resolved, softLineBreaks);
 					const title = e.alt ?? resolved.split('/').pop()!.replace(/\.md$/, '');
 					return `<div class="embed-note" data-target="${escAttr(resolved)}"><div class="embed-note-head"><a class="wikilink" href="/vault/${vault.id}/note/${encodeURI(resolved)}">${escHtml(title)}</a></div><div class="embed-note-body">${childHtml}</div></div>`;
 				} catch {
@@ -160,7 +173,8 @@ function renderInner(
 	// 3. Marked → HTML (with our custom code renderer + footnotes ext + GFM).
 	const raw = marked.parse(processed, {
 		async: false,
-		renderer: createMarkdownRenderer(vault, idx, outgoing, sourcePath)
+		breaks: softLineBreaks,
+		renderer: createMarkdownRenderer(vault, idx, outgoing, sourcePath, softLineBreaks)
 	}) as string;
 
 	// 4. Add id attributes to headings so `[[Note#Heading]]` deep-links work.
@@ -203,13 +217,15 @@ function createMarkdownRenderer(
 	vault: Vault,
 	idx: VaultIndex,
 	outgoing: { target: string; resolved: string | null }[],
-	sourcePath: string | null
+	sourcePath: string | null,
+	softLineBreaks: boolean
 ): Renderer<string, string> {
 	const renderer = new Renderer();
 	renderer.code = renderCodeBlock;
 	renderer.blockquote = (token) => {
 		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
 			async: false,
+			breaks: softLineBreaks,
 			renderer
 		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
 	};

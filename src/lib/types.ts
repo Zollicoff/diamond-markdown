@@ -52,6 +52,7 @@ export interface ObsidianAppConfigInfo {
 	spellcheck?: boolean;
 	tabSize?: number;
 	readableLineLength?: boolean;
+	strictLineBreaks?: boolean;
 	defaultViewMode?: string;
 	livePreview?: boolean;
 	defaultMode?: NoteViewMode;
@@ -233,6 +234,12 @@ export interface EditorDisplayPreference {
 	tabSize: number;
 	readableLineLength: boolean;
 	defaultMode: NoteViewMode;
+	source: 'obsidian-app-config' | 'diamond-default';
+}
+
+export interface MarkdownRenderPreference {
+	strictLineBreaks: boolean;
+	softLineBreaks: boolean;
 	source: 'obsidian-app-config' | 'diamond-default';
 }
 

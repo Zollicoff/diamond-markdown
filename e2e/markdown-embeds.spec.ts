@@ -250,6 +250,56 @@ test.describe('Obsidian image embed variants', () => {
 		expect(styles).toContain('.note mark');
 	});
 
+	test('honors Obsidian strict-line-break preference in read previews and static publish output', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-line-break-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ strictLineBreaks: false }));
+		fs.writeFileSync(
+			path.join(vaultDir, 'Line Breaks.md'),
+			[
+				'---',
+				'title: Line Breaks',
+				'public: true',
+				'---',
+				'# Line Breaks',
+				'',
+				'First paragraph line',
+				'Second paragraph line',
+				'',
+				'> [!NOTE] Soft line callout',
+				'> First callout line',
+				'> Second callout line'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Obsidian Line Break Vault', path: vaultDir }
+		});
+		expect(created.ok(), await created.text()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Line Breaks.md')}`);
+		expect(loaded.ok(), await loaded.text()).toBe(true);
+		const note = await loaded.json() as NoteDoc;
+		expect(note.html).toContain('First paragraph line<br>Second paragraph line');
+		expect(note.html).toContain('First callout line<br>Second callout line');
+
+		const preview = await request.get(`/api/vaults/${vault.id}/preview?path=${encodeURIComponent('Line Breaks.md')}`);
+		expect(preview.ok(), await preview.text()).toBe(true);
+		expect((await preview.json()) as { html: string }).toMatchObject({
+			html: expect.stringContaining('First paragraph line<br>Second paragraph line')
+		});
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok(), await published.text()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(1);
+		const html = fs.readFileSync(path.join(report.outDir, 'line-breaks.html'), 'utf-8');
+		expect(html).toContain('First paragraph line<br>Second paragraph line');
+		expect(html).toContain('First callout line<br>Second callout line');
+	});
+
 	test('renders sized image embeds in read mode and static publish output', async ({ request }) => {
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sized-embed-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });

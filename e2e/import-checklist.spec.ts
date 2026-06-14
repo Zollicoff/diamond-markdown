@@ -18,7 +18,7 @@ import {
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
 import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
-import { editorDisplayPreference, editorLinkPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
+import { editorDisplayPreference, editorLinkPreference, markdownRenderPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
 import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
@@ -902,6 +902,36 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+	});
+
+	test('uses Obsidian strict-line-break preference for markdown rendering', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-line-breaks-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		expect(markdownRenderPreference(vaultDir)).toEqual({
+			strictLineBreaks: true,
+			softLineBreaks: false,
+			source: 'diamond-default'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ strictLineBreaks: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'strictLineBreaks')).toMatchObject({
+			label: 'Strict line breaks',
+			value: 'Disabled'
+		});
+		expect(markdownRenderPreference(vaultDir)).toEqual({
+			strictLineBreaks: false,
+			softLineBreaks: true,
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ strictLineBreaks: true }));
+		expect(markdownRenderPreference(vaultDir)).toEqual({
+			strictLineBreaks: true,
+			softLineBreaks: false,
 			source: 'obsidian-app-config'
 		});
 	});

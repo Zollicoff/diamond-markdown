@@ -180,6 +180,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
+		strictLineBreaks: false,
 		defaultViewMode: 'preview',
 		livePreview: true,
 		trashOption: 'local',
@@ -399,6 +400,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'spellcheck',
 		'tabSize',
 		'readableLineLength',
+		'strictLineBreaks',
 		'livePreview',
 		'defaultViewMode',
 		'trashOption'
@@ -426,6 +428,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'readableLineLength')).toMatchObject({
 		label: 'Readable line length',
 		value: 'Enabled',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'strictLineBreaks')).toMatchObject({
+		label: 'Strict line breaks',
+		value: 'Disabled',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({

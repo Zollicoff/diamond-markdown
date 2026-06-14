@@ -450,6 +450,9 @@ Use small, pushable slices:
   `readableLineLength` by narrowing editor and reading surfaces for imported
   vaults while keeping Diamond's full-width default when the setting is absent
   or disabled.
+- **Obsidian strict-line-break preference.** Honor `.obsidian/app.json`
+  `strictLineBreaks` for Read mode, hover previews, and static publish output,
+  preserving Diamond's strict default when the setting is absent.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

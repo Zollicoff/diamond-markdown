@@ -39,6 +39,7 @@ import { markdownNoteHash, resolveMarkdownNoteReference } from './markdown-links
 import { renderObsidianCallout } from './callouts';
 import { useObsidianMarkedExtensions } from './marked-obsidian';
 import { addObsidianBlockIds } from './block-ids';
+import { markdownRenderPreference } from './obsidian-config';
 import { slugify, slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
@@ -119,6 +120,7 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 	// Render each public note, collecting vault-local assets as we go.
 	const imagesCopied = new Map<string, string>();
 	const attachmentsCopied = new Map<string, string>();
+	const softLineBreaks = markdownRenderPreference(vault.path).softLineBreaks;
 	const skipped: PublishReport['skipped'] = [];
 
 	for (const [notePath, data] of notes) {
@@ -132,7 +134,8 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 				idx,
 				imagesCopied,
 				attachmentsCopied,
-				outDir
+				outDir,
+				softLineBreaks
 			);
 			const html = wrapPage({
 				title: data.title,
@@ -168,7 +171,8 @@ function renderBodyForPublish(
 	idx: ReturnType<typeof getIndex>,
 	imagesCopied: Map<string, string>,
 	attachmentsCopied: Map<string, string>,
-	outDir: string
+	outDir: string,
+	softLineBreaks: boolean
 ): string {
 	const withoutComments = stripObsidianCommentsOutsideCode(body);
 	const processed = processOutsideCode(withoutComments, (chunk) => {
@@ -208,7 +212,8 @@ function renderBodyForPublish(
 	});
 
 	const raw = marked.parse(processed, {
-		renderer: createPublishRenderer(vault, idx, slugs, sourcePath, imagesCopied, outDir)
+		breaks: softLineBreaks,
+		renderer: createPublishRenderer(vault, idx, slugs, sourcePath, imagesCopied, outDir, softLineBreaks)
 	}) as string;
 	return purify.sanitize(addObsidianBlockIds(addHeadingIds(raw)), {
 		ALLOWED_ATTR: [
@@ -280,12 +285,14 @@ function createPublishRenderer(
 	slugs: Map<string, string>,
 	sourcePath: string,
 	imagesCopied: Map<string, string>,
-	outDir: string
+	outDir: string,
+	softLineBreaks: boolean
 ): Renderer<string, string> {
 	const renderer = new Renderer();
 	renderer.blockquote = (token) => {
 		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
 			async: false,
+			breaks: softLineBreaks,
 			renderer
 		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
 	};

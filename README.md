@@ -76,7 +76,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Source / Live / Read mode toggle per note
 - Imported Obsidian vaults can reuse safe `.obsidian/app.json`
   `defaultViewMode` / `livePreview`, `showLineNumber`, `spellcheck`, and
-  `tabSize` / `readableLineLength` editor preferences
+  `tabSize` / `readableLineLength` editor preferences plus
+  `strictLineBreaks` reading/publish behavior
 - Editor toolbar (bold, italic, headings, lists, code, etc.)
 - Word count + reading time in status bar
 
