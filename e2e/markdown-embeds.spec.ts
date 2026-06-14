@@ -193,6 +193,62 @@ test.describe('Obsidian image embed variants', () => {
 		expect(html).not.toContain('private');
 	});
 
+	test('renders Obsidian highlights in read mode and static publish output', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-highlight-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(vaultDir, { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, 'Target.md'), '---\ntitle: Target\npublic: true\n---\n# Target\n');
+		fs.writeFileSync(
+			path.join(vaultDir, 'Highlights.md'),
+			[
+				'---',
+				'title: Highlights',
+				'public: true',
+				'---',
+				'# Highlights',
+				'',
+				'Inline ==priority **now**== and ~~removed~~.',
+				'',
+				'Linked ==[[Target|target]] and #urgent== highlight.',
+				'',
+				'Code `==literal==` stays visible.',
+				'',
+				'```md',
+				'==not highlighted in a fence==',
+				'```'
+			].join('\n')
+		);
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Obsidian Highlight Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Highlights.md')}`);
+		expect(loaded.ok()).toBe(true);
+		const note = await loaded.json() as NoteDoc;
+		expect(note.html).toContain('<mark>priority <strong>now</strong></mark>');
+		expect(note.html).toContain('<del>removed</del>');
+		expect(note.html).toContain(`<mark><a class="wikilink" href="/vault/${vault.id}/note/Target.md" data-target="Target.md">target</a> and <a class="tag" href="/vault/${vault.id}/tag/urgent">#urgent</a></mark>`);
+		expect(note.html).toContain('<code>==literal==</code>');
+		expect(note.html).toContain('==not highlighted in a fence==');
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(2);
+
+		const html = fs.readFileSync(path.join(report.outDir, 'highlights.html'), 'utf-8');
+		expect(html).toContain('<mark>priority <strong>now</strong></mark>');
+		expect(html).toContain('<del>removed</del>');
+		expect(html).toContain('<mark><a class="wikilink" href="target.html">target</a> and <span class="tag">#urgent</span></mark>');
+		expect(html).toContain('<code>==literal==</code>');
+		expect(html).toContain('==not highlighted in a fence==');
+		const styles = fs.readFileSync(path.join(report.outDir, 'styles.css'), 'utf-8');
+		expect(styles).toContain('.note mark');
+	});
+
 	test('renders sized image embeds in read mode and static publish output', async ({ request }) => {
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sized-embed-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });

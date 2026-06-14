@@ -102,6 +102,12 @@
 		border-top: 1px solid var(--border);
 		margin: 2em 0;
 	}
+	.preview :global(mark) {
+		background: color-mix(in srgb, var(--warn), transparent 72%);
+		color: var(--fg);
+		border-radius: 3px;
+		padding: 0 2px;
+	}
 	.preview :global(img) { max-width: 100%; border-radius: 6px; }
 	.preview :global(.embed-attachment) {
 		margin: 1em 0;

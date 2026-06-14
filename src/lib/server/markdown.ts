@@ -35,12 +35,14 @@ import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
 import { purify } from './sanitize';
 import { renderObsidianCallout } from './callouts';
+import { useObsidianMarkedExtensions } from './marked-obsidian';
 import { addObsidianBlockIds } from './block-ids';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
 marked.use(markedFootnote());
+useObsidianMarkedExtensions(marked);
 
 // Custom renderer: highlight code blocks + flag mermaid blocks for client.
 marked.use({ renderer: { code: renderCodeBlock } });

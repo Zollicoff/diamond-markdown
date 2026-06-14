@@ -94,6 +94,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Mermaid diagrams (lazy-loaded client-side)
 - Footnotes — standard `[^1]` references with back-links
 - Obsidian block IDs — trailing paragraph/list markers such as `^block-id` render as linkable anchors without showing the marker text
+- Obsidian highlights — paired `==highlight==` spans render in Read mode and static publish, including nested inline markdown
 - Obsidian comments — paired `%% hidden %%` comments are hidden from Live Preview, Read mode, static publish, search/link/tag indexing, and Canvas text-card previews while remaining in source
 - Note embeds (`![[Note]]`), image embeds (`![[image.png]]`, `![[image.png|300]]`, `![[image.png|300x200]]`)
 

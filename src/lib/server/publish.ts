@@ -36,11 +36,13 @@ import {
 	splitAssetReference
 } from './embed';
 import { renderObsidianCallout } from './callouts';
+import { useObsidianMarkedExtensions } from './marked-obsidian';
 import { addObsidianBlockIds } from './block-ids';
 import { slugify, slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
+useObsidianMarkedExtensions(marked);
 
 export interface PublishReport {
 	outDir: string;
@@ -483,6 +485,12 @@ body {
 .note blockquote {
 	margin: 1em 0; padding: 0.4em 1em;
 	border-left: 3px solid var(--border); color: var(--fg-dim); font-style: italic;
+}
+.note mark {
+	background: color-mix(in srgb, var(--warn), transparent 72%);
+	color: var(--fg);
+	border-radius: 3px;
+	padding: 0 2px;
 }
 .note .callout {
 	--callout-accent: var(--accent);

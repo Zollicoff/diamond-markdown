@@ -523,6 +523,9 @@ Use small, pushable slices:
   Read mode, static publish, vault link/tag/search indexing, and Canvas
   text-card previews while preserving source text and literal markers inside
   code.
+- **Obsidian highlight rendering.** Render paired `==highlight==` spans in
+  Read mode and static publish through a shared marked inline extension,
+  preserving nested inline markdown and leaving code literals unchanged.
 
 ## Next Implementation Slices
 
