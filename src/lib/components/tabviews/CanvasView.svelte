@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/vault-api';
 	import type { CanvasDoc, CanvasNode, NoteLinkTarget } from '$lib/types';
+	import { confirmDialog } from '$lib/dialogs';
 	import { emit, on as onBus } from '$lib/events';
 	import { openCanvas, openNote } from '$lib/workspace/actions';
 	import { replaceLocationHash } from '$lib/workspace/hash';
@@ -24,6 +25,7 @@
 		canvasNodeRefDraftFor,
 		canvasNodesWithPosition,
 		canvasNodesWithSize,
+		canvasNodeTitle,
 		canSaveCanvasNodeRefDraft,
 		edgeLines,
 		type CanvasAddNodeType,
@@ -321,6 +323,13 @@
 
 	async function deleteNode(node: CanvasNode): Promise<void> {
 		if (!doc || !canDeleteCanvasNode(mutationState)) return;
+		const confirmed = await confirmDialog({
+			title: 'Remove Canvas node',
+			message: `Remove canvas node "${canvasNodeTitle(node)}"? Connected edges will also be removed.`,
+			confirmLabel: 'Remove',
+			tone: 'danger'
+		});
+		if (!confirmed) return;
 		deletingNodeId = node.id;
 		error = null;
 		try {
@@ -357,12 +366,19 @@
 		}
 	}
 
-	async function deleteEdge(edgeId: string): Promise<void> {
+	async function deleteEdge(edge: CanvasEdgeSummary): Promise<void> {
 		if (!doc || !canMutateCanvasEdge(mutationState)) return;
-		deletingEdgeId = edgeId;
+		const confirmed = await confirmDialog({
+			title: 'Remove Canvas edge',
+			message: `Remove canvas edge "${edge.description}"?`,
+			confirmLabel: 'Remove',
+			tone: 'danger'
+		});
+		if (!confirmed) return;
+		deletingEdgeId = edge.id;
 		error = null;
 		try {
-			const res = await api.deleteCanvasEdge(vaultId, path, edgeId, doc.revision);
+			const res = await api.deleteCanvasEdge(vaultId, path, edge.id, doc.revision);
 			setDoc(res.doc);
 			emit('toast:show', { title: 'Canvas edge removed', tone: 'success' });
 		} catch (e) {

@@ -52,7 +52,7 @@
 		onSaveEdgeLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onSaveEdgeColor: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
 		onSaveEdgeRouting: (edge: CanvasEdgeSummary) => void | Promise<void>;
-		onDeleteEdge: (edgeId: string) => void | Promise<void>;
+		onDeleteEdge: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
 		onRefDraftChange: (node: CanvasNode, draft: CanvasNodeRefDraft) => void;

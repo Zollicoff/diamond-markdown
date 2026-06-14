@@ -26,7 +26,7 @@
 		onSaveLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
 		onColorChange: (edge: CanvasEdgeSummary, color: string) => void | Promise<void>;
 		onSaveRouting: (edge: CanvasEdgeSummary) => void | Promise<void>;
-		onDelete: (edgeId: string) => void | Promise<void>;
+		onDelete: (edge: CanvasEdgeSummary) => void | Promise<void>;
 	}
 
 	let {
@@ -164,7 +164,7 @@
 						class="edge-remove"
 						aria-label={`Remove canvas edge ${edge.description}`}
 						disabled={deletingEdgeId !== null || savingEdgeId !== null}
-						onclick={() => void onDelete(edge.id)}
+						onclick={() => void onDelete(edge)}
 					>
 						{deletingEdgeId === edge.id ? 'Removing...' : 'Remove'}
 					</button>

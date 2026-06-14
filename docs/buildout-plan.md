@@ -506,6 +506,9 @@ Use small, pushable slices:
   the shared in-app confirmation dialog and cover both cancel and confirm paths
   so git-backed search metadata is not removed by a single accidental chip
   click.
+- **Canvas destructive-action confirmations.** Route Canvas node and edge
+  removal through shared in-app confirmation dialogs and cover cancel/confirm
+  paths so board edits do not accidentally prune cards or connected edges.
 
 ## Next Implementation Slices
 

@@ -1779,6 +1779,15 @@ test('canvas view adds, edits, and removes labeled edges between nodes', async (
 	}).toBe(true);
 
 	await page.getByRole('button', { name: /Remove canvas edge Home\.md to text: loops back/ }).click();
+	const edgeDialog = page.getByRole('alertdialog', { name: 'Remove Canvas edge' });
+	await expect(edgeDialog).toBeVisible();
+	await expect(edgeDialog).toContainText('Remove canvas edge "Home.md to text: loops back"?');
+	await edgeDialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(edgeDialog).toBeHidden();
+	await expect(page.getByLabel('Canvas edges')).toContainText('loops back');
+	await page.getByRole('button', { name: /Remove canvas edge Home\.md to text: loops back/ }).click();
+	await expect(edgeDialog).toBeVisible();
+	await edgeDialog.getByRole('button', { name: 'Remove' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('2 nodes · 1 edge · editable text cards');
 	await expect(page.getByLabel('Canvas edges')).not.toContainText('loops back');
 	await expect.poll(async () => {
@@ -1808,6 +1817,15 @@ test('canvas view removes nodes and connected edges from the board', async ({ pa
 	await expect(page.getByLabel('Canvas edges')).toContainText('Home.md');
 
 	await page.getByRole('button', { name: 'Remove canvas node Home.md' }).click();
+	const nodeDialog = page.getByRole('alertdialog', { name: 'Remove Canvas node' });
+	await expect(nodeDialog).toBeVisible();
+	await expect(nodeDialog).toContainText('Remove canvas node "Home.md"? Connected edges will also be removed.');
+	await nodeDialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(nodeDialog).toBeHidden();
+	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toBeVisible();
+	await page.getByRole('button', { name: 'Remove canvas node Home.md' }).click();
+	await expect(nodeDialog).toBeVisible();
+	await nodeDialog.getByRole('button', { name: 'Remove' }).click();
 	await expect(page.locator('.canvas-view')).toContainText('1 node · 0 edges · editable text cards');
 	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toHaveCount(0);
 	await expect(page.getByLabel('Canvas edges')).toHaveCount(0);
