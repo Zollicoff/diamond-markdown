@@ -49,10 +49,11 @@ honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
 attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
 default destination for generic New Note commands, `useMarkdownLinks` for the
 editor link button's inserted syntax, `showLineNumber` for the editor
-line-number gutter, and `alwaysUpdateLinks` for note/folder rename and move
-operations. Explicit folder context actions such as New note here still use the
-selected folder. Other app settings such as `newLinkFormat` and `trashOption`
-are reported so migration mismatches are visible before opening the vault.
+line-number gutter, `defaultViewMode` plus `livePreview` for the initial note
+view mode, and `alwaysUpdateLinks` for note/folder rename and move operations.
+Explicit folder context actions such as New note here still use the selected
+folder. Other app settings such as `newLinkFormat` and `trashOption` are
+reported so migration mismatches are visible before opening the vault.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same

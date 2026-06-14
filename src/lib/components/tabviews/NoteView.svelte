@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { EditorLinkStyle, NoteDoc } from '$lib/types';
+	import type { EditorLinkStyle, NoteDoc, NoteViewMode } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
@@ -38,7 +38,7 @@
 		paneId: string;
 		tabId: string;
 		path: string;
-		mode: 'live' | 'source' | 'read';
+		mode: NoteViewMode;
 		isFocused: boolean;
 		/** Called when this view emits an update the parent cares about
 		 *  (e.g. backlinks refreshed, title from frontmatter). */
@@ -46,7 +46,7 @@
 		/** Called when the user picks a new view mode in the topbar. The
 		 *  pane owns the mode state so it survives note switches inside
 		 *  the same tab. */
-		onModeChange?: (m: 'live' | 'source' | 'read') => void;
+		onModeChange?: (m: NoteViewMode) => void;
 	}
 
 	let { vaultId, paneId, tabId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();

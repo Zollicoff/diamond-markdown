@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { EditorLinkStyle, NoteDoc } from '$lib/types';
+	import type { EditorLinkStyle, NoteDoc, NoteViewMode } from '$lib/types';
 	import type { NoteViewComponent } from '$lib/note/lazy-components';
 
 	interface Props {
 		vaultId: string;
 		doc: NoteDoc | null;
-		mode: 'live' | 'source' | 'read';
+		mode: NoteViewMode;
 		linkStyle: EditorLinkStyle;
 		showLineNumbers: boolean;
 		content: string;

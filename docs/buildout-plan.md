@@ -243,6 +243,10 @@ Use small, pushable slices:
    `showLineNumber` by showing or hiding CodeMirror's line-number gutter per
    vault while keeping Diamond's default line numbers when the setting is
    absent.
+- **Obsidian default view-mode preference.** Honor supported
+   `.obsidian/app.json` `defaultViewMode` / `livePreview` combinations so
+   imported vaults can open notes in Read, Live, or Source mode by default
+   without overriding a user-selected mode.
 - **Search view presentation split.** Keep query execution, saved-search
    mutations, result paging, and virtual window orchestration in `SearchView`
    while moving header controls, saved-search chrome, and result-list DOM/CSS

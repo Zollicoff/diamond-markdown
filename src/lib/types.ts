@@ -49,6 +49,9 @@ export interface ObsidianAppConfigInfo {
 	alwaysUpdateLinks?: boolean;
 	newLinkFormat?: string;
 	showLineNumber?: boolean;
+	defaultViewMode?: string;
+	livePreview?: boolean;
+	defaultMode?: NoteViewMode;
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
 }
@@ -211,6 +214,7 @@ export interface NewNoteLocation {
 }
 
 export type EditorLinkStyle = 'wikilink' | 'markdown';
+export type NoteViewMode = 'live' | 'source' | 'read';
 
 export interface EditorLinkPreference {
 	style: EditorLinkStyle;
@@ -220,6 +224,7 @@ export interface EditorLinkPreference {
 
 export interface EditorDisplayPreference {
 	lineNumbers: boolean;
+	defaultMode: NoteViewMode;
 	source: 'obsidian-app-config' | 'diamond-default';
 }
 

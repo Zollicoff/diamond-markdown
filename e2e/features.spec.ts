@@ -152,6 +152,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		alwaysUpdateLinks: true,
 		newLinkFormat: 'relative',
 		showLineNumber: false,
+		defaultViewMode: 'preview',
+		livePreview: true,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -346,7 +348,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		attachmentFolderStatus: 'safe',
 		newFileFolderPath: 'Notes/Inbox',
 		newFileFolderStatus: 'safe',
-		showLineNumber: false
+		showLineNumber: false,
+		defaultMode: 'read'
 	});
 	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
 		'attachmentFolderPath',
@@ -356,6 +359,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'alwaysUpdateLinks',
 		'newLinkFormat',
 		'showLineNumber',
+		'livePreview',
+		'defaultViewMode',
 		'trashOption'
 	]);
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'attachmentFolderPath')).toMatchObject({
@@ -366,6 +371,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'showLineNumber')).toMatchObject({
 		label: 'Line numbers',
 		value: 'Hidden',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
+		label: 'Default view mode',
+		value: 'Reading view',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor link button inserts Markdown link syntax');
@@ -507,6 +517,8 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		alwaysUpdateLinks: false,
 		newLinkFormat: 'relative',
 		showLineNumber: false,
+		defaultViewMode: 'source',
+		livePreview: false,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -596,7 +608,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('8 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('10 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
@@ -605,6 +617,10 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Markdown links');
 	await expect(page.locator('.import-card')).toContainText('Line numbers');
 	await expect(page.locator('.import-card')).toContainText('Hidden');
+	await expect(page.locator('.import-card')).toContainText('Live Preview');
+	await expect(page.locator('.import-card')).toContainText('Default view mode');
+	await expect(page.locator('.import-card')).toContainText('Editing view');
+	await expect(page.locator('.import-card')).toContainText('Source mode');
 	await expect(page.locator('.import-card')).toContainText('Update links on rename');
 	await expect(page.locator('.import-card')).toContainText('Disabled in Obsidian');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-app-config-value');
@@ -1224,6 +1240,7 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	expect(preference.ok(), await preference.text()).toBe(true);
 	expect(await preference.json()).toEqual({
 		lineNumbers: false,
+		defaultMode: 'live',
 		source: 'obsidian-app-config'
 	});
 
@@ -1231,6 +1248,35 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	const editor = page.locator('.cm-editor').first();
 	await expect(editor).toBeVisible({ timeout: 10_000 });
 	await expect(editor.locator('.cm-lineNumbers')).toHaveCount(0);
+});
+
+test('note panes honor Obsidian default view mode preference', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-default-view-mode-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		defaultViewMode: 'preview'
+	}));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nReading view by default.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Default View Mode', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const preference = await request.get(`/api/vaults/${vault.id}/editor-preferences`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toEqual({
+		lineNumbers: true,
+		defaultMode: 'read',
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	await expect(page.getByRole('tab', { name: 'Read' })).toHaveClass(/active/, { timeout: 10_000 });
+	await expect(page.locator('.preview').first()).toContainText('Reading view by default.');
+	await expect(page.locator('.cm-editor')).toHaveCount(0);
 });
 
 test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {

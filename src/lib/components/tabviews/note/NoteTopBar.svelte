@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { formatSavedAt } from '$lib/note/view';
-
-	type NoteMode = 'live' | 'source' | 'read';
+	import type { NoteViewMode } from '$lib/types';
 
 	interface Props {
 		path: string;
 		wordCount: number;
 		readingTime: string;
-		mode: NoteMode;
+		mode: NoteViewMode;
 		saving: boolean;
 		dirty: boolean;
 		savedAt: number | null;
 		err: string | null;
 		isConflict: boolean;
-		onModeChange?: (mode: NoteMode) => void;
+		onModeChange?: (mode: NoteViewMode) => void;
 		onReload?: () => void;
 		onHistory?: () => void;
 		onSave?: () => void;

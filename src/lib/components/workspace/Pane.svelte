@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Pane, Tab } from '$lib/workspace/types';
-	import type { NoteDoc } from '$lib/types';
+	import type { NoteDoc, NoteViewMode } from '$lib/types';
 	import TabBar from './TabBar.svelte';
 	import TabContent from './TabContent.svelte';
 	import EmptyPane from './EmptyPane.svelte';
 	import { activateAdjacentTabOrPane, setActivePane } from '$lib/workspace/actions';
+	import { api } from '$lib/vault-api';
 
 	interface Props {
 		vaultId: string;
@@ -19,8 +20,8 @@
 
 	let { vaultId, pane, isActivePane, canClose, onDocLoaded, hideTabBar }: Props = $props();
 
-	type Mode = 'live' | 'source' | 'read';
-	let mode = $state<Mode>('live');
+	let mode = $state<NoteViewMode>('live');
+	let modeChangedByUser = $state(false);
 
 	let activeTab = $derived<Tab | null>(
 		pane.tabs.find((t) => t.id === pane.activeTabId) ?? null
@@ -42,6 +43,28 @@
 	function focus(): void {
 		if (!isActivePane) setActivePane(vaultId, pane.id);
 	}
+
+	function setMode(nextMode: NoteViewMode): void {
+		modeChangedByUser = true;
+		mode = nextMode;
+	}
+
+	$effect(() => {
+		const id = vaultId;
+		let alive = true;
+		modeChangedByUser = false;
+		mode = 'live';
+		api.editorPreferences(id)
+			.then((preference) => {
+				if (!alive || id !== vaultId || modeChangedByUser) return;
+				mode = preference.defaultMode;
+			})
+			.catch(() => {
+				if (!alive || id !== vaultId || modeChangedByUser) return;
+				mode = 'live';
+			});
+		return () => { alive = false; };
+	});
 
 	function shouldIgnoreSwipeTarget(target: EventTarget | null): boolean {
 		if (!(target instanceof Element)) return false;
@@ -128,7 +151,7 @@
 				tab={activeTab}
 				{mode}
 				isFocused={isActivePane}
-				onModeChange={(m) => (mode = m)}
+				onModeChange={setMode}
 				{onDocLoaded}
 			/>
 		{:else}

@@ -151,6 +151,7 @@ test.describe('import checklist helpers', () => {
 			newFileLocation: 'folder',
 			newFileFolderStatus: 'safe',
 			newFileFolderPath: 'Notes/Inbox',
+			defaultMode: 'read',
 			settings: [
 				{
 					id: 'attachmentFolderPath',
@@ -165,10 +166,17 @@ test.describe('import checklist helpers', () => {
 					value: 'Notes/Inbox',
 					detail: 'Reported for migration planning.',
 					level: 'info'
+				},
+				{
+					id: 'defaultViewMode',
+					label: 'Default view mode',
+					value: 'Reading view',
+					detail: 'Diamond opens notes in Read mode for this imported vault.',
+					level: 'info'
 				}
 			],
 			warnings: []
-		})).toBe('2 supported app settings found.');
+		})).toBe('3 supported app settings found.');
 	});
 
 	test('summarizes Obsidian Daily Notes config without raw JSON', () => {
@@ -711,6 +719,7 @@ test.describe('import checklist helpers', () => {
 
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			defaultMode: 'live',
 			source: 'diamond-default'
 		});
 
@@ -721,12 +730,39 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: false,
+			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
 
 		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: true }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'preview' }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
+			label: 'Default view mode',
+			value: 'Reading view'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			defaultMode: 'read',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: false }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			defaultMode: 'source',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: true }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
 	});

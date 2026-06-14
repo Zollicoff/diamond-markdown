@@ -5,6 +5,7 @@ import type {
 	EditorDisplayPreference,
 	EditorLinkPreference,
 	JsonFileStatus,
+	NoteViewMode,
 	ObsidianAppConfigInfo,
 	ObsidianAppConfigSetting,
 	VaultImportCheckLevel
@@ -79,6 +80,29 @@ function newFileLocationLabel(value: string): string {
 	if (value === 'folder') return 'Configured folder';
 	if (value === 'root') return 'Vault root';
 	return value;
+}
+
+function defaultViewModeLabel(value: string): string {
+	if (value === 'preview') return 'Reading view';
+	if (value === 'source') return 'Editing view';
+	if (value === 'live') return 'Live preview';
+	if (value === 'read') return 'Read mode';
+	return value;
+}
+
+function defaultViewModeDetail(mode: NoteViewMode | null, livePreview: boolean | null): string {
+	if (mode === 'read') return 'Diamond opens notes in Read mode for this imported vault.';
+	if (mode === 'source') return 'Diamond opens notes in Source mode because Obsidian uses editing view with Live Preview disabled.';
+	if (mode === 'live') return 'Diamond opens notes in Live mode, matching Obsidian editing view with Live Preview enabled.';
+	if (livePreview === false) return 'Diamond could not map this view mode directly, but Live Preview is disabled in Obsidian.';
+	return 'Reported for migration review; Diamond uses Live mode when the setting is unsupported.';
+}
+
+function noteViewModeForObsidian(defaultViewMode: string | null, livePreview: boolean | null): NoteViewMode | null {
+	if (defaultViewMode === 'preview' || defaultViewMode === 'read') return 'read';
+	if (defaultViewMode === 'live') return 'live';
+	if (defaultViewMode === 'source') return livePreview === false ? 'source' : 'live';
+	return null;
 }
 
 export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
@@ -222,6 +246,36 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const livePreview = booleanValue(body.livePreview);
+	if (livePreview !== null) {
+		base.livePreview = livePreview;
+		base.settings.push(setting(
+			'livePreview',
+			'Live Preview',
+			livePreview ? 'Enabled' : 'Disabled',
+			livePreview
+				? 'Diamond uses Live mode for Obsidian editing view unless Read mode is the configured default.'
+				: 'Diamond uses Source mode when Obsidian editing view is the configured default.'
+		));
+	}
+
+	const defaultViewMode = stringValue(body.defaultViewMode);
+	if (defaultViewMode) {
+		base.defaultViewMode = defaultViewMode;
+		const mappedMode = noteViewModeForObsidian(defaultViewMode, livePreview);
+		if (mappedMode) base.defaultMode = mappedMode;
+		base.settings.push(setting(
+			'defaultViewMode',
+			'Default view mode',
+			defaultViewModeLabel(defaultViewMode),
+			defaultViewModeDetail(mappedMode, livePreview),
+			mappedMode ? 'info' : 'warn'
+		));
+		if (!mappedMode) {
+			base.warnings.push(`Obsidian defaultViewMode "${defaultViewMode}" is unsupported and will not change Diamond's default Live mode.`);
+		}
+	}
+
 	const trashOption = stringValue(body.trashOption);
 	if (trashOption) {
 		base.settings.push(setting(
@@ -258,8 +312,12 @@ export function editorLinkPreference(root: string): EditorLinkPreference {
 
 export function editorDisplayPreference(root: string): EditorDisplayPreference {
 	const config = readObsidianAppConfig(root);
+	const defaultMode = config.defaultMode ?? 'live';
 	return {
 		lineNumbers: config.showLineNumber !== false,
-		source: config.showLineNumber === undefined ? 'diamond-default' : 'obsidian-app-config'
+		defaultMode,
+		source: config.showLineNumber === undefined && config.defaultMode === undefined
+			? 'diamond-default'
+			: 'obsidian-app-config'
 	};
 }

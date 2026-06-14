@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Tab } from '$lib/workspace/types';
-	import type { NoteDoc } from '$lib/types';
+	import type { NoteDoc, NoteViewMode } from '$lib/types';
 	import { setSearchFullText, setSearchQuery } from '$lib/workspace/actions';
 
 	type ViewComponent = any;
@@ -30,10 +30,10 @@
 		vaultId: string;
 		paneId: string;
 		tab: Tab;
-		mode: 'live' | 'source' | 'read';
+		mode: NoteViewMode;
 		isFocused: boolean;
 		onDocLoaded?: (doc: NoteDoc) => void;
-		onModeChange?: (m: 'live' | 'source' | 'read') => void;
+		onModeChange?: (m: NoteViewMode) => void;
 	}
 
 	let { vaultId, paneId, tab, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
