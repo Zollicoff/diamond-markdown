@@ -509,6 +509,9 @@ Use small, pushable slices:
 - **Canvas destructive-action confirmations.** Route Canvas node and edge
   removal through shared in-app confirmation dialogs and cover cancel/confirm
   paths so board edits do not accidentally prune cards or connected edges.
+- **Saved-search presentation split.** Keep search query, grouping, facets,
+  and result orchestration in `SearchHeader`/`SearchView` while moving the
+  saved-search name/chip controls into a focused presentation component.
 
 ## Next Implementation Slices
 
