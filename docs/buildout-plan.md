@@ -491,6 +491,10 @@ Use small, pushable slices:
 - **Canvas text-preview parser extraction.** Move Canvas text-card inline,
   block, embed, wikilink, callout, and table parsing into a focused helper
   module while preserving the existing `view.ts` compatibility exports.
+- **Canvas text-preview renderer extraction.** Keep `CanvasTextPreview`
+  focused on draft parsing and preview containment while moving markdown
+  block, inline, embed, and internal navigation rendering into a focused
+  `CanvasTextPreviewBlocks` component.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
