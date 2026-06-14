@@ -1950,6 +1950,7 @@ test('file tree virtualizes large vaults while preserving scroll access', async 
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator('.tree .file-link').first()).toBeVisible({ timeout: 10_000 });
 	const renderedAtTop = await page.locator('.tree .file-link').count();
 	expect(renderedAtTop).toBeGreaterThan(0);
 	expect(renderedAtTop).toBeLessThan(80);
