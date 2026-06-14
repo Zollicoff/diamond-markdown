@@ -696,6 +696,7 @@ test('search rail icon opens a search tab; results fire on input', async ({ page
 	// Wait out the 120ms debounce + network round trip.
 	await expect(search.locator('.result').first()).toBeVisible({ timeout: 4_000 });
 	await expect(search.locator('.result').first()).toContainText(/Frontmatter/i);
+	await expect(search.locator('.result').first().locator('mark').filter({ hasText: /Frontmatter/i })).toHaveCount(2);
 });
 
 test('search tab saves, restores, and deletes vault-local saved searches', async ({ page, request }) => {

@@ -327,6 +327,7 @@
 	/>
 
 	<SearchResultsList
+		query={q}
 		{resultWindow}
 		{meta}
 		resultsCount={results.length}

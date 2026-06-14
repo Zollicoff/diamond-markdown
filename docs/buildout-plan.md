@@ -377,6 +377,9 @@ Use small, pushable slices:
    full-text results, expose one-click `path:` narrowing in the Search tab, and
    keep the server search response flat so facets remain a client-side
    dashboard affordance.
+- **Search result highlighting.** Highlight literal visible query matches in
+   Search tab titles, paths, and snippets through safe text-node rendering,
+   while leaving negative terms, tags, and regex terms unhighlighted.
 - **Saved searches.** Persist named title/full-text searches in
    `.diamondmd/searches.json`, commit changes with the vault, and expose compact
    restore/delete controls in the Search tab so recurring searches follow

@@ -6,8 +6,10 @@
 		type SearchResultDisplayRow
 	} from '$lib/search/view';
 	import type { SearchResponse } from '$lib/types';
+	import SearchHighlightedText from './SearchHighlightedText.svelte';
 
 	interface Props {
+		query: string;
 		resultWindow: SearchDisplayWindow;
 		meta: SearchResponse | null;
 		resultsCount: number;
@@ -22,6 +24,7 @@
 	}
 
 	let {
+		query,
 		resultWindow,
 		meta,
 		resultsCount,
@@ -81,10 +84,16 @@
 					onclick={(e) => onOpenResultRow(item.row, e)}
 					onkeydown={(e) => onResultRowKey(e, item.row)}
 				>
-					<div class="title">{item.row.hit.title || item.row.hit.path}</div>
-					<div class="path">{item.row.hit.path}</div>
+					<div class="title">
+						<SearchHighlightedText text={item.row.hit.title || item.row.hit.path} {query} field="title" />
+					</div>
+					<div class="path">
+						<SearchHighlightedText text={item.row.hit.path} {query} field="path" />
+					</div>
 					{#if item.row.hit.snippet}
-						<div class="snippet">{item.row.hit.snippet}</div>
+						<div class="snippet">
+							<SearchHighlightedText text={item.row.hit.snippet} {query} field="snippet" />
+						</div>
 					{/if}
 				</button>
 			{/if}
@@ -210,5 +219,11 @@
 		overflow: hidden;
 		white-space: normal;
 		word-break: break-word;
+	}
+	.result :global(mark) {
+		border-radius: 3px;
+		padding: 0 2px;
+		background: color-mix(in srgb, #facc15, transparent 70%);
+		color: inherit;
 	}
 </style>

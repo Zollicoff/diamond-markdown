@@ -10,6 +10,7 @@ import {
 } from '../src/lib/server/saved-searches';
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
 import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src/lib/server/search';
+import { searchHighlightParts, searchHighlightTerms } from '../src/lib/search/highlight';
 import { isActiveSavedSearch, savedSearchButtonLabel, savedSearchModeLabel, savedSearchName, searchModeFromFullText } from '../src/lib/search/saved';
 import {
 	buildSearchResultRows,
@@ -240,6 +241,34 @@ test('search result view helpers build folder facets and filter queries', () => 
 		{ label: 'Client Work', count: 1, query: 'roof survey path:"Client Work"' }
 	]);
 	expect(searchFolderFacets(results, 'roof path:Projects')).toEqual([]);
+});
+
+test('search highlight helpers split visible result text conservatively', () => {
+	expect(searchHighlightTerms('content:"Illinois Shines" roof OR file:Solar -archive tag:client path:"Client Work" content:/roof\\s+survey/', 'title')).toEqual([
+		'Solar',
+		'roof'
+	]);
+	expect(searchHighlightTerms('content:"Illinois Shines" roof OR file:Solar -archive tag:client path:"Client Work" content:/roof\\s+survey/', 'path')).toEqual([
+		'Client Work',
+		'roof'
+	]);
+	expect(searchHighlightTerms('content:"Illinois Shines" roof OR file:Solar -archive tag:client path:"Client Work" content:/roof\\s+survey/', 'snippet')).toEqual([
+		'Illinois Shines',
+		'roof'
+	]);
+	expect(searchHighlightParts('Illinois Shines roof survey', 'content:"Illinois Shines" roof', 'snippet')).toEqual([
+		{ text: 'Illinois Shines', match: true },
+		{ text: ' ', match: false },
+		{ text: 'roof', match: true },
+		{ text: ' survey', match: false }
+	]);
+	expect(searchHighlightParts('Solar Shines', 'sol solar', 'title')).toEqual([
+		{ text: 'Solar', match: true },
+		{ text: ' Shines', match: false }
+	]);
+	expect(searchHighlightParts('Solar Shines', '-solar tag:client /shines/', 'title')).toEqual([
+		{ text: 'Solar Shines', match: false }
+	]);
 });
 
 test('saved search helpers persist sanitized vault-local search groups', () => {

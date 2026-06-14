@@ -29,7 +29,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Outgoing links panel
 - [x] Tag index page
 - [x] Fuzzy quick-switcher
-- [x] Ranked index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, folder grouping/facets, paged loading, and virtualized results
+- [x] Ranked index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, highlighted literal result matches, folder grouping/facets, paged loading, and virtualized results
 - [x] Git auto-commit on save (debounced)
 - [x] Per-note history viewer (git log + diff)
 - [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)
@@ -120,8 +120,9 @@ runtime compatibility is a non-goal.
 - **Export to Obsidian** — Settings can download an Obsidian-ready vault ZIP;
   deeper ecosystem conversion remains outside the core claim.
 - **Search dashboards.** Search now has ranked indexed results, operators,
-  regex, folder grouping/facets, pagination, virtualization, and git-backed
-  saved searches; richer dashboards can stay incremental.
+  regex, highlighted literal result matches, folder grouping/facets,
+  pagination, virtualization, and git-backed saved searches; richer dashboards
+  can stay incremental.
 
 ## Non-goals
 
