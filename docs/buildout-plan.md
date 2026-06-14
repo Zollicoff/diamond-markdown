@@ -480,6 +480,10 @@ Use small, pushable slices:
 - **Canvas group node editor split.** Keep Canvas node shell/chrome and
   node-type routing in `CanvasNodeCard` while moving group label editing,
   group save state, and group delete controls into `CanvasGroupNodeEditor`.
+- **Canvas link-target refresh extraction.** Keep Canvas text-card
+  note/title/alias link resolution fresh after vault note and folder mutations
+  through a tested request queue and vault-scoped refresh helper instead of
+  inline component sequence state.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

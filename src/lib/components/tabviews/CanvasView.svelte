@@ -58,6 +58,10 @@
 		normalizeCanvasZoom,
 		stepCanvasZoom
 	} from '$lib/canvas/viewport';
+	import {
+		CanvasLinkTargetRequestQueue,
+		isCanvasLinkTargetRefreshEvent
+	} from '$lib/canvas/link-targets';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
 
@@ -93,7 +97,7 @@
 	let resizeState = $state<CanvasNodeResizeState | null>(null);
 	let canvasZoom = $state(1);
 	let linkTargets = $state<NoteLinkTarget[]>([]);
-	let linkTargetsRequestSeq = 0;
+	const linkTargetRequests = new CanvasLinkTargetRequestQueue();
 
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
@@ -123,13 +127,8 @@
 	const resolveEmbedTarget = $derived(canvasTextNoteEmbedResolver(linkTargets));
 
 	async function loadLinkTargets(): Promise<void> {
-		const seq = ++linkTargetsRequestSeq;
-		try {
-			const targets = await api.linkTargets(vaultId);
-			if (seq === linkTargetsRequestSeq) linkTargets = targets;
-		} catch {
-			if (seq === linkTargetsRequestSeq) linkTargets = [];
-		}
+		const result = await linkTargetRequests.load(vaultId, api.linkTargets);
+		if (linkTargetRequests.isCurrent(result)) linkTargets = result.targets;
 	}
 
 	function setCanvasZoom(zoom: number): void {
@@ -570,7 +569,7 @@
 
 	$effect(() => {
 		const refresh = (event: { vaultId: string }): void => {
-			if (event.vaultId === vaultId) void loadLinkTargets();
+			if (isCanvasLinkTargetRefreshEvent(vaultId, event)) void loadLinkTargets();
 		};
 		const offs = [
 			onBus('note:saved', refresh),
