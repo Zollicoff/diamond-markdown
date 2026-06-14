@@ -191,6 +191,9 @@
 			{#if analysis.obsidianBookmarks.paths.length > 0}
 				<span class="mono">{compactPathList(analysis.obsidianBookmarks.paths, 4)}</span>
 			{/if}
+			{#if analysis.obsidianBookmarks.searchQueries.length > 0}
+				<span class="mono">{compactPathList(analysis.obsidianBookmarks.searchQueries, 3)}</span>
+			{/if}
 		</div>
 	{/if}
 

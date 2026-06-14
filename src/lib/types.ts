@@ -177,7 +177,9 @@ export interface ObsidianBookmarksInfo {
 	bytes?: number;
 	totalItems: number;
 	importableBookmarks: number;
+	importableSearches: number;
 	paths: string[];
+	searchQueries: string[];
 	warnings: string[];
 }
 

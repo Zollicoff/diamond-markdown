@@ -22,6 +22,11 @@ export interface SaveSavedSearchInput {
 	mode?: unknown;
 }
 
+export interface SeedSavedSearchInput extends SaveSavedSearchInput {
+	createdAt?: unknown;
+	updatedAt?: unknown;
+}
+
 export interface SaveSavedSearchResult {
 	search: SavedSearch;
 	searches: SavedSearch[];
@@ -30,6 +35,10 @@ export interface SaveSavedSearchResult {
 
 function savedSearchesPath(vault: VaultRef): string {
 	return path.join(vault.path, SAVED_SEARCHES_REL_PATH);
+}
+
+export function savedSearchStoreExists(vault: VaultRef): boolean {
+	return fs.existsSync(savedSearchesPath(vault));
 }
 
 function nowIso(): string {
@@ -80,6 +89,47 @@ function normalizeSearch(raw: unknown): SavedSearch | null {
 		mode: cleanSearchMode(obj.mode),
 		createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : nowIso(),
 		updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : nowIso()
+	};
+}
+
+function cleanTimestamp(value: unknown, fallback: string): string {
+	if (typeof value !== 'string' || !value.trim()) return fallback;
+	const parsed = Date.parse(value);
+	return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
+}
+
+function uniqueSearchId(base: string, used: Set<string>): string {
+	if (!used.has(base)) return base;
+	for (let i = 2; i < 1000; i += 1) {
+		const suffix = `-${i}`;
+		const candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+		if (!used.has(candidate)) return candidate;
+	}
+	return `${base.slice(0, 55)}-${Date.now().toString(36)}`;
+}
+
+function normalizeSeedSearch(input: SeedSavedSearchInput, used: Set<string>): SavedSearch | null {
+	let query: string;
+	let name: string;
+	let baseId: string;
+	try {
+		query = cleanQuery(input.query);
+		name = cleanName(input.name, query);
+		baseId = cleanId(input.id, name);
+	} catch {
+		return null;
+	}
+	const id = uniqueSearchId(baseId, used);
+	used.add(id);
+	const now = nowIso();
+	const createdAt = cleanTimestamp(input.createdAt, now);
+	return {
+		id,
+		name,
+		query,
+		mode: cleanSearchMode(input.mode),
+		createdAt,
+		updatedAt: cleanTimestamp(input.updatedAt, createdAt)
 	};
 }
 
@@ -140,6 +190,29 @@ export function saveSavedSearch(vault: VaultRef, input: SaveSavedSearchInput): S
 	const searches = sortSavedSearches(next).slice(0, MAX_SAVED_SEARCHES);
 	writeStore(vault, { version: 1, searches });
 	return { search, searches, created: existingIndex < 0 };
+}
+
+export function seedSavedSearches(
+	vault: VaultRef,
+	inputs: SeedSavedSearchInput[]
+): { created: boolean; imported: number; searches: SavedSearch[] } {
+	if (savedSearchStoreExists(vault)) return { created: false, imported: 0, searches: listSavedSearches(vault) };
+	const seen = new Set<string>();
+	const searches: SavedSearch[] = [];
+	const seenQueryMode = new Set<string>();
+	for (const input of inputs) {
+		const search = normalizeSeedSearch(input, seen);
+		if (!search) continue;
+		const queryKey = `${search.mode}\0${search.query.toLocaleLowerCase()}`;
+		if (seenQueryMode.has(queryKey)) continue;
+		seenQueryMode.add(queryKey);
+		searches.push(search);
+	}
+	const sorted = sortSavedSearches(searches).slice(0, MAX_SAVED_SEARCHES);
+	if (sorted.length > 0) {
+		writeStore(vault, { version: 1, searches: sorted });
+	}
+	return { created: sorted.length > 0, imported: sorted.length, searches: sorted };
 }
 
 export function deleteSavedSearch(vault: VaultRef, id: unknown): { deleted: boolean; searches: SavedSearch[] } {

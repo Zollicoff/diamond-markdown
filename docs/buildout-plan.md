@@ -232,8 +232,9 @@ Use small, pushable slices:
    executing or modifying Obsidian plugins.
 - **Obsidian bookmark import.** Detect `.obsidian/bookmarks.json` and legacy
    `.obsidian/starred.json` during import preflight, seed visible note-level
-   file bookmarks into `.diamondmd/bookmarks.json` on registration when no
-   Diamond bookmark store exists, and commit that metadata file for git-backed
+   file bookmarks into `.diamondmd/bookmarks.json` and search bookmarks into
+   `.diamondmd/searches.json` on registration when the corresponding Diamond
+   store does not already exist, and commit those metadata files for git-backed
    imported vaults.
 - **Obsidian link-style preference.** Honor safe `.obsidian/app.json`
    `useMarkdownLinks` by switching the editor link toolbar action between

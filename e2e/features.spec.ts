@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
+import { SAVED_SEARCHES_REL_PATH } from '../src/lib/server/saved-searches';
 import { formatDate } from '../src/lib/server/templates';
 
 /**
@@ -334,7 +335,9 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			status: string;
 			source: string;
 			importableBookmarks: number;
+			importableSearches: number;
 			paths: string[];
+			searchQueries: string[];
 			warnings: string[];
 		};
 		obsidianGraph: {
@@ -503,7 +506,9 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		status: 'present',
 		source: 'bookmarks',
 		importableBookmarks: 1,
-		paths: ['Notes/Home.md']
+		importableSearches: 1,
+		paths: ['Notes/Home.md'],
+		searchQueries: ['tag:#todo']
 	});
 	expect(body.obsidianGraph).toMatchObject({
 		status: 'present',
@@ -546,7 +551,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.checklist.find((row) => row.id === 'obsidian-appearance')?.detail).toContain('6 Appearance settings found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-core-plugins')?.detail).toContain('4 enabled core plugins found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-hotkeys')?.detail).toContain('2 custom hotkey bindings across 2 commands found');
-	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 bookmark item can seed Diamond bookmarks');
+	expect(body.checklist.find((row) => row.id === 'obsidian-bookmarks')?.detail).toContain('1 note bookmark item and 1 search bookmark item can seed Diamond bookmarks and saved searches');
 	expect(body.checklist.find((row) => row.id === 'obsidian-graph')?.detail).toContain('8 Graph settings found');
 	expect(body.checklist.find((row) => row.id === 'obsidian-graph')?.level).toBe('warn');
 	expect(body.checklist.find((row) => row.id === 'canvas')?.detail).toContain('git-backed node and edge editing');
@@ -626,7 +631,8 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 				title: 'Pinned',
 				items: [
 					{ type: 'file', path: 'Home.md', title: 'Home bookmark' },
-					{ type: 'file', path: 'Missing.md', title: 'Missing bookmark' }
+					{ type: 'file', path: 'Missing.md', title: 'Missing bookmark' },
+					{ type: 'search', title: 'Todo search', query: 'tag:#todo' }
 				]
 			}
 		]
@@ -732,8 +738,9 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('manual: Mod+B');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-hotkey-value');
 	await expect(page.locator('.import-card')).toContainText('Obsidian bookmarks');
-	await expect(page.locator('.import-card')).toContainText('1 Obsidian bookmark item can seed Diamond bookmarks');
+	await expect(page.locator('.import-card')).toContainText('1 note bookmark item and 1 search bookmark item can seed Diamond bookmarks and saved searches');
 	await expect(page.locator('.import-card')).toContainText('Home.md');
+	await expect(page.locator('.import-card')).toContainText('tag:#todo');
 	await expect(page.locator('.import-card')).toContainText('Graph settings');
 	await expect(page.locator('.import-card')).toContainText('8 Graph settings found');
 	await expect(page.locator('.import-card')).toContainText('Obsidian Graph');
@@ -908,6 +915,7 @@ test('vault registration seeds Obsidian bookmarks into git-backed Diamond bookma
 				items: [
 					{ type: 'file', path: 'Home.md', title: 'Home bookmark', ctime: 1_700_000_000_000 },
 					{ type: 'file', path: 'Projects/Solar.md', title: 'Solar bookmark' },
+					{ type: 'search', title: 'Solar saved search', query: 'tag:#client/solar content:"roof photos"' },
 					{ type: 'file', path: 'Board.canvas', title: 'Board' },
 					{ type: 'file', path: 'Missing.md', title: 'Missing' }
 				]
@@ -926,12 +934,21 @@ test('vault registration seeds Obsidian bookmarks into git-backed Diamond bookma
 	expect(created.ok(), await created.text()).toBe(true);
 	const createdBody = await created.json() as {
 		vault: { id: string };
-		obsidianBookmarks: { imported: number; created: boolean; sha: string | null; paths: string[] };
+		obsidianBookmarks: {
+			imported: number;
+			importedSearches: number;
+			created: boolean;
+			sha: string | null;
+			paths: string[];
+			searchQueries: string[];
+		};
 	};
 	expect(createdBody.obsidianBookmarks).toMatchObject({
 		created: true,
 		imported: 2,
-		paths: ['Projects/Solar.md', 'Home.md']
+		importedSearches: 1,
+		paths: ['Projects/Solar.md', 'Home.md'],
+		searchQueries: ['tag:#client/solar content:"roof photos"']
 	});
 	expect(createdBody.obsidianBookmarks.sha).toMatch(/^[a-f0-9]{40}$/);
 
@@ -946,18 +963,36 @@ test('vault registration seeds Obsidian bookmarks into git-backed Diamond bookma
 	expect(listed.ok(), await listed.text()).toBe(true);
 	const listedBody = await listed.json() as { bookmarks: { path: string }[] };
 	expect(listedBody.bookmarks.map((bookmark) => bookmark.path)).toEqual(['Projects/Solar.md', 'Home.md']);
-	expect(git(vaultDir, ['log', '--oneline', '--', '.diamondmd/bookmarks.json'])).toContain('create: imported Obsidian bookmarks');
+	expect(git(vaultDir, ['log', '--oneline', '--', '.diamondmd/bookmarks.json'])).toContain('create: imported Obsidian bookmarks and searches');
+	const searchesFile = path.join(vaultDir, SAVED_SEARCHES_REL_PATH);
+	expect(JSON.parse(fs.readFileSync(searchesFile, 'utf-8'))).toMatchObject({
+		searches: [
+			expect.objectContaining({
+				name: 'Solar saved search',
+				query: 'tag:#client/solar content:"roof photos"',
+				mode: 'full'
+			})
+		]
+	});
+	const listedSearches = await request.get(`/api/vaults/${createdBody.vault.id}/searches`);
+	expect(listedSearches.ok(), await listedSearches.text()).toBe(true);
+	const listedSearchesBody = await listedSearches.json() as { searches: { query: string; mode: string }[] };
+	expect(listedSearchesBody.searches).toEqual([
+		expect.objectContaining({ query: 'tag:#client/solar content:"roof photos"', mode: 'full' })
+	]);
+	expect(git(vaultDir, ['log', '--oneline', '--', SAVED_SEARCHES_REL_PATH])).toContain('create: imported Obsidian bookmarks and searches');
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 
 	const second = await request.post('/api/vaults', {
 		data: { name: 'Obsidian Bookmark Import Again', path: vaultDir }
 	});
 	expect(second.ok(), await second.text()).toBe(true);
-	const secondBody = await second.json() as { obsidianBookmarks: { imported: number; created: boolean; reason?: string } };
+	const secondBody = await second.json() as { obsidianBookmarks: { imported: number; importedSearches: number; created: boolean; reason?: string } };
 	expect(secondBody.obsidianBookmarks).toMatchObject({
 		created: false,
 		imported: 0,
-		reason: 'diamond-bookmarks-exist'
+		importedSearches: 0,
+		reason: 'diamond-bookmarks-and-searches-exist'
 	});
 	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
 });

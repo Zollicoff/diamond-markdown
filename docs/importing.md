@@ -106,12 +106,13 @@ Obsidian shortcuts.
 
 When `.obsidian/bookmarks.json` or legacy `.obsidian/starred.json` is present,
 Diamond imports visible Markdown file bookmarks into `.diamondmd/bookmarks.json`
-when the vault is registered, as long as a Diamond bookmark store does not
-already exist. The importer supports nested Obsidian bookmark groups but only
-seeds note-level file bookmarks; Obsidian search bookmarks, missing files,
-hidden/config paths, Canvas files, and other non-note entries remain preserved
-in `.obsidian` but are not converted into Diamond bookmarks. If the imported
-vault already has Git initialized, Diamond commits the seeded bookmark file.
+and imports Obsidian search bookmarks as full-text saved searches in
+`.diamondmd/searches.json` when the vault is registered, as long as the
+corresponding Diamond store does not already exist. The importer supports
+nested Obsidian bookmark groups but does not recreate group hierarchy; missing
+files, hidden/config paths, Canvas files, and other non-note/non-search entries
+remain preserved in `.obsidian` but are not converted. If the imported vault
+already has Git initialized, Diamond commits the seeded metadata files.
 
 Common attachment folders such as `Attachments`, `assets`, `images`, and
 `media` are detected so the user can confirm embeds are present before opening
@@ -214,8 +215,9 @@ initial state of the imported vault is captured explicitly.
 - It does not automatically remap Obsidian hotkeys into Diamond shortcuts.
 - It does not automatically apply Obsidian graph layout, color groups, tag
   nodes, attachment nodes, or unresolved-link nodes.
-- It does not convert Obsidian search bookmarks, bookmark groups, or non-note
-  bookmarks into Diamond bookmarks.
+- It imports Obsidian search bookmarks as Diamond saved searches, but does not
+  recreate Obsidian bookmark groups or convert non-note bookmarks into Diamond
+  bookmarks.
 - It does not automatically apply every `.obsidian/app.json` UI preference.
 - It does not rewrite wikilinks or embeds.
 - It does not move attachments during import.

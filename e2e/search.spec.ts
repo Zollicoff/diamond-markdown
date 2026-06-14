@@ -6,7 +6,8 @@ import {
 	deleteSavedSearch,
 	listSavedSearches,
 	SAVED_SEARCHES_REL_PATH,
-	saveSavedSearch
+	saveSavedSearch,
+	seedSavedSearches
 } from '../src/lib/server/saved-searches';
 import type { NoteMeta, VaultIndex } from '../src/lib/server/indexer';
 import { clampSearchLimit, clampSearchOffset, searchFullTextIndex } from '../src/lib/server/search';
@@ -324,6 +325,32 @@ test('saved search helpers persist sanitized vault-local search groups', () => {
 	const removed = deleteSavedSearch(vault, 'client-solar');
 	expect(removed.deleted).toBe(true);
 	expect(removed.searches).toEqual([]);
+});
+
+test('saved search helpers seed imported search bookmarks without overwriting stores', () => {
+	const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-seeded-searches-'));
+	const vault = { id: 'seeded-search-test', name: 'Seeded Search Test', path: vaultDir };
+
+	const seeded = seedSavedSearches(vault, [
+		{ name: 'Solar review', query: '  tag:#client/solar   roof  ', mode: 'full', createdAt: '2026-06-14T00:00:00Z' },
+		{ name: 'Solar review', query: 'tag:#client/solar roof', mode: 'full' },
+		{ name: 'Inbox', query: 'path:Inbox', mode: 'title' },
+		{ name: '', query: '', mode: 'full' }
+	]);
+
+	expect(seeded.created).toBe(true);
+	expect(seeded.imported).toBe(2);
+	expect(seeded.searches.map((search) => ({ name: search.name, query: search.query, mode: search.mode }))).toEqual([
+		{ name: 'Inbox', query: 'path:Inbox', mode: 'title' },
+		{ name: 'Solar review', query: 'tag:#client/solar roof', mode: 'full' }
+	]);
+	expect(fs.existsSync(path.join(vaultDir, SAVED_SEARCHES_REL_PATH))).toBe(true);
+	expect(listSavedSearches(vault).map((search) => search.query)).toEqual(['path:Inbox', 'tag:#client/solar roof']);
+
+	const skipped = seedSavedSearches(vault, [{ name: 'Later', query: 'later', mode: 'full' }]);
+	expect(skipped.created).toBe(false);
+	expect(skipped.imported).toBe(0);
+	expect(skipped.searches.map((search) => search.query)).toEqual(['path:Inbox', 'tag:#client/solar roof']);
 });
 
 test('search session helpers keep SearchView orchestration deterministic', () => {

@@ -92,7 +92,9 @@ function analysis(overrides: Partial<VaultImportAnalysis> = {}): VaultImportAnal
 			source: 'missing',
 			totalItems: 0,
 			importableBookmarks: 0,
+			importableSearches: 0,
 			paths: [],
+			searchQueries: [],
 			warnings: []
 		},
 		obsidianGraph: {
@@ -283,7 +285,9 @@ test.describe('import checklist helpers', () => {
 			source: 'bookmarks',
 			totalItems: 0,
 			importableBookmarks: 0,
+			importableSearches: 0,
 			paths: [],
+			searchQueries: [],
 			warnings: []
 		})).toBe('.obsidian/bookmarks.json is present but invalid.');
 		expect(obsidianBookmarksSummary({
@@ -292,18 +296,33 @@ test.describe('import checklist helpers', () => {
 			source: 'bookmarks',
 			totalItems: 3,
 			importableBookmarks: 2,
+			importableSearches: 0,
 			paths: ['Home.md', 'Projects/Solar.md'],
+			searchQueries: [],
 			warnings: []
-		})).toBe('2 Obsidian bookmark items can seed Diamond bookmarks.');
+		})).toBe('2 note bookmark items can seed Diamond bookmarks and saved searches.');
 		expect(obsidianBookmarksSummary({
 			path: '.obsidian/starred.json',
 			status: 'present',
 			source: 'starred',
 			totalItems: 1,
 			importableBookmarks: 1,
+			importableSearches: 0,
 			paths: ['Legacy.md'],
+			searchQueries: [],
 			warnings: []
-		})).toBe('1 Obsidian legacy starred item can seed Diamond bookmarks.');
+		})).toBe('1 note legacy starred item can seed Diamond bookmarks and saved searches.');
+		expect(obsidianBookmarksSummary({
+			path: '.obsidian/bookmarks.json',
+			status: 'present',
+			source: 'bookmarks',
+			totalItems: 3,
+			importableBookmarks: 1,
+			importableSearches: 2,
+			paths: ['Home.md'],
+			searchQueries: ['tag:#project', 'path:"Client Work" roof'],
+			warnings: []
+		})).toBe('1 note bookmark item and 2 search bookmark items can seed Diamond bookmarks and saved searches.');
 	});
 
 	test('summarizes Obsidian graph settings as migration guidance', () => {

@@ -9,6 +9,12 @@ import {
 } from './bookmarks';
 import { commitChange } from './git';
 import { ensureMdExt, normalizeVaultPath, resolveInVault } from './paths';
+import {
+	SAVED_SEARCHES_REL_PATH,
+	savedSearchStoreExists,
+	seedSavedSearches,
+	type SeedSavedSearchInput
+} from './saved-searches';
 
 type ObsidianBookmarkSource = 'bookmarks' | 'starred';
 
@@ -22,13 +28,19 @@ interface ObsidianBookmarkCandidate extends SeedBookmarkInput {
 	path: string;
 }
 
+interface ObsidianSearchBookmarkCandidate extends SeedSavedSearchInput {
+	query: string;
+}
+
 export interface ObsidianBookmarksImportResult {
 	status: ObsidianBookmarksInfo['status'];
 	source: ObsidianBookmarksInfo['source'];
 	created: boolean;
 	imported: number;
+	importedSearches: number;
 	skipped: number;
 	paths: string[];
+	searchQueries: string[];
 	sha: string | null;
 	reason?: string;
 }
@@ -70,6 +82,12 @@ function timestampValue(value: unknown): string | undefined {
 	return undefined;
 }
 
+function searchQueryValue(value: unknown): string | undefined {
+	if (typeof value !== 'string') return undefined;
+	const query = value.replace(/\s+/g, ' ').trim();
+	return query || undefined;
+}
+
 function titleFromPath(rel: string): string {
 	return path.basename(rel, path.extname(rel));
 }
@@ -102,20 +120,45 @@ function collectRawBookmarkItems(value: unknown, items: Record<string, unknown>[
 	const body = record(value);
 	if (!body) return;
 	const type = stringValue(body.type)?.toLowerCase();
-	if (type === 'file' || stringValue(body.path)) items.push(body);
+	if (type === 'file' || type === 'search' || stringValue(body.path)) items.push(body);
 	if (Array.isArray(body.items)) {
 		for (const entry of body.items) collectRawBookmarkItems(entry, items);
 	}
 }
 
-function bookmarkCandidates(root: string, value: unknown): { total: number; bookmarks: ObsidianBookmarkCandidate[] } {
+function searchBookmarkQuery(item: Record<string, unknown>): string | undefined {
+	const state = record(item.state);
+	return searchQueryValue(item.query)
+		?? searchQueryValue(item.search)
+		?? searchQueryValue(item.searchText)
+		?? searchQueryValue(state?.query)
+		?? searchQueryValue(state?.search)
+		?? searchQueryValue(state?.searchText);
+}
+
+function bookmarkCandidates(root: string, value: unknown): {
+	total: number;
+	bookmarks: ObsidianBookmarkCandidate[];
+	searches: ObsidianSearchBookmarkCandidate[];
+} {
 	const rawItems: Record<string, unknown>[] = [];
 	const body = record(value);
 	if (body && Array.isArray(body.items)) collectRawBookmarkItems(body.items, rawItems);
 	else collectRawBookmarkItems(value, rawItems);
 
 	const bookmarks: ObsidianBookmarkCandidate[] = [];
+	const searches: ObsidianSearchBookmarkCandidate[] = [];
 	for (const item of rawItems) {
+		const type = stringValue(item.type)?.toLowerCase();
+		if (type === 'search') {
+			const query = searchBookmarkQuery(item);
+			if (!query) continue;
+			const title = stringValue(item.title) ?? stringValue(item.name) ?? query;
+			const createdAt = timestampValue(item.ctime) ?? timestampValue(item.createdAt);
+			const updatedAt = timestampValue(item.mtime) ?? timestampValue(item.updatedAt) ?? createdAt;
+			searches.push({ name: title, query, mode: 'full', createdAt, updatedAt });
+			continue;
+		}
 		const rawPath = stringValue(item.path);
 		if (!rawPath) continue;
 		const rel = cleanObsidianBookmarkPath(root, rawPath);
@@ -125,12 +168,13 @@ function bookmarkCandidates(root: string, value: unknown): { total: number; book
 		const updatedAt = timestampValue(item.mtime) ?? timestampValue(item.updatedAt) ?? createdAt;
 		bookmarks.push({ path: rel, title, createdAt, updatedAt });
 	}
-	return { total: rawItems.length, bookmarks };
+	return { total: rawItems.length, bookmarks, searches };
 }
 
 function readCandidateSource(root: string): {
 	info: ObsidianBookmarksInfo;
 	bookmarks: ObsidianBookmarkCandidate[];
+	searches: ObsidianSearchBookmarkCandidate[];
 } {
 	for (const source of OBSIDIAN_BOOKMARK_SOURCES) {
 		const abs = path.join(root, source.relPath);
@@ -147,10 +191,13 @@ function readCandidateSource(root: string): {
 					bytes: file.bytes,
 					totalItems: 0,
 					importableBookmarks: 0,
+					importableSearches: 0,
 					paths: [],
+					searchQueries: [],
 					warnings
 				},
-				bookmarks: []
+				bookmarks: [],
+				searches: []
 			};
 		}
 		const parsed = bookmarkCandidates(root, file.value);
@@ -162,10 +209,13 @@ function readCandidateSource(root: string): {
 				bytes: file.bytes,
 				totalItems: parsed.total,
 				importableBookmarks: parsed.bookmarks.length,
+				importableSearches: parsed.searches.length,
 				paths: parsed.bookmarks.map((bookmark) => bookmark.path),
+				searchQueries: parsed.searches.map((search) => search.query),
 				warnings
 			},
-			bookmarks: parsed.bookmarks
+			bookmarks: parsed.bookmarks,
+			searches: parsed.searches
 		};
 	}
 	return {
@@ -174,10 +224,13 @@ function readCandidateSource(root: string): {
 			source: 'missing',
 			totalItems: 0,
 			importableBookmarks: 0,
+			importableSearches: 0,
 			paths: [],
+			searchQueries: [],
 			warnings: []
 		},
-		bookmarks: []
+		bookmarks: [],
+		searches: []
 	};
 }
 
@@ -186,54 +239,86 @@ export function readObsidianBookmarks(root: string): ObsidianBookmarksInfo {
 }
 
 export async function importObsidianBookmarks(vault: VaultRef): Promise<ObsidianBookmarksImportResult> {
-	const { info, bookmarks } = readCandidateSource(vault.path);
+	const { info, bookmarks, searches } = readCandidateSource(vault.path);
 	if (info.status !== 'present') {
 		return {
 			status: info.status,
 			source: info.source,
 			created: false,
 			imported: 0,
+			importedSearches: 0,
 			skipped: 0,
 			paths: [],
+			searchQueries: [],
 			sha: null,
 			reason: info.status === 'missing' ? 'no-obsidian-bookmarks' : 'invalid-obsidian-bookmarks'
 		};
 	}
-	if (bookmarks.length === 0) {
+	if (bookmarks.length === 0 && searches.length === 0) {
 		return {
 			status: info.status,
 			source: info.source,
 			created: false,
 			imported: 0,
+			importedSearches: 0,
 			skipped: info.totalItems,
 			paths: [],
+			searchQueries: [],
 			sha: null,
-			reason: 'no-importable-bookmarks'
+			reason: 'no-importable-bookmarks-or-searches'
 		};
 	}
-	if (bookmarkStoreExists(vault)) {
+	const canSeedBookmarks = bookmarks.length > 0 && !bookmarkStoreExists(vault);
+	const canSeedSearches = searches.length > 0 && !savedSearchStoreExists(vault);
+	if (!canSeedBookmarks && !canSeedSearches) {
 		return {
 			status: info.status,
 			source: info.source,
 			created: false,
 			imported: 0,
-			skipped: bookmarks.length,
+			importedSearches: 0,
+			skipped: bookmarks.length + searches.length,
 			paths: info.paths,
+			searchQueries: info.searchQueries,
 			sha: null,
-			reason: 'diamond-bookmarks-exist'
+			reason: bookmarkStoreExists(vault) && savedSearchStoreExists(vault)
+				? 'diamond-bookmarks-and-searches-exist'
+				: bookmarkStoreExists(vault)
+					? 'diamond-bookmarks-exist'
+					: 'diamond-saved-searches-exist'
 		};
 	}
-	const seeded = seedBookmarks(vault, bookmarks);
-	const commit = seeded.created && fs.existsSync(path.join(vault.path, '.git'))
-		? await commitChange(vault, [BOOKMARKS_REL_PATH], 'create', 'imported Obsidian bookmarks')
+	const seededBookmarks = canSeedBookmarks
+		? seedBookmarks(vault, bookmarks)
+		: { created: false, imported: 0, bookmarks: [] };
+	const seededSearches = canSeedSearches
+		? seedSavedSearches(vault, searches)
+		: { created: false, imported: 0, searches: [] };
+	const createdFiles = [
+		seededBookmarks.created ? BOOKMARKS_REL_PATH : null,
+		seededSearches.created ? SAVED_SEARCHES_REL_PATH : null
+	].filter((file): file is string => !!file);
+	const commitLabel = seededBookmarks.created && seededSearches.created
+		? 'imported Obsidian bookmarks and searches'
+		: seededSearches.created
+			? 'imported Obsidian searches'
+			: 'imported Obsidian bookmarks';
+	const commit = createdFiles.length > 0 && fs.existsSync(path.join(vault.path, '.git'))
+		? await commitChange(vault, createdFiles, 'create', commitLabel)
 		: null;
 	return {
 		status: info.status,
 		source: info.source,
-		created: seeded.created,
-		imported: seeded.imported,
-		skipped: Math.max(0, info.totalItems - seeded.imported),
-		paths: seeded.bookmarks.map((bookmark) => bookmark.path),
+		created: createdFiles.length > 0,
+		imported: seededBookmarks.imported,
+		importedSearches: seededSearches.imported,
+		skipped: Math.max(0, info.totalItems - seededBookmarks.imported - seededSearches.imported),
+		paths: seededBookmarks.bookmarks.length > 0
+			? seededBookmarks.bookmarks.map((bookmark) => bookmark.path)
+			: info.paths,
+		searchQueries: seededSearches.searches.length > 0
+			? seededSearches.searches.map((search) => search.query)
+			: info.searchQueries,
 		sha: commit?.sha ?? null
 	};
 }

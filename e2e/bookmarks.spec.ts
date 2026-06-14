@@ -114,10 +114,11 @@ test.describe('git-backed bookmarks', () => {
 					items: [
 						{ type: 'file', path: 'Notes/Solar.md', title: 'Solar Bookmark', ctime: 1_700_000_000_000 },
 						{ type: 'file', path: 'Missing.md', title: 'Missing' },
+						{ type: 'search', title: 'Todo review', query: 'tag:#todo path:"Notes"' },
 						{ type: 'file', path: 'Board.canvas', title: 'Board' }
 					]
 				},
-				{ type: 'search', query: 'tag:#todo' },
+				{ type: 'search', state: { query: 'content:"roof photos"' } },
 				{ path: 'Loose.md#Heading', title: 'Loose heading' }
 			]
 		}));
@@ -127,9 +128,11 @@ test.describe('git-backed bookmarks', () => {
 			path: '.obsidian/bookmarks.json',
 			status: 'present',
 			source: 'bookmarks',
-			totalItems: 4,
+			totalItems: 6,
 			importableBookmarks: 2,
-			paths: ['Notes/Solar.md', 'Loose.md']
+			importableSearches: 2,
+			paths: ['Notes/Solar.md', 'Loose.md'],
+			searchQueries: ['tag:#todo path:"Notes"', 'content:"roof photos"']
 		});
 
 		fs.rmSync(path.join(vaultDir, '.obsidian', 'bookmarks.json'));
@@ -146,6 +149,7 @@ test.describe('git-backed bookmarks', () => {
 			source: 'starred',
 			totalItems: 2,
 			importableBookmarks: 1,
+			importableSearches: 0,
 			paths: ['Notes/Archive/Old.md']
 		});
 	});

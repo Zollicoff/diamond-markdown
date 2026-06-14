@@ -145,9 +145,16 @@ export function obsidianHotkeysSummary(config: ObsidianHotkeysInfo): string {
 export function obsidianBookmarksSummary(config: ObsidianBookmarksInfo): string {
 	if (config.status === 'missing') return 'No .obsidian/bookmarks.json or legacy .obsidian/starred.json file was found.';
 	if (config.status === 'invalid') return `${config.path ?? '.obsidian/bookmarks.json'} is present but invalid.`;
-	if (config.importableBookmarks === 0) return `${config.path ?? '.obsidian/bookmarks.json'} found; no visible Markdown note bookmarks were recognized.`;
+	if (config.importableBookmarks === 0 && config.importableSearches === 0) return `${config.path ?? '.obsidian/bookmarks.json'} found; no visible Markdown note bookmarks or search bookmarks were recognized.`;
 	const source = config.source === 'starred' ? 'legacy starred' : 'bookmark';
-	return `${config.importableBookmarks} Obsidian ${source} item${config.importableBookmarks === 1 ? '' : 's'} can seed Diamond bookmarks.`;
+	const parts: string[] = [];
+	if (config.importableBookmarks > 0) {
+		parts.push(`${config.importableBookmarks} note ${source} item${config.importableBookmarks === 1 ? '' : 's'}`);
+	}
+	if (config.importableSearches > 0) {
+		parts.push(`${config.importableSearches} search ${source} item${config.importableSearches === 1 ? '' : 's'}`);
+	}
+	return `${parts.join(' and ')} can seed Diamond bookmarks and saved searches.`;
 }
 
 export function obsidianGraphSummary(config: ObsidianGraphInfo): string {
