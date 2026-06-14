@@ -19,6 +19,19 @@ async function openVault(page: Page): Promise<void> {
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 }
 
+async function openSettingsSection(page: Page, section: string): Promise<void> {
+	await page.getByLabel('Settings').click();
+	await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 10_000 });
+	const navButton = page.getByRole('button', { name: section, exact: true });
+	await expect(navButton).toBeVisible({ timeout: 10_000 });
+	await navButton.click();
+}
+
+async function openPluginInstaller(page: Page): Promise<void> {
+	await openSettingsSection(page, 'Plugins');
+	await expect(page.getByLabel('Install from manifest URL')).toBeVisible({ timeout: 10_000 });
+}
+
 function git(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
 }
@@ -1555,7 +1568,7 @@ export function activate(api) {
 	await page.getByRole('button', { name: /Plugin Boot Test/ }).click();
 	await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, string>).__diamondPluginRan)).toBe(vault.id);
 
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Plugins');
 	await expect(page.getByText('Boot Test Plugin')).toBeVisible();
 	await expect(page.getByText('Plugin Boot Test')).toBeVisible();
 	await expect(page.getByText('Boot Test Settings')).toBeVisible();
@@ -1602,7 +1615,7 @@ export function activate(api) {
 
 		await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-		await page.getByLabel('Settings').click();
+		await openPluginInstaller(page);
 		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
 		await page.getByRole('button', { name: 'Install', exact: true }).click();
 		await expect(page.getByText('Installed Remote Test Plugin. Plugin runtime reload requested.')).toBeVisible();
@@ -1658,7 +1671,7 @@ test('plugin install replacement overwrites files and commits a clean edit', asy
 
 		await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-		await page.getByLabel('Settings').click();
+		await openPluginInstaller(page);
 		await page.getByLabel('Install from manifest URL').fill(remote.url('/plugin.json'));
 		await page.getByRole('button', { name: 'Install', exact: true }).click();
 		await expect(page.getByText('Installed Replace Test Plugin. Plugin runtime reload requested.')).toBeVisible();
@@ -1764,7 +1777,7 @@ test('plugin catalog installs curated worker plugins', async ({ page, request })
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Plugins');
 	await expect(page.getByRole('heading', { name: 'Plugin catalog' })).toBeVisible();
 	const card = page.locator('.catalog-card').filter({ hasText: 'scratchpad-helper' });
 	await expect(card.getByText(/Scratchpad Helper/)).toBeVisible();
@@ -1825,7 +1838,7 @@ export function activate(api) {
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await expect.poll(() => logs.some((line) => line.includes('[plugin:worker-test] worker activated worker-test'))).toBe(true);
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Plugins');
 	const card = page.locator('.plugin-card').filter({ hasText: 'worker-test' });
 	await expect(card.getByText(/Worker Test Plugin/)).toBeVisible();
 	await expect(card.locator('.plugin-state').getByText('Worker', { exact: true })).toBeVisible();
@@ -1999,7 +2012,7 @@ export function activate(api) {
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Plugin settings');
 	await expect(page.getByText('Worker Frames Plugin')).toBeVisible();
 	const settingsFrame = page.frameLocator('iframe[title="Worker Frame Settings"]');
 	await expect(settingsFrame.getByTestId('settings-value')).toHaveText(`worker-frames:${vault.id}:blocked`);
