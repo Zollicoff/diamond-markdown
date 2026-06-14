@@ -470,6 +470,9 @@ Use small, pushable slices:
   actions, and mutation callbacks in `CanvasTextNodeEditor` while moving the
   markdown-aware preview renderer and internal note/Canvas navigation into a
   focused `CanvasTextPreview` component.
+- **Canvas edge layer split.** Keep Canvas board zoom, viewport measurement,
+  and node-card rendering in `CanvasBoard` while moving SVG edge markers,
+  edge lines, and edge labels into a focused `CanvasEdgeLayer` component.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
