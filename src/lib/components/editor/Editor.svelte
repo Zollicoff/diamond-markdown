@@ -17,6 +17,7 @@
 		showLineNumbers?: boolean;
 		spellcheck?: boolean;
 		tabSize?: number;
+		readableLineLength?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -36,6 +37,7 @@
 		showLineNumbers = true,
 		spellcheck = false,
 		tabSize = 4,
+		readableLineLength = false,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -332,6 +334,7 @@
 	bind:this={host}
 	class="editor"
 	class:drop-active={dragDepth > 0}
+	class:readable-line-length={readableLineLength}
 	role="region"
 	aria-label="Markdown editor attachment drop zone"
 	ondragenter={handleEditorDragEnter}
@@ -374,5 +377,13 @@
 	}
 	.editor :global(.cm-line) {
 		padding: 0 16px;
+	}
+	.editor.readable-line-length :global(.cm-content) {
+		box-sizing: border-box;
+		max-width: 820px;
+		margin: 0 auto;
+	}
+	.editor.readable-line-length :global(.cm-line) {
+		max-width: 820px;
 	}
 </style>

@@ -15,9 +15,10 @@
 		html: string;
 		vaultId?: string;
 		doc?: NoteDoc;
+		readableLineLength?: boolean;
 	}
 
-	let { html, vaultId, doc }: Props = $props();
+	let { html, vaultId, doc, readableLineLength = false }: Props = $props();
 	let host = $state<HTMLElement | null>(null);
 	const markdownPostprocessors = $derived(vaultId ? listMarkdownPostprocessors(vaultId) : []);
 
@@ -262,6 +263,7 @@
 
 <MarkdownSurface
 	{html}
+	{readableLineLength}
 	onHostMount={setHost}
 	onClickPreview={onClick}
 	onAuxClickPreview={onAuxClick}

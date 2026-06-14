@@ -3,6 +3,7 @@
 
 	interface Props {
 		html: string;
+		readableLineLength?: boolean;
 		onHostMount: (element: HTMLElement | null) => void;
 		onClickPreview: (event: MouseEvent) => void;
 		onAuxClickPreview: (event: MouseEvent) => void;
@@ -13,6 +14,7 @@
 
 	let {
 		html,
+		readableLineLength = false,
 		onHostMount,
 		onClickPreview,
 		onAuxClickPreview,
@@ -32,6 +34,7 @@
 <div
 	bind:this={host}
 	class="preview"
+	class:readable-line-length={readableLineLength}
 	onclick={onClickPreview}
 	onauxclick={onAuxClickPreview}
 	oncontextmenu={onContextPreview}
@@ -53,6 +56,11 @@
 		font-family: var(--sans);
 		font-size: 17px;
 		line-height: 1.7;
+	}
+	.preview.readable-line-length {
+		box-sizing: border-box;
+		width: min(100%, 860px);
+		margin: 0 auto;
 	}
 	.preview :global(h1) { font-family: var(--sans); font-size: 2.2em; margin: 0 0 0.6em; line-height: 1.1; letter-spacing: -0.01em; }
 	.preview :global(h2) { font-family: var(--sans); font-size: 1.6em; margin: 1.8em 0 0.5em; line-height: 1.15; }

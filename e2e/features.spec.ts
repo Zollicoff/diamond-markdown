@@ -177,6 +177,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
+		readableLineLength: true,
 		defaultViewMode: 'preview',
 		livePreview: true,
 		trashOption: 'local',
@@ -271,6 +272,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			showLineNumber?: boolean;
 			spellcheck?: boolean;
 			tabSize?: number;
+			readableLineLength?: boolean;
 			defaultMode?: string;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
@@ -379,6 +381,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
+		readableLineLength: true,
 		defaultMode: 'read'
 	});
 	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
@@ -391,6 +394,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'showLineNumber',
 		'spellcheck',
 		'tabSize',
+		'readableLineLength',
 		'livePreview',
 		'defaultViewMode',
 		'trashOption'
@@ -413,6 +417,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'tabSize')).toMatchObject({
 		label: 'Tab size',
 		value: '8 spaces',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'readableLineLength')).toMatchObject({
+		label: 'Readable line length',
+		value: 'Enabled',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
@@ -561,6 +570,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
+		readableLineLength: true,
 		defaultViewMode: 'source',
 		livePreview: false,
 		trashOption: 'local',
@@ -652,7 +662,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('12 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('13 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
@@ -665,6 +675,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Enabled');
 	await expect(page.locator('.import-card')).toContainText('Tab size');
 	await expect(page.locator('.import-card')).toContainText('8 spaces');
+	await expect(page.locator('.import-card')).toContainText('Readable line length');
 	await expect(page.locator('.import-card')).toContainText('Live Preview');
 	await expect(page.locator('.import-card')).toContainText('Default view mode');
 	await expect(page.locator('.import-card')).toContainText('Editing view');
@@ -1274,7 +1285,8 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		showLineNumber: false,
 		spellcheck: true,
-		tabSize: 8
+		tabSize: 8,
+		readableLineLength: true
 	}));
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLine one.\nLine two.\n');
 
@@ -1290,16 +1302,20 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 		lineNumbers: false,
 		spellcheck: true,
 		tabSize: 8,
+		readableLineLength: true,
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
 	});
 
 	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
-	const editor = page.locator('.cm-editor').first();
+	const editorHost = page.locator('.editor').first();
+	await expect(editorHost).toHaveClass(/readable-line-length/, { timeout: 10_000 });
+	const editor = editorHost.locator('.cm-editor').first();
 	await expect(editor).toBeVisible({ timeout: 10_000 });
 	await expect(editor.locator('.cm-lineNumbers')).toHaveCount(0);
 	await expect(editor.locator('.cm-content')).toHaveAttribute('spellcheck', 'true');
 	await expect(editor.locator('.cm-content')).toHaveCSS('tab-size', '8');
+	await expect(editor.locator('.cm-content')).toHaveCSS('max-width', '820px');
 });
 
 test('note panes honor Obsidian default view mode preference', async ({ page, request }) => {
@@ -1307,7 +1323,8 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
-		defaultViewMode: 'preview'
+		defaultViewMode: 'preview',
+		readableLineLength: true
 	}));
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nReading view by default.\n');
 
@@ -1323,13 +1340,17 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 		lineNumbers: true,
 		spellcheck: false,
 		tabSize: 4,
+		readableLineLength: true,
 		defaultMode: 'read',
 		source: 'obsidian-app-config'
 	});
 
 	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.getByRole('tab', { name: 'Read' })).toHaveClass(/active/, { timeout: 10_000 });
-	await expect(page.locator('.preview').first()).toContainText('Reading view by default.');
+	const preview = page.locator('.preview').first();
+	await expect(preview).toHaveClass(/readable-line-length/, { timeout: 10_000 });
+	await expect(preview).toContainText('Reading view by default.');
+	await expect.poll(async () => Math.round(await preview.evaluate((element) => element.getBoundingClientRect().width))).toBeLessThanOrEqual(860);
 	await expect(page.locator('.cm-editor')).toHaveCount(0);
 });
 

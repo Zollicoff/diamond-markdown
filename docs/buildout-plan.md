@@ -444,6 +444,10 @@ Use small, pushable slices:
 - **Obsidian tab-size preference.** Honor safe `.obsidian/app.json`
   integer `tabSize` values from 1 to 16 in the editor, and warn on unsafe
   values during import preview instead of applying them.
+- **Obsidian readable-line-length preference.** Honor `.obsidian/app.json`
+  `readableLineLength` by narrowing editor and reading surfaces for imported
+  vaults while keeping Diamond's full-width default when the setting is absent
+  or disabled.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

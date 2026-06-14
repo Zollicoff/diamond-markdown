@@ -154,6 +154,7 @@ test.describe('import checklist helpers', () => {
 			defaultMode: 'read',
 			spellcheck: true,
 			tabSize: 8,
+			readableLineLength: true,
 			settings: [
 				{
 					id: 'attachmentFolderPath',
@@ -189,10 +190,17 @@ test.describe('import checklist helpers', () => {
 					value: '8 spaces',
 					detail: 'Diamond uses this Obsidian tab width in the markdown editor for indentation and tab rendering.',
 					level: 'info'
+				},
+				{
+					id: 'readableLineLength',
+					label: 'Readable line length',
+					value: 'Enabled',
+					detail: 'Diamond narrows editor and reading surfaces for this imported vault.',
+					level: 'info'
 				}
 			],
 			warnings: []
-		})).toBe('5 supported app settings found.');
+		})).toBe('6 supported app settings found.');
 	});
 
 	test('summarizes Obsidian Daily Notes config without raw JSON', () => {
@@ -737,6 +745,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
 		});
@@ -750,6 +759,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: false,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -759,6 +769,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -772,6 +783,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: true,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -781,6 +793,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -794,6 +807,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 8,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -809,8 +823,33 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ readableLineLength: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'readableLineLength')).toMatchObject({
+			label: 'Readable line length',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: true,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ readableLineLength: false }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
 		});
 
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'preview' }));
@@ -822,6 +861,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
 		});
@@ -831,6 +871,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
 		});
@@ -840,6 +881,7 @@ test.describe('import checklist helpers', () => {
 			lineNumbers: true,
 			spellcheck: false,
 			tabSize: 4,
+			readableLineLength: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});

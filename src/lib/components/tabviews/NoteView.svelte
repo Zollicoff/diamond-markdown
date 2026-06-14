@@ -68,6 +68,7 @@
 	let showLineNumbers = $state(true);
 	let spellcheck = $state(false);
 	let tabSize = $state(4);
+	let readableLineLength = $state(false);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -117,12 +118,14 @@
 			showLineNumbers = true;
 			spellcheck = false;
 			tabSize = 4;
+			readableLineLength = false;
 			api.editorPreferences(id)
 				.then((preference) => {
 					if (id === vaultId) {
 						showLineNumbers = preference.lineNumbers;
 						spellcheck = preference.spellcheck;
 						tabSize = preference.tabSize;
+						readableLineLength = preference.readableLineLength;
 					}
 				})
 				.catch(() => {
@@ -130,6 +133,7 @@
 						showLineNumbers = true;
 						spellcheck = false;
 						tabSize = 4;
+						readableLineLength = false;
 					}
 				});
 		});
@@ -373,6 +377,7 @@
 		{showLineNumbers}
 		{spellcheck}
 		{tabSize}
+		{readableLineLength}
 		{content}
 		{editorApi}
 		{uploadingAttachments}

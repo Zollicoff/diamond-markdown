@@ -286,6 +286,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		}
 	}
 
+	const readableLineLength = booleanValue(body.readableLineLength);
+	if (readableLineLength !== null) {
+		base.readableLineLength = readableLineLength;
+		base.settings.push(setting(
+			'readableLineLength',
+			'Readable line length',
+			readableLineLength ? 'Enabled' : 'Disabled',
+			readableLineLength
+				? 'Diamond narrows editor and reading surfaces for this imported vault.'
+				: 'Diamond leaves editor and reading surfaces at the full pane width for this imported vault.'
+		));
+	}
+
 	const livePreview = booleanValue(body.livePreview);
 	if (livePreview !== null) {
 		base.livePreview = livePreview;
@@ -357,8 +370,9 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 		lineNumbers: config.showLineNumber !== false,
 		spellcheck: config.spellcheck === true,
 		tabSize: config.tabSize ?? 4,
+		readableLineLength: config.readableLineLength === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined
+		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

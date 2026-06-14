@@ -12,6 +12,7 @@
 		showLineNumbers: boolean;
 		spellcheck: boolean;
 		tabSize: number;
+		readableLineLength: boolean;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -39,6 +40,7 @@
 		showLineNumbers,
 		spellcheck,
 		tabSize,
+		readableLineLength,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -75,7 +77,7 @@
 	{:else if viewLoadError}
 		<div class="loading err">Could not load view: {viewLoadError}</div>
 	{:else if mode === 'read' && PreviewView}
-		<PreviewView html={doc.html} {vaultId} {doc} />
+		<PreviewView html={doc.html} {vaultId} {doc} {readableLineLength} />
 	{:else if mode === 'read' && waitingForPreview}
 		<div class="loading">Loading preview...</div>
 	{:else if mode !== 'read' && EditorView}
@@ -85,6 +87,7 @@
 			{showLineNumbers}
 			{spellcheck}
 			{tabSize}
+			{readableLineLength}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}
