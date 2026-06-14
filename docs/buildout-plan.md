@@ -251,6 +251,10 @@ Use small, pushable slices:
    `spellcheck` by reconfiguring CodeMirror's editable content DOM per vault
    while leaving Diamond's default editor spellcheck disabled when the setting
    is absent.
+- **Obsidian tab-size preference.** Honor safe `.obsidian/app.json`
+   integer `tabSize` values by reconfiguring CodeMirror's indentation and
+   rendered tab width per vault while keeping Diamond's default tab size when
+   the setting is absent or unsafe.
 - **Search view presentation split.** Keep query execution, saved-search
    mutations, result paging, and virtual window orchestration in `SearchView`
    while moving header controls, saved-search chrome, and result-list DOM/CSS
@@ -433,6 +437,9 @@ Use small, pushable slices:
    `showLineNumber: false` by hiding the editor line-number gutter for that
    vault while leaving Diamond's default gutter visible when the setting is
    missing.
+- **Obsidian tab-size preference.** Honor safe `.obsidian/app.json`
+  integer `tabSize` values from 1 to 16 in the editor, and warn on unsafe
+  values during import preview instead of applying them.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

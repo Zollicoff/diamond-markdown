@@ -50,6 +50,7 @@ export interface ObsidianAppConfigInfo {
 	newLinkFormat?: string;
 	showLineNumber?: boolean;
 	spellcheck?: boolean;
+	tabSize?: number;
 	defaultViewMode?: string;
 	livePreview?: boolean;
 	defaultMode?: NoteViewMode;
@@ -226,6 +227,7 @@ export interface EditorLinkPreference {
 export interface EditorDisplayPreference {
 	lineNumbers: boolean;
 	spellcheck: boolean;
+	tabSize: number;
 	defaultMode: NoteViewMode;
 	source: 'obsidian-app-config' | 'diamond-default';
 }

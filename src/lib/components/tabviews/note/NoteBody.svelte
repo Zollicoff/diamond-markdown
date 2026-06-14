@@ -11,6 +11,7 @@
 		linkStyle: EditorLinkStyle;
 		showLineNumbers: boolean;
 		spellcheck: boolean;
+		tabSize: number;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -37,6 +38,7 @@
 		linkStyle,
 		showLineNumbers,
 		spellcheck,
+		tabSize,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -82,6 +84,7 @@
 			mode={mode}
 			{showLineNumbers}
 			{spellcheck}
+			{tabSize}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}

@@ -25,7 +25,7 @@ an existing Obsidian vault. The preflight reports:
 - whether `.obsidian` exists
 - supported `.obsidian/app.json` settings, including safe attachment folder,
   new-note folder, link style, link-update preference, link format,
-  line-number display, spellcheck, initial view mode, and trash preference
+  line-number display, spellcheck, tab size, initial view mode, and trash preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
@@ -50,8 +50,9 @@ attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
 default destination for generic New Note commands, `useMarkdownLinks` for the
 editor link button's inserted syntax, `showLineNumber` for the editor
 line-number gutter, `spellcheck` for the markdown editor's browser spellcheck
-attribute, `defaultViewMode` plus `livePreview` for the initial note view mode,
-and `alwaysUpdateLinks` for note/folder rename and move operations.
+attribute, safe integer `tabSize` values from 1 to 16 for editor indentation
+and tab rendering, `defaultViewMode` plus `livePreview` for the initial note
+view mode, and `alwaysUpdateLinks` for note/folder rename and move operations.
 Explicit folder context actions such as New note here still use the selected
 folder. Other app settings such as `newLinkFormat` and `trashOption` are
 reported so migration mismatches are visible before opening the vault.

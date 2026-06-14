@@ -67,6 +67,7 @@
 	let linkStyle = $state<EditorLinkStyle>('wikilink');
 	let showLineNumbers = $state(true);
 	let spellcheck = $state(false);
+	let tabSize = $state(4);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -115,17 +116,20 @@
 		untrack(() => {
 			showLineNumbers = true;
 			spellcheck = false;
+			tabSize = 4;
 			api.editorPreferences(id)
 				.then((preference) => {
 					if (id === vaultId) {
 						showLineNumbers = preference.lineNumbers;
 						spellcheck = preference.spellcheck;
+						tabSize = preference.tabSize;
 					}
 				})
 				.catch(() => {
 					if (id === vaultId) {
 						showLineNumbers = true;
 						spellcheck = false;
+						tabSize = 4;
 					}
 				});
 		});
@@ -368,6 +372,7 @@
 		{linkStyle}
 		{showLineNumbers}
 		{spellcheck}
+		{tabSize}
 		{content}
 		{editorApi}
 		{uploadingAttachments}

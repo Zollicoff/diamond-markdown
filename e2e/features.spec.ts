@@ -153,6 +153,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		newLinkFormat: 'relative',
 		showLineNumber: false,
 		spellcheck: true,
+		tabSize: 8,
 		defaultViewMode: 'preview',
 		livePreview: true,
 		trashOption: 'local',
@@ -246,6 +247,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			newFileFolderStatus: string;
 			showLineNumber?: boolean;
 			spellcheck?: boolean;
+			tabSize?: number;
 			defaultMode?: string;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
@@ -353,6 +355,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		newFileFolderStatus: 'safe',
 		showLineNumber: false,
 		spellcheck: true,
+		tabSize: 8,
 		defaultMode: 'read'
 	});
 	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
@@ -364,6 +367,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'newLinkFormat',
 		'showLineNumber',
 		'spellcheck',
+		'tabSize',
 		'livePreview',
 		'defaultViewMode',
 		'trashOption'
@@ -381,6 +385,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'spellcheck')).toMatchObject({
 		label: 'Spellcheck',
 		value: 'Enabled',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'tabSize')).toMatchObject({
+		label: 'Tab size',
+		value: '8 spaces',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
@@ -528,6 +537,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		newLinkFormat: 'relative',
 		showLineNumber: false,
 		spellcheck: true,
+		tabSize: 8,
 		defaultViewMode: 'source',
 		livePreview: false,
 		trashOption: 'local',
@@ -619,7 +629,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('11 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('12 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
@@ -630,6 +640,8 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Hidden');
 	await expect(page.locator('.import-card')).toContainText('Spellcheck');
 	await expect(page.locator('.import-card')).toContainText('Enabled');
+	await expect(page.locator('.import-card')).toContainText('Tab size');
+	await expect(page.locator('.import-card')).toContainText('8 spaces');
 	await expect(page.locator('.import-card')).toContainText('Live Preview');
 	await expect(page.locator('.import-card')).toContainText('Default view mode');
 	await expect(page.locator('.import-card')).toContainText('Editing view');
@@ -1240,7 +1252,8 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		showLineNumber: false,
-		spellcheck: true
+		spellcheck: true,
+		tabSize: 8
 	}));
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLine one.\nLine two.\n');
 
@@ -1255,6 +1268,7 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	expect(await preference.json()).toEqual({
 		lineNumbers: false,
 		spellcheck: true,
+		tabSize: 8,
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
 	});
@@ -1264,6 +1278,7 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	await expect(editor).toBeVisible({ timeout: 10_000 });
 	await expect(editor.locator('.cm-lineNumbers')).toHaveCount(0);
 	await expect(editor.locator('.cm-content')).toHaveAttribute('spellcheck', 'true');
+	await expect(editor.locator('.cm-content')).toHaveCSS('tab-size', '8');
 });
 
 test('note panes honor Obsidian default view mode preference', async ({ page, request }) => {
@@ -1286,6 +1301,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 	expect(await preference.json()).toEqual({
 		lineNumbers: true,
 		spellcheck: false,
+		tabSize: 4,
 		defaultMode: 'read',
 		source: 'obsidian-app-config'
 	});

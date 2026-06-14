@@ -153,6 +153,7 @@ test.describe('import checklist helpers', () => {
 			newFileFolderPath: 'Notes/Inbox',
 			defaultMode: 'read',
 			spellcheck: true,
+			tabSize: 8,
 			settings: [
 				{
 					id: 'attachmentFolderPath',
@@ -181,10 +182,17 @@ test.describe('import checklist helpers', () => {
 					value: 'Enabled',
 					detail: 'Diamond enables browser spellcheck in the markdown editor for this imported vault.',
 					level: 'info'
+				},
+				{
+					id: 'tabSize',
+					label: 'Tab size',
+					value: '8 spaces',
+					detail: 'Diamond uses this Obsidian tab width in the markdown editor for indentation and tab rendering.',
+					level: 'info'
 				}
 			],
 			warnings: []
-		})).toBe('4 supported app settings found.');
+		})).toBe('5 supported app settings found.');
 	});
 
 	test('summarizes Obsidian Daily Notes config without raw JSON', () => {
@@ -728,6 +736,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'diamond-default'
 		});
@@ -740,6 +749,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: false,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -748,6 +758,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -760,6 +771,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: true,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -768,8 +780,37 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ tabSize: 8 }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'tabSize')).toMatchObject({
+			label: 'Tab size',
+			value: '8 spaces'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: false,
+			tabSize: 8,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ tabSize: 24 }));
+		const unsafeTabSize = readObsidianAppConfig(vaultDir);
+		expect(unsafeTabSize.settings.find((setting) => setting.id === 'tabSize')).toMatchObject({
+			label: 'Tab size',
+			level: 'warn'
+		});
+		expect(unsafeTabSize.warnings).toContain("Obsidian tabSize is outside Diamond's supported range and will be ignored.");
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: false,
+			tabSize: 4,
+			defaultMode: 'live',
+			source: 'diamond-default'
 		});
 
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'preview' }));
@@ -780,6 +821,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
 		});
@@ -788,6 +830,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
 		});
@@ -796,6 +839,7 @@ test.describe('import checklist helpers', () => {
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
 			spellcheck: false,
+			tabSize: 4,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});

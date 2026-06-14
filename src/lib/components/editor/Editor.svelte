@@ -16,6 +16,7 @@
 		mode?: 'live' | 'source';
 		showLineNumbers?: boolean;
 		spellcheck?: boolean;
+		tabSize?: number;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -34,6 +35,7 @@
 		mode = 'live',
 		showLineNumbers = true,
 		spellcheck = false,
+		tabSize = 4,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -51,6 +53,7 @@
 	const previewCompartment = new Compartment();
 	const lineNumberCompartment = new Compartment();
 	const contentAttributeCompartment = new Compartment();
+	const tabSizeCompartment = new Compartment();
 
 	interface WikilinkWidgetEventDetail {
 		target: string;
@@ -88,6 +91,11 @@
 		return EditorView.contentAttributes.of({
 			spellcheck: checkSpelling ? 'true' : 'false'
 		});
+	}
+
+	function editorTabSizeExtension(size: number): Extension {
+		const normalized = Number.isInteger(size) && size >= 1 && size <= 16 ? size : 4;
+		return EditorState.tabSize.of(normalized);
 	}
 
 	function hasTransferFiles(data: DataTransfer | null): boolean {
@@ -160,6 +168,7 @@
 		const extensions: Extension[] = [
 			lineNumberCompartment.of(lineNumberExtension(showLineNumbers)),
 			contentAttributeCompartment.of(contentAttributeExtension(spellcheck)),
+			tabSizeCompartment.of(editorTabSizeExtension(tabSize)),
 			history(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
@@ -311,6 +320,11 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: contentAttributeCompartment.reconfigure(contentAttributeExtension(spellcheck)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({ effects: tabSizeCompartment.reconfigure(editorTabSizeExtension(tabSize)) });
 	});
 </script>
 

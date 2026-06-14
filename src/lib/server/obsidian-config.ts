@@ -27,6 +27,11 @@ function booleanValue(value: unknown): boolean | null {
 	return typeof value === 'boolean' ? value : null;
 }
 
+function safeTabSize(value: unknown): number | null {
+	if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+	return value >= 1 && value <= 16 ? value : null;
+}
+
 function readJsonFile(abs: string): { status: JsonFileStatus; value?: unknown; bytes?: number } {
 	if (!fs.existsSync(abs)) return { status: 'missing' };
 	let content = '';
@@ -259,6 +264,28 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	if ('tabSize' in body) {
+		const tabSize = safeTabSize(body.tabSize);
+		if (tabSize !== null) {
+			base.tabSize = tabSize;
+			base.settings.push(setting(
+				'tabSize',
+				'Tab size',
+				`${tabSize} spaces`,
+				'Diamond uses this Obsidian tab width in the markdown editor for indentation and tab rendering.'
+			));
+		} else {
+			base.settings.push(setting(
+				'tabSize',
+				'Tab size',
+				String(body.tabSize ?? ''),
+				'Ignored because Diamond only accepts integer tab sizes from 1 to 16.',
+				'warn'
+			));
+			base.warnings.push('Obsidian tabSize is outside Diamond\'s supported range and will be ignored.');
+		}
+	}
+
 	const livePreview = booleanValue(body.livePreview);
 	if (livePreview !== null) {
 		base.livePreview = livePreview;
@@ -329,8 +356,9 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 	return {
 		lineNumbers: config.showLineNumber !== false,
 		spellcheck: config.spellcheck === true,
+		tabSize: config.tabSize ?? 4,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined
+		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

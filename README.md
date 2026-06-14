@@ -75,8 +75,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Live preview** — Obsidian-style: markdown markers hide off-line, wikilinks render as atomic pills inline, headings render with their sizing
 - Source / Live / Read mode toggle per note
 - Imported Obsidian vaults can reuse safe `.obsidian/app.json`
-  `defaultViewMode` / `livePreview`, `showLineNumber`, and `spellcheck`
-  editor preferences
+  `defaultViewMode` / `livePreview`, `showLineNumber`, `spellcheck`, and
+  `tabSize` editor preferences
 - Editor toolbar (bold, italic, headings, lists, code, etc.)
 - Word count + reading time in status bar
 
@@ -107,7 +107,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Polymorphic tabs: notes, graph, tags, search, settings
 - File tree with folders, markdown notes, and Canvas files; rename / move / delete, drag-drop
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
-- Obsidian import support that preserves `.obsidian`, surfaces plugin, appearance, graph, core-plugin, and hotkey settings as migration guidance with known Diamond command mappings, imports note-level Obsidian bookmarks, and honors safe attachment/new-note/daily-note/link-style/line-number settings plus link-update preferences
+- Obsidian import support that preserves `.obsidian`, surfaces plugin, appearance, graph, core-plugin, and hotkey settings as migration guidance with known Diamond command mappings, imports note-level Obsidian bookmarks, and honors safe attachment/new-note/daily-note/link-style/editor-display settings plus link-update preferences
 - Obsidian export package from Settings that preserves vault files and `.obsidian` config while excluding Diamond metadata, generated publish output, and Git internals
 - Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, hidden Obsidian comments, callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks and note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, file-card heading/block subpaths, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
