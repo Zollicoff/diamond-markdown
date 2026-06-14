@@ -2025,8 +2025,13 @@ export function activate(api) {
 
 test('sort menu in file-tree toolbar layers above the editor', async ({ page }) => {
 	await openVault(page);
-	await page.locator('.toolbar-btn.sort').click();
-	const menu = page.locator('.sort-menu');
+	const sortButton = page.getByRole('button', { name: 'Change sort order' });
+	await expect(sortButton).toBeVisible({ timeout: 10_000 });
+	await expect(async () => {
+		await sortButton.click();
+		await expect(sortButton).toHaveAttribute('aria-expanded', 'true', { timeout: 1_000 });
+	}).toPass({ timeout: 10_000 });
+	const menu = page.getByRole('menu').filter({ has: page.locator('.sort-item') });
 	await expect(menu).toBeVisible();
 	// position:fixed + z-index:1000 lifts the menu out of the sidebar's
 	// overflow:hidden clip. If the editor pane covered the menu, the
