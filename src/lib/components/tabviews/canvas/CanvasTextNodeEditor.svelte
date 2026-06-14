@@ -12,7 +12,8 @@
 		canvasTextPreviewBlocks,
 		type CanvasTextPreviewBlock,
 		type CanvasTextPreviewEmbed,
-		type CanvasTextPreviewInline
+		type CanvasTextPreviewInline,
+		type CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 
 	interface Props {
@@ -20,6 +21,7 @@
 		node: CanvasNode;
 		draft: string;
 		changed: boolean;
+		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		saving: boolean;
 		deleting: boolean;
 		disableDelete: boolean;
@@ -33,6 +35,7 @@
 		node,
 		draft,
 		changed,
+		resolveWikilinkTarget,
 		saving,
 		deleting,
 		disableDelete,
@@ -42,7 +45,7 @@
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
-	const previewBlocks = $derived(canvasTextPreviewBlocks(draft));
+	const previewBlocks = $derived(canvasTextPreviewBlocks(draft, { resolveWikilinkTarget }));
 
 	function openInternalEmbed(embed: CanvasTextPreviewEmbed, event: MouseEvent): void {
 		const target = canvasTextEmbedOpenTarget(embed);

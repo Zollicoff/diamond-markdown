@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/vault-api';
-	import type { CanvasDoc, CanvasNode } from '$lib/types';
-	import { emit } from '$lib/events';
+	import type { CanvasDoc, CanvasNode, NoteLinkTarget } from '$lib/types';
+	import { emit, on as onBus } from '$lib/events';
 	import { openCanvas, openNote } from '$lib/workspace/actions';
 	import { replaceLocationHash } from '$lib/workspace/hash';
 	import {
@@ -24,6 +24,7 @@
 		canvasNodeSizeChanged,
 		canvasNodeOptions,
 		canvasFileOpenTarget,
+		canvasTextNoteWikilinkResolver,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
@@ -95,6 +96,8 @@
 	let dragState = $state<CanvasNodeDragState | null>(null);
 	let resizeState = $state<CanvasNodeResizeState | null>(null);
 	let canvasZoom = $state(1);
+	let linkTargets = $state<NoteLinkTarget[]>([]);
+	let linkTargetsRequestSeq = 0;
 
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
@@ -120,6 +123,17 @@
 	const zoomLabel = $derived(canvasZoomLabel(canvasZoom));
 	const canZoomIn = $derived(canZoomCanvasIn(canvasZoom));
 	const canZoomOut = $derived(canZoomCanvasOut(canvasZoom));
+	const resolveWikilinkTarget = $derived(canvasTextNoteWikilinkResolver(linkTargets));
+
+	async function loadLinkTargets(): Promise<void> {
+		const seq = ++linkTargetsRequestSeq;
+		try {
+			const targets = await api.linkTargets(vaultId);
+			if (seq === linkTargetsRequestSeq) linkTargets = targets;
+		} catch {
+			if (seq === linkTargetsRequestSeq) linkTargets = [];
+		}
+	}
 
 	function setCanvasZoom(zoom: number): void {
 		canvasZoom = normalizeCanvasZoom(zoom);
@@ -553,6 +567,27 @@
 		return () => { alive = false; };
 	});
 
+	$effect(() => {
+		vaultId;
+		void loadLinkTargets();
+	});
+
+	$effect(() => {
+		const refresh = (event: { vaultId: string }): void => {
+			if (event.vaultId === vaultId) void loadLinkTargets();
+		};
+		const offs = [
+			onBus('note:saved', refresh),
+			onBus('note:created', refresh),
+			onBus('note:deleted', refresh),
+			onBus('note:renamed', refresh),
+			onBus('folder:renamed', refresh),
+			onBus('folder:deleted', refresh),
+			onBus('tree:invalidate', refresh)
+		];
+		return () => offs.forEach((off) => off());
+	});
+
 	$effect(() => () => {
 		cleanupDragListeners();
 		cleanupResizeListeners();
@@ -601,6 +636,7 @@
 		{deletingNodeId}
 		{savingEdgeId}
 		{deletingEdgeId}
+		{resolveWikilinkTarget}
 		zoom={canvasZoom}
 		{zoomLabel}
 		{canZoomIn}

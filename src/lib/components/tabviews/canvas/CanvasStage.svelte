@@ -10,7 +10,8 @@
 		CanvasGroupLabelDrafts,
 		CanvasNodeRefDraft,
 		CanvasNodeRefDrafts,
-		CanvasTextDrafts
+		CanvasTextDrafts,
+		CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 	import CanvasBoard from './CanvasBoard.svelte';
 	import CanvasEdgeList from './CanvasEdgeList.svelte';
@@ -29,6 +30,7 @@
 		refDrafts: CanvasNodeRefDrafts;
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
 		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
+		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		savingNodeId: string | null;
 		movingNodeId: string | null;
 		moveSavingNodeId: string | null;
@@ -78,6 +80,7 @@
 		refDrafts,
 		edgeLabelDrafts,
 		edgeRoutingDrafts,
+		resolveWikilinkTarget,
 		savingNodeId,
 		movingNodeId,
 		moveSavingNodeId,
@@ -149,6 +152,7 @@
 		{textDrafts}
 		{groupLabelDrafts}
 		{refDrafts}
+		{resolveWikilinkTarget}
 		{savingNodeId}
 		{movingNodeId}
 		{moveSavingNodeId}

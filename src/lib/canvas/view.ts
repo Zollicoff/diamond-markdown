@@ -1,4 +1,4 @@
-import type { CanvasDoc, CanvasEdge, CanvasNode } from '$lib/types';
+import type { CanvasDoc, CanvasEdge, CanvasNode, NoteLinkTarget } from '$lib/types';
 import { parseWikilinkSubpath, wikilinkFragment } from '$lib/markdown/wikilinks';
 
 export interface CanvasBounds {
@@ -120,6 +120,12 @@ export interface CanvasTextPreviewInline {
 	text: string;
 	href?: string;
 	target?: CanvasTextInlineTarget;
+}
+
+export type CanvasTextWikilinkResolver = (target: string, label: string | undefined) => CanvasTextInlineTarget | null;
+
+export interface CanvasTextPreviewOptions {
+	resolveWikilinkTarget?: CanvasTextWikilinkResolver;
 }
 
 export interface CanvasTextPreviewListItem {
@@ -470,11 +476,11 @@ export function canvasNodeBody(node: CanvasNode): string {
 	return '';
 }
 
-export function canvasTextPreviewInlines(value: string): CanvasTextPreviewInline[] {
+export function canvasTextPreviewInlines(value: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewInline[] {
 	const inlines: CanvasTextPreviewInline[] = [];
 	let remaining = value;
 	while (remaining.length > 0) {
-		const match = firstInlineMatch(remaining);
+		const match = firstInlineMatch(remaining, options);
 		if (!match) {
 			inlines.push({ kind: 'text', text: remaining });
 			break;
@@ -488,7 +494,7 @@ export function canvasTextPreviewInlines(value: string): CanvasTextPreviewInline
 	return inlines.filter((inline) => inline.text.length > 0);
 }
 
-export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] {
+export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewBlock[] {
 	const lines = text.replace(/\r\n?/g, '\n').split('\n');
 	const blocks: CanvasTextPreviewBlock[] = [];
 	let paragraphLines: string[] = [];
@@ -498,7 +504,7 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 
 	function flushParagraph(): void {
 		const paragraph = paragraphLines.join(' ').trim();
-		if (paragraph) blocks.push({ type: 'paragraph', inline: canvasTextPreviewInlines(paragraph) });
+		if (paragraph) blocks.push({ type: 'paragraph', inline: canvasTextPreviewInlines(paragraph, options) });
 		paragraphLines = [];
 	}
 
@@ -565,13 +571,13 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 			blocks.push({
 				type: 'heading',
 				level: heading[1].length as 1 | 2 | 3,
-				inline: canvasTextPreviewInlines(heading[2].trim())
+				inline: canvasTextPreviewInlines(heading[2].trim(), options)
 			});
 			index += 1;
 			continue;
 		}
 
-		const table = canvasTablePreviewAt(lines, index);
+		const table = canvasTablePreviewAt(lines, index, options);
 		if (table) {
 			flushParagraph();
 			flushList();
@@ -596,9 +602,9 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 			blocks.push({
 				type: 'callout',
 				kind,
-				title: canvasTextPreviewInlines(canvasCalloutTitle(kind, callout[3])),
+				title: canvasTextPreviewInlines(canvasCalloutTitle(kind, callout[3]), options),
 				fold: callout[2] === '-' ? 'closed' : callout[2] === '+' ? 'open' : null,
-				body: canvasTextPreviewBlocks(bodyLines.join('\n'))
+				body: canvasTextPreviewBlocks(bodyLines.join('\n'), options)
 			});
 			continue;
 		}
@@ -607,7 +613,7 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 		if (quote) {
 			flushParagraph();
 			flushList();
-			blocks.push({ type: 'quote', inline: canvasTextPreviewInlines(quote[1].trim()) });
+			blocks.push({ type: 'quote', inline: canvasTextPreviewInlines(quote[1].trim(), options) });
 			index += 1;
 			continue;
 		}
@@ -623,7 +629,7 @@ export function canvasTextPreviewBlocks(text: string): CanvasTextPreviewBlock[] 
 				currentList = { type, items: [] };
 			}
 			currentList!.items.push({
-				inline: canvasTextPreviewInlines((task?.[2] ?? unordered?.[1] ?? ordered?.[1] ?? '').trim()),
+				inline: canvasTextPreviewInlines((task?.[2] ?? unordered?.[1] ?? ordered?.[1] ?? '').trim(), options),
 				checked: task ? task[1].toLowerCase() === 'x' : undefined
 			});
 			index += 1;
@@ -771,6 +777,35 @@ export function canvasTextEmbedRouteHref(vaultId: string, embed: CanvasTextPrevi
 
 export function canvasTextInlineTargetHref(vaultId: string, inline: CanvasTextPreviewInline): string | null {
 	return inline.target ? canvasTextInternalTargetHref(vaultId, inline.target) : null;
+}
+
+export function canvasTextNoteWikilinkResolver(targets: NoteLinkTarget[]): CanvasTextWikilinkResolver {
+	const lookup = new Map<string, NoteLinkTarget>();
+	for (const target of targets) {
+		for (const key of canvasNoteLinkTargetKeys(target)) {
+			lookup.set(key, target);
+		}
+	}
+	return (target, label) => {
+		if (target.includes('?')) return null;
+		const ref = splitCanvasWikilinkTarget(target);
+		const key = ref.path.trim().toLowerCase();
+		const note = lookup.get(key) ?? lookup.get(`${key}.md`);
+		if (!note) return null;
+		return canvasTextInternalTarget('note', note.path, ref.suffix, label?.trim() || note.title);
+	};
+}
+
+function canvasNoteLinkTargetKeys(target: NoteLinkTarget): string[] {
+	const path = target.path.trim().toLowerCase();
+	const keys = [
+		path,
+		path.replace(/\.md$/i, ''),
+		target.stem.trim().toLowerCase(),
+		target.title.trim().toLowerCase(),
+		...target.aliases.map((alias) => alias.trim().toLowerCase())
+	].filter(Boolean);
+	return [...new Set(keys)];
 }
 
 function canvasTextInternalTargetHref(vaultId: string, target: CanvasTextInlineTarget): string {
@@ -1047,7 +1082,8 @@ function canvasCalloutTitle(kind: string, title: string | undefined): string {
 
 function canvasTablePreviewAt(
 	lines: string[],
-	index: number
+	index: number,
+	options: CanvasTextPreviewOptions
 ): { table: CanvasTextPreviewTable; nextIndex: number } | null {
 	const header = canvasTableRow(lines[index]);
 	const separator = canvasTableSeparator(lines[index + 1]);
@@ -1059,13 +1095,13 @@ function canvasTablePreviewAt(
 	while (nextIndex < lines.length) {
 		const row = canvasTableRow(lines[nextIndex]);
 		if (!row) break;
-		rows.push(canvasTableCells(row, columnCount));
+		rows.push(canvasTableCells(row, columnCount, options));
 		nextIndex += 1;
 	}
 
 	return {
 		table: {
-			headers: canvasTableCells(header, columnCount),
+			headers: canvasTableCells(header, columnCount, options),
 			rows
 		},
 		nextIndex
@@ -1088,9 +1124,9 @@ function canvasTableSeparator(line: string | undefined): boolean {
 	return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
-function canvasTableCells(values: string[], columnCount: number): CanvasTextPreviewTableCell[] {
+function canvasTableCells(values: string[], columnCount: number, options: CanvasTextPreviewOptions): CanvasTextPreviewTableCell[] {
 	return Array.from({ length: columnCount }, (_, index) => ({
-		inline: canvasTextPreviewInlines(values[index] ?? '')
+		inline: canvasTextPreviewInlines(values[index] ?? '', options)
 	}));
 }
 
@@ -1182,7 +1218,10 @@ function isCanvasStandaloneEmbedSyntax(line: string): boolean {
 	return /^!\[\[[^\[\]\n]+]]$/.test(trimmed) || /^!\[[^\]\n]*]\([^\n)]+\)$/.test(trimmed);
 }
 
-function firstInlineMatch(value: string): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
+function firstInlineMatch(
+	value: string,
+	options: CanvasTextPreviewOptions
+): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
 	const candidates = [
 		inlineCandidate(value, /`([^`]+)`/, (match) => ({ kind: 'code', text: match[1] })),
 		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
@@ -1196,10 +1235,11 @@ function firstInlineMatch(value: string): { index: number; raw: string; inline: 
 		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
 			const rawTarget = match[1].trim();
 			const label = match[2]?.trim();
-			const target = canvasTextInlineTargetFromWikilink(rawTarget, label);
+			const target = canvasTextInlineTargetFromWikilink(rawTarget, label) ?? options.resolveWikilinkTarget?.(rawTarget, label);
+			const displayTarget = splitCanvasWikilinkTarget(rawTarget).path || rawTarget;
 			return {
 				kind: 'wikilink',
-				text: label || rawTarget,
+				text: label || displayTarget,
 				...(target ? { target } : {})
 			};
 		}),

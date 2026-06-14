@@ -446,6 +446,10 @@ Use small, pushable slices:
   `[[Note.md#Heading|label]]` and `[[Board.canvas|label]]` links as internal
   preview navigation targets in Canvas text cards while leaving alias-only
   links conservative.
+- **Canvas text-card resolved wikilinks.** Resolve inline Canvas text-card note
+  wikilinks through the vault index by path, title, stem, or alias, preserving
+  heading/block subpaths while leaving missing links inert and `.canvas` links
+  explicit.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

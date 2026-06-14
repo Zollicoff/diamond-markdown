@@ -19,7 +19,8 @@
 		type CanvasGroupLabelDrafts,
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
-		type CanvasTextDrafts
+		type CanvasTextDrafts,
+		type CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 	import {
 		canvasBoardZoomStyle,
@@ -36,6 +37,7 @@
 		textDrafts: CanvasTextDrafts;
 		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
+		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		savingNodeId: string | null;
 		movingNodeId: string | null;
 		moveSavingNodeId: string | null;
@@ -73,6 +75,7 @@
 		textDrafts,
 		groupLabelDrafts,
 		refDrafts,
+		resolveWikilinkTarget,
 		savingNodeId,
 		movingNodeId,
 		moveSavingNodeId,
@@ -207,6 +210,7 @@
 				refDraft={canvasNodeRefDraftFor(node, refDrafts)}
 				refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
+				{resolveWikilinkTarget}
 				saving={savingNodeId === node.id}
 				moving={movingNodeId === node.id || moveSavingNodeId === node.id}
 				resizing={resizingNodeId === node.id || resizeSavingNodeId === node.id}

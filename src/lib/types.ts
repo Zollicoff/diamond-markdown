@@ -252,6 +252,13 @@ export interface OutgoingLink {
 	resolved: string | null;
 }
 
+export interface NoteLinkTarget {
+	path: string;
+	title: string;
+	aliases: string[];
+	stem: string;
+}
+
 export interface Frontmatter {
 	title?: string;
 	tags?: string[];

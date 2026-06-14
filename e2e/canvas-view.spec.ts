@@ -72,6 +72,7 @@ import {
 	canvasTextEmbedRouteHref,
 	canvasTextPreviewBlocks,
 	canvasTextPreviewInlines,
+	canvasTextNoteWikilinkResolver,
 	canvasTextDrafts,
 	edgeLines,
 	canvasNodeStyle,
@@ -210,6 +211,63 @@ test.describe('canvas view helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[1])).toBe('/vault/vault%20id/note/Home.md#install-steps');
 		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
 		expect(canvasTextInlineTargetHref('vault id', explicitInlineTargets[5])).toBeNull();
+		const resolveWikilinkTarget = canvasTextNoteWikilinkResolver([
+			{ path: 'Home.md', title: 'Home', aliases: ['Launch Base'], stem: 'home' },
+			{
+				path: 'References/Roof Photos.md',
+				title: 'Roof Photos',
+				aliases: ['Survey Photos'],
+				stem: 'roof photos'
+			}
+		]);
+		const resolvedAliasTargets = canvasTextPreviewInlines(
+			'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Launch Base]], and [[Unknown]]',
+			{ resolveWikilinkTarget }
+		);
+		expect(resolvedAliasTargets).toEqual([
+			{ kind: 'text', text: 'Review ' },
+			{
+				kind: 'wikilink',
+				text: 'site photos',
+				target: {
+					kind: 'note',
+					path: 'References/Roof Photos.md',
+					title: 'site photos',
+					subpath: '#Meter',
+					hash: 'meter'
+				}
+			},
+			{ kind: 'text', text: ', ' },
+			{
+				kind: 'wikilink',
+				text: 'Home',
+				target: {
+					kind: 'note',
+					path: 'Home.md',
+					title: 'Home',
+					subpath: '#Launch Plan',
+					hash: 'launch-plan'
+				}
+			},
+			{ kind: 'text', text: ', ' },
+			{
+				kind: 'wikilink',
+				text: 'Launch Base',
+				target: {
+					kind: 'note',
+					path: 'Home.md',
+					title: 'Home',
+					subpath: null,
+					hash: null
+				}
+			},
+			{ kind: 'text', text: ', and ' },
+			{ kind: 'wikilink', text: 'Unknown' }
+		]);
+		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[1])).toBe('/vault/vault%20id/note/References/Roof%20Photos.md#meter');
+		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[3])).toBe('/vault/vault%20id/note/Home.md#launch-plan');
+		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[5])).toBe('/vault/vault%20id/note/Home.md');
+		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[7])).toBeNull();
 		const previewBlocks = canvasTextPreviewBlocks([
 			'# Launch plan',
 			'',
@@ -713,7 +771,17 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Docs'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Boards'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'References'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Launch Plan\n\nHome details.\n');
+	fs.writeFileSync(path.join(vaultDir, 'References', 'Roof Photos.md'), [
+		'---',
+		'aliases:',
+		'  - Survey Photos',
+		'---',
+		'# Meter',
+		'',
+		'Site survey photos.'
+	].join('\n'));
 	fs.writeFileSync(path.join(vaultDir, 'Boards', 'Map.canvas'), JSON.stringify({
 		nodes: [{ id: 'map-text', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Map board' }],
 		edges: []
@@ -740,9 +808,10 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
-					'Review [[Home.md#Launch Plan|Launch link]] and [[Boards/Map.canvas|Map board]]',
+					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
+					'- [ ] Missing [[Missing Alias]] stays visible',
 					'> Refer homeowner questions',
 					'> [!TIP]+ Site survey',
 					'> Capture ==main panel== photos',
@@ -764,6 +833,17 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	});
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
+	const linkTargets = await request.get(`/api/vaults/${vault.id}/link-targets`);
+	expect(linkTargets.ok()).toBe(true);
+	const linkTargetBody = await linkTargets.json() as { targets: unknown[] };
+	expect(linkTargetBody.targets).toEqual(expect.arrayContaining([
+		expect.objectContaining({
+			path: 'References/Roof Photos.md',
+			title: 'Roof Photos',
+			aliases: ['Survey Photos'],
+			stem: 'roof photos'
+		})
+	]));
 
 	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
@@ -775,11 +855,14 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');
 	await expect(preview.getByRole('link', { name: /Panel packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel\.pdf#page=2$/);
+	await expect(preview.getByRole('link', { name: /\[\[site photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
+	await expect(preview.getByRole('link', { name: /\[\[Home\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Launch link\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Map board\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('del')).toHaveText('old bill');
-	await expect(preview.locator('.wikilink').filter({ hasText: '[[Roof Photos]]' })).toHaveCount(1);
+	await expect(preview.getByRole('link', { name: /\[\[Roof Photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md$/);
+	await expect(preview.locator('.wikilink').filter({ hasText: '[[Missing Alias]]' })).toHaveCount(1);
 	await expect(preview.locator('blockquote')).toContainText('Refer homeowner questions');
 	await expect(preview.locator('.preview-callout')).toContainText('tip');
 	await expect(preview.locator('.preview-callout')).toContainText('Site survey');

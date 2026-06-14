@@ -152,8 +152,9 @@ dimensions, node and edge colors, edge connections, edge labels, and node or
 edge deletion with git-backed commits. Canvas text cards show a safe
 markdown-aware preview while preserving the raw editable text.
 Canvas text cards preview common Markdown plus Obsidian callout blocks,
-highlights, strikethrough, simple Markdown tables, explicit note/canvas inline
-wikilinks such as `[[Home.md#Install Steps|Launch link]]` and
+highlights, strikethrough, simple Markdown tables, resolved note/title/alias
+inline wikilinks such as `[[Survey Photos#Meter|site photos]]` and
+`[[Home.md#Install Steps|Launch link]]`, explicit Canvas links such as
 `[[Boards/Map.canvas|Map board]]`, explicit note/canvas embed chips such as
 `![[Home.md#Install Steps]]` and `![[Boards/Map.canvas]]`, and safe vault-local
 asset embed lines such as `![[Images/roof.png]]` or `![Roof](Images/roof.png)`,
