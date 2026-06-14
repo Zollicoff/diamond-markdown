@@ -65,6 +65,7 @@
 	let ToolbarView = $state<NoteViewComponent | null>(null);
 	let viewLoadError = $state<string | null>(null);
 	let linkStyle = $state<EditorLinkStyle>('wikilink');
+	let showLineNumbers = $state(true);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -104,6 +105,20 @@
 				})
 				.catch(() => {
 					if (id === vaultId) linkStyle = 'wikilink';
+				});
+		});
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			showLineNumbers = true;
+			api.editorPreferences(id)
+				.then((preference) => {
+					if (id === vaultId) showLineNumbers = preference.lineNumbers;
+				})
+				.catch(() => {
+					if (id === vaultId) showLineNumbers = true;
 				});
 		});
 	});
@@ -343,6 +358,7 @@
 		{doc}
 		{mode}
 		{linkStyle}
+		{showLineNumbers}
 		{content}
 		{editorApi}
 		{uploadingAttachments}

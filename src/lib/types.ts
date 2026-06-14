@@ -48,6 +48,7 @@ export interface ObsidianAppConfigInfo {
 	useMarkdownLinks?: boolean;
 	alwaysUpdateLinks?: boolean;
 	newLinkFormat?: string;
+	showLineNumber?: boolean;
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
 }
@@ -184,6 +185,11 @@ export type EditorLinkStyle = 'wikilink' | 'markdown';
 export interface EditorLinkPreference {
 	style: EditorLinkStyle;
 	newLinkFormat: string | null;
+	source: 'obsidian-app-config' | 'diamond-default';
+}
+
+export interface EditorDisplayPreference {
+	lineNumbers: boolean;
 	source: 'obsidian-app-config' | 'diamond-default';
 }
 

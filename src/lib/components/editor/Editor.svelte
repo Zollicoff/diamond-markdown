@@ -14,6 +14,7 @@
 		value: string;
 		/** 'live' renders inline (Obsidian-style); 'source' shows raw markdown. */
 		mode?: 'live' | 'source';
+		showLineNumbers?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -30,6 +31,7 @@
 	let {
 		value,
 		mode = 'live',
+		showLineNumbers = true,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -45,6 +47,7 @@
 	let dragDepth = $state(0);
 	let suppressNextWikilinkClick = false;
 	const previewCompartment = new Compartment();
+	const lineNumberCompartment = new Compartment();
 
 	interface WikilinkWidgetEventDetail {
 		target: string;
@@ -72,6 +75,10 @@
 
 	function previewExtension(m: 'live' | 'source'): Extension {
 		return m === 'live' ? livePreview(resolveLink) : [];
+	}
+
+	function lineNumberExtension(show: boolean): Extension {
+		return show ? lineNumbers() : [];
 	}
 
 	function hasTransferFiles(data: DataTransfer | null): boolean {
@@ -142,7 +149,7 @@
 		host.addEventListener('diamond-wikilink-click', handleWikilinkWidgetClick);
 		host.addEventListener('diamond-wikilink-context', handleWikilinkWidgetContext);
 		const extensions: Extension[] = [
-			lineNumbers(),
+			lineNumberCompartment.of(lineNumberExtension(showLineNumbers)),
 			history(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
@@ -278,6 +285,11 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: previewCompartment.reconfigure(previewExtension(mode)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({ effects: lineNumberCompartment.reconfigure(lineNumberExtension(showLineNumbers)) });
 	});
 </script>
 

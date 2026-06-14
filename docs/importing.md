@@ -24,8 +24,8 @@ an existing Obsidian vault. The preflight reports:
 - likely attachment folders
 - whether `.obsidian` exists
 - supported `.obsidian/app.json` settings, including safe attachment folder,
-  new-note folder, link style, link-update preference, link format, and trash
-  preference
+  new-note folder, link style, link-update preference, link format,
+  line-number display, and trash preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
@@ -46,11 +46,11 @@ shows them as migration notes instead of dumping the raw JSON. It currently
 honors a safe `attachmentFolderPath` for dropped, pasted, and uploaded
 attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
 default destination for generic New Note commands, `useMarkdownLinks` for the
-editor link button's inserted syntax, and `alwaysUpdateLinks` for note/folder
-rename and move operations. Explicit folder context actions such as New note
-here still use the selected folder. Other app settings such as `newLinkFormat`
-and `trashOption` are reported so migration mismatches are visible before
-opening the vault.
+editor link button's inserted syntax, `showLineNumber` for the editor
+line-number gutter, and `alwaysUpdateLinks` for note/folder rename and move
+operations. Explicit folder context actions such as New note here still use the
+selected folder. Other app settings such as `newLinkFormat` and `trashOption`
+are reported so migration mismatches are visible before opening the vault.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same

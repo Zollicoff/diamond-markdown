@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeVaultPath } from './paths';
 import type {
+	EditorDisplayPreference,
 	EditorLinkPreference,
 	JsonFileStatus,
 	ObsidianAppConfigInfo,
@@ -208,6 +209,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const showLineNumber = booleanValue(body.showLineNumber);
+	if (showLineNumber !== null) {
+		base.showLineNumber = showLineNumber;
+		base.settings.push(setting(
+			'showLineNumber',
+			'Line numbers',
+			showLineNumber ? 'Visible' : 'Hidden',
+			showLineNumber
+				? 'Diamond shows editor line numbers for this imported vault.'
+				: 'Diamond hides editor line numbers for this imported vault.'
+		));
+	}
+
 	const trashOption = stringValue(body.trashOption);
 	if (trashOption) {
 		base.settings.push(setting(
@@ -239,5 +253,13 @@ export function editorLinkPreference(root: string): EditorLinkPreference {
 		style,
 		newLinkFormat: config.newLinkFormat ?? null,
 		source: config.useMarkdownLinks === undefined ? 'diamond-default' : 'obsidian-app-config'
+	};
+}
+
+export function editorDisplayPreference(root: string): EditorDisplayPreference {
+	const config = readObsidianAppConfig(root);
+	return {
+		lineNumbers: config.showLineNumber !== false,
+		source: config.showLineNumber === undefined ? 'diamond-default' : 'obsidian-app-config'
 	};
 }

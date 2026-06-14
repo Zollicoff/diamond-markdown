@@ -151,6 +151,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		useMarkdownLinks: true,
 		alwaysUpdateLinks: true,
 		newLinkFormat: 'relative',
+		showLineNumber: false,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -229,6 +230,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			attachmentFolderStatus: string;
 			newFileFolderPath?: string;
 			newFileFolderStatus: string;
+			showLineNumber?: boolean;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
@@ -321,7 +323,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		attachmentFolderPath: 'Attachments',
 		attachmentFolderStatus: 'safe',
 		newFileFolderPath: 'Notes/Inbox',
-		newFileFolderStatus: 'safe'
+		newFileFolderStatus: 'safe',
+		showLineNumber: false
 	});
 	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
 		'attachmentFolderPath',
@@ -330,11 +333,17 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'useMarkdownLinks',
 		'alwaysUpdateLinks',
 		'newLinkFormat',
+		'showLineNumber',
 		'trashOption'
 	]);
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'attachmentFolderPath')).toMatchObject({
 		label: 'Attachment folder',
 		value: 'Attachments',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'showLineNumber')).toMatchObject({
+		label: 'Line numbers',
+		value: 'Hidden',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor link button inserts Markdown link syntax');
@@ -452,6 +461,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		useMarkdownLinks: true,
 		alwaysUpdateLinks: false,
 		newLinkFormat: 'relative',
+		showLineNumber: false,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -530,13 +540,15 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('7 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('8 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
 	await expect(page.locator('.import-card')).toContainText('Notes/Inbox');
 	await expect(page.locator('.import-card')).toContainText('Link style');
 	await expect(page.locator('.import-card')).toContainText('Markdown links');
+	await expect(page.locator('.import-card')).toContainText('Line numbers');
+	await expect(page.locator('.import-card')).toContainText('Hidden');
 	await expect(page.locator('.import-card')).toContainText('Update links on rename');
 	await expect(page.locator('.import-card')).toContainText('Disabled in Obsidian');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-app-config-value');
@@ -1113,6 +1125,34 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 	const text = await editor.innerText();
 	expect(text).toContain('MARK:[]()');
 	expect(text).not.toContain('MARK:[[]]');
+});
+
+test('editor display honors Obsidian line-number preference', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-editor-display-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		showLineNumber: false
+	}));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLine one.\nLine two.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Editor Display', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const preference = await request.get(`/api/vaults/${vault.id}/editor-preferences`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toEqual({
+		lineNumbers: false,
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	const editor = page.locator('.cm-editor').first();
+	await expect(editor).toBeVisible({ timeout: 10_000 });
+	await expect(editor.locator('.cm-lineNumbers')).toHaveCount(0);
 });
 
 test('delete note command uses an in-app confirmation dialog', async ({ page, request }) => {

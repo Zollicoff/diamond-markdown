@@ -239,6 +239,10 @@ Use small, pushable slices:
    `useMarkdownLinks` by switching the editor link toolbar action between
    Obsidian wikilinks and Markdown link syntax without changing existing note
    content.
+- **Obsidian editor line-number preference.** Honor `.obsidian/app.json`
+   `showLineNumber` by showing or hiding CodeMirror's line-number gutter per
+   vault while keeping Diamond's default line numbers when the setting is
+   absent.
 - **Shared pointer open-mode helper.** Move modifier-click and middle-click
    open-mode rules into a workspace helper used by note preview, search,
    file tree, bookmarks, and recent notes.
@@ -406,6 +410,10 @@ Use small, pushable slices:
    `useMarkdownLinks: true` for the editor link toolbar button so new inserted
    links use Markdown `[]()` syntax while existing wikilinks and imported notes
    remain untouched.
+- **Obsidian line-number preference.** Honor `.obsidian/app.json`
+   `showLineNumber: false` by hiding the editor line-number gutter for that
+   vault while leaving Diamond's default gutter visible when the setting is
+   missing.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

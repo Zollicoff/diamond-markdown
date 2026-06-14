@@ -17,7 +17,7 @@ import {
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
 import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
-import { editorLinkPreference, preferredObsidianNewNoteFolder, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
+import { editorDisplayPreference, editorLinkPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
 import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
@@ -578,6 +578,33 @@ test.describe('import checklist helpers', () => {
 			text: '[[Solar Plan]]',
 			anchorOffset: 2,
 			headOffset: 12
+		});
+	});
+
+	test('uses Obsidian line-number preference for editor display', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-editor-display-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			source: 'diamond-default'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showLineNumber')).toMatchObject({
+			label: 'Line numbers',
+			value: 'Hidden'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: false,
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: true }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			source: 'obsidian-app-config'
 		});
 	});
 

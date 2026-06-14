@@ -9,6 +9,7 @@
 		doc: NoteDoc | null;
 		mode: 'live' | 'source' | 'read';
 		linkStyle: EditorLinkStyle;
+		showLineNumbers: boolean;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -33,6 +34,7 @@
 		doc,
 		mode,
 		linkStyle,
+		showLineNumbers,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -76,6 +78,7 @@
 		<EditorView
 			value={content}
 			mode={mode}
+			{showLineNumbers}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}

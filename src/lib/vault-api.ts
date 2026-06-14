@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, EditorDisplayPreference, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
@@ -74,6 +74,10 @@ export const api = {
 
 	async linkStyle(vaultId: string): Promise<EditorLinkPreference> {
 		return json(`/api/vaults/${vaultId}/link-style`);
+	},
+
+	async editorPreferences(vaultId: string): Promise<EditorDisplayPreference> {
+		return json(`/api/vaults/${vaultId}/editor-preferences`);
 	},
 
 	async linkTargets(vaultId: string): Promise<NoteLinkTarget[]> {
