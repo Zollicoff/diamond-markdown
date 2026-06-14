@@ -8,6 +8,7 @@ import {
 	splitCanvasAssetReference
 } from '$lib/canvas/files';
 import type { CanvasFileAssetKind } from '$lib/canvas/files';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 export type CanvasTextEmbedKind = CanvasFileAssetKind | 'note' | 'canvas';
 
@@ -109,7 +110,7 @@ export function canvasTextPreviewInlines(value: string, options: CanvasTextPrevi
 }
 
 export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewBlock[] {
-	const lines = text.replace(/\r\n?/g, '\n').split('\n');
+	const lines = stripObsidianCommentsOutsideCode(text).replace(/\r\n?/g, '\n').split('\n');
 	const blocks: CanvasTextPreviewBlock[] = [];
 	let paragraphLines: string[] = [];
 	let currentList: Extract<CanvasTextPreviewBlock, { type: 'ordered-list' | 'unordered-list' }> | null = null;

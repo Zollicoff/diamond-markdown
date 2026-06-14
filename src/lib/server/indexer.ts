@@ -17,6 +17,7 @@ import path from 'node:path';
 import { getConfigDir, type Vault } from './vault';
 import { parseWikilinks, parseInlineTags } from './wikilink';
 import { splitFrontmatter, collectTags, aliasesOf } from './frontmatter';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 export interface NoteMeta {
 	/** Vault-relative path with `/` separators, e.g. "Features/Wikilinks.md" */
@@ -140,16 +141,17 @@ export function removeNote(vault: Vault, notePath: string, opts: { skipCache?: b
 /** Parse frontmatter + body, add to maps. No link resolution yet. */
 function ingestNote(idx: VaultIndex, notePath: string, body: string): void {
 	const { frontmatter, body: main } = splitFrontmatter(body);
+	const visibleMain = stripObsidianCommentsOutsideCode(main);
 	const stem = path.basename(notePath, path.extname(notePath));
 	const title = typeof frontmatter.title === 'string' ? frontmatter.title : stem;
 	const aliases = aliasesOf(frontmatter);
-	const tags = collectTags(frontmatter, parseInlineTags(main));
+	const tags = collectTags(frontmatter, parseInlineTags(visibleMain));
 	const meta: NoteMeta = { notePath, title, aliases, tags, stem: stem.toLowerCase() };
 	idx.notes.set(notePath, meta);
 	const rawOut = new Set<string>();
-	for (const link of parseWikilinks(main)) rawOut.add(link.target);
+	for (const link of parseWikilinks(visibleMain)) rawOut.add(link.target);
 	idx.linksOutRaw.set(notePath, rawOut);
-	const text = normalizeSearchText(main);
+	const text = normalizeSearchText(visibleMain);
 	idx.searchDocs.set(notePath, { notePath, text, textLower: text.toLowerCase() });
 }
 

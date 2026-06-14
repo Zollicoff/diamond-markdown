@@ -38,6 +38,7 @@ import {
 import { renderObsidianCallout } from './callouts';
 import { addObsidianBlockIds } from './block-ids';
 import { slugify, slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -65,10 +66,11 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 		}
 		const { frontmatter, body } = splitFrontmatter(raw);
 		if (frontmatter.public !== true) continue;
+		const visibleBody = stripObsidianCommentsOutsideCode(body);
 		notes.set(meta.notePath, {
 			title: typeof frontmatter.title === 'string' ? frontmatter.title : meta.title,
 			body,
-			tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.filter((x): x is string => typeof x === 'string') : parseInlineTags(body)
+			tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.filter((x): x is string => typeof x === 'string') : parseInlineTags(visibleBody)
 		});
 	}
 
@@ -165,7 +167,8 @@ function renderBodyForPublish(
 	attachmentsCopied: Map<string, string>,
 	outDir: string
 ): string {
-	const processed = processOutsideCode(body, (chunk) => {
+	const withoutComments = stripObsidianCommentsOutsideCode(body);
+	const processed = processOutsideCode(withoutComments, (chunk) => {
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
 				const ref = splitAssetReference(e.target);

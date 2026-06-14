@@ -37,6 +37,7 @@ import { purify } from './sanitize';
 import { renderObsidianCallout } from './callouts';
 import { addObsidianBlockIds } from './block-ids';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
 marked.use(markedFootnote());
@@ -87,9 +88,11 @@ function renderInner(
 	visited: Set<string>,
 	sourcePath: string | null
 ): string {
+	const withoutComments = stripObsidianCommentsOutsideCode(body);
+
 	// 1. Math first — replace $...$ and $$...$$ with rendered HTML so marked
 	//    passes them through unchanged. Done outside code regions only.
-	const mathReplaced = processOutsideCode(body, (chunk) => renderMathInChunk(chunk));
+	const mathReplaced = processOutsideCode(withoutComments, (chunk) => renderMathInChunk(chunk));
 
 	// 2. Embeds + wikilinks + tags — also outside code regions.
 	const processed = processOutsideCode(mathReplaced, (chunk) => {

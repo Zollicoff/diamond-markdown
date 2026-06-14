@@ -79,6 +79,37 @@ test.describe('canvas text preview helpers', () => {
 		expect(blocks[7]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 	});
 
+	test('hides Obsidian comments in Canvas text previews outside code', () => {
+		const blocks = canvasTextPreviewBlocks([
+			'Visible %%hidden [[Secret]] #private%% note',
+			'%%',
+			'Hidden block [[Secret]]',
+			'%%',
+			'Code `%%kept-inline%%` stays',
+			'```txt',
+			'%% kept fence %%',
+			'```'
+		].join('\n'));
+		const serialized = JSON.stringify(blocks);
+		expect(serialized).not.toContain('hidden');
+		expect(serialized).not.toContain('Hidden block');
+		expect(serialized).not.toContain('Secret');
+		expect(serialized).not.toContain('private');
+		expect(blocks[0]).toMatchObject({
+			type: 'paragraph',
+			inline: [{ kind: 'text', text: 'Visible  note' }]
+		});
+		expect(blocks[1]).toMatchObject({
+			type: 'paragraph',
+			inline: [
+				{ kind: 'text', text: 'Code ' },
+				{ kind: 'code', text: '%%kept-inline%%' },
+				{ kind: 'text', text: ' stays' }
+			]
+		});
+		expect(blocks[2]).toEqual({ type: 'code', language: 'txt', code: '%% kept fence %%' });
+	});
+
 	test('parses safe asset, note, and Canvas embeds', () => {
 		expect(canvasTextPreviewBlocks('![[Images/roof.svg#diagram|Roof photo|320x180]]')).toEqual([
 			{

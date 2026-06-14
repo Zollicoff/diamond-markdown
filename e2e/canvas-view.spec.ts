@@ -897,6 +897,11 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'# Launch plan',
 					'#### Detail scope',
 					'---',
+					'Visible %%hidden canvas comment [[Hidden]]%% note',
+					'%%',
+					'Hidden canvas block',
+					'%%',
+					'Code `%%kept-inline%%` stays',
 					'![[Home.md#Launch Plan|Launch note]]',
 					'![[Survey Photos#Meter|Survey note]]',
 					'![[Boards/Map.canvas|Canvas map]]',
@@ -945,6 +950,10 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview).toContainText('Launch plan');
 	await expect(preview.locator('.preview-heading.level-4')).toHaveText('Detail scope');
 	await expect(preview.locator('hr')).toHaveCount(1);
+	await expect(preview).toContainText('Visible note');
+	await expect(preview).toContainText('%%kept-inline%%');
+	await expect(preview).not.toContainText('hidden canvas comment');
+	await expect(preview).not.toContainText('Hidden canvas block');
 	await expect(preview.getByRole('link', { name: /Launch note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /Survey note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
 	await expect(preview.getByRole('link', { name: /Canvas map CANVAS/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);

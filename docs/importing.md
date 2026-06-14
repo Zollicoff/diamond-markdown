@@ -134,6 +134,11 @@ and static publish. Wikilinks like `[[Target#^install-steps]]` preserve the
 block-reference fragment in Live Preview, Read mode, and static publish instead
 of treating it as a heading link.
 
+Paired Obsidian comments such as `%% hidden note %%` are hidden from Read mode,
+static publish, search/link/tag indexing, and Canvas text-card previews while
+remaining unchanged in source. Literal `%%` markers inside inline code and
+fenced code blocks remain visible.
+
 Frontmatter `tags` and `aliases` are read from either flow arrays
 (`tags: [project/foo, review]`) or Obsidian-style block lists, so imported
 vaults keep their search, tag index, and alias-based wikilink behavior without
@@ -162,9 +167,9 @@ dimensions, node and edge colors, edge connections, edge labels, and node or
 edge deletion with git-backed commits. Canvas text cards show a safe
 markdown-aware preview while preserving the raw editable text.
 Canvas text cards preview common Markdown plus H1-H6 headings, thematic
-breaks, Obsidian callout blocks, highlights, strikethrough, simple Markdown
-tables, resolved note/title/alias inline wikilinks such as
-`[[Survey Photos#Meter|site photos]]` and
+breaks, hidden Obsidian comments, Obsidian callout blocks, highlights,
+strikethrough, simple Markdown tables, resolved note/title/alias inline
+wikilinks such as `[[Survey Photos#Meter|site photos]]` and
 `[[Home.md#Install Steps|Launch link]]`, explicit Canvas links such as
 `[[Boards/Map.canvas|Map board]]`, resolved note embed chips such as
 `![[Survey Photos#Meter|Survey note]]` or `![[Home.md#Install Steps]]`,

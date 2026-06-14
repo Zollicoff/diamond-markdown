@@ -123,6 +123,76 @@ test.describe('Obsidian image embed variants', () => {
 		expect(styles).toContain('.note .callout');
 	});
 
+	test('hides Obsidian comments in read mode and static publish output', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-comments-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(vaultDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(vaultDir, 'Comments.md'),
+			[
+				'---',
+				'title: Comments',
+				'public: true',
+				'---',
+				'# Comments',
+				'',
+				'Visible text %%hidden inline [[Hidden]] #private $x$%% after.',
+				'',
+				'%%',
+				'Hidden block [[Hidden]] #private',
+				'%%',
+				'',
+				'Code `%%kept-inline%%` stays visible.',
+				'',
+				'```text',
+				'%% kept fence %%',
+				'```'
+			].join('\n')
+		);
+		fs.writeFileSync(path.join(vaultDir, 'Hidden.md'), '# Hidden\n');
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Obsidian Comments Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const loaded = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Comments.md')}`);
+		expect(loaded.ok()).toBe(true);
+		const note = await loaded.json() as NoteDoc;
+		expect(note.html).toContain('Visible text');
+		expect(note.html).toContain('after.');
+		expect(note.html).toContain('%%kept-inline%%');
+		expect(note.html).toContain('%% kept fence %%');
+		expect(note.html).not.toContain('hidden inline');
+		expect(note.html).not.toContain('Hidden block');
+		expect(note.html).not.toContain('private');
+		expect(note.outgoingLinks.some((link) => link.target === 'Hidden')).toBe(false);
+		expect(note.tags).not.toContain('private');
+
+		const hiddenRes = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Hidden.md')}`);
+		expect(hiddenRes.ok()).toBe(true);
+		const hidden = await hiddenRes.json() as NoteDoc;
+		expect(hidden.backlinks.some((link) => link.path === 'Comments.md')).toBe(false);
+
+		const hiddenSearch = await request.get(`/api/vaults/${vault.id}/search?q=${encodeURIComponent('hidden inline')}&full=1`);
+		expect(hiddenSearch.ok()).toBe(true);
+		expect((await hiddenSearch.json()) as { total: number }).toMatchObject({ total: 0 });
+
+		const published = await request.post(`/api/vaults/${vault.id}/publish`);
+		expect(published.ok()).toBe(true);
+		const report = await published.json() as { outDir: string; publicNotes: number };
+		expect(report.publicNotes).toBe(1);
+		const html = fs.readFileSync(path.join(report.outDir, 'comments.html'), 'utf-8');
+		expect(html).toContain('Visible text');
+		expect(html).toContain('after.');
+		expect(html).toContain('%%kept-inline%%');
+		expect(html).toContain('%% kept fence %%');
+		expect(html).not.toContain('hidden inline');
+		expect(html).not.toContain('Hidden block');
+		expect(html).not.toContain('private');
+	});
+
 	test('renders sized image embeds in read mode and static publish output', async ({ request }) => {
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'sized-embed-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });

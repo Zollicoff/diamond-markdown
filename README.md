@@ -94,6 +94,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Mermaid diagrams (lazy-loaded client-side)
 - Footnotes — standard `[^1]` references with back-links
 - Obsidian block IDs — trailing paragraph/list markers such as `^block-id` render as linkable anchors without showing the marker text
+- Obsidian comments — paired `%% hidden %%` comments are hidden from Read mode, static publish, search/link/tag indexing, and Canvas text-card previews while remaining in source
 - Note embeds (`![[Note]]`), image embeds (`![[image.png]]`, `![[image.png|300]]`, `![[image.png|300x200]]`)
 
 ### Workspace
@@ -104,7 +105,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
 - Obsidian import support that preserves `.obsidian`, surfaces plugin, appearance, graph, core-plugin, and hotkey settings as migration guidance with known Diamond command mappings, imports note-level Obsidian bookmarks, and honors safe attachment/new-note/daily-note/link-style/line-number settings plus link-update preferences
 - Obsidian export package from Settings that preserves vault files and `.obsidian` config while excluding Diamond metadata, generated publish output, and Git internals
-- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks and note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, file-card heading/block subpaths, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
+- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, hidden Obsidian comments, callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks and note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, file-card heading/block subpaths, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)
