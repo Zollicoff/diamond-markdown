@@ -13,7 +13,7 @@
 		type CanvasTextPreviewInline,
 		type CanvasTextEmbedResolver,
 		type CanvasTextWikilinkResolver
-	} from '$lib/canvas/view';
+	} from '$lib/canvas/text-preview';
 
 	interface Props {
 		vaultId: string;

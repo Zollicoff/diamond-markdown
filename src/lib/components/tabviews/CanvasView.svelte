@@ -21,8 +21,6 @@
 		canvasNodeSizeChanged,
 		canvasNodeOptions,
 		canvasFileOpenTarget,
-		canvasTextNoteEmbedResolver,
-		canvasTextNoteWikilinkResolver,
 		canvasNodeRefDraftFor,
 		canvasNodesWithPosition,
 		canvasNodesWithSize,
@@ -38,6 +36,12 @@
 		type CanvasEdgeSummary,
 		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import {
+		canvasTextNoteEmbedResolver,
+		canvasTextNoteWikilinkResolver,
+		type CanvasTextEmbedResolver,
+		type CanvasTextWikilinkResolver
+	} from '$lib/canvas/text-preview';
 	import {
 		canvasNodeDragPosition,
 		canvasNodeResizeSize,

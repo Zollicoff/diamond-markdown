@@ -7,10 +7,12 @@
 		canvasNodeTitle,
 		isCanvasGroupNode,
 		type CanvasBounds,
-		type CanvasNodeRefDraft,
-		type CanvasTextEmbedResolver,
-		type CanvasTextWikilinkResolver
+		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
+	import type {
+		CanvasTextEmbedResolver,
+		CanvasTextWikilinkResolver
+	} from '$lib/canvas/text-preview';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
 	import CanvasGroupNodeEditor from './CanvasGroupNodeEditor.svelte';
 	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';

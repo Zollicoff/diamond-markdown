@@ -10,10 +10,12 @@
 		CanvasGroupLabelDrafts,
 		CanvasNodeRefDraft,
 		CanvasNodeRefDrafts,
-		CanvasTextDrafts,
+		CanvasTextDrafts
+	} from '$lib/canvas/view';
+	import type {
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
-	} from '$lib/canvas/view';
+	} from '$lib/canvas/text-preview';
 	import CanvasBoard from './CanvasBoard.svelte';
 	import CanvasEdgeList from './CanvasEdgeList.svelte';
 

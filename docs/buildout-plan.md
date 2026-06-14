@@ -488,6 +488,9 @@ Use small, pushable slices:
   vault-local asset URLs, media classification, subpath normalization, and URL
   node validation into a focused helper module while preserving the existing
   `view.ts` compatibility exports.
+- **Canvas text-preview parser extraction.** Move Canvas text-card inline,
+  block, embed, wikilink, callout, and table parsing into a focused helper
+  module while preserving the existing `view.ts` compatibility exports.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

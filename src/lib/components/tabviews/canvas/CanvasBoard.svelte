@@ -15,10 +15,12 @@
 		type CanvasGroupLabelDrafts,
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
-		type CanvasTextDrafts,
-		type CanvasTextEmbedResolver,
-		type CanvasTextWikilinkResolver
+		type CanvasTextDrafts
 	} from '$lib/canvas/view';
+	import type {
+		CanvasTextEmbedResolver,
+		CanvasTextWikilinkResolver
+	} from '$lib/canvas/text-preview';
 	import {
 		canvasBoardZoomStyle,
 		canvasGridBackgroundSize,

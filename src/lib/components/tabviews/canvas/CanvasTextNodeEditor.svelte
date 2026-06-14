@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { CanvasNode } from '$lib/types';
-	import {
-		canvasNodeTitle,
-		type CanvasTextEmbedResolver,
-		type CanvasTextWikilinkResolver
-	} from '$lib/canvas/view';
+	import { canvasNodeTitle } from '$lib/canvas/view';
+	import type {
+		CanvasTextEmbedResolver,
+		CanvasTextWikilinkResolver
+	} from '$lib/canvas/text-preview';
 	import CanvasTextPreview from './CanvasTextPreview.svelte';
 
 	interface Props {
