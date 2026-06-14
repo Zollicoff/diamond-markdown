@@ -20,6 +20,7 @@
 		type CanvasNodeRefDraft,
 		type CanvasNodeRefDrafts,
 		type CanvasTextDrafts,
+		type CanvasTextEmbedResolver,
 		type CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 	import {
@@ -37,6 +38,7 @@
 		textDrafts: CanvasTextDrafts;
 		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
+		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		savingNodeId: string | null;
 		movingNodeId: string | null;
@@ -75,6 +77,7 @@
 		textDrafts,
 		groupLabelDrafts,
 		refDrafts,
+		resolveEmbedTarget,
 		resolveWikilinkTarget,
 		savingNodeId,
 		movingNodeId,
@@ -210,6 +213,7 @@
 				refDraft={canvasNodeRefDraftFor(node, refDrafts)}
 				refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
+				{resolveEmbedTarget}
 				{resolveWikilinkTarget}
 				saving={savingNodeId === node.id}
 				moving={movingNodeId === node.id || moveSavingNodeId === node.id}

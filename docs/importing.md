@@ -155,9 +155,11 @@ Canvas text cards preview common Markdown plus Obsidian callout blocks,
 highlights, strikethrough, simple Markdown tables, resolved note/title/alias
 inline wikilinks such as `[[Survey Photos#Meter|site photos]]` and
 `[[Home.md#Install Steps|Launch link]]`, explicit Canvas links such as
-`[[Boards/Map.canvas|Map board]]`, explicit note/canvas embed chips such as
-`![[Home.md#Install Steps]]` and `![[Boards/Map.canvas]]`, and safe vault-local
-asset embed lines such as `![[Images/roof.png]]` or `![Roof](Images/roof.png)`,
+`[[Boards/Map.canvas|Map board]]`, resolved note embed chips such as
+`![[Survey Photos#Meter|Survey note]]` or `![[Home.md#Install Steps]]`,
+explicit Canvas embed chips such as `![[Boards/Map.canvas]]`, and safe
+vault-local asset embed lines such as `![[Images/roof.png]]` or
+`![Roof](Images/roof.png)`,
 while leaving the raw card text editable. Canvas group
 nodes are rendered behind cards and can be created from the Canvas toolbar.
 Canvas node and edge colors

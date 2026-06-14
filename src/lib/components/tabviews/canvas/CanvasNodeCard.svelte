@@ -8,6 +8,7 @@
 		isCanvasGroupNode,
 		type CanvasBounds,
 		type CanvasNodeRefDraft,
+		type CanvasTextEmbedResolver,
 		type CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
@@ -26,6 +27,7 @@
 		refDraft: CanvasNodeRefDraft;
 		refChanged: boolean;
 		refCanSave: boolean;
+		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		saving: boolean;
 		moving: boolean;
@@ -57,6 +59,7 @@
 		refDraft,
 		refChanged,
 		refCanSave,
+		resolveEmbedTarget,
 		resolveWikilinkTarget,
 		saving,
 		moving,
@@ -131,6 +134,7 @@
 			{node}
 			{draft}
 			{changed}
+			{resolveEmbedTarget}
 			{resolveWikilinkTarget}
 			{saving}
 			{deleting}

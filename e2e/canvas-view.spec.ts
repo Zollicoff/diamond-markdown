@@ -72,6 +72,7 @@ import {
 	canvasTextEmbedRouteHref,
 	canvasTextPreviewBlocks,
 	canvasTextPreviewInlines,
+	canvasTextNoteEmbedResolver,
 	canvasTextNoteWikilinkResolver,
 	canvasTextDrafts,
 	edgeLines,
@@ -268,6 +269,35 @@ test.describe('canvas view helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[3])).toBe('/vault/vault%20id/note/Home.md#launch-plan');
 		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[5])).toBe('/vault/vault%20id/note/Home.md');
 		expect(canvasTextInlineTargetHref('vault id', resolvedAliasTargets[7])).toBeNull();
+		const resolveEmbedTarget = canvasTextNoteEmbedResolver([
+			{ path: 'Home.md', title: 'Home', aliases: ['Launch Base'], stem: 'home' },
+			{
+				path: 'References/Roof Photos.md',
+				title: 'Roof Photos',
+				aliases: ['Survey Photos'],
+				stem: 'roof photos'
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![[Survey Photos#Meter|site photos]]', { resolveEmbedTarget })).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'References/Roof Photos.md',
+					suffix: '#Meter',
+					kind: 'note',
+					title: 'site photos',
+					alt: 'site photos',
+					width: null,
+					height: null
+				}
+			}
+		]);
+		const resolvedNoteEmbed = canvasTextPreviewBlocks('![[Launch Base]]', { resolveEmbedTarget })[0];
+		if (!resolvedNoteEmbed || resolvedNoteEmbed.type !== 'embed') throw new Error('expected resolved note embed');
+		expect(canvasTextEmbedRouteHref('vault id', resolvedNoteEmbed.embed)).toBe('/vault/vault%20id/note/Home.md');
+		expect(canvasTextPreviewBlocks('![[Unknown Alias]]', { resolveEmbedTarget })).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[Unknown Alias]]' }] }
+		]);
 		const previewBlocks = canvasTextPreviewBlocks([
 			'# Launch plan',
 			'',
@@ -801,10 +831,11 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 				x: 0,
 				y: 0,
 				width: 340,
-				height: 320,
+				height: 360,
 				text: [
 					'# Launch plan',
 					'![[Home.md#Launch Plan|Launch note]]',
+					'![[Survey Photos#Meter|Survey note]]',
 					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
@@ -850,6 +881,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
 	await expect(preview.getByRole('link', { name: /Launch note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
+	await expect(preview.getByRole('link', { name: /Survey note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
 	await expect(preview.getByRole('link', { name: /Canvas map CANVAS/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');

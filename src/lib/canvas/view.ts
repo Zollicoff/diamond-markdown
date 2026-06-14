@@ -123,9 +123,14 @@ export interface CanvasTextPreviewInline {
 }
 
 export type CanvasTextWikilinkResolver = (target: string, label: string | undefined) => CanvasTextInlineTarget | null;
+export type CanvasTextEmbedResolver = (
+	target: string,
+	meta: Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'>
+) => CanvasTextPreviewEmbed | null;
 
 export interface CanvasTextPreviewOptions {
 	resolveWikilinkTarget?: CanvasTextWikilinkResolver;
+	resolveEmbedTarget?: CanvasTextEmbedResolver;
 }
 
 export interface CanvasTextPreviewListItem {
@@ -548,7 +553,7 @@ export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreview
 			continue;
 		}
 
-		const embed = canvasTextEmbedPreview(line);
+		const embed = canvasTextEmbedPreview(line, options);
 		if (embed) {
 			flushParagraph();
 			flushList();
@@ -780,20 +785,48 @@ export function canvasTextInlineTargetHref(vaultId: string, inline: CanvasTextPr
 }
 
 export function canvasTextNoteWikilinkResolver(targets: NoteLinkTarget[]): CanvasTextWikilinkResolver {
+	const lookup = canvasNoteLinkTargetLookup(targets);
+	return (target, label) => {
+		const { note, ref } = canvasNoteLinkTargetFor(lookup, target);
+		if (!note) return null;
+		return canvasTextInternalTarget('note', note.path, ref.suffix, label?.trim() || note.title);
+	};
+}
+
+export function canvasTextNoteEmbedResolver(targets: NoteLinkTarget[]): CanvasTextEmbedResolver {
+	const lookup = canvasNoteLinkTargetLookup(targets);
+	return (target, meta) => {
+		const { note, ref } = canvasNoteLinkTargetFor(lookup, target);
+		if (!note) return null;
+		if (ref.suffix && !normalizeCanvasFileSubpath(ref.suffix)) return null;
+		return {
+			path: note.path,
+			suffix: ref.suffix,
+			kind: 'note',
+			title: meta.alt ?? note.title,
+			...meta
+		};
+	};
+}
+
+function canvasNoteLinkTargetLookup(targets: NoteLinkTarget[]): Map<string, NoteLinkTarget> {
 	const lookup = new Map<string, NoteLinkTarget>();
 	for (const target of targets) {
 		for (const key of canvasNoteLinkTargetKeys(target)) {
 			lookup.set(key, target);
 		}
 	}
-	return (target, label) => {
-		if (target.includes('?')) return null;
-		const ref = splitCanvasWikilinkTarget(target);
-		const key = ref.path.trim().toLowerCase();
-		const note = lookup.get(key) ?? lookup.get(`${key}.md`);
-		if (!note) return null;
-		return canvasTextInternalTarget('note', note.path, ref.suffix, label?.trim() || note.title);
-	};
+	return lookup;
+}
+
+function canvasNoteLinkTargetFor(
+	lookup: Map<string, NoteLinkTarget>,
+	target: string
+): { note: NoteLinkTarget | null; ref: { path: string; suffix: string } } {
+	const ref = splitCanvasWikilinkTarget(target);
+	if (target.includes('?') || !ref.path) return { note: null, ref };
+	const key = ref.path.trim().toLowerCase();
+	return { note: lookup.get(key) ?? lookup.get(`${key}.md`) ?? null, ref };
 }
 
 function canvasNoteLinkTargetKeys(target: NoteLinkTarget): string[] {
@@ -1198,11 +1231,15 @@ function canvasTextEmbedFromTarget(
 	};
 }
 
-function canvasTextEmbedPreview(line: string): CanvasTextPreviewEmbed | null {
+function canvasTextEmbedPreview(line: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewEmbed | null {
 	const trimmed = line.trim();
 	const obsidian = trimmed.match(/^!\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?]]$/);
 	if (obsidian) {
-		return canvasTextEmbedFromTarget(obsidian[1].trim(), canvasObsidianEmbedMeta(obsidian[2]));
+		const target = obsidian[1].trim();
+		const meta = canvasObsidianEmbedMeta(obsidian[2]);
+		const direct = canvasTextEmbedFromTarget(target, meta);
+		if (direct && (direct.kind !== 'file' || canvasAssetReferenceHasExtension(target))) return direct;
+		return options.resolveEmbedTarget?.(target, meta) ?? null;
 	}
 
 	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\s]+)\)$/);
@@ -1211,6 +1248,11 @@ function canvasTextEmbedPreview(line: string): CanvasTextPreviewEmbed | null {
 	}
 
 	return null;
+}
+
+function canvasAssetReferenceHasExtension(target: string): boolean {
+	const ref = splitCanvasAssetReference(target);
+	return /\.[^./]+$/.test(ref.path);
 }
 
 function isCanvasStandaloneEmbedSyntax(line: string): boolean {

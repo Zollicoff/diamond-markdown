@@ -24,6 +24,7 @@
 		canvasNodeSizeChanged,
 		canvasNodeOptions,
 		canvasFileOpenTarget,
+		canvasTextNoteEmbedResolver,
 		canvasTextNoteWikilinkResolver,
 		canvasNodeRefDraftFor,
 		canvasNodeRefDrafts,
@@ -124,6 +125,7 @@
 	const canZoomIn = $derived(canZoomCanvasIn(canvasZoom));
 	const canZoomOut = $derived(canZoomCanvasOut(canvasZoom));
 	const resolveWikilinkTarget = $derived(canvasTextNoteWikilinkResolver(linkTargets));
+	const resolveEmbedTarget = $derived(canvasTextNoteEmbedResolver(linkTargets));
 
 	async function loadLinkTargets(): Promise<void> {
 		const seq = ++linkTargetsRequestSeq;
@@ -628,6 +630,7 @@
 		{refDrafts}
 		{edgeLabelDrafts}
 		{edgeRoutingDrafts}
+		{resolveEmbedTarget}
 		{savingNodeId}
 		{movingNodeId}
 		{moveSavingNodeId}
