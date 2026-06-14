@@ -128,9 +128,10 @@ render as styled callout blocks in read mode and static publish. Fold markers
 use native disclosure blocks, so collapsed and expanded defaults survive
 without client-only JavaScript.
 
-Obsidian highlights such as `==important==` render as `<mark>` spans in read
-mode and static publish. Inline Markdown inside the highlighted span, including
-wikilinks, tags, and emphasis, still renders through Diamond's normal pipeline.
+Obsidian highlights such as `==important==` render in Live Preview and as
+`<mark>` spans in read mode and static publish. Inline Markdown inside the
+highlighted span, including wikilinks, tags, and emphasis, still renders through
+Diamond's normal pipeline.
 
 Obsidian block IDs on paragraphs and list items, such as
 `Important install step ^install-steps`, render as linkable anchors in read mode

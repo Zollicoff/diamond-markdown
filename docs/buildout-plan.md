@@ -524,8 +524,8 @@ Use small, pushable slices:
   text-card previews while preserving source text and literal markers inside
   code.
 - **Obsidian highlight rendering.** Render paired `==highlight==` spans in
-  Read mode and static publish through a shared marked inline extension,
-  preserving nested inline markdown and leaving code literals unchanged.
+  Live Preview, Read mode, and static publish, preserving nested inline markdown
+  and leaving code literals unchanged.
 
 ## Next Implementation Slices
 

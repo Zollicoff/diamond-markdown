@@ -251,6 +251,12 @@
 						color: 'var(--link-broken)',
 						background: 'rgba(248, 81, 73, 0.08)',
 						fontStyle: 'italic'
+					},
+					'.cm-obsidian-highlight': {
+						background: 'rgba(255, 213, 79, 0.28)',
+						color: 'var(--fg)',
+						borderRadius: '3px',
+						padding: '0 2px'
 					}
 				},
 				{ dark: true }

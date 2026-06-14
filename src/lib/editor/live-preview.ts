@@ -32,19 +32,29 @@ interface PreviewSpan {
 	to: number;
 }
 
+interface HighlightSpan extends PreviewSpan {
+	contentFrom: number;
+	contentTo: number;
+}
+
 class WikilinkWidget extends WidgetType {
 	constructor(
 		readonly target: string,
 		readonly display: string,
 		readonly resolved: boolean,
-		readonly href: string | null
+		readonly href: string | null,
+		readonly highlighted = false
 	) {
 		super();
 	}
 
 	toDOM(): HTMLElement {
 		const a = document.createElement('a');
-		a.className = this.resolved ? 'cm-wikilink' : 'cm-wikilink cm-wikilink--broken';
+		a.className = [
+			'cm-wikilink',
+			this.resolved ? '' : 'cm-wikilink--broken',
+			this.highlighted ? 'cm-obsidian-highlight' : ''
+		].filter(Boolean).join(' ');
 		a.textContent = this.display;
 		if (this.href) a.href = this.href;
 		a.dataset.target = this.target;
@@ -84,7 +94,8 @@ class WikilinkWidget extends WidgetType {
 			other.target === this.target &&
 			other.display === this.display &&
 			other.resolved === this.resolved &&
-			other.href === this.href
+			other.href === this.href &&
+			other.highlighted === this.highlighted
 		);
 	}
 
@@ -144,6 +155,24 @@ function collectObsidianCommentSpans(view: EditorView, codeSpans: PreviewSpan[])
 	return spans;
 }
 
+function collectObsidianHighlightSpans(
+	view: EditorView,
+	codeSpans: PreviewSpan[],
+	commentSpans: PreviewSpan[]
+): HighlightSpan[] {
+	const spans: HighlightSpan[] = [];
+	const text = view.state.doc.toString();
+	const highlightRe = /==(?!=)(?=\S)([^\n]*?\S)==(?![=])/g;
+	let match: RegExpExecArray | null;
+	while ((match = highlightRe.exec(text))) {
+		const from = match.index;
+		const to = from + match[0].length;
+		if (overlapsSpan(codeSpans, from, to) || overlapsSpan(commentSpans, from, to)) continue;
+		spans.push({ from, to, contentFrom: from + 2, contentTo: to - 2 });
+	}
+	return spans;
+}
+
 function buildDecorations(view: EditorView, resolveLink: LinkResolver): DecorationSet {
 	const ranges: Range<Decoration>[] = [];
 	const cursor = view.state.selection.main.head;
@@ -154,13 +183,23 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 	const cursorInside = (from: number, to: number): boolean => cursor >= from && cursor <= to;
 	const codeSpans = collectCodeSpans(view);
 	const commentSpans = collectObsidianCommentSpans(view, codeSpans);
+	const highlightSpans = collectObsidianHighlightSpans(view, codeSpans, commentSpans);
+	const activeHighlightSpans = highlightSpans.filter((span) => cursorInside(span.from, span.to));
+	const inactiveHighlightSpans = highlightSpans.filter((span) => !cursorInside(span.from, span.to));
 
 	// Pre-pass: collect [[wikilink]] spans across the visible viewport.
 	// lezer-markdown parses `[[Note]]` as a literal `[` + standard Link `[Note]`
 	// + literal `]`, so the LinkMark/URL handlers below would hide the inner
 	// brackets — leaving the outer pair visible as `[Note]`. We need to know
 	// the wikilink spans first so those passes can skip anything inside them.
-	const wikilinkSpans: Array<{ from: number; to: number; target: string; display: string; fragment: string }> = [];
+	const wikilinkSpans: Array<{
+		from: number;
+		to: number;
+		target: string;
+		display: string;
+		fragment: string;
+		highlighted: boolean;
+	}> = [];
 	for (const { from: vFrom, to: vTo } of view.visibleRanges) {
 		const text = doc.sliceString(vFrom, vTo);
 		let m: RegExpExecArray | null;
@@ -173,7 +212,11 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 			const display = (m[3]?.trim() || target);
 			const fragment = wikilinkFragment(subpath);
 			if (overlapsSpan(commentSpans, start, end)) continue;
-			wikilinkSpans.push({ from: start, to: end, target, display, fragment });
+			if (overlapsSpan(activeHighlightSpans, start, end)) continue;
+			const highlighted = inactiveHighlightSpans.some(
+				(span) => start >= span.contentFrom && end <= span.contentTo
+			);
+			wikilinkSpans.push({ from: start, to: end, target, display, fragment, highlighted });
 		}
 	}
 	const insideWikilink = (from: number, to: number): boolean => {
@@ -264,6 +307,15 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 		ranges.push(Decoration.replace({}).range(comment.from, comment.to));
 	}
 
+	// Obsidian `==highlight==` marks — hide only the paired `==` markers when
+	// the caret is outside the span, and style the content as highlighted text.
+	for (const highlight of highlightSpans) {
+		if (cursorInside(highlight.from, highlight.to)) continue;
+		ranges.push(Decoration.replace({}).range(highlight.from, highlight.contentFrom));
+		ranges.push(Decoration.mark({ class: 'cm-obsidian-highlight' }).range(highlight.contentFrom, highlight.contentTo));
+		ranges.push(Decoration.replace({}).range(highlight.contentTo, highlight.to));
+	}
+
 	// Wikilink pills — replace each pre-collected span with a widget unless
 	// the caret is inside it (then leave the raw `[[…]]` text for editing).
 	for (const w of wikilinkSpans) {
@@ -272,7 +324,7 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 		const hrefWithFragment = href ? `${href}${w.fragment}` : null;
 		ranges.push(
 			Decoration.replace({
-				widget: new WikilinkWidget(w.target, w.display, resolved, hrefWithFragment)
+				widget: new WikilinkWidget(w.target, w.display, resolved, hrefWithFragment, w.highlighted)
 			}).range(w.from, w.to)
 		);
 	}

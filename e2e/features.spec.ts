@@ -2102,6 +2102,52 @@ test('live preview hides Obsidian comments outside code', async ({ page, request
 	await expect(editor).toContainText('hidden inline [[Hidden]] #private');
 });
 
+test('live preview renders Obsidian highlights outside code', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'live-preview-highlight-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(vaultDir, { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Target.md'), '# Target\n');
+	fs.writeFileSync(
+		path.join(vaultDir, 'Highlight Check.md'),
+		[
+			'# Highlight Check',
+			'',
+			'Live ==priority **now**== and ==[[Target|target]]==.',
+			'',
+			'Code `==literal==` stays visible.',
+			'',
+			'```txt',
+			'== kept fence ==',
+			'```',
+			''
+		].join('\n')
+	);
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Live Preview Highlight Vault', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Highlight Check.md')}`, { waitUntil: 'domcontentloaded' });
+	const editor = page.locator('.cm-content').first();
+	await expect(editor).toBeVisible({ timeout: 5_000 });
+	await page.locator('.rail').first().click({ force: true });
+
+	await expect(editor).toContainText('Live priority now and target.');
+	await expect(editor).not.toContainText('==priority');
+	await expect(editor).not.toContainText('target==');
+	await expect(page.locator('.cm-obsidian-highlight').filter({ hasText: 'priority now' })).toBeVisible();
+	await expect(page.locator('.cm-obsidian-highlight').filter({ hasText: 'target' })).toBeVisible();
+	await expect(page.locator('a.cm-wikilink').filter({ hasText: 'target' })).toBeVisible();
+	await expect(editor).toContainText('==literal==');
+	await expect(editor).toContainText('== kept fence ==');
+
+	await page.getByRole('tab', { name: 'Source' }).click();
+	await expect(editor).toContainText('==priority **now**==');
+	await expect(editor).toContainText('==[[Target|target]]==');
+});
+
 test('search rail icon dedupes — clicking twice activates the same tab', async ({ page }) => {
 	await openVault(page);
 	const railSearch = page.locator('.rail .r-btn[aria-label="Search"]');

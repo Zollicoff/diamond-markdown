@@ -29,16 +29,19 @@
 	let tree = $state<TreeNode[]>([]);
 	let activeDoc = $state<NoteDoc | null>(null);
 
+	// Register before child controls can fire click/key handlers. The registry
+	// is idempotent, so this remains safe across client navigations.
+	registerBuiltinCommands();
+
 	$effect(() => {
 		// Keep the tree prop synced when data reloads.
 		tree = data.tree;
 	});
 
 	onMount(() => {
-		// Boot: hydrate workspace, wire event listeners, register commands.
+		// Boot: hydrate workspace and wire event listeners.
 		hydrateWorkspace(vaultId);
 		void hydrateBookmarks(vaultId);
-		registerBuiltinCommands();
 		let disposePlugins: (() => void) | null = null;
 		let pluginReloadSeq = 0;
 		async function reloadPlugins(): Promise<void> {
