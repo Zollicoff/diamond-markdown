@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -30,6 +30,16 @@ async function openSettingsSection(page: Page, section: string): Promise<void> {
 async function openPluginInstaller(page: Page): Promise<void> {
 	await openSettingsSection(page, 'Plugins');
 	await expect(page.getByLabel('Install from manifest URL')).toBeVisible({ timeout: 10_000 });
+}
+
+async function clickUntilVisible(trigger: Locator, target: Locator, timeout = 10_000): Promise<void> {
+	await expect(trigger).toBeVisible({ timeout });
+	await expect(async () => {
+		if (!(await target.isVisible().catch(() => false))) {
+			await trigger.click();
+		}
+		await expect(target).toBeVisible({ timeout: 1_500 });
+	}).toPass({ timeout });
 }
 
 function git(cwd: string, args: string[]): string {
@@ -1061,9 +1071,8 @@ test('new note command uses an in-app name dialog', async ({ page, request }) =>
 	if (fs.existsSync(abs)) fs.unlinkSync(abs);
 
 	await openVault(page);
-	await page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }).click();
 	const dialog = page.getByRole('dialog', { name: 'New note' });
-	await expect(dialog).toBeVisible();
+	await clickUntilVisible(page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }), dialog);
 	await dialog.getByLabel('Name in vault root').fill('Dialog Created Note');
 	await dialog.getByRole('button', { name: 'Create note' }).click();
 	await expect(dialog).toBeHidden();
@@ -1099,9 +1108,8 @@ test('generic new note command honors safe Obsidian configured folder', async ({
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }).click();
 	const dialog = page.getByRole('dialog', { name: 'New note' });
-	await expect(dialog).toBeVisible();
+	await clickUntilVisible(page.getByLabel('File tree controls').getByRole('button', { name: 'New note' }), dialog);
 	await dialog.getByLabel('Name in Notes/Inbox').fill('Configured Folder Note');
 	await dialog.getByRole('button', { name: 'Create note' }).click();
 	await expect(dialog).toBeHidden();
