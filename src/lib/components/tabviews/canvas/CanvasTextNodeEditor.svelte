@@ -1,10 +1,16 @@
 <script lang="ts">
 	import type { CanvasNode } from '$lib/types';
+	import { openCanvas, openNote } from '$lib/workspace/actions';
+	import { replaceLocationHash } from '$lib/workspace/hash';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import {
 		canvasNodeTitle,
 		canvasTextEmbedHref,
+		canvasTextEmbedOpenTarget,
+		canvasTextEmbedRouteHref,
 		canvasTextPreviewBlocks,
 		type CanvasTextPreviewBlock,
+		type CanvasTextPreviewEmbed,
 		type CanvasTextPreviewInline
 	} from '$lib/canvas/view';
 
@@ -36,6 +42,18 @@
 
 	const title = $derived(canvasNodeTitle(node));
 	const previewBlocks = $derived(canvasTextPreviewBlocks(draft));
+
+	function openInternalEmbed(embed: CanvasTextPreviewEmbed, event: MouseEvent): void {
+		const target = canvasTextEmbedOpenTarget(embed);
+		if (!target) return;
+		event.preventDefault();
+		if (target.kind === 'canvas') {
+			openCanvas(vaultId, target.path, target.title, openModeForPointer(event));
+			return;
+		}
+		replaceLocationHash(target.hash);
+		openNote(vaultId, target.path, target.title, openModeForPointer(event));
+	}
 </script>
 
 {#snippet inline(parts: CanvasTextPreviewInline[])}
@@ -132,7 +150,17 @@
 		</div>
 	{:else if block.type === 'embed'}
 		{@const href = canvasTextEmbedHref(vaultId, block.embed)}
-		{#if href}
+		{@const routeHref = canvasTextEmbedRouteHref(vaultId, block.embed)}
+		{#if routeHref}
+			<a
+				class={`preview-embed preview-embed-${block.embed.kind}`}
+				href={routeHref}
+				onclick={(event) => openInternalEmbed(block.embed, event)}
+			>
+				<span>{block.embed.title}</span>
+				<small>{block.embed.kind.toUpperCase()}</small>
+			</a>
+		{:else if href}
 			{#if block.embed.kind === 'image'}
 				<figure class="preview-embed preview-embed-image">
 					<img

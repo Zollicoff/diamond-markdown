@@ -67,6 +67,8 @@ import {
 	canvasSvgNodeColors,
 	canvasSummary,
 	canvasTextEmbedHref,
+	canvasTextEmbedOpenTarget,
+	canvasTextEmbedRouteHref,
 	canvasTextPreviewBlocks,
 	canvasTextPreviewInlines,
 	canvasTextDrafts,
@@ -275,13 +277,52 @@ test.describe('canvas view helpers', () => {
 		expect(canvasTextPreviewBlocks('![[../secret.png]]')).toEqual([
 			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[../secret.png]]' }] }
 		]);
-		expect(canvasTextPreviewBlocks('![[Home.md]]')).toEqual([
-			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[Home.md]]' }] }
+		expect(canvasTextPreviewBlocks('![[Home.md#Install Steps|Launch note]]')).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Home.md',
+					suffix: '#Install Steps',
+					kind: 'note',
+					title: 'Launch note',
+					alt: 'Launch note',
+					width: null,
+					height: null
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![[Boards/Map.canvas|Canvas map]]')).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Boards/Map.canvas',
+					suffix: '',
+					kind: 'canvas',
+					title: 'Canvas map',
+					alt: 'Canvas map',
+					width: null,
+					height: null
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![[Home.md?raw=1]]')).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[Home.md?raw=1]]' }] }
 		]);
 		expect(canvasTextEmbedHref('vault id', {
 			path: 'Images/roof.svg',
+			kind: 'image',
 			suffix: '#diagram'
 		})).toBe('/api/vaults/vault%20id/raw/Images/roof.svg#diagram');
+		const noteEmbed = canvasTextPreviewBlocks('![[Home.md#Install Steps|Launch note]]')[0];
+		if (noteEmbed.type !== 'embed') throw new Error('expected note embed');
+		expect(canvasTextEmbedOpenTarget(noteEmbed.embed)).toEqual({
+			kind: 'note',
+			path: 'Home.md',
+			title: 'Launch note',
+			subpath: '#Install Steps',
+			hash: 'install-steps'
+		});
+		expect(canvasTextEmbedRouteHref('vault id', noteEmbed.embed)).toBe('/vault/vault%20id/note/Home.md#install-steps');
 		expect(previewBlocks[5]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
 		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
@@ -636,6 +677,12 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
 	fs.mkdirSync(path.join(vaultDir, 'Docs'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Boards'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Launch Plan\n\nHome details.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Boards', 'Map.canvas'), JSON.stringify({
+		nodes: [{ id: 'map-text', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Map board' }],
+		edges: []
+	}));
 	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof.svg'), [
 		'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
 		'<rect width="160" height="90" fill="#0f766e"/>',
@@ -654,6 +701,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 				height: 320,
 				text: [
 					'# Launch plan',
+					'![[Home.md#Launch Plan|Launch note]]',
+					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
 					'- [x] Capture **utility bill** and ~~old bill~~',
@@ -684,6 +733,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
+	await expect(preview.getByRole('link', { name: /Launch note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
+	await expect(preview.getByRole('link', { name: /Canvas map CANVAS/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');

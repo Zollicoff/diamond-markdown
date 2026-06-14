@@ -94,6 +94,7 @@ export interface CanvasFileOpenTarget {
 }
 
 export type CanvasFileAssetKind = 'image' | 'pdf' | 'audio' | 'video' | 'file';
+export type CanvasTextEmbedKind = CanvasFileAssetKind | 'note' | 'canvas';
 
 export interface CanvasFileAssetPreview {
 	kind: CanvasFileAssetKind;
@@ -129,11 +130,19 @@ export interface CanvasTextPreviewTable {
 export interface CanvasTextPreviewEmbed {
 	path: string;
 	suffix: string;
-	kind: CanvasFileAssetKind;
+	kind: CanvasTextEmbedKind;
 	title: string;
 	alt: string | null;
 	width: number | null;
 	height: number | null;
+}
+
+export interface CanvasTextEmbedOpenTarget {
+	kind: 'note' | 'canvas';
+	path: string;
+	title: string;
+	subpath: string | null;
+	hash: string | null;
 }
 
 export type CanvasTextPreviewBlock =
@@ -733,8 +742,33 @@ export function canvasFileAssetPreview(node: CanvasNode, vaultId: string): Canva
 	};
 }
 
-export function canvasTextEmbedHref(vaultId: string, embed: Pick<CanvasTextPreviewEmbed, 'path' | 'suffix'>): string | null {
+export function canvasTextEmbedHref(
+	vaultId: string,
+	embed: Pick<CanvasTextPreviewEmbed, 'path' | 'suffix'> & Partial<Pick<CanvasTextPreviewEmbed, 'kind'>>
+): string | null {
+	if (embed.kind === 'note' || embed.kind === 'canvas') return null;
 	return canvasRawAssetHref(vaultId, `${embed.path}${embed.suffix}`);
+}
+
+export function canvasTextEmbedOpenTarget(embed: CanvasTextPreviewEmbed): CanvasTextEmbedOpenTarget | null {
+	if (embed.kind !== 'note' && embed.kind !== 'canvas') return null;
+	const subpath = embed.suffix ? normalizeCanvasFileSubpath(embed.suffix) : null;
+	if (embed.suffix && !subpath) return null;
+	return {
+		kind: embed.kind,
+		path: embed.path,
+		title: embed.title,
+		subpath,
+		hash: embed.kind === 'note' && subpath ? wikilinkFragment(parseWikilinkSubpath(subpath.slice(1))).slice(1) || null : null
+	};
+}
+
+export function canvasTextEmbedRouteHref(vaultId: string, embed: CanvasTextPreviewEmbed): string | null {
+	const target = canvasTextEmbedOpenTarget(embed);
+	if (!target) return null;
+	const encodedPath = target.path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+	const base = `/vault/${encodeURIComponent(vaultId)}/${target.kind === 'canvas' ? 'canvas' : 'note'}/${encodedPath}`;
+	return target.hash ? `${base}#${encodeURIComponent(target.hash)}` : base;
 }
 
 export function canvasLinkNodeHref(node: CanvasNode): string | null {
@@ -1050,9 +1084,28 @@ function canvasTextEmbedFromTarget(
 ): CanvasTextPreviewEmbed | null {
 	const ref = splitCanvasAssetReference(target);
 	if (!ref.path || !isCanvasVaultRelativeAssetPath(ref.path)) return null;
-	if (/\.(md|markdown|canvas)$/i.test(ref.path)) return null;
+	const title = meta.alt ?? ref.path.split('/').pop()?.replace(/\.(md|markdown|canvas)$/i, '') ?? ref.path;
+	if (/\.(md|markdown)$/i.test(ref.path)) {
+		if (ref.suffix && !normalizeCanvasFileSubpath(ref.suffix)) return null;
+		return {
+			path: ref.path,
+			suffix: ref.suffix,
+			kind: 'note',
+			title,
+			...meta
+		};
+	}
+	if (/\.canvas$/i.test(ref.path)) {
+		if (ref.suffix) return null;
+		return {
+			path: ref.path,
+			suffix: '',
+			kind: 'canvas',
+			title,
+			...meta
+		};
+	}
 	const kind = canvasFileAssetKind(ref.path);
-	const title = meta.alt ?? ref.path.split('/').pop() ?? ref.path;
 	return {
 		path: ref.path,
 		suffix: ref.suffix,

@@ -438,6 +438,10 @@ Use small, pushable slices:
   Markdown image syntax that point at safe vault-local assets inside Canvas
   text-card previews, using the existing raw-asset route and preserving the raw
   editable card text.
+- **Canvas text-card note and Canvas embeds.** Render explicit standalone
+  `![[Note.md#Heading]]` and `![[Board.canvas]]` lines as internal preview
+  chips in Canvas text cards, preserving safe heading/block subpaths and
+  leaving alias-only unresolved embeds conservative.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
