@@ -243,6 +243,10 @@ Use small, pushable slices:
    `showLineNumber` by showing or hiding CodeMirror's line-number gutter per
    vault while keeping Diamond's default line numbers when the setting is
    absent.
+- **Search view presentation split.** Keep query execution, saved-search
+   mutations, result paging, and virtual window orchestration in `SearchView`
+   while moving header controls, saved-search chrome, and result-list DOM/CSS
+   into focused presentation components.
 - **Shared pointer open-mode helper.** Move modifier-click and middle-click
    open-mode rules into a workspace helper used by note preview, search,
    file tree, bookmarks, and recent notes.

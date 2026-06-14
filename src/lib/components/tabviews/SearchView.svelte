@@ -4,15 +4,12 @@
 	import { api } from '$lib/vault-api';
 	import {
 		isActiveSavedSearch,
-		savedSearchButtonLabel,
-		savedSearchModeLabel,
 		savedSearchName,
 		searchModeFromFullText
 	} from '$lib/search/saved';
 	import {
 		buildSearchResultRows,
 		searchFolderFacets,
-		searchResultRowStyle,
 		visibleSearchRows,
 		type SearchResultDisplayRow,
 		type SearchGroupMode
@@ -20,6 +17,8 @@
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import type { SavedSearch, SavedSearchMode, SearchHit, SearchResponse } from '$lib/types';
+	import SearchHeader from './search/SearchHeader.svelte';
+	import SearchResultsList from './search/SearchResultsList.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -29,8 +28,6 @@
 
 	let { vaultId, query, onQueryChange }: Props = $props();
 
-	let inputEl: HTMLInputElement | null = $state(null);
-	let resultsEl: HTMLDivElement | null = $state(null);
 	// svelte-ignore state_referenced_locally
 	let q = $state(query);
 	let fullText = $state(false);
@@ -52,6 +49,7 @@
 	let controller: AbortController | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let requestId = 0;
+	let resultResetKey = $state(0);
 	let resultRows = $derived(buildSearchResultRows(results, groupMode));
 	let resultWindow = $derived(visibleSearchRows(resultRows, scrollTop, viewportHeight));
 	let folderFacets = $derived(searchFolderFacets(results, q));
@@ -67,25 +65,6 @@
 				? 'This search is already saved'
 				: 'Save current search'
 	);
-
-	onMount(() => {
-		savedName = savedSearchName(q);
-		setTimeout(() => inputEl?.focus(), 0);
-		if (q.trim()) void runSearch(q);
-		const measure = () => {
-			viewportHeight = resultsEl?.clientHeight ?? 0;
-		};
-		const observer = typeof ResizeObserver === 'undefined'
-			? null
-			: new ResizeObserver(measure);
-		if (resultsEl) observer?.observe(resultsEl);
-		window.addEventListener('resize', measure);
-		setTimeout(measure, 0);
-		return () => {
-			observer?.disconnect();
-			window.removeEventListener('resize', measure);
-		};
-	});
 
 	function runSearchDebounced(): void {
 		if (debounceTimer) clearTimeout(debounceTimer);
@@ -140,21 +119,22 @@
 		}
 	}
 
-	function onInput(e: Event): void {
-		q = (e.target as HTMLInputElement).value;
+	function onQueryInput(value: string): void {
+		q = value;
 		if (!savedNameTouched || !savedName.trim() || savedName === 'Saved search') {
 			savedName = savedSearchName(q);
 		}
 		runSearchDebounced();
 	}
 
-	function onResultsScroll(): void {
-		scrollTop = resultsEl?.scrollTop ?? 0;
+	function onSavedNameInput(value: string): void {
+		savedName = value;
+		savedNameTouched = true;
 	}
 
 	function resetResultWindow(): void {
 		scrollTop = 0;
-		if (resultsEl) resultsEl.scrollTop = 0;
+		resultResetKey += 1;
 	}
 
 	function loadMore(): void {
@@ -262,6 +242,11 @@
 		return error instanceof DOMException && error.name === 'AbortError';
 	}
 
+	onMount(() => {
+		savedName = savedSearchName(q);
+		if (q.trim()) void runSearch(q);
+	});
+
 	// If the bound query prop changes externally (e.g., the search command
 	// is invoked again with a different seed query), reflect it. untrack
 	// avoids loops with our own writes.
@@ -287,170 +272,47 @@
 </script>
 
 <div class="search-view">
-	<header class="search-header">
-		<div class="input-row">
-			<svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-				<circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4" />
-				<line x1="10.4" y1="10.4" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-			</svg>
-			<input
-				bind:this={inputEl}
-				type="text"
-				placeholder={fullText ? 'Search notes and contents…' : 'Search note titles…'}
-				title={fullText ? 'Supports quoted phrases, OR, /regex/, tag:, path:, file:, content:, and -exclusions.' : 'Search note titles and aliases.'}
-				value={q}
-				oninput={onInput}
-				autocomplete="off"
-				spellcheck="false"
-			/>
-			<button
-				class="mode-toggle"
-				class:active={fullText}
-				onclick={toggleFullText}
-				title={fullText ? 'Notes and contents — click to switch to titles' : 'Titles — click to switch to notes and contents'}
-			>
-				{fullText ? 'Notes' : 'Title'}
-			</button>
-			<button
-				type="button"
-				class="save-search"
-				disabled={!canSaveSearch}
-				onclick={saveCurrentSearch}
-				aria-label="Save current search"
-				title={saveSearchTitle}
-			>
-				{savingSearch ? 'Saving' : 'Save'}
-			</button>
-		</div>
-		<div class="search-options" aria-label="Search display options">
-			<div class="segmented" role="group" aria-label="Group search results">
-				<span class="seg-label">Group</span>
-				<button
-					type="button"
-					class:active={groupMode === 'none'}
-					aria-pressed={groupMode === 'none'}
-					onclick={() => setGroupMode('none')}
-				>
-					Off
-				</button>
-				<button
-					type="button"
-					class:active={groupMode === 'folder'}
-					aria-pressed={groupMode === 'folder'}
-					onclick={() => setGroupMode('folder')}
-				>
-					Folder
-				</button>
-			</div>
-		</div>
-		{#if fullText && folderFacets.length > 1}
-			<div class="folder-facets" aria-label="Search result folders">
-				<span class="facet-label">Folders</span>
-				{#each folderFacets as facet (facet.label)}
-					<button
-						type="button"
-						class="folder-facet"
-						onclick={() => narrowToFolder(facet.query)}
-						aria-label={`Narrow search to ${facet.label}`}
-						title={`Narrow to ${facet.label}`}
-					>
-						<span class="facet-name">{facet.label}</span>
-						<span class="facet-count">{facet.count}</span>
-					</button>
-				{/each}
-			</div>
-		{/if}
-		<div class="saved-search-control">
-			<input
-				type="text"
-				aria-label="Saved search name"
-				placeholder="Saved search name"
-				value={savedName}
-				oninput={(e) => {
-					savedName = (e.target as HTMLInputElement).value;
-					savedNameTouched = true;
-				}}
-				disabled={!q.trim() || savingSearch}
-			/>
-		</div>
-		<div class="saved-searches" aria-label="Saved searches">
-			{#if savedErr}
-				<p class="saved-message saved-error">Saved search error: {savedErr}</p>
-			{:else if savedLoading}
-				<p class="saved-message">Loading saved searches...</p>
-			{:else if savedSearches.length > 0}
-				<div class="saved-list">
-					{#each savedSearches as saved (saved.id)}
-						<div class="saved-chip" class:active={isActiveSavedSearch(saved, q, currentMode)}>
-							<button
-								type="button"
-								class="saved-run"
-								onclick={() => runSavedSearch(saved)}
-								aria-label={`Run saved search ${savedSearchButtonLabel(saved)}`}
-								title={saved.query}
-							>
-								<span class="saved-mode">{savedSearchModeLabel(saved.mode)}</span>
-								<span class="saved-query">{saved.name}</span>
-							</button>
-							<button
-								type="button"
-								class="saved-remove"
-								disabled={deletingSearchId === saved.id}
-								onclick={() => deleteSavedSearch(saved)}
-								aria-label={`Delete saved search ${saved.name}`}
-								title="Delete saved search"
-							>
-								{deletingSearchId === saved.id ? '...' : 'Del'}
-							</button>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-		<p class="hint">
-			{#if loading}Searching…
-			{:else if err}<span class="err">Error: {err}</span>
-			{:else if !q.trim()}Type to search.
-			{:else if results.length === 0}No matches.
-			{:else if meta && meta.total > results.length}Showing {results.length} of {meta.total} matches.
-			{:else}{results.length} result{results.length === 1 ? '' : 's'}
-			{/if}
-		</p>
-	</header>
+	<SearchHeader
+		{q}
+		{fullText}
+		{groupMode}
+		{folderFacets}
+		{savedName}
+		{savedSearches}
+		{currentMode}
+		{canSaveSearch}
+		{saveSearchTitle}
+		{savingSearch}
+		{savedErr}
+		{savedLoading}
+		{deletingSearchId}
+		{loading}
+		{err}
+		resultsCount={results.length}
+		{meta}
+		onQueryInput={onQueryInput}
+		onSavedNameInput={onSavedNameInput}
+		onToggleFullText={toggleFullText}
+		onSetGroupMode={setGroupMode}
+		onNarrowToFolder={narrowToFolder}
+		onSaveCurrentSearch={saveCurrentSearch}
+		onRunSavedSearch={runSavedSearch}
+		onDeleteSavedSearch={deleteSavedSearch}
+	/>
 
-	<div class="results" bind:this={resultsEl} onscroll={onResultsScroll}>
-		<div class="result-spacer" style={`height: ${resultWindow.totalHeight}px;`}>
-			{#each resultWindow.visibleRows as item (item.row.key)}
-				{#if item.row.kind === 'group'}
-					<div class="result-group" style={searchResultRowStyle(item.row)}>
-						<span class="group-title">{item.row.label}</span>
-						<span class="group-count">{item.row.count}</span>
-					</div>
-				{:else}
-					<button
-						type="button"
-						class="result"
-						style={searchResultRowStyle(item.row)}
-						onclick={(e) => openResultRow(item.row, e)}
-						onkeydown={(e) => onResultRowKey(e, item.row)}
-					>
-						<div class="title">{item.row.hit.title || item.row.hit.path}</div>
-						<div class="path">{item.row.hit.path}</div>
-						{#if item.row.hit.snippet}
-							<div class="snippet">{item.row.hit.snippet}</div>
-						{/if}
-					</button>
-				{/if}
-			{/each}
-		</div>
-		{#if meta?.hasMore}
-			<div class="results-footer">
-				<button type="button" class="load-more" disabled={loading || loadingMore} onclick={loadMore}>
-					{loadingMore ? 'Loading…' : `Load more (${results.length}/${meta.total})`}
-				</button>
-			</div>
-		{/if}
-	</div>
+	<SearchResultsList
+		{resultWindow}
+		{meta}
+		resultsCount={results.length}
+		{loading}
+		{loadingMore}
+		resetKey={resultResetKey}
+		onScrollTopChange={(value) => (scrollTop = value)}
+		onViewportHeightChange={(value) => (viewportHeight = value)}
+		onLoadMore={loadMore}
+		onOpenResultRow={openResultRow}
+		onResultRowKey={onResultRowKey}
+	/>
 </div>
 
 <style>
@@ -459,362 +321,5 @@
 		flex-direction: column;
 		height: 100%;
 		min-height: 0;
-	}
-	.search-header {
-		padding: 18px 22px 10px;
-		border-bottom: 1px solid var(--border);
-	}
-	.input-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 8px 12px;
-	}
-	.icon {
-		width: 16px;
-		height: 16px;
-		color: var(--fg-dim);
-		flex: 0 0 16px;
-	}
-	.input-row input {
-		flex: 1;
-		background: transparent;
-		border: 0;
-		outline: none;
-		color: var(--fg);
-		font: inherit;
-		font-size: 0.95rem;
-	}
-	.mode-toggle {
-		background: transparent;
-		border: 1px solid var(--border);
-		color: var(--fg-muted);
-		padding: 4px 10px;
-		border-radius: 4px;
-		font-size: 0.78rem;
-		cursor: pointer;
-	}
-	.mode-toggle:hover { color: var(--fg); }
-	.mode-toggle.active {
-		color: var(--accent);
-		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 12%, transparent);
-	}
-	.save-search {
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		color: white;
-		padding: 4px 10px;
-		border-radius: 4px;
-		font-size: 0.78rem;
-		cursor: pointer;
-	}
-	.save-search:disabled {
-		background: transparent;
-		color: var(--fg-dim);
-		border-color: var(--border);
-		cursor: default;
-	}
-	.search-options {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-top: 8px;
-	}
-	.segmented {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
-		padding: 2px;
-	}
-	.seg-label {
-		color: var(--fg-dim);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0;
-		padding: 0 6px 0 5px;
-	}
-	.segmented button {
-		min-width: 48px;
-		border: 0;
-		border-radius: 4px;
-		background: transparent;
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.76rem;
-		padding: 4px 8px;
-		cursor: pointer;
-	}
-	.segmented button:hover {
-		color: var(--fg);
-	}
-	.segmented button.active {
-		background: color-mix(in srgb, var(--accent) 14%, transparent);
-		color: var(--accent);
-	}
-	.folder-facets {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-top: 8px;
-		min-width: 0;
-		overflow-x: auto;
-		padding-bottom: 1px;
-	}
-	.facet-label {
-		color: var(--fg-dim);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0;
-		flex: 0 0 auto;
-	}
-	.folder-facet {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		max-width: 220px;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		background: color-mix(in srgb, var(--bg-elev), transparent 28%);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.74rem;
-		padding: 3px 7px;
-		cursor: pointer;
-		flex: 0 0 auto;
-	}
-	.folder-facet:hover {
-		border-color: var(--accent);
-		color: var(--fg);
-	}
-	.facet-name {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.facet-count {
-		color: var(--fg-dim);
-		font-family: var(--mono);
-		font-size: 0.68rem;
-		flex: 0 0 auto;
-	}
-	.saved-search-control {
-		margin-top: 8px;
-	}
-	.saved-search-control input {
-		width: 100%;
-		box-sizing: border-box;
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--fg);
-		font: inherit;
-		font-size: 0.8rem;
-		padding: 6px 8px;
-	}
-	.saved-search-control input:disabled {
-		opacity: 0.55;
-	}
-	.saved-searches {
-		margin-top: 8px;
-		min-height: 26px;
-	}
-	.saved-list {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		overflow-x: auto;
-		padding-bottom: 2px;
-	}
-	.saved-message {
-		margin: 0;
-		color: var(--fg-dim);
-		font-size: 0.76rem;
-	}
-	.saved-error {
-		color: var(--danger, #f87171);
-	}
-	.saved-chip {
-		display: inline-flex;
-		align-items: center;
-		max-width: 260px;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		background: color-mix(in srgb, var(--bg-elev), transparent 20%);
-		overflow: hidden;
-		flex: 0 0 auto;
-	}
-	.saved-chip.active {
-		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 10%, transparent);
-	}
-	.saved-run,
-	.saved-remove {
-		border: 0;
-		background: transparent;
-		color: var(--fg-muted);
-		font: inherit;
-		cursor: pointer;
-	}
-	.saved-run {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		min-width: 0;
-		padding: 4px 7px;
-	}
-	.saved-run:hover,
-	.saved-remove:hover {
-		color: var(--fg);
-	}
-	.saved-mode {
-		color: var(--accent);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0;
-		flex: 0 0 auto;
-	}
-	.saved-query {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 0.78rem;
-	}
-	.saved-remove {
-		width: 34px;
-		height: 24px;
-		border-left: 1px solid var(--border);
-		padding: 0;
-		flex: 0 0 34px;
-		font-size: 0.68rem;
-	}
-	.saved-remove:disabled {
-		cursor: default;
-		opacity: 0.55;
-	}
-	.hint {
-		margin: 8px 2px 0;
-		color: var(--fg-dim);
-		font-size: 0.8rem;
-	}
-	.hint .err { color: var(--danger, #f87171); }
-
-	.results {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		padding: 6px 12px 18px;
-	}
-	.result-spacer {
-		position: relative;
-		min-height: 100%;
-	}
-	.results-footer {
-		display: flex;
-		justify-content: center;
-		padding: 8px 0 14px;
-	}
-	.load-more {
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--bg-elev);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.8rem;
-		padding: 6px 12px;
-		cursor: pointer;
-	}
-	.load-more:hover:not(:disabled) {
-		color: var(--fg);
-		border-color: var(--accent);
-	}
-	.load-more:disabled {
-		cursor: default;
-		opacity: 0.6;
-	}
-	.result-group {
-		position: absolute;
-		left: 0;
-		right: 0;
-		height: var(--search-result-row-height);
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 0 12px;
-		box-sizing: border-box;
-		color: var(--fg-dim);
-		font-size: 0.72rem;
-		text-transform: uppercase;
-		letter-spacing: 0;
-		pointer-events: none;
-	}
-	.group-title {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.group-count {
-		flex: 0 0 auto;
-		color: var(--fg-muted);
-		font-family: var(--mono);
-	}
-	.result {
-		display: block;
-		position: absolute;
-		left: 0;
-		right: 0;
-		height: calc(var(--search-result-row-height) - 4px);
-		text-align: left;
-		background: transparent;
-		border: 0;
-		border-radius: 6px;
-		padding: 10px 12px;
-		overflow: hidden;
-		cursor: pointer;
-		color: inherit;
-		font: inherit;
-	}
-	.result:hover { background: var(--bg-hover); }
-	.result:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
-	}
-	.title {
-		color: var(--fg);
-		font-weight: 600;
-		font-size: 0.95rem;
-		font-family: 'Bricolage Grotesque', var(--sans);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.path {
-		color: var(--fg-dim);
-		font-size: 0.78rem;
-		margin-top: 2px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.snippet {
-		color: var(--fg-muted);
-		font-size: 0.82rem;
-		margin-top: 6px;
-		line-height: 1.45;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		white-space: normal;
-		word-break: break-word;
 	}
 </style>
