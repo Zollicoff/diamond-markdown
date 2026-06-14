@@ -74,6 +74,20 @@ async function openFirstNote(page: Page): Promise<void> {
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 10_000 });
 }
 
+async function dispatchModShiftKey(page: Page, key: string): Promise<void> {
+	await page.evaluate(({ key, mod }) => {
+		window.dispatchEvent(new KeyboardEvent('keydown', {
+			key,
+			code: `Key${key.toUpperCase()}`,
+			metaKey: mod === 'Meta',
+			ctrlKey: mod === 'Control',
+			shiftKey: true,
+			bubbles: true,
+			cancelable: true
+		}));
+	}, { key, mod: MOD });
+}
+
 test('⌘\\ toggles the left sidebar', async ({ page }) => {
 	await openVault(page);
 	const sidebar = page.locator('.sidebar').first();
@@ -128,11 +142,16 @@ test('⌘⇧F opens full-text search', async ({ page }) => {
 
 test('⌘⇧D opens today\'s daily note', async ({ page }) => {
 	await openVault(page);
-	const tabsBefore = await page.locator('.tabs > .tab, [role="tab"][aria-selected]').count();
-	await page.keyboard.press(`${MOD}+Shift+KeyD`);
-	// Daily note becomes a new tab; either a new tab appears or the
-	// active tab title changes to a YYYY-MM-DD pattern.
-	await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/Daily Notes\/\d{4}-\d{2}-\d{2}|note\/Daily/);
+	// Chrome/Linux reserves Ctrl+Shift+D for browser bookmarks, so dispatch
+	// the same app-level keydown shape directly to Diamond's keymap listener.
+	await dispatchModShiftKey(page, 'd');
+	const activeDailyTab = page.locator('.tabs .tab.active').filter({ hasText: /\d{4}-\d{2}-\d{2}/ });
+	await expect(activeDailyTab).toBeVisible({ timeout: 5_000 });
+	await expect.poll(() => {
+		const dailyDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'Daily Notes');
+		if (!fs.existsSync(dailyDir)) return '';
+		return fs.readdirSync(dailyDir).find((name) => /^\d{4}-\d{2}-\d{2}\.md$/.test(name)) ?? '';
+	}, { timeout: 5_000 }).toMatch(/^\d{4}-\d{2}-\d{2}\.md$/);
 });
 
 test('⌘⇧L cycles theme', async ({ page }) => {
