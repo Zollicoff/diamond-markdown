@@ -52,7 +52,11 @@ export function registerViewCommands(): void {
 		shortcut: '⌘⇧F',
 		category: 'view',
 		exec(ctx: CommandContext) {
-			emit('switcher:open', { vaultId: ctx.vaultId!, fullText: true });
+			openTab(
+				ctx.vaultId!,
+				{ id: 'search', kind: 'search', title: 'Search', query: '', fullText: true },
+				'new-tab'
+			);
 		}
 	});
 

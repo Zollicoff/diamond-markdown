@@ -137,7 +137,10 @@ test('⌘K opens the quick switcher', async ({ page }) => {
 test('⌘⇧F opens full-text search', async ({ page }) => {
 	await openVault(page);
 	await dispatchModKey(page, 'f', { shift: true });
-	await expect(page.locator('input[placeholder*="full-text" i], input[placeholder*="search" i]').first()).toBeVisible({ timeout: 2_000 });
+	const search = page.locator('.search-view');
+	await expect(search).toBeVisible({ timeout: 2_000 });
+	await expect(search.locator('.input-row input').first()).toHaveAttribute('placeholder', /contents/i);
+	await expect(search.getByRole('button', { name: 'Notes' })).toBeVisible();
 });
 
 test('⌘⇧D opens today\'s daily note', async ({ page }) => {

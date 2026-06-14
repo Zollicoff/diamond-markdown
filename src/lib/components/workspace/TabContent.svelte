@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Tab } from '$lib/workspace/types';
 	import type { NoteDoc } from '$lib/types';
-	import { setSearchQuery } from '$lib/workspace/actions';
+	import { setSearchFullText, setSearchQuery } from '$lib/workspace/actions';
 
 	type ViewComponent = any;
 
@@ -81,7 +81,9 @@
 	<View
 		{vaultId}
 		query={tab.query}
+		initialFullText={tab.fullText}
 		onQueryChange={(q: string) => setSearchQuery(vaultId, tab.id, q)}
+		onFullTextChange={(fullText: boolean) => setSearchFullText(vaultId, tab.id, fullText)}
 	/>
 {:else if tab.kind === 'settings'}
 	<View />

@@ -36,6 +36,7 @@ export interface TagsTab extends TabBase {
 export interface SearchTab extends TabBase {
 	kind: 'search';
 	query: string;
+	fullText?: boolean;
 }
 
 export interface SettingsTab extends TabBase {

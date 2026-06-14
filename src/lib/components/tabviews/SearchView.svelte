@@ -23,14 +23,19 @@
 	interface Props {
 		vaultId: string;
 		query: string;
+		initialFullText?: boolean;
 		onQueryChange?: (q: string) => void;
+		onFullTextChange?: (fullText: boolean) => void;
 	}
 
-	let { vaultId, query, onQueryChange }: Props = $props();
+	let { vaultId, query, initialFullText = false, onQueryChange, onFullTextChange }: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	let q = $state(query);
-	let fullText = $state(false);
+	// svelte-ignore state_referenced_locally
+	let fullText = $state(initialFullText);
+	// svelte-ignore state_referenced_locally
+	let appliedInitialFullText = $state(initialFullText);
 	let groupMode = $state<SearchGroupMode>('none');
 	let results = $state<SearchHit[]>([]);
 	let savedSearches = $state<SavedSearch[]>([]);
@@ -144,6 +149,7 @@
 
 	function toggleFullText(): void {
 		fullText = !fullText;
+		onFullTextChange?.(fullText);
 		void runSearch(q);
 	}
 
@@ -197,6 +203,7 @@
 	function runSavedSearch(search: SavedSearch): void {
 		q = search.query;
 		fullText = search.mode === 'full';
+		onFullTextChange?.(fullText);
 		savedName = search.name;
 		savedNameTouched = false;
 		void runSearch(q);
@@ -257,6 +264,17 @@
 				q = incoming;
 				savedName = savedSearchName(incoming);
 				savedNameTouched = false;
+				void runSearch(q);
+			}
+		});
+	});
+
+	$effect(() => {
+		const incoming = initialFullText;
+		untrack(() => {
+			if (incoming !== appliedInitialFullText) {
+				fullText = incoming;
+				appliedInitialFullText = incoming;
 				void runSearch(q);
 			}
 		});

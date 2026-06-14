@@ -128,6 +128,13 @@ export function openTab(vaultId: string, tab: Tab, mode: OpenMode = 'replace'): 
 	if (mode === 'new-tab') {
 		const existing = pane.tabs.find((t) => t.id === withId.id);
 		if (existing) {
+			if (existing.kind === 'search' && withId.kind === 'search') {
+				if (withId.query) {
+					existing.query = withId.query;
+					existing.title = withId.title;
+				}
+				if (withId.fullText !== undefined) existing.fullText = withId.fullText;
+			}
 			pane.activeTabId = existing.id;
 		} else {
 			pane.tabs = [...pane.tabs, withId];
@@ -176,6 +183,17 @@ export function setSearchQuery(vaultId: string, tabId: string, query: string): v
 		if (tab && tab.kind === 'search') {
 			tab.query = query;
 			tab.title = query ? `Search: ${query}` : 'Search';
+			persist(vaultId);
+			return;
+		}
+	}
+}
+
+export function setSearchFullText(vaultId: string, tabId: string, fullText: boolean): void {
+	for (const pane of Object.values(workspace.panes)) {
+		const tab = pane.tabs.find((t) => t.id === tabId && t.kind === 'search');
+		if (tab && tab.kind === 'search') {
+			tab.fullText = fullText;
 			persist(vaultId);
 			return;
 		}
