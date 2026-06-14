@@ -743,6 +743,15 @@ test('search tab saves, restores, and deletes vault-local saved searches', async
 	await expect(search.locator('.result').first()).toContainText('Solar');
 
 	await search.getByRole('button', { name: 'Delete saved search Solar followups' }).click();
+	const deleteDialog = page.getByRole('alertdialog', { name: 'Delete saved search' });
+	await expect(deleteDialog).toBeVisible();
+	await expect(deleteDialog).toContainText('Delete saved search "Solar followups"?');
+	await deleteDialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(deleteDialog).toBeHidden();
+	await expect(saved).toBeVisible();
+	await search.getByRole('button', { name: 'Delete saved search Solar followups' }).click();
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete' }).click();
 	await expect(saved).toHaveCount(0);
 	await expect.poll(() => {
 		const body = JSON.parse(fs.readFileSync(savedFile, 'utf-8')) as { searches: unknown[] };

@@ -14,6 +14,7 @@
 		type SearchResultDisplayRow,
 		type SearchGroupMode
 	} from '$lib/search/view';
+	import { confirmDialog } from '$lib/dialogs';
 	import { openNote } from '$lib/workspace/actions';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import type { SavedSearch, SavedSearchMode, SearchHit, SearchResponse } from '$lib/types';
@@ -211,6 +212,13 @@
 
 	async function deleteSavedSearch(search: SavedSearch): Promise<void> {
 		if (deletingSearchId) return;
+		const confirmed = await confirmDialog({
+			title: 'Delete saved search',
+			message: `Delete saved search "${search.name}"?`,
+			confirmLabel: 'Delete',
+			tone: 'danger'
+		});
+		if (!confirmed) return;
 		deletingSearchId = search.id;
 		savedErr = null;
 		try {

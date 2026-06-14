@@ -502,6 +502,10 @@ Use small, pushable slices:
   busy-state guards into a focused helper with deterministic coverage so the
   Canvas view stays oriented around loading, mutation orchestration, and
   pointer lifecycle rather than duplicated interlock logic.
+- **Saved-search delete confirmation.** Route saved-search deletion through
+  the shared in-app confirmation dialog and cover both cancel and confirm paths
+  so git-backed search metadata is not removed by a single accidental chip
+  click.
 
 ## Next Implementation Slices
 
