@@ -67,6 +67,9 @@ test('shortcut helpers expose global keymap rows and Obsidian command aliases', 
 async function openVault(page: Page): Promise<void> {
 	await page.goto('/vault/default');
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.evaluate(() => new Promise<void>((resolve) => {
+		requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+	}));
 }
 
 async function openFirstNote(page: Page): Promise<void> {
@@ -130,14 +133,15 @@ test('⌘P still opens the palette while the editor is focused', async ({ page }
 
 test('⌘K opens the quick switcher', async ({ page }) => {
 	await openVault(page);
+	const switcher = page.locator('input[placeholder*="jump" i], input[placeholder*="title" i]');
 	await dispatchModKey(page, 'k');
-	await expect(page.locator('input[placeholder*="jump" i], input[placeholder*="title" i]').first()).toBeVisible({ timeout: 2_000 });
+	await expect(switcher.first()).toBeVisible({ timeout: 2_000 });
 });
 
 test('⌘⇧F opens full-text search', async ({ page }) => {
 	await openVault(page);
-	await dispatchModKey(page, 'f', { shift: true });
 	const search = page.locator('.search-view');
+	await dispatchModKey(page, 'f', { shift: true });
 	await expect(search).toBeVisible({ timeout: 2_000 });
 	await expect(search.locator('.input-row input').first()).toHaveAttribute('placeholder', /contents/i);
 	await expect(search.getByRole('button', { name: 'Notes' })).toBeVisible();

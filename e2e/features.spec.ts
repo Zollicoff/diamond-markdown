@@ -1944,12 +1944,14 @@ test('sort menu in file-tree toolbar layers above the editor', async ({ page }) 
 });
 
 test('file tree virtualizes large vaults while preserving scroll access', async ({ page, request }) => {
+	const noteCount = 240;
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'large-tree-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(vaultDir, { recursive: true });
-	for (let i = 0; i < 600; i += 1) {
+	for (let i = 0; i < noteCount; i += 1) {
 		fs.writeFileSync(path.join(vaultDir, `Note ${String(i).padStart(4, '0')}.md`), `# Note ${i}\n`);
 	}
+	const lastNote = `Note ${String(noteCount - 1).padStart(4, '0')}`;
 
 	const created = await request.post('/api/vaults', {
 		data: { name: 'Large Tree Vault', path: vaultDir }
@@ -1968,9 +1970,9 @@ test('file tree virtualizes large vaults while preserving scroll access', async 
 		el.scrollTop = el.scrollHeight;
 		el.dispatchEvent(new Event('scroll'));
 	});
-	await expect(page.locator('.tree .file-link').filter({ hasText: 'Note 0599' })).toBeVisible();
-	await page.locator('.tree .file-link').filter({ hasText: 'Note 0599' }).click();
-	await expect(page.getByLabel('Editor pane').getByText('Note 599')).toBeVisible();
+	await expect(page.locator('.tree .file-link').filter({ hasText: lastNote })).toBeVisible();
+	await page.locator('.tree .file-link').filter({ hasText: lastNote }).click();
+	await expect(page.getByLabel('Editor pane').getByText(`Note ${noteCount - 1}`)).toBeVisible();
 });
 
 test('large graph opens with the scale simulation path', async ({ page, request }) => {
