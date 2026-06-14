@@ -10,6 +10,7 @@ import {
 	CANVAS_EDGE_SIDE_OPTIONS,
 	canvasBounds,
 	canvasConnectionDraft,
+	canvasDraftStateForDoc,
 	canvasDraftChanged,
 	canvasDraftFor,
 	canvasAddNodeButtonLabel,
@@ -736,6 +737,31 @@ test.describe('canvas view helpers', () => {
 			...edgeRoutingDrafts,
 			'edge-a-b': { fromSide: 'right', toSide: 'left', fromEnd: 'arrow', toEnd: 'none' }
 		})).toBe(true);
+		const draftState = canvasDraftStateForDoc({
+			nodes: [
+				doc.nodes[0],
+				groupNode,
+				{ ...doc.nodes[1], label: 'Home note', subpath: '#Install Steps' }
+			],
+			edges: [{ ...doc.edges[0], fromSide: 'right', toSide: 'left' }]
+		}, 'b', 'a');
+		expect(draftState.textDrafts).toEqual({ a: 'Hello canvas' });
+		expect(draftState.groupLabelDrafts).toEqual({ group: 'Research cluster' });
+		expect(draftState.refDrafts).toEqual({
+			b: { value: 'Home.md', label: 'Home note', subpath: '#Install Steps' }
+		});
+		expect(draftState.edgeLabelDrafts).toEqual({ 'edge-a-b': 'opens' });
+		expect(draftState.edgeRoutingDrafts).toEqual({
+			'edge-a-b': { fromSide: 'right', toSide: 'left', fromEnd: 'none', toEnd: 'arrow' }
+		});
+		expect(draftState.edgeFromNodeId).toBe('b');
+		expect(draftState.edgeToNodeId).toBe('a');
+		const resetDraftState = canvasDraftStateForDoc({
+			nodes: [groupNode, doc.nodes[0]],
+			edges: []
+		}, 'missing', 'b');
+		expect(resetDraftState.edgeFromNodeId).toBe('a');
+		expect(resetDraftState.edgeToNodeId).toBe('');
 	});
 });
 

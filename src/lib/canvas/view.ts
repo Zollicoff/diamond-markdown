@@ -189,6 +189,16 @@ export type CanvasEdgeLabelDrafts = Record<string, string>;
 export type CanvasEdgeRoutingDrafts = Record<string, CanvasEdgeRoutingDraft>;
 export type CanvasAddNodeType = 'text' | 'file' | 'link' | 'group';
 
+export interface CanvasDraftState {
+	textDrafts: CanvasTextDrafts;
+	groupLabelDrafts: CanvasGroupLabelDrafts;
+	refDrafts: CanvasNodeRefDrafts;
+	edgeLabelDrafts: CanvasEdgeLabelDrafts;
+	edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
+	edgeFromNodeId: string;
+	edgeToNodeId: string;
+}
+
 export const CANVAS_EDGE_SIDE_OPTIONS: { value: CanvasEdgeSide; label: string }[] = [
 	{ value: 'center', label: 'center' },
 	{ value: 'top', label: 'top' },
@@ -1088,6 +1098,24 @@ export function canvasEdgeRoutingDraftFor(edge: CanvasEdgeSummary, drafts: Canva
 		toSide: edge.toSide,
 		fromEnd: edge.fromEnd,
 		toEnd: edge.toEnd
+	};
+}
+
+export function canvasDraftStateForDoc(
+	doc: Pick<CanvasDoc, 'nodes' | 'edges'>,
+	currentFromNodeId = '',
+	currentToNodeId = ''
+): CanvasDraftState {
+	const edgeSummaries = canvasEdgeSummaries(doc);
+	const edgeDraft = canvasConnectionDraft(doc.nodes, currentFromNodeId, currentToNodeId);
+	return {
+		textDrafts: canvasTextDrafts(doc.nodes),
+		groupLabelDrafts: canvasGroupLabelDrafts(doc.nodes),
+		refDrafts: canvasNodeRefDrafts(doc.nodes),
+		edgeLabelDrafts: canvasEdgeLabelDrafts(edgeSummaries),
+		edgeRoutingDrafts: canvasEdgeRoutingDrafts(edgeSummaries),
+		edgeFromNodeId: edgeDraft.fromNodeId,
+		edgeToNodeId: edgeDraft.toNodeId
 	};
 }
 

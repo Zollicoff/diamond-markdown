@@ -6,17 +6,14 @@
 	import { replaceLocationHash } from '$lib/workspace/hash';
 	import {
 		canvasBounds,
-		canvasConnectionDraft,
+		canvasDraftStateForDoc,
 		canvasDraftChanged,
 		canvasDraftFor,
 		canvasEdgeLabelChanged,
 		canvasEdgeLabelDraftFor,
-		canvasEdgeLabelDrafts,
 		canvasEdgeRoutingChanged,
 		canvasEdgeRoutingDraftFor,
-		canvasEdgeRoutingDrafts,
 		canvasGroupLabelDraftFor,
-		canvasGroupLabelDrafts,
 		canConnectCanvasNodes,
 		canSaveCanvasGroupLabel,
 		canvasEdgeSummaries,
@@ -27,10 +24,8 @@
 		canvasTextNoteEmbedResolver,
 		canvasTextNoteWikilinkResolver,
 		canvasNodeRefDraftFor,
-		canvasNodeRefDrafts,
 		canvasNodesWithPosition,
 		canvasNodesWithSize,
-		canvasTextDrafts,
 		canSaveCanvasNodeRefDraft,
 		edgeLines,
 		type CanvasAddNodeType,
@@ -158,16 +153,15 @@
 	}
 
 	function setDoc(next: CanvasDoc): void {
+		const drafts = canvasDraftStateForDoc(next, edgeFromNodeId, edgeToNodeId);
 		doc = next;
-		textDrafts = canvasTextDrafts(next.nodes);
-		groupLabelDrafts = canvasGroupLabelDrafts(next.nodes);
-		refDrafts = canvasNodeRefDrafts(next.nodes);
-		const summaries = canvasEdgeSummaries(next);
-		edgeLabelDrafts = canvasEdgeLabelDrafts(summaries);
-		edgeRoutingDrafts = canvasEdgeRoutingDrafts(summaries);
-		const edgeDraft = canvasConnectionDraft(next.nodes, edgeFromNodeId, edgeToNodeId);
-		edgeFromNodeId = edgeDraft.fromNodeId;
-		edgeToNodeId = edgeDraft.toNodeId;
+		textDrafts = drafts.textDrafts;
+		groupLabelDrafts = drafts.groupLabelDrafts;
+		refDrafts = drafts.refDrafts;
+		edgeLabelDrafts = drafts.edgeLabelDrafts;
+		edgeRoutingDrafts = drafts.edgeRoutingDrafts;
+		edgeFromNodeId = drafts.edgeFromNodeId;
+		edgeToNodeId = drafts.edgeToNodeId;
 	}
 
 	function setDraft(node: CanvasNode, value: string): void {
