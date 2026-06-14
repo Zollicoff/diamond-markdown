@@ -247,6 +247,10 @@ Use small, pushable slices:
    `.obsidian/app.json` `defaultViewMode` / `livePreview` combinations so
    imported vaults can open notes in Read, Live, or Source mode by default
    without overriding a user-selected mode.
+- **Obsidian spellcheck preference.** Honor `.obsidian/app.json`
+   `spellcheck` by reconfiguring CodeMirror's editable content DOM per vault
+   while leaving Diamond's default editor spellcheck disabled when the setting
+   is absent.
 - **Search view presentation split.** Keep query execution, saved-search
    mutations, result paging, and virtual window orchestration in `SearchView`
    while moving header controls, saved-search chrome, and result-list DOM/CSS

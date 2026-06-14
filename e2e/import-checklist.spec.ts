@@ -152,6 +152,7 @@ test.describe('import checklist helpers', () => {
 			newFileFolderStatus: 'safe',
 			newFileFolderPath: 'Notes/Inbox',
 			defaultMode: 'read',
+			spellcheck: true,
 			settings: [
 				{
 					id: 'attachmentFolderPath',
@@ -173,10 +174,17 @@ test.describe('import checklist helpers', () => {
 					value: 'Reading view',
 					detail: 'Diamond opens notes in Read mode for this imported vault.',
 					level: 'info'
+				},
+				{
+					id: 'spellcheck',
+					label: 'Spellcheck',
+					value: 'Enabled',
+					detail: 'Diamond enables browser spellcheck in the markdown editor for this imported vault.',
+					level: 'info'
 				}
 			],
 			warnings: []
-		})).toBe('3 supported app settings found.');
+		})).toBe('4 supported app settings found.');
 	});
 
 	test('summarizes Obsidian Daily Notes config without raw JSON', () => {
@@ -719,6 +727,7 @@ test.describe('import checklist helpers', () => {
 
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			spellcheck: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
 		});
@@ -730,6 +739,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: false,
+			spellcheck: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -737,6 +747,27 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: true }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			spellcheck: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ spellcheck: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'spellcheck')).toMatchObject({
+			label: 'Spellcheck',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: true,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ spellcheck: false }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			spellcheck: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -748,6 +779,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			spellcheck: false,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
 		});
@@ -755,6 +787,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: false }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			spellcheck: false,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
 		});
@@ -762,6 +795,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: true }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			spellcheck: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});

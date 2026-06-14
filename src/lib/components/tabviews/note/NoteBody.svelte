@@ -10,6 +10,7 @@
 		mode: NoteViewMode;
 		linkStyle: EditorLinkStyle;
 		showLineNumbers: boolean;
+		spellcheck: boolean;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -35,6 +36,7 @@
 		mode,
 		linkStyle,
 		showLineNumbers,
+		spellcheck,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -79,6 +81,7 @@
 			value={content}
 			mode={mode}
 			{showLineNumbers}
+			{spellcheck}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}

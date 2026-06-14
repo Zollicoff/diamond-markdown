@@ -246,6 +246,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const spellcheck = booleanValue(body.spellcheck);
+	if (spellcheck !== null) {
+		base.spellcheck = spellcheck;
+		base.settings.push(setting(
+			'spellcheck',
+			'Spellcheck',
+			spellcheck ? 'Enabled' : 'Disabled',
+			spellcheck
+				? 'Diamond enables browser spellcheck in the markdown editor for this imported vault.'
+				: 'Diamond keeps browser spellcheck disabled in the markdown editor for this imported vault.'
+		));
+	}
+
 	const livePreview = booleanValue(body.livePreview);
 	if (livePreview !== null) {
 		base.livePreview = livePreview;
@@ -315,8 +328,9 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 	const defaultMode = config.defaultMode ?? 'live';
 	return {
 		lineNumbers: config.showLineNumber !== false,
+		spellcheck: config.spellcheck === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.defaultMode === undefined
+		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

@@ -75,7 +75,8 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - **Live preview** — Obsidian-style: markdown markers hide off-line, wikilinks render as atomic pills inline, headings render with their sizing
 - Source / Live / Read mode toggle per note
 - Imported Obsidian vaults can reuse safe `.obsidian/app.json`
-  `defaultViewMode` / `livePreview` preferences for the initial note view mode
+  `defaultViewMode` / `livePreview`, `showLineNumber`, and `spellcheck`
+  editor preferences
 - Editor toolbar (bold, italic, headings, lists, code, etc.)
 - Word count + reading time in status bar
 

@@ -15,6 +15,7 @@
 		/** 'live' renders inline (Obsidian-style); 'source' shows raw markdown. */
 		mode?: 'live' | 'source';
 		showLineNumbers?: boolean;
+		spellcheck?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -32,6 +33,7 @@
 		value,
 		mode = 'live',
 		showLineNumbers = true,
+		spellcheck = false,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -48,6 +50,7 @@
 	let suppressNextWikilinkClick = false;
 	const previewCompartment = new Compartment();
 	const lineNumberCompartment = new Compartment();
+	const contentAttributeCompartment = new Compartment();
 
 	interface WikilinkWidgetEventDetail {
 		target: string;
@@ -79,6 +82,12 @@
 
 	function lineNumberExtension(show: boolean): Extension {
 		return show ? lineNumbers() : [];
+	}
+
+	function contentAttributeExtension(checkSpelling: boolean): Extension {
+		return EditorView.contentAttributes.of({
+			spellcheck: checkSpelling ? 'true' : 'false'
+		});
 	}
 
 	function hasTransferFiles(data: DataTransfer | null): boolean {
@@ -150,6 +159,7 @@
 		host.addEventListener('diamond-wikilink-context', handleWikilinkWidgetContext);
 		const extensions: Extension[] = [
 			lineNumberCompartment.of(lineNumberExtension(showLineNumbers)),
+			contentAttributeCompartment.of(contentAttributeExtension(spellcheck)),
 			history(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
@@ -296,6 +306,11 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: lineNumberCompartment.reconfigure(lineNumberExtension(showLineNumbers)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({ effects: contentAttributeCompartment.reconfigure(contentAttributeExtension(spellcheck)) });
 	});
 </script>
 

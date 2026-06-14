@@ -66,6 +66,7 @@
 	let viewLoadError = $state<string | null>(null);
 	let linkStyle = $state<EditorLinkStyle>('wikilink');
 	let showLineNumbers = $state(true);
+	let spellcheck = $state(false);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -113,12 +114,19 @@
 		const id = vaultId;
 		untrack(() => {
 			showLineNumbers = true;
+			spellcheck = false;
 			api.editorPreferences(id)
 				.then((preference) => {
-					if (id === vaultId) showLineNumbers = preference.lineNumbers;
+					if (id === vaultId) {
+						showLineNumbers = preference.lineNumbers;
+						spellcheck = preference.spellcheck;
+					}
 				})
 				.catch(() => {
-					if (id === vaultId) showLineNumbers = true;
+					if (id === vaultId) {
+						showLineNumbers = true;
+						spellcheck = false;
+					}
 				});
 		});
 	});
@@ -359,6 +367,7 @@
 		{mode}
 		{linkStyle}
 		{showLineNumbers}
+		{spellcheck}
 		{content}
 		{editorApi}
 		{uploadingAttachments}
