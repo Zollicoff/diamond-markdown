@@ -71,6 +71,7 @@
 	import {
 		canDeleteCanvasNode,
 		canMutateCanvasEdge,
+		canSaveCanvasNodeContent,
 		canSaveCanvasNodeColor,
 		canStartCanvasNodeMove,
 		canStartCanvasNodeResize
@@ -245,7 +246,7 @@
 	}
 
 	async function saveTextNode(node: CanvasNode): Promise<void> {
-		if (!doc || savingNodeId || !canvasDraftChanged(node, textDrafts)) return;
+		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canvasDraftChanged(node, textDrafts)) return;
 		savingNodeId = node.id;
 		error = null;
 		try {
@@ -260,7 +261,7 @@
 	}
 
 	async function saveGroupLabel(node: CanvasNode): Promise<void> {
-		if (!doc || savingNodeId || !canSaveCanvasGroupLabel(node, groupLabelDrafts)) return;
+		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canSaveCanvasGroupLabel(node, groupLabelDrafts)) return;
 		savingNodeId = node.id;
 		error = null;
 		try {
@@ -281,7 +282,7 @@
 	}
 
 	async function saveRefNode(node: CanvasNode): Promise<void> {
-		if (!doc || savingNodeId || !canSaveCanvasNodeRefDraft(node, refDrafts)) return;
+		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canSaveCanvasNodeRefDraft(node, refDrafts)) return;
 		if (node.type !== 'file' && node.type !== 'link') return;
 		const draft = canvasNodeRefDraftFor(node, refDrafts);
 		savingNodeId = node.id;
@@ -661,14 +662,7 @@
 		{edgeLabelDrafts}
 		{edgeRoutingDrafts}
 		{resolveEmbedTarget}
-		{savingNodeId}
-		{movingNodeId}
-		{moveSavingNodeId}
-		{resizingNodeId}
-		{resizeSavingNodeId}
-		{deletingNodeId}
-		{savingEdgeId}
-		{deletingEdgeId}
+		{mutationState}
 		{resolveWikilinkTarget}
 		zoom={canvasZoom}
 		{zoomLabel}

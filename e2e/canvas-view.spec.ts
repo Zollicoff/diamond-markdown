@@ -108,8 +108,11 @@ import {
 	stepCanvasZoom
 } from '../src/lib/canvas/viewport';
 import {
+	canvasEdgeMutationFlags,
+	canvasNodeMutationFlags,
 	canDeleteCanvasNode,
 	canMutateCanvasEdge,
+	canSaveCanvasNodeContent,
 	canSaveCanvasNodeColor,
 	canStartCanvasNodeMove,
 	canStartCanvasNodeResize,
@@ -171,6 +174,7 @@ test.describe('canvas view helpers', () => {
 			savingEdgeId: null,
 			deletingEdgeId: null
 		} satisfies CanvasMutationState;
+		expect(canSaveCanvasNodeContent(idleMutationState)).toBe(true);
 		expect(canSaveCanvasNodeColor(idleMutationState)).toBe(true);
 		expect(canDeleteCanvasNode(idleMutationState)).toBe(true);
 		expect(canMutateCanvasEdge(idleMutationState)).toBe(true);
@@ -180,9 +184,40 @@ test.describe('canvas view helpers', () => {
 		expect(canSaveCanvasNodeColor({ ...idleMutationState, movingNodeId: 'a' })).toBe(false);
 		expect(canDeleteCanvasNode({ ...idleMutationState, savingEdgeId: 'edge-a-b' })).toBe(false);
 		expect(canMutateCanvasEdge({ ...idleMutationState, deletingEdgeId: 'edge-a-b' })).toBe(false);
+		expect(canSaveCanvasNodeContent({ ...idleMutationState, savingNodeId: 'a' })).toBe(false);
 		expect(canStartCanvasNodeMove({ ...idleMutationState, moveSavingNodeId: 'a' })).toBe(false);
 		expect(canStartCanvasNodeResize({ ...idleMutationState, resizeSavingNodeId: 'a' })).toBe(false);
 		expect(isCanvasNodeDeleteDisabled({ ...idleMutationState, deletingNodeId: 'a' })).toBe(true);
+		expect(canvasNodeMutationFlags('a', {
+			...idleMutationState,
+			savingNodeId: 'a',
+			moveSavingNodeId: 'a',
+			resizingNodeId: 'a',
+			deletingNodeId: 'a',
+			savingEdgeId: 'edge-a-b'
+		})).toEqual({
+			saving: true,
+			moving: true,
+			resizing: true,
+			deleting: true,
+			deleteDisabled: true
+		});
+		expect(canvasEdgeMutationFlags('edge-a-b', {
+			...idleMutationState,
+			savingEdgeId: 'edge-a-b'
+		})).toEqual({
+			saving: true,
+			deleting: false,
+			disabled: true
+		});
+		expect(canvasEdgeMutationFlags('edge-a-b', {
+			...idleMutationState,
+			deletingEdgeId: 'edge-a-b'
+		})).toEqual({
+			saving: false,
+			deleting: true,
+			disabled: true
+		});
 
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');

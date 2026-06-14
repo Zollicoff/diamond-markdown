@@ -9,6 +9,24 @@ export interface CanvasMutationState {
 	deletingEdgeId: string | null;
 }
 
+export interface CanvasNodeMutationFlags {
+	saving: boolean;
+	moving: boolean;
+	resizing: boolean;
+	deleting: boolean;
+	deleteDisabled: boolean;
+}
+
+export interface CanvasEdgeMutationFlags {
+	saving: boolean;
+	deleting: boolean;
+	disabled: boolean;
+}
+
+export function canSaveCanvasNodeContent(state: CanvasMutationState): boolean {
+	return !state.savingNodeId;
+}
+
 export function canSaveCanvasNodeColor(state: CanvasMutationState): boolean {
 	return !(
 		state.savingNodeId ||
@@ -38,4 +56,28 @@ export function canMutateCanvasEdge(state: CanvasMutationState): boolean {
 
 export function isCanvasNodeDeleteDisabled(state: CanvasMutationState): boolean {
 	return !canDeleteCanvasNode(state);
+}
+
+export function canvasNodeMutationFlags(
+	nodeId: string,
+	state: CanvasMutationState
+): CanvasNodeMutationFlags {
+	return {
+		saving: state.savingNodeId === nodeId,
+		moving: state.movingNodeId === nodeId || state.moveSavingNodeId === nodeId,
+		resizing: state.resizingNodeId === nodeId || state.resizeSavingNodeId === nodeId,
+		deleting: state.deletingNodeId === nodeId,
+		deleteDisabled: isCanvasNodeDeleteDisabled(state)
+	};
+}
+
+export function canvasEdgeMutationFlags(
+	edgeId: string,
+	state: CanvasMutationState
+): CanvasEdgeMutationFlags {
+	return {
+		saving: state.savingEdgeId === edgeId,
+		deleting: state.deletingEdgeId === edgeId,
+		disabled: !canMutateCanvasEdge(state)
+	};
 }

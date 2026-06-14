@@ -26,7 +26,10 @@
 		canvasGridBackgroundSize,
 		canvasZoomLayerStyle
 	} from '$lib/canvas/viewport';
-	import { isCanvasNodeDeleteDisabled } from '$lib/canvas/mutations';
+	import {
+		canvasNodeMutationFlags,
+		type CanvasMutationState
+	} from '$lib/canvas/mutations';
 	import CanvasEdgeLayer from './CanvasEdgeLayer.svelte';
 	import CanvasNodeCard from './CanvasNodeCard.svelte';
 
@@ -40,14 +43,7 @@
 		refDrafts: CanvasNodeRefDrafts;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
-		savingNodeId: string | null;
-		movingNodeId: string | null;
-		moveSavingNodeId: string | null;
-		resizingNodeId: string | null;
-		resizeSavingNodeId: string | null;
-		deletingNodeId: string | null;
-		savingEdgeId: string | null;
-		deletingEdgeId: string | null;
+		mutationState: CanvasMutationState;
 		zoom: number;
 		zoomLabel: string;
 		canZoomIn: boolean;
@@ -79,14 +75,7 @@
 		refDrafts,
 		resolveEmbedTarget,
 		resolveWikilinkTarget,
-		savingNodeId,
-		movingNodeId,
-		moveSavingNodeId,
-		resizingNodeId,
-		resizeSavingNodeId,
-		deletingNodeId,
-		savingEdgeId,
-		deletingEdgeId,
+		mutationState,
 		zoom,
 		zoomLabel,
 		canZoomIn,
@@ -111,17 +100,6 @@
 	let viewportWidth = $state(0);
 	let viewportHeight = $state(0);
 
-	const mutationState = $derived({
-		savingNodeId,
-		movingNodeId,
-		moveSavingNodeId,
-		resizingNodeId,
-		resizeSavingNodeId,
-		deletingNodeId,
-		savingEdgeId,
-		deletingEdgeId
-	});
-	const disableNodeDelete = $derived(isCanvasNodeDeleteDisabled(mutationState));
 	const layeredNodes = $derived(canvasLayeredNodes(nodes));
 	const zoomLayerStyle = $derived(canvasZoomLayerStyle(bounds, zoom));
 	const boardStyle = $derived(canvasBoardZoomStyle(bounds, zoom));
@@ -150,6 +128,7 @@
 		<CanvasEdgeLayer {bounds} {lines} />
 
 		{#each layeredNodes as node (node.id)}
+			{@const nodeMutation = canvasNodeMutationFlags(node.id, mutationState)}
 			<CanvasNodeCard
 				{vaultId}
 				{node}
@@ -164,11 +143,11 @@
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
 				{resolveEmbedTarget}
 				{resolveWikilinkTarget}
-				saving={savingNodeId === node.id}
-				moving={movingNodeId === node.id || moveSavingNodeId === node.id}
-				resizing={resizingNodeId === node.id || resizeSavingNodeId === node.id}
-				deleting={deletingNodeId === node.id}
-				disableDelete={disableNodeDelete}
+				saving={nodeMutation.saving}
+				moving={nodeMutation.moving}
+				resizing={nodeMutation.resizing}
+				deleting={nodeMutation.deleting}
+				disableDelete={nodeMutation.deleteDisabled}
 				onDraftChange={onDraftChange}
 				onGroupLabelDraftChange={onGroupLabelDraftChange}
 				onRefDraftChange={onRefDraftChange}

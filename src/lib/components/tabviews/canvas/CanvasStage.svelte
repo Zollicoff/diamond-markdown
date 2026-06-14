@@ -16,6 +16,7 @@
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
 	} from '$lib/canvas/text-preview';
+	import type { CanvasMutationState } from '$lib/canvas/mutations';
 	import CanvasBoard from './CanvasBoard.svelte';
 	import CanvasEdgeList from './CanvasEdgeList.svelte';
 
@@ -35,14 +36,7 @@
 		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
-		savingNodeId: string | null;
-		movingNodeId: string | null;
-		moveSavingNodeId: string | null;
-		resizingNodeId: string | null;
-		resizeSavingNodeId: string | null;
-		deletingNodeId: string | null;
-		savingEdgeId: string | null;
-		deletingEdgeId: string | null;
+		mutationState: CanvasMutationState;
 		zoom: number;
 		zoomLabel: string;
 		canZoomIn: boolean;
@@ -86,14 +80,7 @@
 		edgeRoutingDrafts,
 		resolveEmbedTarget,
 		resolveWikilinkTarget,
-		savingNodeId,
-		movingNodeId,
-		moveSavingNodeId,
-		resizingNodeId,
-		resizeSavingNodeId,
-		deletingNodeId,
-		savingEdgeId,
-		deletingEdgeId,
+		mutationState,
 		zoom,
 		zoomLabel,
 		canZoomIn,
@@ -140,8 +127,7 @@
 		edges={edgeSummaries}
 		{edgeLabelDrafts}
 		{edgeRoutingDrafts}
-		{savingEdgeId}
-		{deletingEdgeId}
+		{mutationState}
 		onLabelDraftChange={onEdgeLabelDraftChange}
 		onRoutingDraftChange={onEdgeRoutingDraftChange}
 		onSaveLabel={onSaveEdgeLabel}
@@ -159,14 +145,7 @@
 		{refDrafts}
 		{resolveEmbedTarget}
 		{resolveWikilinkTarget}
-		{savingNodeId}
-		{movingNodeId}
-		{moveSavingNodeId}
-		{resizingNodeId}
-		{resizeSavingNodeId}
-		{deletingNodeId}
-		{savingEdgeId}
-		{deletingEdgeId}
+		{mutationState}
 		{zoom}
 		{zoomLabel}
 		{canZoomIn}

@@ -13,14 +13,17 @@
 		type CanvasEdgeSide,
 		type CanvasEdgeSummary
 	} from '$lib/canvas/view';
+	import {
+		canvasEdgeMutationFlags,
+		type CanvasMutationState
+	} from '$lib/canvas/mutations';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
 
 	interface Props {
 		edges: CanvasEdgeSummary[];
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
 		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
-		savingEdgeId: string | null;
-		deletingEdgeId: string | null;
+		mutationState: CanvasMutationState;
 		onLabelDraftChange: (edge: CanvasEdgeSummary, value: string) => void;
 		onRoutingDraftChange: (edge: CanvasEdgeSummary, draft: CanvasEdgeRoutingDraft) => void;
 		onSaveLabel: (edge: CanvasEdgeSummary) => void | Promise<void>;
@@ -33,8 +36,7 @@
 		edges,
 		edgeLabelDrafts,
 		edgeRoutingDrafts,
-		savingEdgeId,
-		deletingEdgeId,
+		mutationState,
 		onLabelDraftChange,
 		onRoutingDraftChange,
 		onSaveLabel,
@@ -57,6 +59,7 @@
 		<div class="edge-items">
 			{#each edges as edge (edge.id)}
 				{@const routingDraft = canvasEdgeRoutingDraftFor(edge, edgeRoutingDrafts)}
+				{@const edgeMutation = canvasEdgeMutationFlags(edge.id, mutationState)}
 				<div class="edge-item">
 					<span class="edge-copy" title={edge.description}>
 						<span>{edge.fromLabel}</span>
@@ -70,8 +73,8 @@
 						kind="edge"
 						label={edge.description}
 						color={edge.color}
-						saving={savingEdgeId === edge.id}
-						disabled={savingEdgeId !== null || deletingEdgeId !== null}
+						saving={edgeMutation.saving}
+						disabled={edgeMutation.disabled}
 						onColorChange={(color) => onColorChange(edge, color)}
 					/>
 					<form
@@ -86,15 +89,15 @@
 							aria-label={`Edit label for canvas edge ${edge.description}`}
 							placeholder="label"
 							value={canvasEdgeLabelDraftFor(edge, edgeLabelDrafts)}
-							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={edgeMutation.disabled}
 							oninput={(event) => onLabelDraftChange(edge, event.currentTarget.value)}
 						/>
 						<button
 							class="edge-save"
 							aria-label={`Save canvas edge ${edge.description}`}
-							disabled={!canvasEdgeLabelChanged(edge, edgeLabelDrafts) || savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={!canvasEdgeLabelChanged(edge, edgeLabelDrafts) || edgeMutation.disabled}
 						>
-							{savingEdgeId === edge.id ? 'Saving...' : 'Save'}
+							{edgeMutation.saving ? 'Saving...' : 'Save'}
 						</button>
 					</form>
 					<form
@@ -107,7 +110,7 @@
 						<select
 							aria-label={`Canvas edge ${edge.description} from side`}
 							value={routingDraft.fromSide}
-							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={edgeMutation.disabled}
 							onchange={(event) => updateRoutingDraft(edge, {
 								fromSide: event.currentTarget.value as CanvasEdgeSide
 							})}
@@ -119,7 +122,7 @@
 						<select
 							aria-label={`Canvas edge ${edge.description} to side`}
 							value={routingDraft.toSide}
-							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={edgeMutation.disabled}
 							onchange={(event) => updateRoutingDraft(edge, {
 								toSide: event.currentTarget.value as CanvasEdgeSide
 							})}
@@ -131,7 +134,7 @@
 						<select
 							aria-label={`Canvas edge ${edge.description} start endpoint`}
 							value={routingDraft.fromEnd}
-							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={edgeMutation.disabled}
 							onchange={(event) => updateRoutingDraft(edge, {
 								fromEnd: event.currentTarget.value as CanvasEdgeEnd
 							})}
@@ -143,7 +146,7 @@
 						<select
 							aria-label={`Canvas edge ${edge.description} end endpoint`}
 							value={routingDraft.toEnd}
-							disabled={savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={edgeMutation.disabled}
 							onchange={(event) => updateRoutingDraft(edge, {
 								toEnd: event.currentTarget.value as CanvasEdgeEnd
 							})}
@@ -155,18 +158,18 @@
 						<button
 							class="edge-save"
 							aria-label={`Save canvas edge routing ${edge.description}`}
-							disabled={!canvasEdgeRoutingChanged(edge, edgeRoutingDrafts) || savingEdgeId !== null || deletingEdgeId !== null}
+							disabled={!canvasEdgeRoutingChanged(edge, edgeRoutingDrafts) || edgeMutation.disabled}
 						>
-							{savingEdgeId === edge.id ? 'Saving...' : 'Route'}
+							{edgeMutation.saving ? 'Saving...' : 'Route'}
 						</button>
 					</form>
 					<button
 						class="edge-remove"
 						aria-label={`Remove canvas edge ${edge.description}`}
-						disabled={deletingEdgeId !== null || savingEdgeId !== null}
+						disabled={edgeMutation.disabled}
 						onclick={() => void onDelete(edge)}
 					>
-						{deletingEdgeId === edge.id ? 'Removing...' : 'Remove'}
+						{edgeMutation.deleting ? 'Removing...' : 'Remove'}
 					</button>
 				</div>
 			{/each}
