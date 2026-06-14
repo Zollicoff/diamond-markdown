@@ -3,6 +3,18 @@
 Diamond Markdown registers an existing folder in place. It does not copy,
 rewrite, or normalize markdown files during import.
 
+## Exporting Back To Obsidian
+
+Use **Settings → Vault → Obsidian export** to download an Obsidian-ready ZIP
+package of the active vault. The package preserves Markdown files, Canvas files,
+attachments, and `.obsidian` configuration files so the extracted folder can be
+opened directly in Obsidian. Diamond-specific `.diamondmd/` metadata, generated
+`.diamond-publish/` output, `.git/`, `node_modules/`, and `.DS_Store` files are
+left out of the package.
+
+The export does not rewrite notes or convert Diamond plugins into Obsidian
+plugins; it is a clean vault-file handoff, not a full ecosystem migration.
+
 ## Obsidian Vaults
 
 Use the home screen's **Add vault** form and run **Inspect import** before adding

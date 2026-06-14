@@ -115,7 +115,8 @@ runtime compatibility is a non-goal.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
-- **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
+- **Export to Obsidian** — Settings can download an Obsidian-ready vault ZIP;
+  deeper ecosystem conversion remains outside the core claim.
 - **Search dashboards.** Search now has ranked indexed results, operators,
   regex, folder grouping/facets, pagination, virtualization, and git-backed
   saved searches; richer dashboards can stay incremental.

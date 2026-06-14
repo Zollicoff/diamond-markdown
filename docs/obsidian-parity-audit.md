@@ -42,7 +42,7 @@ The main remaining product risks are:
 
 | Area | Status | Evidence | Remaining blocker |
 | --- | --- | --- | --- |
-| Vault filesystem model | Done | Vault registry, server path guards, import preflight, file tree tests | Keep all new disk routes on server path helpers |
+| Vault filesystem model | Done | Vault registry, server path guards, import preflight, Obsidian-ready vault ZIP export, file tree tests | Keep all new disk routes on server path helpers |
 | Markdown editing | Done | CodeMirror source/live/read modes, toolbar, word count, stale revision guard | Polish editor edge cases as reported |
 | Wikilinks and navigation | Done | Alias/path/heading/block refs, context menus, hover previews, modifier opens | More obscure Obsidian link aliases can be added later |
 | Backlinks/outgoing links | Done | Indexer and right-panel link lists, including unlinked mention detection | Keep mention matching conservative so it remains useful on large vaults |
@@ -54,7 +54,7 @@ The main remaining product risks are:
 | Graph | Done | Force graph, filters, selection, pinning, quadtree scaling path | Cosmetic parity with Obsidian graph is not the priority |
 | Git history | Done | Auto-commits, note history diff/copy/restore | Branch workflows are still an open idea |
 | GitHub sync | Partial | Remote setup, check, safe one-click sync, fetch, fast-forward pull, guarded push, incoming-file review with UI-level sync recovery, divergence/recovery UI, git-backed bookmarks and saved searches | Background sync and conflict resolution remain manual by design |
-| Import from Obsidian | Partial | `.obsidian` detection, supported `app.json`, Daily Notes, Templates, Appearance/CSS snippet guidance, core-plugin support notes, hotkey migration guidance with known Diamond command mappings, and bookmark migration notes, safe attachment-folder reuse, safe configured new-note folder defaults, `useMarkdownLinks` editor insertion preference, safe Daily Notes folder/template/date-format reuse, safe Templates folder/default date-time format reuse, note-level Obsidian bookmark seeding, `alwaysUpdateLinks` rename behavior, plugin settings migration guidance, Canvas preservation | No full plugin/theme/hotkey migration or execution; some Obsidian UI preferences remain guidance-only |
+| Import/export with Obsidian | Partial | `.obsidian` detection, supported `app.json`, Daily Notes, Templates, Appearance/CSS snippet guidance, core-plugin support notes, hotkey migration guidance with known Diamond command mappings, and bookmark migration notes, safe attachment-folder reuse, safe configured new-note folder defaults, `useMarkdownLinks` editor insertion preference, safe Daily Notes folder/template/date-format reuse, safe Templates folder/default date-time format reuse, note-level Obsidian bookmark seeding, `alwaysUpdateLinks` rename behavior, plugin settings migration guidance, Canvas preservation, Obsidian-ready ZIP export that excludes Diamond/Git/generated metadata | No full plugin/theme/hotkey migration or execution; some Obsidian UI preferences remain guidance-only |
 | Static publishing | Done | Public frontmatter export, public-only wikilinks, assets copied | Hosted publish service is intentionally out of scope |
 | PWA/mobile | Partial | PWA app shell, mobile gestures, responsive layout | Offline editing/sync conflict story remains intentionally server-backed |
 | Self-hosting/security | Partial | Basic Auth, read-only mode, path traversal tests, self-hosting docs | No multi-user auth/authorization model |

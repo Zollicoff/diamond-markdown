@@ -21,6 +21,8 @@ Diamond Markdown already has the right foundation:
   supported Obsidian app settings, core-plugin and hotkey migration guidance,
   Obsidian plugin folders with manual settings-migration guidance, Canvas files,
   and Git readiness before registration.
+- Obsidian-ready ZIP export that preserves vault content and `.obsidian` config
+  while excluding Diamond metadata, generated publish output, and git internals.
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and batched full-suite Playwright e2e.
 
@@ -163,6 +165,9 @@ Use small, pushable slices:
    pull/sync operations and verify the incoming-remote-changes recovery panel
    can sync from the visible UI while newly pulled files appear without a
    manual page refresh.
+- **Obsidian export package.** Download a portable ZIP of vault files from
+   Settings, preserving `.obsidian` configuration and excluding `.diamondmd`,
+   `.diamond-publish`, `.git`, `node_modules`, and `.DS_Store` metadata.
 - **Canvas node positioning.** Drag Canvas cards to update node coordinates in
    `.canvas` files through git-backed commits with stale-revision protection.
 - **Canvas edge creation.** Connect existing Canvas nodes from the board with

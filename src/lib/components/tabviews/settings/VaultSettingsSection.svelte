@@ -1,5 +1,6 @@
 <script lang="ts">
 	interface VaultSettingsSummary {
+		id: string;
 		name: string;
 		path: string;
 	}
@@ -9,6 +10,8 @@
 	}
 
 	let { vault }: Props = $props();
+
+	const obsidianExportHref = $derived(`/api/vaults/${vault.id}/export/obsidian`);
 </script>
 
 <section class="group" id="vault">
@@ -33,6 +36,13 @@
 			<div class="row-hint">Pick a different vault from the registry.</div>
 		</div>
 		<a class="link-btn" href="/">Open vault picker →</a>
+	</div>
+	<div class="row">
+		<div class="row-label">
+			<div class="row-title">Obsidian export</div>
+			<div class="row-hint">Download a ZIP package of the vault files without Diamond or Git metadata.</div>
+		</div>
+		<a class="link-btn" href={obsidianExportHref} download>Download ZIP →</a>
 	</div>
 </section>
 
