@@ -75,10 +75,12 @@ test('Obsidian export downloads vault files without Diamond or Git metadata', as
 	expect(created.ok(), created.ok() ? '' : await created.text()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'networkidle' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
 	await page.getByLabel('Settings').click();
-	await expect(page.getByRole('link', { name: 'Download ZIP →' })).toHaveAttribute(
+	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+	const downloadZipLink = page.getByRole('link', { name: /Download ZIP/ });
+	await expect(downloadZipLink).toHaveAttribute(
 		'href',
 		`/api/vaults/${vault.id}/export/obsidian`
 	);
