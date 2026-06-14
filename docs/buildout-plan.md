@@ -498,6 +498,10 @@ Use small, pushable slices:
   artifact manifests containing source commit/ref, package and Tauri versions,
   runner platform, requested bundle targets, file sizes, and SHA-256 hashes so
   unsigned CI bundles are ready for later GitHub Release publishing policy.
+- **Canvas mutation-state helper extraction.** Move repeated Canvas node/edge
+  busy-state guards into a focused helper with deterministic coverage so the
+  Canvas view stays oriented around loading, mutation orchestration, and
+  pointer lifecycle rather than duplicated interlock logic.
 
 ## Next Implementation Slices
 

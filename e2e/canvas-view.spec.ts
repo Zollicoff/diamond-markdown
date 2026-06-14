@@ -107,6 +107,15 @@ import {
 	scaledCanvasLength,
 	stepCanvasZoom
 } from '../src/lib/canvas/viewport';
+import {
+	canDeleteCanvasNode,
+	canMutateCanvasEdge,
+	canSaveCanvasNodeColor,
+	canStartCanvasNodeMove,
+	canStartCanvasNodeResize,
+	isCanvasNodeDeleteDisabled,
+	type CanvasMutationState
+} from '../src/lib/canvas/mutations';
 
 const canvasJson = JSON.stringify({
 	nodes: [
@@ -152,6 +161,28 @@ test.describe('canvas view helpers', () => {
 		expect(canvasZoomLayerStyle({ width: 640, height: 360 }, 1.25)).toBe('width: 800px; height: 450px');
 		expect(canvasBoardZoomStyle({ width: 640, height: 360 }, 0.8)).toBe('width: 640px; height: 360px; transform: scale(0.8)');
 		expect(canvasGridBackgroundSize(0.5)).toBe('18px 18px');
+		const idleMutationState = {
+			savingNodeId: null,
+			movingNodeId: null,
+			moveSavingNodeId: null,
+			resizingNodeId: null,
+			resizeSavingNodeId: null,
+			deletingNodeId: null,
+			savingEdgeId: null,
+			deletingEdgeId: null
+		} satisfies CanvasMutationState;
+		expect(canSaveCanvasNodeColor(idleMutationState)).toBe(true);
+		expect(canDeleteCanvasNode(idleMutationState)).toBe(true);
+		expect(canMutateCanvasEdge(idleMutationState)).toBe(true);
+		expect(canStartCanvasNodeMove(idleMutationState)).toBe(true);
+		expect(canStartCanvasNodeResize(idleMutationState)).toBe(true);
+		expect(isCanvasNodeDeleteDisabled(idleMutationState)).toBe(false);
+		expect(canSaveCanvasNodeColor({ ...idleMutationState, movingNodeId: 'a' })).toBe(false);
+		expect(canDeleteCanvasNode({ ...idleMutationState, savingEdgeId: 'edge-a-b' })).toBe(false);
+		expect(canMutateCanvasEdge({ ...idleMutationState, deletingEdgeId: 'edge-a-b' })).toBe(false);
+		expect(canStartCanvasNodeMove({ ...idleMutationState, moveSavingNodeId: 'a' })).toBe(false);
+		expect(canStartCanvasNodeResize({ ...idleMutationState, resizeSavingNodeId: 'a' })).toBe(false);
+		expect(isCanvasNodeDeleteDisabled({ ...idleMutationState, deletingNodeId: 'a' })).toBe(true);
 
 		expect(canvasNodeTitle(doc.nodes[0])).toBe('text');
 		expect(canvasNodeTitle(doc.nodes[1])).toBe('Home.md');

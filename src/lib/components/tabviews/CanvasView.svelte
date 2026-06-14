@@ -66,6 +66,13 @@
 		CanvasLinkTargetRequestQueue,
 		isCanvasLinkTargetRefreshEvent
 	} from '$lib/canvas/link-targets';
+	import {
+		canDeleteCanvasNode,
+		canMutateCanvasEdge,
+		canSaveCanvasNodeColor,
+		canStartCanvasNodeMove,
+		canStartCanvasNodeResize
+	} from '$lib/canvas/mutations';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
 
@@ -103,6 +110,16 @@
 	let linkTargets = $state<NoteLinkTarget[]>([]);
 	const linkTargetRequests = new CanvasLinkTargetRequestQueue();
 
+	const mutationState = $derived({
+		savingNodeId,
+		movingNodeId,
+		moveSavingNodeId,
+		resizingNodeId,
+		resizeSavingNodeId,
+		deletingNodeId,
+		savingEdgeId,
+		deletingEdgeId
+	});
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
 		dragState ? canvasNodeDragPosition(dragState) : null
@@ -288,7 +305,7 @@
 	}
 
 	async function saveNodeColor(node: CanvasNode, color: string): Promise<void> {
-		if (!doc || savingNodeId || deletingNodeId || movingNodeId || moveSavingNodeId || resizingNodeId || resizeSavingNodeId) return;
+		if (!doc || !canSaveCanvasNodeColor(mutationState)) return;
 		savingNodeId = node.id;
 		error = null;
 		try {
@@ -303,7 +320,7 @@
 	}
 
 	async function deleteNode(node: CanvasNode): Promise<void> {
-		if (!doc || deletingNodeId || savingNodeId || movingNodeId || moveSavingNodeId || resizingNodeId || resizeSavingNodeId || savingEdgeId || deletingEdgeId) return;
+		if (!doc || !canDeleteCanvasNode(mutationState)) return;
 		deletingNodeId = node.id;
 		error = null;
 		try {
@@ -341,7 +358,7 @@
 	}
 
 	async function deleteEdge(edgeId: string): Promise<void> {
-		if (!doc || deletingEdgeId || savingEdgeId) return;
+		if (!doc || !canMutateCanvasEdge(mutationState)) return;
 		deletingEdgeId = edgeId;
 		error = null;
 		try {
@@ -356,7 +373,7 @@
 	}
 
 	async function saveEdgeLabel(edge: CanvasEdgeSummary): Promise<void> {
-		if (!doc || savingEdgeId || deletingEdgeId || !canvasEdgeLabelChanged(edge, edgeLabelDrafts)) return;
+		if (!doc || !canMutateCanvasEdge(mutationState) || !canvasEdgeLabelChanged(edge, edgeLabelDrafts)) return;
 		savingEdgeId = edge.id;
 		error = null;
 		try {
@@ -377,7 +394,7 @@
 	}
 
 	async function saveEdgeColor(edge: CanvasEdgeSummary, color: string): Promise<void> {
-		if (!doc || savingEdgeId || deletingEdgeId) return;
+		if (!doc || !canMutateCanvasEdge(mutationState)) return;
 		savingEdgeId = edge.id;
 		error = null;
 		try {
@@ -392,7 +409,7 @@
 	}
 
 	async function saveEdgeRouting(edge: CanvasEdgeSummary): Promise<void> {
-		if (!doc || savingEdgeId || deletingEdgeId || !canvasEdgeRoutingChanged(edge, edgeRoutingDrafts)) return;
+		if (!doc || !canMutateCanvasEdge(mutationState) || !canvasEdgeRoutingChanged(edge, edgeRoutingDrafts)) return;
 		savingEdgeId = edge.id;
 		error = null;
 		try {
@@ -476,7 +493,7 @@
 	}
 
 	function startMoveNode(node: CanvasNode, event: PointerEvent): void {
-		if (!doc || moveSavingNodeId) return;
+		if (!doc || !canStartCanvasNodeMove(mutationState)) return;
 		event.preventDefault();
 		movingNodeId = node.id;
 		dragState = createCanvasNodeDragState(node, event, canvasZoom);
@@ -527,7 +544,7 @@
 	}
 
 	function startResizeNode(node: CanvasNode, event: PointerEvent): void {
-		if (!doc || resizeSavingNodeId) return;
+		if (!doc || !canStartCanvasNodeResize(mutationState)) return;
 		event.preventDefault();
 		event.stopPropagation();
 		resizingNodeId = node.id;

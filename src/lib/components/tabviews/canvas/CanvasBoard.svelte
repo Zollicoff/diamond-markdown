@@ -26,6 +26,7 @@
 		canvasGridBackgroundSize,
 		canvasZoomLayerStyle
 	} from '$lib/canvas/viewport';
+	import { isCanvasNodeDeleteDisabled } from '$lib/canvas/mutations';
 	import CanvasEdgeLayer from './CanvasEdgeLayer.svelte';
 	import CanvasNodeCard from './CanvasNodeCard.svelte';
 
@@ -110,16 +111,17 @@
 	let viewportWidth = $state(0);
 	let viewportHeight = $state(0);
 
-	const disableNodeDelete = $derived(
-		deletingNodeId !== null ||
-		savingNodeId !== null ||
-		movingNodeId !== null ||
-		moveSavingNodeId !== null ||
-		resizingNodeId !== null ||
-		resizeSavingNodeId !== null ||
-		savingEdgeId !== null ||
-		deletingEdgeId !== null
-	);
+	const mutationState = $derived({
+		savingNodeId,
+		movingNodeId,
+		moveSavingNodeId,
+		resizingNodeId,
+		resizeSavingNodeId,
+		deletingNodeId,
+		savingEdgeId,
+		deletingEdgeId
+	});
+	const disableNodeDelete = $derived(isCanvasNodeDeleteDisabled(mutationState));
 	const layeredNodes = $derived(canvasLayeredNodes(nodes));
 	const zoomLayerStyle = $derived(canvasZoomLayerStyle(bounds, zoom));
 	const boardStyle = $derived(canvasBoardZoomStyle(bounds, zoom));
