@@ -466,6 +466,10 @@ Use small, pushable slices:
   text-card note embed chips through the same vault index by path, title,
   stem, or alias, preserving heading/block subpaths while leaving missing
   embeds literal and `.canvas` embeds explicit.
+- **Canvas text preview split.** Keep text-card draft editing, save/delete
+  actions, and mutation callbacks in `CanvasTextNodeEditor` while moving the
+  markdown-aware preview renderer and internal note/Canvas navigation into a
+  focused `CanvasTextPreview` component.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
