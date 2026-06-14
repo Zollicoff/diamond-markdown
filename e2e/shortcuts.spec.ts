@@ -74,18 +74,18 @@ async function openFirstNote(page: Page): Promise<void> {
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 10_000 });
 }
 
-async function dispatchModShiftKey(page: Page, key: string): Promise<void> {
-	await page.evaluate(({ key, mod }) => {
+async function dispatchModKey(page: Page, key: string, options: { shift?: boolean } = {}): Promise<void> {
+	await page.evaluate(({ key, mod, shift }) => {
 		window.dispatchEvent(new KeyboardEvent('keydown', {
 			key,
 			code: `Key${key.toUpperCase()}`,
 			metaKey: mod === 'Meta',
 			ctrlKey: mod === 'Control',
-			shiftKey: true,
+			shiftKey: shift,
 			bubbles: true,
 			cancelable: true
 		}));
-	}, { key, mod: MOD });
+	}, { key, mod: MOD, shift: options.shift ?? false });
 }
 
 test('⌘\\ toggles the left sidebar', async ({ page }) => {
@@ -130,13 +130,13 @@ test('⌘P still opens the palette while the editor is focused', async ({ page }
 
 test('⌘K opens the quick switcher', async ({ page }) => {
 	await openVault(page);
-	await page.keyboard.press(`${MOD}+KeyK`);
+	await dispatchModKey(page, 'k');
 	await expect(page.locator('input[placeholder*="jump" i], input[placeholder*="title" i]').first()).toBeVisible({ timeout: 2_000 });
 });
 
 test('⌘⇧F opens full-text search', async ({ page }) => {
 	await openVault(page);
-	await page.keyboard.press(`${MOD}+Shift+KeyF`);
+	await dispatchModKey(page, 'f', { shift: true });
 	await expect(page.locator('input[placeholder*="full-text" i], input[placeholder*="search" i]').first()).toBeVisible({ timeout: 2_000 });
 });
 
@@ -144,7 +144,7 @@ test('⌘⇧D opens today\'s daily note', async ({ page }) => {
 	await openVault(page);
 	// Chrome/Linux reserves Ctrl+Shift+D for browser bookmarks, so dispatch
 	// the same app-level keydown shape directly to Diamond's keymap listener.
-	await dispatchModShiftKey(page, 'd');
+	await dispatchModKey(page, 'd', { shift: true });
 	const activeDailyTab = page.locator('.tabs .tab.active').filter({ hasText: /\d{4}-\d{2}-\d{2}/ });
 	await expect(activeDailyTab).toBeVisible({ timeout: 5_000 });
 	await expect.poll(() => {
