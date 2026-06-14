@@ -516,6 +516,9 @@ Use small, pushable slices:
 - **Saved-search presentation split.** Keep search query, grouping, facets,
   and result orchestration in `SearchHeader`/`SearchView` while moving the
   saved-search name/chip controls into a focused presentation component.
+- **Canvas text-card heading/rule compatibility.** Render H1-H6 headings and
+  Markdown thematic breaks inside Canvas text-card previews while preserving
+  the raw editable card text.
 
 ## Next Implementation Slices
 

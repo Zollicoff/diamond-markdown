@@ -53,6 +53,8 @@ test.describe('canvas text preview helpers', () => {
 	test('parses Canvas text-card blocks without mutating markdown text', () => {
 		const blocks = canvasTextPreviewBlocks([
 			'# Launch plan',
+			'#### Detail scope',
+			'---',
 			'',
 			'- [x] Capture **utility bill**',
 			'- [ ] Upload [[Roof Photos]]',
@@ -68,11 +70,13 @@ test.describe('canvas text preview helpers', () => {
 		].join('\n'));
 
 		expect(blocks[0]).toMatchObject({ type: 'heading', level: 1 });
-		expect(blocks[1]).toMatchObject({ type: 'unordered-list' });
-		expect(blocks[2]).toMatchObject({ type: 'quote' });
-		expect(blocks[3]).toMatchObject({ type: 'callout', kind: 'warning', fold: 'closed' });
-		expect(blocks[4]).toMatchObject({ type: 'table' });
-		expect(blocks[5]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
+		expect(blocks[1]).toMatchObject({ type: 'heading', level: 4 });
+		expect(blocks[2]).toEqual({ type: 'thematic-break' });
+		expect(blocks[3]).toMatchObject({ type: 'unordered-list' });
+		expect(blocks[4]).toMatchObject({ type: 'quote' });
+		expect(blocks[5]).toMatchObject({ type: 'callout', kind: 'warning', fold: 'closed' });
+		expect(blocks[6]).toMatchObject({ type: 'table' });
+		expect(blocks[7]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 	});
 
 	test('parses safe asset, note, and Canvas embeds', () => {

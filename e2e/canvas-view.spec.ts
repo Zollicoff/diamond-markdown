@@ -332,6 +332,8 @@ test.describe('canvas view helpers', () => {
 		]);
 		const previewBlocks = canvasTextPreviewBlocks([
 			'# Launch plan',
+			'#### Detail scope',
+			'---',
 			'',
 			'- [x] Capture **utility bill** and ~~old bill~~',
 			'- [ ] Upload [[Roof Photos]]',
@@ -347,7 +349,9 @@ test.describe('canvas view helpers', () => {
 			'```'
 		].join('\n'));
 		expect(previewBlocks[0]).toMatchObject({ type: 'heading', level: 1 });
-		expect(previewBlocks[1]).toMatchObject({
+		expect(previewBlocks[1]).toMatchObject({ type: 'heading', level: 4 });
+		expect(previewBlocks[2]).toEqual({ type: 'thematic-break' });
+		expect(previewBlocks[3]).toMatchObject({
 			type: 'unordered-list',
 			items: [
 				{
@@ -362,8 +366,8 @@ test.describe('canvas view helpers', () => {
 				{ checked: false, inline: [{ kind: 'text', text: 'Upload ' }, { kind: 'wikilink', text: 'Roof Photos' }] }
 			]
 		});
-		expect(previewBlocks[2]).toMatchObject({ type: 'quote', inline: [{ kind: 'text', text: 'Refer questions' }] });
-		expect(previewBlocks[3]).toMatchObject({
+		expect(previewBlocks[4]).toMatchObject({ type: 'quote', inline: [{ kind: 'text', text: 'Refer questions' }] });
+		expect(previewBlocks[5]).toMatchObject({
 			type: 'callout',
 			kind: 'warning',
 			title: [{ kind: 'text', text: 'Site survey' }],
@@ -379,7 +383,7 @@ test.describe('canvas view helpers', () => {
 				}
 			]
 		});
-		expect(previewBlocks[4]).toMatchObject({
+		expect(previewBlocks[6]).toMatchObject({
 			type: 'table',
 			table: {
 				headers: [
@@ -478,7 +482,7 @@ test.describe('canvas view helpers', () => {
 			hash: 'install-steps'
 		});
 		expect(canvasTextEmbedRouteHref('vault id', noteEmbed.embed)).toBe('/vault/vault%20id/note/Home.md#install-steps');
-		expect(previewBlocks[5]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
+		expect(previewBlocks[7]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 		const groupDrafts = canvasGroupLabelDrafts([doc.nodes[0], groupNode, doc.nodes[1]]);
 		expect(canvasGroupLabelDraftFor(groupNode, groupDrafts)).toBe('Research cluster');
 		expect(canvasGroupLabelChanged(groupNode, groupDrafts)).toBe(false);
@@ -891,6 +895,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 				height: 360,
 				text: [
 					'# Launch plan',
+					'#### Detail scope',
+					'---',
 					'![[Home.md#Launch Plan|Launch note]]',
 					'![[Survey Photos#Meter|Survey note]]',
 					'![[Boards/Map.canvas|Canvas map]]',
@@ -937,6 +943,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
+	await expect(preview.locator('.preview-heading.level-4')).toHaveText('Detail scope');
+	await expect(preview.locator('hr')).toHaveCount(1);
 	await expect(preview.getByRole('link', { name: /Launch note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /Survey note NOTE/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
 	await expect(preview.getByRole('link', { name: /Canvas map CANVAS/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);

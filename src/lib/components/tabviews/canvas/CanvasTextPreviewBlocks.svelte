@@ -172,6 +172,8 @@
 				</a>
 			{/if}
 		{/if}
+	{:else if block.type === 'thematic-break'}
+		<hr />
 	{:else if block.type === 'code'}
 		<pre data-language={block.language}><code>{block.code}</code></pre>
 	{/if}
@@ -213,6 +215,15 @@
 	}
 	.preview-heading.level-3 {
 		font-size: 0.78rem;
+	}
+	.preview-heading.level-4,
+	.preview-heading.level-5,
+	.preview-heading.level-6 {
+		font-size: 0.74rem;
+	}
+	.preview-heading.level-5,
+	.preview-heading.level-6 {
+		color: var(--fg-muted);
 	}
 	blockquote {
 		border-left: 2px solid var(--canvas-node-border, var(--accent));
@@ -409,5 +420,13 @@
 	.empty-preview {
 		color: var(--fg-dim);
 		font-style: italic;
+	}
+	hr {
+		margin: 6px 0;
+		border: 0;
+		border-top: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 45%);
+	}
+	hr:last-child {
+		margin-bottom: 0;
 	}
 </style>

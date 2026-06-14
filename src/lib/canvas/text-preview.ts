@@ -73,7 +73,7 @@ export interface CanvasTextEmbedOpenTarget {
 }
 
 export type CanvasTextPreviewBlock =
-	| { type: 'heading'; level: 1 | 2 | 3; inline: CanvasTextPreviewInline[] }
+	| { type: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6; inline: CanvasTextPreviewInline[] }
 	| { type: 'paragraph'; inline: CanvasTextPreviewInline[] }
 	| { type: 'quote'; inline: CanvasTextPreviewInline[] }
 	| {
@@ -87,6 +87,7 @@ export type CanvasTextPreviewBlock =
 	| { type: 'ordered-list'; items: CanvasTextPreviewListItem[] }
 	| { type: 'table'; table: CanvasTextPreviewTable }
 	| { type: 'embed'; embed: CanvasTextPreviewEmbed }
+	| { type: 'thematic-break' }
 	| { type: 'code'; language: string; code: string };
 
 export function canvasTextPreviewInlines(value: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewInline[] {
@@ -177,15 +178,23 @@ export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreview
 			continue;
 		}
 
-		const heading = line.match(/^\s{0,3}(#{1,3})\s+(.+)$/);
+		const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+)$/);
 		if (heading) {
 			flushParagraph();
 			flushList();
 			blocks.push({
 				type: 'heading',
-				level: heading[1].length as 1 | 2 | 3,
+				level: heading[1].length as 1 | 2 | 3 | 4 | 5 | 6,
 				inline: canvasTextPreviewInlines(heading[2].trim(), options)
 			});
+			index += 1;
+			continue;
+		}
+
+		if (isCanvasThematicBreak(line)) {
+			flushParagraph();
+			flushList();
+			blocks.push({ type: 'thematic-break' });
 			index += 1;
 			continue;
 		}
@@ -392,6 +401,11 @@ function canvasCalloutTitle(kind: string, title: string | undefined): string {
 	const cleanedTitle = title?.trim();
 	if (cleanedTitle) return cleanedTitle;
 	return kind.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function isCanvasThematicBreak(line: string): boolean {
+	const trimmed = line.trim();
+	return /^([-*_])(?:\s*\1){2,}\s*$/.test(trimmed);
 }
 
 function canvasTablePreviewAt(
