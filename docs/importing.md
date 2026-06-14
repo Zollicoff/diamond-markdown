@@ -139,8 +139,9 @@ edit text cards, file cards, URL cards, group labels, node positions and
 dimensions, node and edge colors, edge connections, edge labels, and node or
 edge deletion with git-backed commits. Canvas text cards show a safe
 markdown-aware preview while preserving the raw editable text.
-Canvas text cards preview common Markdown plus Obsidian callout blocks and
-simple Markdown tables while leaving the raw card text editable. Canvas group
+Canvas text cards preview common Markdown plus Obsidian callout blocks,
+highlights, strikethrough, and simple Markdown tables while leaving the raw
+card text editable. Canvas group
 nodes are rendered behind cards and can be created from the Canvas toolbar.
 Canvas node and edge colors
 are preserved, edited, and rendered in the board and SVG export. Canvas edge

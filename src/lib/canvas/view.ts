@@ -103,7 +103,7 @@ export interface CanvasFileAssetPreview {
 	actionLabel: string;
 }
 
-export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'code' | 'wikilink' | 'link';
+export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link';
 export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
 
 export interface CanvasTextPreviewInline {
@@ -975,6 +975,8 @@ function firstInlineMatch(value: string): { index: number; raw: string; inline: 
 	const candidates = [
 		inlineCandidate(value, /`([^`]+)`/, (match) => ({ kind: 'code', text: match[1] })),
 		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
+		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
+		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
 		inlineCandidate(value, /\[([^\]\n]+)]\((https?:\/\/[^)\s]+)\)/i, (match) => ({
 			kind: 'link',
 			text: match[1],
@@ -1004,10 +1006,12 @@ function inlinePriority(kind: CanvasTextPreviewInlineKind): number {
 	const priorities: Record<CanvasTextPreviewInlineKind, number> = {
 		code: 0,
 		strong: 1,
-		link: 2,
-		wikilink: 3,
-		emphasis: 4,
-		text: 5
+		strikethrough: 2,
+		highlight: 3,
+		link: 4,
+		wikilink: 5,
+		emphasis: 6,
+		text: 7
 	};
 	return priorities[kind];
 }

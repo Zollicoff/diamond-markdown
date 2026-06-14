@@ -156,11 +156,15 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
 		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
 		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
-		expect(canvasTextPreviewInlines('Use **bill** with *roof* `photo` [[Home|label]] [site](https://example.com)')).toEqual([
+		expect(canvasTextPreviewInlines('Use **bill** with *roof* ~~old plan~~ ==priority== `photo` [[Home|label]] [site](https://example.com)')).toEqual([
 			{ kind: 'text', text: 'Use ' },
 			{ kind: 'strong', text: 'bill' },
 			{ kind: 'text', text: ' with ' },
 			{ kind: 'emphasis', text: 'roof' },
+			{ kind: 'text', text: ' ' },
+			{ kind: 'strikethrough', text: 'old plan' },
+			{ kind: 'text', text: ' ' },
+			{ kind: 'highlight', text: 'priority' },
 			{ kind: 'text', text: ' ' },
 			{ kind: 'code', text: 'photo' },
 			{ kind: 'text', text: ' ' },
@@ -171,15 +175,15 @@ test.describe('canvas view helpers', () => {
 		const previewBlocks = canvasTextPreviewBlocks([
 			'# Launch plan',
 			'',
-			'- [x] Capture **utility bill**',
+			'- [x] Capture **utility bill** and ~~old bill~~',
 			'- [ ] Upload [[Roof Photos]]',
 			'> Refer questions',
 			'> [!WARNING]- Site survey',
-			'> Capture **main panel** photos',
+			'> Capture ==main panel== photos',
 			'| Step | Owner |',
 			'| --- | --- |',
 			'| Bill | [[Sandy]] |',
-			'| **Panel** | Runner |',
+			'| **Panel** | ==Runner== |',
 			'```txt',
 			'main panel',
 			'```'
@@ -188,7 +192,15 @@ test.describe('canvas view helpers', () => {
 		expect(previewBlocks[1]).toMatchObject({
 			type: 'unordered-list',
 			items: [
-				{ checked: true, inline: [{ kind: 'text', text: 'Capture ' }, { kind: 'strong', text: 'utility bill' }] },
+				{
+					checked: true,
+					inline: [
+						{ kind: 'text', text: 'Capture ' },
+						{ kind: 'strong', text: 'utility bill' },
+						{ kind: 'text', text: ' and ' },
+						{ kind: 'strikethrough', text: 'old bill' }
+					]
+				},
 				{ checked: false, inline: [{ kind: 'text', text: 'Upload ' }, { kind: 'wikilink', text: 'Roof Photos' }] }
 			]
 		});
@@ -198,7 +210,16 @@ test.describe('canvas view helpers', () => {
 			kind: 'warning',
 			title: [{ kind: 'text', text: 'Site survey' }],
 			fold: 'closed',
-			body: [{ type: 'paragraph', inline: [{ kind: 'text', text: 'Capture ' }, { kind: 'strong', text: 'main panel' }, { kind: 'text', text: ' photos' }] }]
+			body: [
+				{
+					type: 'paragraph',
+					inline: [
+						{ kind: 'text', text: 'Capture ' },
+						{ kind: 'highlight', text: 'main panel' },
+						{ kind: 'text', text: ' photos' }
+					]
+				}
+			]
 		});
 		expect(previewBlocks[4]).toMatchObject({
 			type: 'table',
@@ -214,7 +235,7 @@ test.describe('canvas view helpers', () => {
 					],
 					[
 						{ inline: [{ kind: 'strong', text: 'Panel' }] },
-						{ inline: [{ kind: 'text', text: 'Runner' }] }
+						{ inline: [{ kind: 'highlight', text: 'Runner' }] }
 					]
 				]
 			}
@@ -585,15 +606,15 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 				height: 260,
 				text: [
 					'# Launch plan',
-					'- [x] Capture **utility bill**',
+					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'> Refer homeowner questions',
 					'> [!TIP]+ Site survey',
-					'> Capture **main panel** photos',
+					'> Capture ==main panel== photos',
 					'| Step | Owner |',
 					'| --- | --- |',
 					'| Bill | [[Sandy]] |',
-					'| **Panel** | Runner |',
+					'| **Panel** | ==Runner== |',
 					'```txt',
 					'main panel',
 					'```'
@@ -614,15 +635,17 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
+	await expect(preview.locator('del')).toHaveText('old bill');
 	await expect(preview.locator('.wikilink').first()).toHaveText('[[Roof Photos]]');
 	await expect(preview.locator('blockquote')).toContainText('Refer homeowner questions');
 	await expect(preview.locator('.preview-callout')).toContainText('tip');
 	await expect(preview.locator('.preview-callout')).toContainText('Site survey');
-	await expect(preview.locator('.preview-callout strong')).toHaveText('main panel');
+	await expect(preview.locator('.preview-callout mark')).toHaveText('main panel');
 	await expect(preview.locator('table')).toContainText('Step');
 	await expect(preview.locator('table')).toContainText('Owner');
 	await expect(preview.locator('table .wikilink')).toHaveText('[[Sandy]]');
 	await expect(preview.locator('table strong')).toHaveText('Panel');
+	await expect(preview.locator('table mark')).toHaveText('Runner');
 	await expect(preview.locator('pre')).toContainText('main panel');
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue(/# Launch plan/);
 });

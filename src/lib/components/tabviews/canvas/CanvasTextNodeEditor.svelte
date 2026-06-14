@@ -43,6 +43,10 @@
 			<em>{part.text}</em>
 		{:else if part.kind === 'code'}
 			<code>{part.text}</code>
+		{:else if part.kind === 'strikethrough'}
+			<del>{part.text}</del>
+		{:else if part.kind === 'highlight'}
+			<mark>{part.text}</mark>
 		{:else if part.kind === 'wikilink'}
 			<span class="wikilink">[[{part.text}]]</span>
 		{:else if part.kind === 'link' && part.href}
@@ -328,6 +332,16 @@
 		color: var(--fg);
 		font-family: var(--mono);
 		font-size: 0.7rem;
+	}
+	del {
+		color: var(--fg-dim);
+		text-decoration-thickness: 1.5px;
+	}
+	mark {
+		border-radius: 3px;
+		padding: 0 3px;
+		background: color-mix(in srgb, #facc15, transparent 72%);
+		color: var(--fg);
 	}
 	pre {
 		overflow: auto;

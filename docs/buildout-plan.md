@@ -422,6 +422,9 @@ Use small, pushable slices:
 - **Canvas text-card tables.** Render simple Markdown pipe tables in the
   lightweight Canvas text-card preview, with inline formatting inside cells and
   compact overflow handling.
+- **Canvas text-card highlight and strikethrough.** Render Obsidian-style
+  `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
+  lightweight Canvas text-card preview while leaving the raw card text editable.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.
