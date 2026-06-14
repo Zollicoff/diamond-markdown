@@ -2241,9 +2241,11 @@ test('vault writes are blocked until fetched remote commits are pulled', async (
 	expect(await blockedSave.text()).toContain('pull remote changes before editing vault files');
 	expect(fs.existsSync(path.join(vaultDir, 'Local While Behind.md'))).toBe(false);
 
-	const pulled = await request.post(`/api/vaults/${vault.id}/sync`, { data: { action: 'pull' } });
-	expect(pulled.ok()).toBe(true);
+	await recovery.getByRole('button', { name: 'Sync now' }).click();
+	await expect(page.getByText('Fetched origin Pulled 1 commit.')).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator('.sync-block').filter({ hasText: 'Remote changes waiting' })).toHaveCount(0);
 	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(true);
+	await expect(page.getByRole('treeitem', { name: 'RemoteOnly' })).toBeVisible({ timeout: 10_000 });
 
 	const unblockedSave = await request.post(`/api/vaults/${vault.id}/note`, {
 		data: { path: 'Local After Pull.md', content: '# Local after pull\n' }

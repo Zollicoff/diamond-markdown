@@ -159,6 +159,10 @@ Use small, pushable slices:
    safe, lightweight markdown preview for headings, lists, tasks, quotes,
    inline emphasis, links, wikilinks, and fenced code while keeping the raw
    text editor available.
+- **Sync recovery tree refresh.** Invalidate the vault tree after successful
+   pull/sync operations and verify the incoming-remote-changes recovery panel
+   can sync from the visible UI while newly pulled files appear without a
+   manual page refresh.
 - **Canvas node positioning.** Drag Canvas cards to update node coordinates in
    `.canvas` files through git-backed commits with stale-revision protection.
 - **Canvas edge creation.** Connect existing Canvas nodes from the board with

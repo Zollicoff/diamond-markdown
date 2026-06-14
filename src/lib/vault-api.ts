@@ -667,11 +667,13 @@ export const api = {
 	},
 
 	async pullSync(vaultId: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
+		const res = await json<GitSyncResult>(`/api/vaults/${vaultId}/sync`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ action: 'pull' })
 		});
+		emit('tree:invalidate', { vaultId });
+		return res;
 	},
 
 	async pushSync(vaultId: string): Promise<GitSyncResult> {
@@ -683,11 +685,13 @@ export const api = {
 	},
 
 	async syncNow(vaultId: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
+		const res = await json<GitSyncResult>(`/api/vaults/${vaultId}/sync`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ action: 'sync' })
 		});
+		emit('tree:invalidate', { vaultId });
+		return res;
 	},
 
 	async plugins(vaultId: string): Promise<PluginListResponse> {
