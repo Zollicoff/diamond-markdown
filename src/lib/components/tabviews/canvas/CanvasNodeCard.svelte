@@ -12,6 +12,7 @@
 		type CanvasTextWikilinkResolver
 	} from '$lib/canvas/view';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
+	import CanvasGroupNodeEditor from './CanvasGroupNodeEditor.svelte';
 	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';
 	import CanvasTextNodeEditor from './CanvasTextNodeEditor.svelte';
 
@@ -103,31 +104,18 @@
 	</div>
 	<h3 title={title}>{title}</h3>
 	{#if isCanvasGroupNode(node)}
-		<input
-			class="group-label-input"
-			aria-label={`Canvas group label for ${title}`}
-			value={groupLabelDraft}
-			placeholder="Group label"
-			oninput={(event) => onGroupLabelDraftChange(node, (event.currentTarget as HTMLInputElement).value)}
+		<CanvasGroupNodeEditor
+			{node}
+			{groupLabelDraft}
+			{groupLabelChanged}
+			{groupLabelCanSave}
+			{saving}
+			{deleting}
+			{disableDelete}
+			{onGroupLabelDraftChange}
+			{onSaveGroupLabel}
+			{onDelete}
 		/>
-		<div class="group-fill"></div>
-		<div class="node-actions group-actions">
-			<button
-				class="mini node-save"
-				disabled={saving || !groupLabelCanSave}
-				onclick={() => void onSaveGroupLabel(node)}
-			>
-				{saving ? 'Saving...' : groupLabelChanged ? 'Save label' : 'Saved'}
-			</button>
-			<button
-				class="mini node-remove"
-				aria-label={`Remove canvas node ${title}`}
-				disabled={disableDelete}
-				onclick={() => void onDelete(node)}
-			>
-				{deleting ? 'Removing...' : 'Remove'}
-			</button>
-		</div>
 	{:else if node.type === 'text'}
 		<CanvasTextNodeEditor
 			{vaultId}
@@ -331,33 +319,11 @@
 		line-height: 1.35;
 		white-space: pre-wrap;
 	}
-	.group-label-input {
-		width: 100%;
-		border: 1px solid var(--border);
-		border-color: color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 25%);
-		border-radius: 6px;
-		padding: 5px 7px;
-		background: color-mix(in srgb, var(--bg), transparent 18%);
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.76rem;
-	}
-	.group-label-input:focus {
-		outline: 2px solid color-mix(in srgb, var(--accent), transparent 60%);
-		border-color: var(--accent);
-	}
 	.node-actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
-	}
-	.group-fill {
-		flex: 1;
-		min-height: 0;
-	}
-	.group-actions {
-		justify-content: flex-start;
 	}
 	.node-save,
 	.node-remove {
