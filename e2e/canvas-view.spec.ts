@@ -3,13 +3,17 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
-import type { CanvasDoc } from '../src/lib/types';
+import type { CanvasDoc, CanvasNotePreview } from '../src/lib/types';
 import { duplicateCanvasRawNode } from '../src/lib/server/canvas';
 import { canvasNotePreviewBody } from '../src/lib/server/canvas-note-previews';
 import {
+	CanvasNotePreviewRequestQueue,
 	canvasNotePreviewForNode,
 	canvasNotePreviewMap,
-	canvasNotePreviewPaths
+	canvasNotePreviewPaths,
+	isCanvasNotePreviewRefreshEvent,
+	refreshCanvasNotePreviews,
+	refreshCanvasNotePreviewsForVaultEvent
 } from '../src/lib/canvas/note-previews';
 import {
 	CANVAS_COLOR_OPTIONS,
@@ -942,6 +946,52 @@ test.describe('canvas view helpers', () => {
 		}, 'missing', 'b');
 		expect(resetDraftState.edgeFromNodeId).toBe('a');
 		expect(resetDraftState.edgeToNodeId).toBe('');
+	});
+
+	test('applies only latest Canvas note preview loads and gates vault refresh events', async () => {
+		const queue = new CanvasNotePreviewRequestQueue();
+		const calls: { vaultId: string; paths: string[] }[] = [];
+		let resolveFirst: ((previews: CanvasNotePreview[]) => void) | null = null;
+		let resolveSecond: ((previews: CanvasNotePreview[]) => void) | null = null;
+		const applied: string[][] = [];
+		const fetcher = (vaultId: string, paths: string[]) => {
+			calls.push({ vaultId, paths: [...paths] });
+			return new Promise<CanvasNotePreview[]>((resolve) => {
+				if (calls.length === 1) {
+					resolveFirst = resolve;
+				} else {
+					resolveSecond = resolve;
+				}
+			});
+		};
+
+		const first = refreshCanvasNotePreviews(queue, 'vault-a', ['First.md'], fetcher, (previews) => {
+			applied.push(Object.keys(previews));
+		});
+		const second = refreshCanvasNotePreviews(queue, 'vault-a', ['Second.md'], fetcher, (previews) => {
+			applied.push(Object.keys(previews));
+		});
+
+		expect(calls).toEqual([
+			{ vaultId: 'vault-a', paths: ['First.md'] },
+			{ vaultId: 'vault-a', paths: ['Second.md'] }
+		]);
+		resolveSecond?.([{ path: 'Second.md', title: 'Second', body: 'new', status: 'ok', truncated: false }]);
+		await second;
+		expect(applied).toEqual([['Second.md']]);
+
+		resolveFirst?.([{ path: 'First.md', title: 'First', body: 'old', status: 'ok', truncated: false }]);
+		await first;
+		expect(applied).toEqual([['Second.md']]);
+
+		let refreshCount = 0;
+		const loadPreviews = () => { refreshCount += 1; };
+		expect(isCanvasNotePreviewRefreshEvent('vault-a', { vaultId: 'vault-a' })).toBe(true);
+		expect(isCanvasNotePreviewRefreshEvent('vault-a', { vaultId: 'vault-b' })).toBe(false);
+		expect(refreshCanvasNotePreviewsForVaultEvent('vault-a', { vaultId: 'vault-b' }, loadPreviews)).toBe(false);
+		expect(refreshCount).toBe(0);
+		expect(refreshCanvasNotePreviewsForVaultEvent('vault-a', { vaultId: 'vault-a' }, loadPreviews)).toBe(true);
+		expect(refreshCount).toBe(1);
 	});
 });
 

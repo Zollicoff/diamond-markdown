@@ -122,6 +122,10 @@ Use small, pushable slices:
   latest-request queue used by Canvas link-target and note-preview loaders, and
   add direct note-preview queue coverage so stale async preview responses stay
   testable outside `CanvasView`.
+- **Canvas note-preview refresh extraction.** Keep Canvas Markdown file-card
+  note previews fresh after vault note and folder mutations through a tested
+  request-refresh helper and vault-scoped event gate instead of inline
+  component sequence checks.
 - **Canvas text-card table alignment.** Preserve Markdown pipe-table alignment
    markers (`:---`, `:---:`, and `---:`) in Canvas text-card previews and render
    aligned header/body cells with helper and browser coverage.

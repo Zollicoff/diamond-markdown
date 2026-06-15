@@ -75,8 +75,9 @@
 	} from '$lib/canvas/link-targets';
 	import {
 		CanvasNotePreviewRequestQueue,
-		canvasNotePreviewMap,
 		canvasNotePreviewPaths,
+		refreshCanvasNotePreviews,
+		refreshCanvasNotePreviewsForVaultEvent,
 		type CanvasNotePreviewMap
 	} from '$lib/canvas/note-previews';
 	import {
@@ -160,8 +161,9 @@
 	}
 
 	async function loadNotePreviews(paths: string[] = canvasNotePreviewPaths(doc?.nodes ?? [])): Promise<void> {
-		const result = await notePreviewRequests.load(vaultId, paths, api.canvasNotePreviews);
-		if (notePreviewRequests.isCurrent(result)) notePreviews = canvasNotePreviewMap(result.previews);
+		await refreshCanvasNotePreviews(notePreviewRequests, vaultId, paths, api.canvasNotePreviews, (previews) => {
+			notePreviews = previews;
+		});
 	}
 
 	function setMutationState(patch: Partial<CanvasMutationState>): void {
@@ -645,7 +647,7 @@
 			refreshCanvasLinkTargetsForVaultEvent(vaultId, event, loadLinkTargets);
 		};
 		const refreshPreviews = (event: { vaultId: string }): void => {
-			if (event.vaultId === vaultId) void loadNotePreviews();
+			refreshCanvasNotePreviewsForVaultEvent(vaultId, event, loadNotePreviews);
 		};
 		const offs = [
 			onBus('note:saved', (event) => { refresh(event); refreshPreviews(event); }),
