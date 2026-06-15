@@ -2,7 +2,9 @@
 	import type { TreeNode } from '$lib/types';
 	import type { VisibleTreeRow } from '$lib/tree/view';
 	import {
+		canMutateTreeNode,
 		isCanvasTreeFile,
+		isUnsupportedTreeFile,
 		treeFileDisplayName,
 		treeFileHref,
 		treeInitialRenameValue
@@ -47,6 +49,8 @@
 	const node = $derived(row.node);
 	const isRenaming = $derived(renamingPath === node.path);
 	const isOpen = $derived(expanded.has(node.path));
+	const canMutate = $derived(canMutateTreeNode(node));
+	const isUnsupportedFile = $derived(isUnsupportedTreeFile(node));
 
 	function focusOnMount(input: HTMLInputElement): void {
 		requestAnimationFrame(() => {
@@ -71,12 +75,14 @@
 	}
 
 	function handleFileClick(e: MouseEvent, node: TreeNode): void {
+		if (isUnsupportedTreeFile(node)) return;
 		if (!onFileClick) return;
 		e.preventDefault();
 		onFileClick(e, node);
 	}
 
 	function handleAuxClick(e: MouseEvent, node: TreeNode): void {
+		if (isUnsupportedTreeFile(node)) return;
 		if (e.button !== 1 || !onFileClick) return;
 		e.preventDefault();
 		onFileClick(e, node);
@@ -88,12 +94,12 @@
 		class="node dir"
 		class:open={isOpen}
 		class:drop-target={dragOverPath === node.path}
-		draggable={!isRenaming}
 		role="treeitem"
 		aria-level={row.depth + 1}
 		aria-expanded={isOpen}
 		aria-selected={activePath === node.path}
 		tabindex="-1"
+		draggable={!isRenaming && canMutate}
 		ondragstart={(e) => onDragStart(e, node)}
 		ondragover={(e) => onDragOver(e, node)}
 		ondragleave={() => onDragLeave(node)}
@@ -120,7 +126,7 @@
 	<div
 		class="node file"
 		class:active={activePath === node.path}
-		draggable={!isRenaming}
+		draggable={!isRenaming && canMutate}
 		role="treeitem"
 		aria-level={row.depth + 1}
 		aria-selected={activePath === node.path}
@@ -143,11 +149,15 @@
 			<a
 				href={treeFileHref(vaultId, node)}
 				class="file-link"
+				target={isUnsupportedFile ? '_blank' : undefined}
+				rel={isUnsupportedFile ? 'noopener noreferrer' : undefined}
 				onclick={(e) => handleFileClick(e, node)}
 				onauxclick={(e) => handleAuxClick(e, node)}
 			>
 				{#if isCanvasTreeFile(node)}
 					<span class="file-kind" aria-hidden="true">□</span>
+				{:else if isUnsupportedFile}
+					<span class="file-kind" aria-hidden="true">◇</span>
 				{/if}
 				<span class="file-name">{treeFileDisplayName(node)}</span>
 			</a>

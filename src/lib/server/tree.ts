@@ -2,11 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { TreeNode } from '$lib/types';
 import type { Vault } from './vault';
+import { shouldShowUnsupportedFiles } from './obsidian-config';
 
-function fileKind(name: string): TreeNode['fileKind'] | null {
+export interface BuildVaultTreeOptions {
+	showUnsupportedFiles?: boolean;
+}
+
+function fileKind(name: string, showUnsupportedFiles: boolean): TreeNode['fileKind'] | null {
 	const lower = name.toLowerCase();
 	if (lower.endsWith('.md') || lower.endsWith('.markdown')) return 'markdown';
 	if (lower.endsWith('.canvas')) return 'canvas';
+	if (showUnsupportedFiles) return 'unsupported';
 	return null;
 }
 
@@ -26,7 +32,7 @@ function normalizeExcluded(folders: string[] | undefined): Set<string> {
 	return new Set((folders ?? []).map((folder) => folder.replace(/^\/+|\/+$/g, '')).filter(Boolean));
 }
 
-function walk(dir: string, base: string, excluded: Set<string>): TreeNode[] {
+function walk(dir: string, base: string, excluded: Set<string>, showUnsupportedFiles: boolean): TreeNode[] {
 	let entries: fs.Dirent[];
 	try {
 		entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -47,13 +53,13 @@ function walk(dir: string, base: string, excluded: Set<string>): TreeNode[] {
 				type: 'directory',
 				mtime: 0,
 				ctime: 0,
-				children: walk(abs, base, excluded)
+				children: walk(abs, base, excluded, showUnsupportedFiles)
 			});
 			continue;
 		}
 
 		if (!entry.isFile()) continue;
-		const kind = fileKind(entry.name);
+		const kind = fileKind(entry.name, showUnsupportedFiles);
 		if (!kind) continue;
 		const times = fileTimes(abs);
 		nodes.push({
@@ -71,6 +77,7 @@ function walk(dir: string, base: string, excluded: Set<string>): TreeNode[] {
 	});
 }
 
-export function buildVaultTree(vault: Vault): TreeNode[] {
-	return walk(vault.path, vault.path, normalizeExcluded(vault.excludedFolders));
+export function buildVaultTree(vault: Vault, options: BuildVaultTreeOptions = {}): TreeNode[] {
+	const showUnsupportedFiles = options.showUnsupportedFiles ?? shouldShowUnsupportedFiles(vault.path);
+	return walk(vault.path, vault.path, normalizeExcluded(vault.excludedFolders), showUnsupportedFiles);
 }

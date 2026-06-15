@@ -8,6 +8,7 @@ import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import { SAVED_SEARCHES_REL_PATH } from '../src/lib/server/saved-searches';
 import { formatDate } from '../src/lib/server/templates';
+import type { TreeNode } from '../src/lib/types';
 
 /**
  * Feature spec — covers surfaces that don't fit the smoke or hotkey
@@ -45,6 +46,24 @@ async function clickUntilVisible(trigger: Locator, target: Locator, timeout = 10
 
 function git(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
+}
+
+function treePaths(nodes: TreeNode[]): string[] {
+	const paths: string[] = [];
+	for (const node of nodes) {
+		paths.push(node.path);
+		if (node.children) paths.push(...treePaths(node.children));
+	}
+	return paths;
+}
+
+function findTreeNode(nodes: TreeNode[], target: string): TreeNode | null {
+	for (const node of nodes) {
+		if (node.path === target) return node;
+		const found = node.children ? findTreeNode(node.children, target) : null;
+		if (found) return found;
+	}
+	return null;
 }
 
 async function servePluginFiles(files: Record<string, string>): Promise<{ url: (path: string) => string; close: () => Promise<void> }> {
@@ -176,6 +195,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		useMarkdownLinks: true,
 		alwaysUpdateLinks: true,
 		newLinkFormat: 'relative',
+		showUnsupportedFiles: true,
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
@@ -273,6 +293,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			attachmentFolderStatus: string;
 			newFileFolderPath?: string;
 			newFileFolderStatus: string;
+			showUnsupportedFiles?: boolean;
 			showLineNumber?: boolean;
 			spellcheck?: boolean;
 			tabSize?: number;
@@ -385,6 +406,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		attachmentFolderStatus: 'safe',
 		newFileFolderPath: 'Notes/Inbox',
 		newFileFolderStatus: 'safe',
+		showUnsupportedFiles: true,
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
@@ -399,6 +421,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'useMarkdownLinks',
 		'alwaysUpdateLinks',
 		'newLinkFormat',
+		'showUnsupportedFiles',
 		'showLineNumber',
 		'spellcheck',
 		'tabSize',
@@ -417,6 +440,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'showLineNumber')).toMatchObject({
 		label: 'Line numbers',
 		value: 'Hidden',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'showUnsupportedFiles')).toMatchObject({
+		label: 'Unsupported files',
+		value: 'Visible',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'spellcheck')).toMatchObject({
@@ -589,6 +617,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		useMarkdownLinks: true,
 		alwaysUpdateLinks: false,
 		newLinkFormat: 'relative',
+		showUnsupportedFiles: true,
 		showLineNumber: false,
 		spellcheck: true,
 		tabSize: 8,
@@ -686,13 +715,15 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('14 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('15 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
 	await expect(page.locator('.import-card')).toContainText('Notes/Inbox');
 	await expect(page.locator('.import-card')).toContainText('Link style');
 	await expect(page.locator('.import-card')).toContainText('Markdown links');
+	await expect(page.locator('.import-card')).toContainText('Unsupported files');
+	await expect(page.locator('.import-card')).toContainText('Visible');
 	await expect(page.locator('.import-card')).toContainText('Line numbers');
 	await expect(page.locator('.import-card')).toContainText('Hidden');
 	await expect(page.locator('.import-card')).toContainText('Spellcheck');
@@ -786,6 +817,57 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 
 	await page.getByRole('button', { name: 'Add vault', exact: true }).click();
 	await expect(page).toHaveURL(/\/vault\/obsidian-ui-import$/);
+});
+
+test('file tree honors Obsidian unsupported file visibility', async ({ page, request }) => {
+	const hiddenVaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'unsupported-files-hidden-vault');
+	fs.rmSync(hiddenVaultDir, { recursive: true, force: true });
+	fs.mkdirSync(hiddenVaultDir, { recursive: true });
+	fs.writeFileSync(path.join(hiddenVaultDir, 'Home.md'), '# Home\n\nVisible note.\n');
+	fs.writeFileSync(path.join(hiddenVaultDir, 'packet.pdf'), Buffer.from('%PDF-hidden'));
+
+	const hiddenCreated = await request.post('/api/vaults', {
+		data: { name: 'Unsupported Files Hidden', path: hiddenVaultDir }
+	});
+	expect(hiddenCreated.ok(), await hiddenCreated.text()).toBe(true);
+	const { vault: hiddenVault } = await hiddenCreated.json() as { vault: { id: string } };
+	const hiddenTreeResponse = await request.get(`/api/vaults/${hiddenVault.id}/tree`);
+	expect(hiddenTreeResponse.ok(), await hiddenTreeResponse.text()).toBe(true);
+	const hiddenTree = await hiddenTreeResponse.json() as { tree: TreeNode[] };
+	expect(treePaths(hiddenTree.tree)).toContain('Home.md');
+	expect(treePaths(hiddenTree.tree)).not.toContain('packet.pdf');
+
+	const visibleVaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'unsupported-files-visible-vault');
+	fs.rmSync(visibleVaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(visibleVaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(visibleVaultDir, '.obsidian', 'app.json'), JSON.stringify({ showUnsupportedFiles: true }));
+	fs.writeFileSync(path.join(visibleVaultDir, 'Home.md'), '# Home\n\nVisible note.\n');
+	fs.writeFileSync(path.join(visibleVaultDir, 'packet.pdf'), Buffer.from('%PDF-visible'));
+
+	const visibleCreated = await request.post('/api/vaults', {
+		data: { name: 'Unsupported Files Visible', path: visibleVaultDir }
+	});
+	expect(visibleCreated.ok(), await visibleCreated.text()).toBe(true);
+	const { vault } = await visibleCreated.json() as { vault: { id: string } };
+	const visibleTreeResponse = await request.get(`/api/vaults/${vault.id}/tree`);
+	expect(visibleTreeResponse.ok(), await visibleTreeResponse.text()).toBe(true);
+	const visibleTree = await visibleTreeResponse.json() as { tree: TreeNode[] };
+	expect(findTreeNode(visibleTree.tree, 'packet.pdf')).toMatchObject({
+		path: 'packet.pdf',
+		type: 'file',
+		fileKind: 'unsupported'
+	});
+
+	const raw = await request.get(`/api/vaults/${vault.id}/raw/packet.pdf`);
+	expect(raw.ok(), await raw.text()).toBe(true);
+	expect(raw.headers()['content-type']).toContain('application/pdf');
+
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
+	const assetLink = page.getByRole('link', { name: /packet\.pdf/ });
+	await expect(assetLink).toBeVisible({ timeout: 10_000 });
+	await expect(assetLink).toHaveAttribute('href', `/api/vaults/${vault.id}/raw/packet.pdf`);
+	await expect(assetLink).toHaveAttribute('target', '_blank');
+	await expect(assetLink).toHaveAttribute('rel', 'noopener noreferrer');
 });
 
 test('search rail icon opens a search tab; results fire on input', async ({ page }) => {

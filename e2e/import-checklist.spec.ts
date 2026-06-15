@@ -157,6 +157,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: true,
 			tabSize: 8,
 			readableLineLength: true,
+			showUnsupportedFiles: true,
 			settings: [
 				{
 					id: 'attachmentFolderPath',
@@ -199,10 +200,17 @@ test.describe('import checklist helpers', () => {
 					value: 'Enabled',
 					detail: 'Diamond narrows editor and reading surfaces for this imported vault.',
 					level: 'info'
+				},
+				{
+					id: 'showUnsupportedFiles',
+					label: 'Unsupported files',
+					value: 'Visible',
+					detail: 'Diamond shows non-note vault files in the tree and opens them through the raw asset route.',
+					level: 'info'
 				}
 			],
 			warnings: []
-		})).toBe('6 supported app settings found.');
+		})).toBe('7 supported app settings found.');
 	});
 
 	test('summarizes Obsidian Daily Notes config without raw JSON', () => {

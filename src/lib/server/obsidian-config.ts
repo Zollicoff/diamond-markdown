@@ -240,6 +240,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const showUnsupportedFiles = booleanValue(body.showUnsupportedFiles);
+	if (showUnsupportedFiles !== null) {
+		base.showUnsupportedFiles = showUnsupportedFiles;
+		base.settings.push(setting(
+			'showUnsupportedFiles',
+			'Unsupported files',
+			showUnsupportedFiles ? 'Visible' : 'Hidden',
+			showUnsupportedFiles
+				? 'Diamond shows non-note vault files in the tree and opens them through the raw asset route.'
+				: 'Diamond keeps non-note vault files hidden from the active file tree.'
+		));
+	}
+
 	const showLineNumber = booleanValue(body.showLineNumber);
 	if (showLineNumber !== null) {
 		base.showLineNumber = showLineNumber;
@@ -425,6 +438,11 @@ export function preferredObsidianNewNoteFolder(root: string): string | null {
 export function shouldUpdateLinksOnRename(root: string): boolean {
 	const config = readObsidianAppConfig(root);
 	return config.alwaysUpdateLinks !== false;
+}
+
+export function shouldShowUnsupportedFiles(root: string): boolean {
+	const config = readObsidianAppConfig(root);
+	return config.showUnsupportedFiles === true;
 }
 
 export function editorLinkPreference(root: string): EditorLinkPreference {

@@ -475,6 +475,10 @@ Use small, pushable slices:
   `promptDelete: false` for note, Canvas file, folder, and attachment delete
   confirmation dialogs while keeping confirmation enabled by default and for
   Canvas node/edge edit deletions.
+- **Obsidian unsupported-file visibility.** Honor `.obsidian/app.json`
+  `showUnsupportedFiles: true` by showing non-note, non-Canvas vault files in
+  the tree as raw assets while keeping note/Canvas/folder mutation commands
+  scoped away from those unsupported files.
 - **Obsidian local-trash preference.** Honor `.obsidian/app.json`
   `trashOption: "local"` by moving deleted notes, Canvas files, folders, and
   attachments into the vault `.trash/` folder while keeping active tree/search

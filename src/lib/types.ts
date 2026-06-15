@@ -48,6 +48,7 @@ export interface ObsidianAppConfigInfo {
 	useMarkdownLinks?: boolean;
 	alwaysUpdateLinks?: boolean;
 	newLinkFormat?: string;
+	showUnsupportedFiles?: boolean;
 	showLineNumber?: boolean;
 	showInlineTitle?: boolean;
 	spellcheck?: boolean;
@@ -308,7 +309,7 @@ export interface TreeNode {
 	name: string;
 	path: string;
 	type: 'file' | 'directory';
-	fileKind?: 'markdown' | 'canvas';
+	fileKind?: 'markdown' | 'canvas' | 'unsupported';
 	/** Modified time (ms since epoch). 0 for directories. */
 	mtime?: number;
 	/** Created/birth time. Falls back to mtime on filesystems without

@@ -3,11 +3,13 @@ import type { TreeNode } from '../src/lib/types';
 import {
 	buildTreeDropMoveIntent,
 	buildTreeRenameIntent,
+	canMutateTreeNode,
 	collectDirectoryPaths,
 	defaultTreePanelPreferences,
 	flattenVisibleTreeRows,
 	isCanvasTreeFile,
 	isMarkdownTreeFile,
+	isUnsupportedTreeFile,
 	isTreeSortMode,
 	parentDirectoriesForPath,
 	parseTreeExpansion,
@@ -25,6 +27,7 @@ import {
 	treePanelPreferencesSnapshot,
 	treePathIsDescendant,
 	treePathParent,
+	treeRawFileHref,
 	treePreferencesStorageKey,
 	treeRowStyle,
 	visibleTreeWindow,
@@ -182,19 +185,28 @@ test.describe('tree view helpers', () => {
 	test('classifies markdown and canvas files for tree-only behavior', () => {
 		const canvas = { ...file('Boards/Plan.canvas'), fileKind: 'canvas' as const };
 		const markdown = { ...file('Notes/Daily.markdown'), fileKind: 'markdown' as const };
+		const asset = { ...file('Files/packet.pdf'), fileKind: 'unsupported' as const };
 
 		expect(treeFileDisplayName(canvas)).toBe('Plan');
 		expect(treeFileDisplayName(markdown)).toBe('Daily');
+		expect(treeFileDisplayName(asset)).toBe('packet.pdf');
 		expect(isCanvasTreeFile(canvas)).toBe(true);
 		expect(isCanvasTreeFile(markdown)).toBe(false);
 		expect(isMarkdownTreeFile(markdown)).toBe(true);
 		expect(isMarkdownTreeFile(canvas)).toBe(false);
+		expect(isUnsupportedTreeFile(asset)).toBe(true);
+		expect(canMutateTreeNode(canvas)).toBe(true);
+		expect(canMutateTreeNode(markdown)).toBe(true);
+		expect(canMutateTreeNode(asset)).toBe(false);
 		expect(treeInitialRenameValue(canvas)).toBe('Plan');
+		expect(treeInitialRenameValue(asset)).toBe('packet.pdf');
 		expect(treeInitialRenameValue(dir('Boards'))).toBe('Boards');
 		expect(treeFileHref('vault-1', { ...canvas, path: 'Boards/Space Plan.canvas' })).toBe(
 			'/vault/vault-1/canvas/Boards/Space%20Plan.canvas'
 		);
 		expect(treeFileHref('vault-1', markdown)).toBe('/vault/vault-1/note/Notes/Daily.markdown');
+		expect(treeRawFileHref('vault id', 'Files/site packet.pdf')).toBe('/api/vaults/vault%20id/raw/Files/site%20packet.pdf');
+		expect(treeFileHref('vault id', asset)).toBe('/api/vaults/vault%20id/raw/Files/packet.pdf');
 		expect(renamedTreeNodePath(canvas, 'Roadmap')).toBe('Boards/Roadmap.canvas');
 		expect(renamedTreeNodePath(markdown, 'Weekly')).toBe('Notes/Weekly.markdown');
 		expect(renamedTreeNodePath(dir('Boards'), 'Canvases')).toBe('Canvases');
@@ -229,6 +241,7 @@ test.describe('tree view helpers', () => {
 			to: 'Notes/Reference'
 		});
 
+		expect(buildTreeRenameIntent({ ...file('Files/packet.pdf'), fileKind: 'unsupported' as const }, 'packet-final.pdf')).toBeNull();
 		expect(buildTreeRenameIntent(markdown, 'Daily ')).toBeNull();
 		expect(buildTreeRenameIntent(folder, '')).toBeNull();
 		expect(buildTreeDropMoveIntent('Notes/Daily.md', 'Projects')).toEqual({

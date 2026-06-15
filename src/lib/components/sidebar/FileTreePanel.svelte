@@ -6,7 +6,7 @@
 	import FileTreeToolbar from './FileTreeToolbar.svelte';
 	import { api } from '$lib/vault-api';
 	import { openCanvas, openNote } from '$lib/workspace/actions';
-	import { canvasFileMenu, fileMenu, folderMenu, rootMenu } from './menu-builders';
+	import { canvasFileMenu, fileMenu, folderMenu, rootMenu, unsupportedFileMenu } from './menu-builders';
 	import { on as onBus } from '$lib/events';
 	import { workspace } from '$lib/workspace/store.svelte';
 	import { openModeForPointer } from '$lib/workspace/open-mode';
@@ -18,6 +18,7 @@
 		collectDirectoryPaths,
 		isCanvasTreeFile,
 		isMarkdownTreeFile,
+		isUnsupportedTreeFile,
 		revealParentDirectories,
 		sortTreeNodes,
 		treeFileDisplayName,
@@ -124,7 +125,7 @@
 	function onNodeContext(e: MouseEvent, node: TreeNode): void {
 		const deps = { vaultId, beginRename };
 		showMenu(e, node.type === 'file'
-			? isCanvasTreeFile(node) ? canvasFileMenu(node, deps) : fileMenu(node, deps)
+			? isCanvasTreeFile(node) ? canvasFileMenu(node, deps) : isUnsupportedTreeFile(node) ? unsupportedFileMenu(node, deps) : fileMenu(node, deps)
 			: folderMenu(node, deps)
 		);
 	}

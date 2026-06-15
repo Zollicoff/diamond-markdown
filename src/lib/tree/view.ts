@@ -224,6 +224,7 @@ export function sortMenuPositionFromRect(rect: Pick<DOMRect, 'bottom' | 'right'>
 }
 
 export function treeFileDisplayName(node: TreeNode): string {
+	if (isUnsupportedTreeFile(node)) return node.name;
 	return node.name.replace(/\.(md|markdown|canvas)$/i, '');
 }
 
@@ -232,8 +233,14 @@ export function treeInitialRenameValue(node: TreeNode): string {
 }
 
 export function treeFileHref(vaultId: string, node: TreeNode): string {
+	if (isUnsupportedTreeFile(node)) return treeRawFileHref(vaultId, node.path);
 	const route = isCanvasTreeFile(node) ? 'canvas' : 'note';
 	return `/vault/${vaultId}/${route}/${encodeURI(node.path)}`;
+}
+
+export function treeRawFileHref(vaultId: string, filePath: string): string {
+	const encodedPath = filePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+	return `/api/vaults/${encodeURIComponent(vaultId)}/raw/${encodedPath}`;
 }
 
 export function renamedTreeNodePath(node: TreeNode, newName: string): string {
@@ -261,6 +268,7 @@ export function treeMutationKindForNode(node: TreeNode): TreeMutationKind {
 }
 
 export function buildTreeRenameIntent(node: TreeNode, newName: string): TreeMutationIntent | null {
+	if (!canMutateTreeNode(node)) return null;
 	const currentName = node.type === 'file' ? treeFileDisplayName(node) : node.name;
 	if (!newName.trim() || newName === currentName || newName === node.name) return null;
 
@@ -295,6 +303,14 @@ export function isCanvasTreeFile(node: TreeNode): boolean {
 export function isMarkdownTreeFile(node: TreeNode): boolean {
 	if (node.type !== 'file') return false;
 	return node.fileKind === 'markdown' || /\.(md|markdown)$/i.test(node.path);
+}
+
+export function isUnsupportedTreeFile(node: TreeNode): boolean {
+	return node.type === 'file' && node.fileKind === 'unsupported';
+}
+
+export function canMutateTreeNode(node: TreeNode): boolean {
+	return node.type === 'directory' || isCanvasTreeFile(node) || isMarkdownTreeFile(node);
 }
 
 function compareNames(a: string, b: string): number {

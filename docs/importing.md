@@ -25,9 +25,9 @@ an existing Obsidian vault. The preflight reports:
 - whether `.obsidian` exists
 - supported `.obsidian/app.json` settings, including safe attachment folder,
   new-note folder, link style, link-update preference, link format,
-  line-number display, spellcheck, tab size, readable line length, strict
-  line-break rendering, initial view mode, delete confirmation, and trash
-  preference
+  unsupported-file visibility, line-number display, spellcheck, tab size,
+  readable line length, strict line-break rendering, initial view mode, delete
+  confirmation, and trash preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
@@ -62,7 +62,10 @@ integer `tabSize` values from 1 to 16 for editor indentation and tab rendering,
 rendering, `defaultViewMode` plus `livePreview` for the initial note view mode,
 `alwaysUpdateLinks` for note/folder rename and move operations, `promptDelete`
 for note, Canvas file, folder, and attachment delete confirmation dialogs, and
-`trashOption: "local"` for portable vault-local delete-to-trash behavior.
+`trashOption: "local"` for portable vault-local delete-to-trash behavior. When
+`showUnsupportedFiles: true`, Diamond shows non-note, non-Canvas vault files in
+the tree and opens them through the raw asset route instead of treating them as
+editable notes.
 Explicit folder context actions such as New note here still use the selected
 folder. Other app settings such as `newLinkFormat` and non-local trash modes
 are reported so migration mismatches are visible before opening the vault;
