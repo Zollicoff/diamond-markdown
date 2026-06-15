@@ -30,7 +30,8 @@ an existing Obsidian vault. The preflight reports:
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
-  read-only migration guidance
+  migration guidance, with safe base font size and hex accent color applied
+  while the vault is open
 - `.obsidian/graph.json` filter/display/force settings as read-only migration
   guidance
 - `.obsidian/core-plugins.json` support notes for enabled Obsidian core plugins
@@ -89,9 +90,11 @@ full plugin setting values in the preview.
 
 When `.obsidian/appearance.json` or `.obsidian/snippets/*.css` is present,
 Diamond surfaces theme names, base font size, accent color, enabled snippet
-names, missing enabled snippets, and snippet filenames as read-only migration
-guidance. It does not load Obsidian community themes, execute CSS snippets, or
-show CSS file contents during import preview.
+names, missing enabled snippets, and snippet filenames as migration guidance.
+Safe integer `baseFontSize` values from 12px to 24px and safe hex
+`accentColor` / `customAccentColor` values are applied while the vault is open.
+Diamond does not load Obsidian community themes, execute CSS snippets, or show
+CSS file contents during import preview.
 
 When `.obsidian/graph.json` is present, Diamond surfaces recognized graph
 search, orphan visibility, attachment/tag/unresolved-node visibility, custom

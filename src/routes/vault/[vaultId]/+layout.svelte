@@ -19,7 +19,9 @@
 	import { on as onBus } from '$lib/events';
 	import { hydrate as hydrateBookmarks, rename as renameBookmark, deleted as deleteBookmark } from '$lib/bookmarks.svelte';
 	import { loadVaultPlugins } from '$lib/plugins/runtime';
-	import type { NoteDoc } from '$lib/types';
+	import { applyVaultAppearance, vaultAppearanceStyle } from '$lib/appearance';
+	import { api } from '$lib/vault-api';
+	import type { NoteDoc, VaultAppearancePreference } from '$lib/types';
 	import type { TreeNode } from '$lib/types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
@@ -28,6 +30,8 @@
 
 	let tree = $state<TreeNode[]>([]);
 	let activeDoc = $state<NoteDoc | null>(null);
+	let appearancePreference = $state<VaultAppearancePreference | null>(null);
+	const appearanceStyle = $derived(vaultAppearanceStyle(appearancePreference));
 
 	// Register before child controls can fire click/key handlers. The registry
 	// is idempotent, so this remains safe across client navigations.
@@ -37,6 +41,20 @@
 		// Keep the tree prop synced when data reloads.
 		tree = data.tree;
 	});
+
+	$effect(() => {
+		const id = vaultId;
+		appearancePreference = null;
+		api.appearancePreferences(id)
+			.then((preference) => {
+				if (id === vaultId) appearancePreference = preference;
+			})
+			.catch(() => {
+				if (id === vaultId) appearancePreference = null;
+			});
+	});
+
+	$effect(() => applyVaultAppearance(appearancePreference));
 
 	onMount(() => {
 		// Boot: hydrate workspace and wire event listeners.
@@ -134,6 +152,7 @@
 	class="shell"
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
+	style={appearanceStyle}
 >
 	<!-- Top bar spans the full width via subgrid; columns mirror the
 	     layout below: rail | left-sidebar | editor | right-sidebar.

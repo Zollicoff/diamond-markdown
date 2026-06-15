@@ -419,6 +419,10 @@ Use small, pushable slices:
 - **Obsidian Appearance guidance.** Surface `.obsidian/appearance.json` theme,
    font, accent, and CSS snippet filenames as read-only migration guidance
    without loading Obsidian community themes, CSS snippets, or raw CSS contents.
+- **Safe Obsidian Appearance application.** Apply safe `.obsidian/appearance.json`
+   integer `baseFontSize` values and hex `accentColor` / `customAccentColor`
+   values while a vault is open, while still refusing to load Obsidian
+   community themes or CSS snippets.
 - **Obsidian Graph guidance.** Surface recognized `.obsidian/graph.json`
    search, display, force, zoom, and color-group settings as read-only
    migration guidance, marking tag/attachment/unresolved graph nodes and color

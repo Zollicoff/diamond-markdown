@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { vaultAppearanceStyle } from '../src/lib/appearance';
 import { buildSettingsSections, themeModeOptions } from '../src/lib/settings/view';
 
 test.describe('settings view helpers', () => {
@@ -28,5 +29,14 @@ test.describe('settings view helpers', () => {
 	test('lists the supported theme modes in display order', () => {
 		expect(themeModeOptions.map((mode) => mode.id)).toEqual(['auto', 'light', 'dark']);
 		expect(themeModeOptions.map((mode) => mode.label)).toEqual(['Auto', 'Light', 'Dark']);
+	});
+
+	test('builds safe vault appearance CSS variables from imported preferences', () => {
+		expect(vaultAppearanceStyle(null)).toBe('');
+		expect(vaultAppearanceStyle({
+			baseFontSize: 18,
+			accentColor: '#0f766e',
+			source: 'obsidian-appearance'
+		})).toBe('--vault-base-font-size: 18px; --accent: #0f766e; --accent-soft: rgba(15, 118, 110, 0.14)');
 	});
 });

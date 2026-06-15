@@ -159,6 +159,7 @@ html, body {
 	height: 100%;
 	background: var(--bg);
 	color: var(--fg);
+	font-size: var(--vault-base-font-size, 16px);
 	font-family: var(--sans);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;

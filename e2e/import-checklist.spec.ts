@@ -20,7 +20,7 @@ import {
 import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
 import { editorDisplayPreference, editorLinkPreference, markdownRenderPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
-import { readObsidianAppearanceConfig } from '../src/lib/server/obsidian-appearance';
+import { readObsidianAppearanceConfig, vaultAppearancePreference } from '../src/lib/server/obsidian-appearance';
 import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
 import { readObsidianGraphConfig } from '../src/lib/server/obsidian-graph';
 import { readObsidianTemplatesConfig, templateRuntimeSettings } from '../src/lib/server/obsidian-templates';
@@ -528,6 +528,21 @@ test.describe('import checklist helpers', () => {
 		expect(config.warnings).toContain('1 Obsidian CSS snippet name ignored because it was unsafe.');
 		expect(JSON.stringify(config)).not.toContain('do-not-render-this-css-value');
 		expect(JSON.stringify(config)).not.toContain('do-not-render-this-appearance-value');
+		expect(vaultAppearancePreference(vaultDir)).toEqual({
+			baseFontSize: 16,
+			accentColor: '#0f766e',
+			source: 'obsidian-appearance'
+		});
+
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'appearance.json'), JSON.stringify({
+			baseFontSize: 48,
+			accentColor: 'url(javascript:alert(1))'
+		}));
+		expect(vaultAppearancePreference(vaultDir)).toEqual({
+			baseFontSize: null,
+			accentColor: null,
+			source: 'diamond-default'
+		});
 	});
 
 	test('summarizes and classifies Obsidian core plugin settings', () => {

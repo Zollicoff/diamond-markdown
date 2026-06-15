@@ -243,6 +243,12 @@ export interface EditorDisplayPreference {
 	source: 'obsidian-app-config' | 'diamond-default';
 }
 
+export interface VaultAppearancePreference {
+	baseFontSize: number | null;
+	accentColor: string | null;
+	source: 'obsidian-appearance' | 'diamond-default';
+}
+
 export interface MarkdownRenderPreference {
 	strictLineBreaks: boolean;
 	softLineBreaks: boolean;

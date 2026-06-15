@@ -1370,6 +1370,46 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 	await expect(editor.locator('.cm-foldGutter')).toHaveCount(1);
 });
 
+test('vault shell applies safe Obsidian appearance preferences', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-appearance-applied-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'appearance.json'), JSON.stringify({
+		theme: 'moonstone',
+		cssTheme: 'Minimal',
+		baseFontSize: 18,
+		accentColor: '#0f766e',
+		enabledCssSnippets: ['cards']
+	}));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nAppearance settings apply safely.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Appearance Applied', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const preference = await request.get(`/api/vaults/${vault.id}/appearance-preferences`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toEqual({
+		baseFontSize: 18,
+		accentColor: '#0f766e',
+		source: 'obsidian-appearance'
+	});
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--vault-base-font-size'))).toBe('18px');
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--accent'))).toBe('#0f766e');
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--accent-soft'))).toBe('rgba(15, 118, 110, 0.14)');
+	await expect.poll(async () => page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe('18px');
+
+	await page.goto('/', { waitUntil: 'domcontentloaded' });
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--vault-base-font-size'))).toBe('');
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--accent'))).toBe('');
+	await expect.poll(async () => page.evaluate(() => document.documentElement.style.getPropertyValue('--accent-soft'))).toBe('');
+});
+
 test('note panes honor Obsidian default view mode preference', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-default-view-mode-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
