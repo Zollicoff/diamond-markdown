@@ -70,6 +70,7 @@
 	} from '$lib/canvas/link-targets';
 	import {
 		canDeleteCanvasNode,
+		canDuplicateCanvasNode,
 		canMutateCanvasEdge,
 		canSaveCanvasNodeContent,
 		canSaveCanvasNodeColor,
@@ -310,6 +311,21 @@
 			error = (e as Error).message;
 		} finally {
 			setMutationState({ savingNodeId: null });
+		}
+	}
+
+	async function duplicateNode(node: CanvasNode): Promise<void> {
+		if (!doc || !canDuplicateCanvasNode(mutationState)) return;
+		setMutationState({ duplicatingNodeId: node.id });
+		error = null;
+		try {
+			const res = await api.duplicateCanvasNode(vaultId, path, node.id, doc.revision);
+			setDoc(res.doc);
+			emit('toast:show', { title: 'Canvas node duplicated', tone: 'success' });
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			setMutationState({ duplicatingNodeId: null });
 		}
 	}
 
@@ -673,6 +689,7 @@
 		onSaveRefNode={saveRefNode}
 		onOpenRefNode={openRefNode}
 		onSaveNodeColor={saveNodeColor}
+		onDuplicateNode={duplicateNode}
 		onDeleteNode={deleteNode}
 		onMovePointerDown={startMoveNode}
 		onResizePointerDown={startResizeNode}

@@ -195,6 +195,22 @@ export const api = {
 		return res;
 	},
 
+	async duplicateCanvasNode(
+		vaultId: string,
+		path: string,
+		nodeId: string,
+		expectedRevision: string
+	): Promise<CanvasMutationResult> {
+		const res = await json<CanvasMutationResult>(`/api/vaults/${vaultId}/canvas`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path, action: 'duplicate-node', nodeId, expectedRevision })
+		});
+		emit('canvas:saved', { vaultId, path: res.path, sha: res.sha });
+		emit('tree:invalidate', { vaultId });
+		return res;
+	},
+
 	async moveCanvasNode(
 		vaultId: string,
 		path: string,

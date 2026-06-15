@@ -58,6 +58,7 @@ export interface CanvasSvgExport {
 export type CanvasEditAction =
 	| 'add-node'
 	| 'add-text-node'
+	| 'duplicate-node'
 	| 'update-node-text'
 	| 'update-group-label'
 	| 'update-node-reference'
@@ -385,6 +386,25 @@ function createCanvasNodeId(nodes: unknown[], prefix: string): string {
 	return `${prefix}-${Date.now().toString(36)}`;
 }
 
+function canvasNodeIdPrefix(value: unknown): string {
+	const prefix = text(value)
+		?.toLowerCase()
+		.replace(/[^a-z0-9_-]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 24);
+	return prefix || 'node';
+}
+
+export function duplicateCanvasRawNode(nodes: unknown[], nodeId: string): Record<string, unknown> {
+	const source = nodes.map(nodeRecord).find((candidate) => candidate?.id === nodeId);
+	if (!source) throw new CanvasFileError('canvas node not found', 404);
+	const duplicate = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
+	duplicate.id = createCanvasNodeId(nodes, canvasNodeIdPrefix(duplicate.type));
+	duplicate.x = boundedNumber(number(source.x) + 40, 40, -100_000, 100_000);
+	duplicate.y = boundedNumber(number(source.y) + 40, 40, -100_000, 100_000);
+	return duplicate;
+}
+
 function createCanvasEdgeId(edges: unknown[]): string {
 	const used = new Set(edges.map((edge) => edgeRecord(edge)?.id).filter((id): id is string => Boolean(id)));
 	for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -547,6 +567,9 @@ export async function mutateCanvas(vault: Vault, input: MutateCanvasInput): Prom
 			node.label = cleanOptionalLabel(input.label ?? input.text) || 'Group';
 		}
 		nodes.push(node);
+	} else if (input.action === 'duplicate-node') {
+		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
+		nodes.push(duplicateCanvasRawNode(nodes, input.nodeId));
 	} else if (input.action === 'update-node-text') {
 		if (!input.nodeId) throw new CanvasFileError('nodeId is required');
 		if (typeof input.text !== 'string') throw new CanvasFileError('text is required');

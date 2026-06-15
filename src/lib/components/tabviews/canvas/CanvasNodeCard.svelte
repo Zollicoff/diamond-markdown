@@ -35,9 +35,11 @@
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		saving: boolean;
+		duplicating: boolean;
 		moving: boolean;
 		resizing: boolean;
 		deleting: boolean;
+		disableDuplicate: boolean;
 		disableDelete: boolean;
 		onDraftChange: (node: CanvasNode, value: string) => void;
 		onGroupLabelDraftChange: (node: CanvasNode, value: string) => void;
@@ -47,6 +49,7 @@
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
 		onColorChange: (node: CanvasNode, color: string) => void | Promise<void>;
+		onDuplicate: (node: CanvasNode) => void | Promise<void>;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -68,9 +71,11 @@
 		resolveEmbedTarget,
 		resolveWikilinkTarget,
 		saving,
+		duplicating,
 		moving,
 		resizing,
 		deleting,
+		disableDuplicate,
 		disableDelete,
 		onDraftChange,
 		onGroupLabelDraftChange,
@@ -80,6 +85,7 @@
 		onSaveRef,
 		onOpenRef,
 		onColorChange,
+		onDuplicate,
 		onDelete,
 		onMovePointerDown,
 		onResizePointerDown
@@ -107,6 +113,15 @@
 			{saving}
 			onColorChange={(color) => onColorChange(node, color)}
 		/>
+		<button
+			type="button"
+			class="node-duplicate"
+			aria-label={`Duplicate canvas node ${title}`}
+			disabled={disableDuplicate}
+			onclick={() => void onDuplicate(node)}
+		>
+			{duplicating ? 'Duplicating...' : 'Duplicate'}
+		</button>
 	</div>
 	<h3 title={title}>{title}</h3>
 	{#if isCanvasGroupNode(node)}
@@ -226,6 +241,27 @@
 	}
 	.node-topline :global(.color-palette) {
 		margin-left: auto;
+	}
+	.node-duplicate {
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 3px 8px;
+		background: transparent;
+		color: var(--fg-muted);
+		font: inherit;
+		font-size: 0.7rem;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.node-duplicate:hover:not(:disabled),
+	.node-duplicate:focus-visible {
+		border-color: var(--accent);
+		color: var(--accent);
+		outline: none;
+	}
+	.node-duplicate:disabled {
+		cursor: not-allowed;
+		opacity: 0.55;
 	}
 	.node-drag-handle {
 		position: relative;

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { CanvasDoc } from '../src/lib/types';
+import { duplicateCanvasRawNode } from '../src/lib/server/canvas';
 import {
 	CANVAS_COLOR_OPTIONS,
 	CANVAS_EDGE_END_OPTIONS,
@@ -111,6 +112,7 @@ import {
 	canvasEdgeMutationFlags,
 	canvasNodeMutationFlags,
 	canDeleteCanvasNode,
+	canDuplicateCanvasNode,
 	canMutateCanvasEdge,
 	canSaveCanvasNodeContent,
 	canSaveCanvasNodeColor,
@@ -170,6 +172,7 @@ test.describe('canvas view helpers', () => {
 		const idleMutationState = idleCanvasMutationState();
 		expect(idleMutationState).toEqual({
 			savingNodeId: null,
+			duplicatingNodeId: null,
 			movingNodeId: null,
 			moveSavingNodeId: null,
 			resizingNodeId: null,
@@ -203,6 +206,7 @@ test.describe('canvas view helpers', () => {
 		expect(canSaveCanvasNodeContent(idleMutationState)).toBe(true);
 		expect(canSaveCanvasNodeColor(idleMutationState)).toBe(true);
 		expect(canDeleteCanvasNode(idleMutationState)).toBe(true);
+		expect(canDuplicateCanvasNode(idleMutationState)).toBe(true);
 		expect(canMutateCanvasEdge(idleMutationState)).toBe(true);
 		expect(canStartCanvasNodeMove(idleMutationState)).toBe(true);
 		expect(canStartCanvasNodeResize(idleMutationState)).toBe(true);
@@ -211,21 +215,26 @@ test.describe('canvas view helpers', () => {
 		expect(canDeleteCanvasNode({ ...idleMutationState, savingEdgeId: 'edge-a-b' })).toBe(false);
 		expect(canMutateCanvasEdge({ ...idleMutationState, deletingEdgeId: 'edge-a-b' })).toBe(false);
 		expect(canSaveCanvasNodeContent({ ...idleMutationState, savingNodeId: 'a' })).toBe(false);
+		expect(canSaveCanvasNodeContent({ ...idleMutationState, duplicatingNodeId: 'a' })).toBe(false);
+		expect(canDuplicateCanvasNode({ ...idleMutationState, duplicatingNodeId: 'a' })).toBe(false);
 		expect(canStartCanvasNodeMove({ ...idleMutationState, moveSavingNodeId: 'a' })).toBe(false);
 		expect(canStartCanvasNodeResize({ ...idleMutationState, resizeSavingNodeId: 'a' })).toBe(false);
 		expect(isCanvasNodeDeleteDisabled({ ...idleMutationState, deletingNodeId: 'a' })).toBe(true);
 		expect(canvasNodeMutationFlags('a', {
 			...idleMutationState,
 			savingNodeId: 'a',
+			duplicatingNodeId: 'a',
 			moveSavingNodeId: 'a',
 			resizingNodeId: 'a',
 			deletingNodeId: 'a',
 			savingEdgeId: 'edge-a-b'
 		})).toEqual({
 			saving: true,
+			duplicating: true,
 			moving: true,
 			resizing: true,
 			deleting: true,
+			duplicateDisabled: true,
 			deleteDisabled: true
 		});
 		expect(canvasEdgeMutationFlags('edge-a-b', {
@@ -255,6 +264,20 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
 		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
 		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
+		const duplicatedRawNode = duplicateCanvasRawNode([
+			{ id: 'raw-a', type: 'mystery', x: 12, y: 18, width: 260, height: 140, label: 'Keep me', pluginData: { preserved: true } }
+		], 'raw-a');
+		expect(duplicatedRawNode).toMatchObject({
+			type: 'mystery',
+			x: 52,
+			y: 58,
+			width: 260,
+			height: 140,
+			label: 'Keep me',
+			pluginData: { preserved: true }
+		});
+		expect(duplicatedRawNode.id).toMatch(/^mystery-/);
+		expect(duplicatedRawNode.id).not.toBe('raw-a');
 		expect(canvasTextPreviewInlines('Use **bill** with *roof* ~~old plan~~ ==priority== `photo` [[Home|label]] [site](https://example.com)')).toEqual([
 			{ kind: 'text', text: 'Use ' },
 			{ kind: 'strong', text: 'bill' },
@@ -1332,7 +1355,28 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 	});
 	expect(gitStatus(vaultDir)).toBe('');
 
-	const addedFileNode = groupUpdatedBody.doc.nodes.find((node) => node.type === 'file' && node.id !== 'b' && node.file === 'Home.md');
+	const duplicated = await request.post(`/api/vaults/${vault.id}/canvas`, {
+		data: {
+			path: 'Board.canvas',
+			action: 'duplicate-node',
+			nodeId: 'a',
+			expectedRevision: groupUpdatedBody.doc.revision
+		}
+	});
+	expect(duplicated.ok(), await duplicated.text()).toBe(true);
+	const duplicatedBody = await duplicated.json() as { sha: string | null; doc: CanvasDoc };
+	expect(duplicatedBody.sha).toBeTruthy();
+	const duplicatedTextNode = duplicatedBody.doc.nodes.find((node) => node.id !== 'a' && node.type === 'text' && node.text === 'Edited text card');
+	expect(duplicatedTextNode).toMatchObject({
+		x: 40,
+		y: 40,
+		width: 220,
+		height: 120,
+		color: '1'
+	});
+	expect(gitStatus(vaultDir)).toBe('');
+
+	const addedFileNode = duplicatedBody.doc.nodes.find((node) => node.type === 'file' && node.id !== 'b' && node.file === 'Home.md');
 	expect(addedFileNode).toBeTruthy();
 	const fileUpdated = await request.post(`/api/vaults/${vault.id}/canvas`, {
 		data: {
@@ -1342,7 +1386,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 			file: 'References/Home.md',
 			subpath: '#Install Steps',
 			label: 'Home reference',
-			expectedRevision: groupUpdatedBody.doc.revision
+			expectedRevision: duplicatedBody.doc.revision
 		}
 	});
 	expect(fileUpdated.ok(), await fileUpdated.text()).toBe(true);
@@ -1697,6 +1741,7 @@ test('canvas API adds, edits, moves, and deletes cards with clean git commits an
 		edges: { fromNode?: string; toNode?: string; label?: string }[];
 	};
 	expect(raw.nodes.some((node) => node.text === 'Edited text card')).toBe(true);
+	expect(raw.nodes.filter((node) => node.text === 'Edited text card')).toHaveLength(2);
 	expect(raw.nodes.some((node) => node.text === 'Follow-up idea')).toBe(true);
 	expect(raw.nodes.some((node) => node.type === 'group' && node.label === 'Renamed API group')).toBe(true);
 	expect(raw.nodes.some((node) => node.file === 'References/Home.md' && node.label === 'Home reference')).toBe(true);
@@ -1731,19 +1776,24 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 		return body.nodes.find((node) => node.id === 'b')?.color;
 	}).toBe('5');
 
-	await page.getByRole('button', { name: 'Add text' }).click();
+	await page.getByRole('button', { name: 'Duplicate canvas node Home.md' }).click();
+	await expect(page.getByText('Canvas node duplicated')).toBeVisible({ timeout: 10_000 });
 	await expect(page.locator('.canvas-view')).toContainText('3 nodes · 1 edge · editable text cards');
+	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toHaveCount(2);
+
+	await page.getByRole('button', { name: 'Add text' }).click();
+	await expect(page.locator('.canvas-view')).toContainText('4 nodes · 1 edge · editable text cards');
 
 	await page.getByLabel('Canvas node type').selectOption('file');
 	await page.getByLabel('Canvas node value').fill('Home.md');
 	await page.getByRole('button', { name: 'Add file' }).click();
-	await expect(page.locator('.canvas-view')).toContainText('4 nodes · 1 edge · editable text cards');
-	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toHaveCount(2);
+	await expect(page.locator('.canvas-view')).toContainText('5 nodes · 1 edge · editable text cards');
+	await expect(page.locator('.canvas-node-file').filter({ hasText: 'Home.md' })).toHaveCount(3);
 
 	await page.getByLabel('Canvas node type').selectOption('link');
 	await page.getByLabel('Canvas node value').fill('https://example.com/research');
 	await page.getByRole('button', { name: 'Add URL' }).click();
-	await expect(page.locator('.canvas-view')).toContainText('5 nodes · 1 edge · editable text cards');
+	await expect(page.locator('.canvas-view')).toContainText('6 nodes · 1 edge · editable text cards');
 	await expect(page.locator('.canvas-node-link').filter({ hasText: 'https://example.com/research' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Open canvas URL node https://example.com/research' })).toHaveAttribute(
 		'href',
@@ -1788,11 +1838,12 @@ test('canvas view adds text, file, and URL cards from the board', async ({ page,
 		return {
 			text: body.nodes.find((node) => node.id === 'a')?.text,
 			homeColor: body.nodes.find((node) => node.id === 'b')?.color,
+			homeFileNodes: body.nodes.filter((node) => node.type === 'file' && node.file === 'Home.md').length,
 			hasFile: body.nodes.some((node) => node.type === 'file' && node.file === 'Home.md'),
 			hasEditedFile: body.nodes.some((node) => node.type === 'file' && node.file === 'References/Home.md' && node.subpath === '#Install Steps' && node.label === 'Home reference'),
 			hasEditedLink: body.nodes.some((node) => node.type === 'link' && node.url === 'https://example.com/updated' && node.label === 'Updated research')
 		};
-	}).toEqual({ text: 'Edited through UI', homeColor: '5', hasFile: true, hasEditedFile: true, hasEditedLink: true });
+	}).toEqual({ text: 'Edited through UI', homeColor: '5', homeFileNodes: 2, hasFile: true, hasEditedFile: true, hasEditedLink: true });
 	await expect.poll(() => gitStatus(vaultDir)).toBe('');
 });
 

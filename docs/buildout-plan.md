@@ -186,6 +186,10 @@ Use small, pushable slices:
    stale-revision protection.
 - **Canvas node deletion.** Remove Canvas cards from the board view and prune
    connected edges through git-backed commits with stale-revision protection.
+- **Canvas node duplication.** Duplicate an existing Canvas card from the board
+   view by preserving its raw node JSON, assigning a fresh id, offsetting the
+   cloned card, and committing the edit through the git-backed Canvas mutation
+   path.
 - **Canvas file and URL node editing.** Edit Canvas file paths, URL targets,
    and optional display labels inline through git-backed commits with
    stale-revision protection.

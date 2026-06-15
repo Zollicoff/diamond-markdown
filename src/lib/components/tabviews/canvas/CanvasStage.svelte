@@ -56,6 +56,7 @@
 		onSaveRefNode: (node: CanvasNode) => void | Promise<void>;
 		onOpenRefNode: (node: CanvasNode) => void;
 		onSaveNodeColor: (node: CanvasNode, color: string) => void | Promise<void>;
+		onDuplicateNode: (node: CanvasNode) => void | Promise<void>;
 		onDeleteNode: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -101,6 +102,7 @@
 		onSaveRefNode,
 		onOpenRefNode,
 		onSaveNodeColor,
+		onDuplicateNode,
 		onDeleteNode,
 		onMovePointerDown,
 		onResizePointerDown,
@@ -161,6 +163,7 @@
 		onSaveRef={onSaveRefNode}
 		onOpenRef={onOpenRefNode}
 		onColorChange={onSaveNodeColor}
+		onDuplicate={onDuplicateNode}
 		onDelete={onDeleteNode}
 		{onMovePointerDown}
 		{onResizePointerDown}

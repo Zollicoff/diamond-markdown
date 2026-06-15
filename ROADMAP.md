@@ -112,8 +112,9 @@ runtime compatibility is a non-goal.
   cards with H1-H6 headings, thematic breaks, callouts, highlights,
   strikethrough, simple tables, resolved note/title/alias inline wikilinks and
   note embed chips, explicit Canvas links and embed chips, and safe vault-local
-  asset embeds, file-card subpaths, SVG export, and git-backed editing exist; full
-  visual whiteboard parity would need its own focused track.
+  asset embeds, file-card subpaths, SVG export, git-backed editing, and node
+  duplication exist; full visual whiteboard parity would need its own focused
+  track.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.

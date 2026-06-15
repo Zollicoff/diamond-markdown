@@ -57,6 +57,7 @@
 		onSaveRef: (node: CanvasNode) => void | Promise<void>;
 		onOpenRef: (node: CanvasNode) => void;
 		onColorChange: (node: CanvasNode, color: string) => void | Promise<void>;
+		onDuplicate: (node: CanvasNode) => void | Promise<void>;
 		onDelete: (node: CanvasNode) => void | Promise<void>;
 		onMovePointerDown: (node: CanvasNode, event: PointerEvent) => void;
 		onResizePointerDown: (node: CanvasNode, event: PointerEvent) => void;
@@ -90,6 +91,7 @@
 		onSaveRef,
 		onOpenRef,
 		onColorChange,
+		onDuplicate,
 		onDelete,
 		onMovePointerDown,
 		onResizePointerDown,
@@ -147,9 +149,11 @@
 				{resolveEmbedTarget}
 				{resolveWikilinkTarget}
 				saving={nodeMutation.saving}
+				duplicating={nodeMutation.duplicating}
 				moving={nodeMutation.moving}
 				resizing={nodeMutation.resizing}
 				deleting={nodeMutation.deleting}
+				disableDuplicate={nodeMutation.duplicateDisabled}
 				disableDelete={nodeMutation.deleteDisabled}
 				onDraftChange={onDraftChange}
 				onGroupLabelDraftChange={onGroupLabelDraftChange}
@@ -159,6 +163,7 @@
 				onSaveRef={onSaveRef}
 				onOpenRef={onOpenRef}
 				onColorChange={onColorChange}
+				onDuplicate={onDuplicate}
 				onDelete={onDelete}
 				onMovePointerDown={onMovePointerDown}
 				onResizePointerDown={onResizePointerDown}

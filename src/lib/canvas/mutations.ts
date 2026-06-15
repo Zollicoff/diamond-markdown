@@ -1,5 +1,6 @@
 export interface CanvasMutationState {
 	savingNodeId: string | null;
+	duplicatingNodeId: string | null;
 	movingNodeId: string | null;
 	moveSavingNodeId: string | null;
 	resizingNodeId: string | null;
@@ -11,9 +12,11 @@ export interface CanvasMutationState {
 
 export interface CanvasNodeMutationFlags {
 	saving: boolean;
+	duplicating: boolean;
 	moving: boolean;
 	resizing: boolean;
 	deleting: boolean;
+	duplicateDisabled: boolean;
 	deleteDisabled: boolean;
 }
 
@@ -25,6 +28,7 @@ export interface CanvasEdgeMutationFlags {
 
 const IDLE_CANVAS_MUTATION_STATE: CanvasMutationState = {
 	savingNodeId: null,
+	duplicatingNodeId: null,
 	movingNodeId: null,
 	moveSavingNodeId: null,
 	resizingNodeId: null,
@@ -55,12 +59,13 @@ export function clearCanvasPointerMutationState(state: CanvasMutationState): Can
 }
 
 export function canSaveCanvasNodeContent(state: CanvasMutationState): boolean {
-	return !state.savingNodeId;
+	return !state.savingNodeId && !state.duplicatingNodeId;
 }
 
 export function canSaveCanvasNodeColor(state: CanvasMutationState): boolean {
 	return !(
 		state.savingNodeId ||
+		state.duplicatingNodeId ||
 		state.deletingNodeId ||
 		state.movingNodeId ||
 		state.moveSavingNodeId ||
@@ -71,6 +76,10 @@ export function canSaveCanvasNodeColor(state: CanvasMutationState): boolean {
 
 export function canDeleteCanvasNode(state: CanvasMutationState): boolean {
 	return canSaveCanvasNodeColor(state) && !state.savingEdgeId && !state.deletingEdgeId;
+}
+
+export function canDuplicateCanvasNode(state: CanvasMutationState): boolean {
+	return canDeleteCanvasNode(state);
 }
 
 export function canStartCanvasNodeMove(state: CanvasMutationState): boolean {
@@ -95,9 +104,11 @@ export function canvasNodeMutationFlags(
 ): CanvasNodeMutationFlags {
 	return {
 		saving: state.savingNodeId === nodeId,
+		duplicating: state.duplicatingNodeId === nodeId,
 		moving: state.movingNodeId === nodeId || state.moveSavingNodeId === nodeId,
 		resizing: state.resizingNodeId === nodeId || state.resizeSavingNodeId === nodeId,
 		deleting: state.deletingNodeId === nodeId,
+		duplicateDisabled: !canDuplicateCanvasNode(state),
 		deleteDisabled: isCanvasNodeDeleteDisabled(state)
 	};
 }
