@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { GitSyncStatus } from '../src/lib/types';
+import { gitSyncCommandCopyLabel, gitSyncCommandCopyTone } from '../src/lib/sync/command-block';
 import {
 	buildGitSyncUiState,
 	classifyGitSyncRecovery,
@@ -144,6 +145,15 @@ test.describe('git sync UI state', () => {
 		expect(gitSyncBusyActionLabel('pull')).toBe('Pulling...');
 		expect(gitSyncBusyActionLabel('push')).toBe('Pushing...');
 		expect(gitSyncBusyActionLabel('remote')).toBe('Saving...');
+	});
+
+	test('labels sync recovery command copy states', () => {
+		expect(gitSyncCommandCopyLabel('idle')).toBe('Copy commands');
+		expect(gitSyncCommandCopyLabel('copied')).toBe('Copied');
+		expect(gitSyncCommandCopyLabel('failed')).toBe('Copy failed');
+		expect(gitSyncCommandCopyTone('idle')).toBe('default');
+		expect(gitSyncCommandCopyTone('copied')).toBe('success');
+		expect(gitSyncCommandCopyTone('failed')).toBe('danger');
 	});
 
 	test('builds setup and recovery copy with matching operator commands', () => {

@@ -2616,7 +2616,7 @@ test('search rail icon dedupes — clicking twice activates the same tab', async
 
 test('settings exposes GitHub sync status and controls', async ({ page }) => {
 	await openVault(page);
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Sync');
 	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 	await expect(page.getByPlaceholder('https://github.com/owner/repo.git')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
@@ -2647,14 +2647,33 @@ test('settings shows local git changes recovery guidance before sync actions', a
 
 	fs.writeFileSync(path.join(vaultDir, 'Dirty.md'), '# Dirty\n\nExternal edit.\n');
 
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, 'clipboard', {
+			configurable: true,
+			value: {
+				writeText: async (value: string) => {
+					(window as unknown as { __diamondCopiedText?: string }).__diamondCopiedText = value;
+				}
+			}
+		});
+	});
+
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Sync');
 	const recovery = page.locator('.sync-block').filter({ hasText: 'Uncommitted files' });
 	await expect(recovery.getByText('Local vault changes', { exact: true })).toBeVisible();
 	await expect(recovery.getByText('Uncommitted files')).toBeVisible();
 	await expect(recovery.getByText('Dirty.md')).toBeVisible();
 	await expect(recovery).toContainText("git commit -m 'sync: save local vault changes'");
+	const copyButton = recovery.getByRole('button', { name: 'Copy git recovery commands' });
+	await expect(copyButton).toHaveText('Copy commands');
+	await copyButton.click();
+	await expect(copyButton).toHaveText('Copied');
+	await expect(page.getByText('Git commands copied')).toBeVisible();
+	const copied = await page.evaluate(() => (window as unknown as { __diamondCopiedText?: string }).__diamondCopiedText ?? '');
+	expect(copied).toContain("git commit -m 'sync: save local vault changes'");
+	expect(copied).toContain("git stash push -u -m 'diamond markdown local changes'");
 	await expect(page.getByRole('button', { name: 'Pull' })).toBeDisabled();
 	await expect(page.getByRole('button', { name: 'Push' })).toBeDisabled();
 });
@@ -2828,7 +2847,7 @@ test('sync status surfaces diverged histories with overlapping file candidates',
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Sync');
 	await expect(page.getByText('Diverged history')).toBeVisible();
 	await expect(page.getByText('Overlapping files')).toBeVisible();
 	await expect(page.locator('.change-box.local').getByText('LocalOnly.md')).toBeVisible();
@@ -2888,7 +2907,7 @@ test('vault writes are blocked until fetched remote commits are pulled', async (
 
 	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
-	await page.getByLabel('Settings').click();
+	await openSettingsSection(page, 'Sync');
 	const recovery = page.locator('.sync-block').filter({ hasText: 'Remote changes waiting' });
 	await expect(recovery.getByText('Incoming files')).toBeVisible();
 	await expect(recovery.getByText('RemoteOnly.md')).toBeVisible();

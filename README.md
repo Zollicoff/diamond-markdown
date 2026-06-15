@@ -141,7 +141,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Per-note history viewer with diff, snapshot copy, and git-backed restore
 - Vault-local bookmarks and saved searches are stored under `.diamondmd/` so
   they follow ordinary GitHub sync with the vault
-- GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, and push local commits
+- GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, push local commits, and copy explicit recovery commands when manual git resolution is needed
 
 ### Daily notes
 - ⌘⇧D opens today's daily note, defaulting to `Daily Notes/YYYY-MM-DD.md`

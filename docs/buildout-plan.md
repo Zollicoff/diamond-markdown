@@ -78,6 +78,9 @@ Use small, pushable slices:
 - **Git sync busy-state clarity.** Keep conservative sync semantics while
   making in-flight operations explicit in the remote form, status card, action
   bar, and recovery panels.
+- **Git sync recovery command copy.** Keep manual recovery visible while making
+  generated setup/resolution command blocks directly copyable with app-level
+  toast feedback.
 - **Note view split.** Extract metadata, wikilink navigation, save/reload, and
    link-create behavior from `NoteView` so the component focuses on layout and
    editor/preview switching.
