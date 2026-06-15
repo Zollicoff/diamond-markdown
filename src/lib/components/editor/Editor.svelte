@@ -5,7 +5,7 @@
 	import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 	import { markdown } from '@codemirror/lang-markdown';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-	import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+	import { foldGutter, foldKeymap, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 	import { tags } from '@lezer/highlight';
 	import { livePreview, type LinkResolver } from '$lib/editor/live-preview';
 	import { makeEditorApi, type EditorApi } from '$lib/editor/commands';
@@ -18,6 +18,7 @@
 		spellcheck?: boolean;
 		tabSize?: number;
 		readableLineLength?: boolean;
+		folding?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -38,6 +39,7 @@
 		spellcheck = false,
 		tabSize = 4,
 		readableLineLength = false,
+		folding = false,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -56,6 +58,8 @@
 	const lineNumberCompartment = new Compartment();
 	const contentAttributeCompartment = new Compartment();
 	const tabSizeCompartment = new Compartment();
+	const foldingCompartment = new Compartment();
+	const foldKeymapCompartment = new Compartment();
 
 	interface WikilinkWidgetEventDetail {
 		target: string;
@@ -98,6 +102,14 @@
 	function editorTabSizeExtension(size: number): Extension {
 		const normalized = Number.isInteger(size) && size >= 1 && size <= 16 ? size : 4;
 		return EditorState.tabSize.of(normalized);
+	}
+
+	function foldingExtension(enabled: boolean): Extension {
+		return enabled ? foldGutter() : [];
+	}
+
+	function foldKeymapExtension(enabled: boolean): Extension {
+		return enabled ? keymap.of(foldKeymap) : [];
 	}
 
 	function hasTransferFiles(data: DataTransfer | null): boolean {
@@ -171,12 +183,14 @@
 			lineNumberCompartment.of(lineNumberExtension(showLineNumbers)),
 			contentAttributeCompartment.of(contentAttributeExtension(spellcheck)),
 			tabSizeCompartment.of(editorTabSizeExtension(tabSize)),
+			foldingCompartment.of(foldingExtension(folding)),
 			history(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
 			markdown(),
 			syntaxHighlighting(highlightStyle),
 			previewCompartment.of(previewExtension(mode)),
+			foldKeymapCompartment.of(foldKeymapExtension(folding)),
 			keymap.of([
 				...defaultKeymap,
 				...historyKeymap,
@@ -327,6 +341,16 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: tabSizeCompartment.reconfigure(editorTabSizeExtension(tabSize)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({
+			effects: [
+				foldingCompartment.reconfigure(foldingExtension(folding)),
+				foldKeymapCompartment.reconfigure(foldKeymapExtension(folding))
+			]
+		});
 	});
 </script>
 

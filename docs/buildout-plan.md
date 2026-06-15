@@ -450,6 +450,9 @@ Use small, pushable slices:
   `readableLineLength` by narrowing editor and reading surfaces for imported
   vaults while keeping Diamond's full-width default when the setting is absent
   or disabled.
+- **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
+  and `foldIndent` by showing CodeMirror fold controls for imported vaults
+  that request editor folding.
 - **Obsidian strict-line-break preference.** Honor `.obsidian/app.json`
   `strictLineBreaks` for Read mode, hover previews, and static publish output,
   preserving Diamond's strict default when the setting is absent.
@@ -565,6 +568,9 @@ Use small, pushable slices:
   `showInlineTitle` by showing the note file title above the editor and
   reading surface for imported vaults that request it, while keeping Diamond's
   existing chrome-only title behavior when the setting is absent or disabled.
+- **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
+  and `foldIndent` by enabling editor fold controls for imported vaults that
+  request foldable headings or indented blocks.
 
 ## Next Implementation Slices
 

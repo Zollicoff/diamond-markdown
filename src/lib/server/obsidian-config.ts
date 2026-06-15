@@ -313,6 +313,32 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const foldHeading = booleanValue(body.foldHeading);
+	if (foldHeading !== null) {
+		base.foldHeading = foldHeading;
+		base.settings.push(setting(
+			'foldHeading',
+			'Fold headings',
+			foldHeading ? 'Enabled' : 'Disabled',
+			foldHeading
+				? 'Diamond shows editor fold controls for foldable Markdown sections in this imported vault.'
+				: 'Diamond keeps heading fold controls disabled unless another Obsidian folding preference enables editor folding.'
+		));
+	}
+
+	const foldIndent = booleanValue(body.foldIndent);
+	if (foldIndent !== null) {
+		base.foldIndent = foldIndent;
+		base.settings.push(setting(
+			'foldIndent',
+			'Fold indented blocks',
+			foldIndent ? 'Enabled' : 'Disabled',
+			foldIndent
+				? 'Diamond shows editor fold controls for foldable Markdown sections in this imported vault.'
+				: 'Diamond keeps indented-block fold controls disabled unless another Obsidian folding preference enables editor folding.'
+		));
+	}
+
 	const strictLineBreaks = booleanValue(body.strictLineBreaks);
 	if (strictLineBreaks !== null) {
 		base.strictLineBreaks = strictLineBreaks;
@@ -416,8 +442,9 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 		spellcheck: config.spellcheck === true,
 		tabSize: config.tabSize ?? 4,
 		readableLineLength: config.readableLineLength === true,
+		folding: config.foldHeading === true || config.foldIndent === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined
+		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.foldHeading === undefined && config.foldIndent === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

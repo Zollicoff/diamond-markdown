@@ -53,6 +53,8 @@ export interface ObsidianAppConfigInfo {
 	spellcheck?: boolean;
 	tabSize?: number;
 	readableLineLength?: boolean;
+	foldHeading?: boolean;
+	foldIndent?: boolean;
 	strictLineBreaks?: boolean;
 	defaultViewMode?: string;
 	livePreview?: boolean;
@@ -236,6 +238,7 @@ export interface EditorDisplayPreference {
 	spellcheck: boolean;
 	tabSize: number;
 	readableLineLength: boolean;
+	folding: boolean;
 	defaultMode: NoteViewMode;
 	source: 'obsidian-app-config' | 'diamond-default';
 }

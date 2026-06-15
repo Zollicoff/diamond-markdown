@@ -766,6 +766,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
 		});
@@ -781,6 +782,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -792,6 +794,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -807,6 +810,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -822,6 +826,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -837,6 +842,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: true,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -848,6 +854,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -863,6 +870,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 8,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -880,6 +888,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
 		});
@@ -895,6 +904,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: true,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -906,6 +916,51 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ foldHeading: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'foldHeading')).toMatchObject({
+			label: 'Fold headings',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			folding: true,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ foldHeading: false }));
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ foldIndent: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'foldIndent')).toMatchObject({
+			label: 'Fold indented blocks',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			folding: true,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});
@@ -921,6 +976,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
 		});
@@ -932,6 +988,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
 		});
@@ -943,6 +1000,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
 		});

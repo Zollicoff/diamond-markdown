@@ -15,6 +15,7 @@
 		spellcheck: boolean;
 		tabSize: number;
 		readableLineLength: boolean;
+		folding: boolean;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -44,6 +45,7 @@
 		spellcheck,
 		tabSize,
 		readableLineLength,
+		folding,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -97,6 +99,7 @@
 			{spellcheck}
 			{tabSize}
 			{readableLineLength}
+			{folding}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}

@@ -1330,7 +1330,9 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		showInlineTitle: true,
 		spellcheck: true,
 		tabSize: 8,
-		readableLineLength: true
+		readableLineLength: true,
+		foldHeading: true,
+		foldIndent: true
 	}));
 	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLine one.\nLine two.\n');
 
@@ -1348,6 +1350,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
+		folding: true,
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
 	});
@@ -1364,6 +1367,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 	await expect(editor.locator('.cm-content')).toHaveAttribute('spellcheck', 'true');
 	await expect(editor.locator('.cm-content')).toHaveCSS('tab-size', '8');
 	await expect(editor.locator('.cm-content')).toHaveCSS('max-width', '820px');
+	await expect(editor.locator('.cm-foldGutter')).toHaveCount(1);
 });
 
 test('note panes honor Obsidian default view mode preference', async ({ page, request }) => {
@@ -1390,6 +1394,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 		spellcheck: false,
 		tabSize: 4,
 		readableLineLength: true,
+		folding: false,
 		defaultMode: 'read',
 		source: 'obsidian-app-config'
 	});

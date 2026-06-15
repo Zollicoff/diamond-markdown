@@ -69,6 +69,7 @@
 	let spellcheck = $state(false);
 	let tabSize = $state(4);
 	let readableLineLength = $state(false);
+	let folding = $state(false);
 	let showInlineTitle = $state(false);
 
 	let loadedPath: string | null = null;
@@ -121,6 +122,7 @@
 			spellcheck = false;
 			tabSize = 4;
 			readableLineLength = false;
+			folding = false;
 			api.editorPreferences(id)
 				.then((preference) => {
 					if (id === vaultId) {
@@ -129,6 +131,7 @@
 						spellcheck = preference.spellcheck;
 						tabSize = preference.tabSize;
 						readableLineLength = preference.readableLineLength;
+						folding = preference.folding;
 					}
 				})
 				.catch(() => {
@@ -138,6 +141,7 @@
 						spellcheck = false;
 						tabSize = 4;
 						readableLineLength = false;
+						folding = false;
 					}
 				});
 		});
@@ -383,6 +387,7 @@
 		{spellcheck}
 		{tabSize}
 		{readableLineLength}
+		{folding}
 		{content}
 		{editorApi}
 		{uploadingAttachments}
