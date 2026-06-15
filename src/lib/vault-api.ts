@@ -7,11 +7,12 @@
  * without explicit wiring.
  */
 
-import type { Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
+import type { Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
 import { attachmentsApi } from './api/attachments';
 import { canvasApi } from './api/canvas';
 import { pluginsApi } from './api/plugins';
 import { json } from './api/request';
+import { searchApi } from './api/search';
 import { syncApi } from './api/sync';
 import { emit } from './events';
 
@@ -160,59 +161,7 @@ export const api = {
 		emit('tree:invalidate', { vaultId });
 	},
 
-	async search(vaultId: string, query: string, opts: { full?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<SearchHit[]> {
-		return (await this.searchWithMeta(vaultId, query, opts)).results;
-	},
-
-	async searchWithMeta(vaultId: string, query: string, opts: { full?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<SearchResponse> {
-		const params = new URLSearchParams({ q: query });
-		if (opts.full) params.set('full', '1');
-		if (opts.limit) params.set('limit', String(opts.limit));
-		if (opts.offset) params.set('offset', String(opts.offset));
-		const res = await json<SearchResponse>(`/api/vaults/${vaultId}/search?${params.toString()}`, { signal: opts.signal });
-		const results = res.results ?? [];
-		const offset = res.offset ?? opts.offset ?? 0;
-		const total = res.total ?? results.length;
-		const nextOffset = res.nextOffset ?? (offset + results.length < total ? offset + results.length : null);
-		return {
-			query: res.query ?? query.trim(),
-			mode: res.mode ?? (opts.full ? 'full' : 'title'),
-			limit: res.limit ?? opts.limit ?? (opts.full ? 50 : 25),
-			offset,
-			total,
-			limited: res.limited ?? nextOffset !== null,
-			hasMore: res.hasMore ?? nextOffset !== null,
-			nextOffset,
-			results
-		};
-	},
-
-	async savedSearches(vaultId: string): Promise<SavedSearch[]> {
-		const res = await json<{ searches: SavedSearch[] }>(`/api/vaults/${vaultId}/searches`);
-		return res.searches ?? [];
-	},
-
-	async saveSavedSearch(
-		vaultId: string,
-		input: { id?: string; name: string; query: string; mode: SavedSearchMode }
-	): Promise<SavedSearchMutationResult> {
-		const res = await json<SavedSearchMutationResult>(`/api/vaults/${vaultId}/searches`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(input)
-		});
-		emit('searches:changed', { vaultId });
-		return res;
-	},
-
-	async deleteSavedSearch(vaultId: string, id: string): Promise<SavedSearchMutationResult> {
-		const res = await json<SavedSearchMutationResult>(
-			`/api/vaults/${vaultId}/searches?id=${encodeURIComponent(id)}`,
-			{ method: 'DELETE' }
-		);
-		emit('searches:changed', { vaultId });
-		return res;
-	},
+	...searchApi,
 
 	async bookmarks(vaultId: string): Promise<Bookmark[]> {
 		const res = await json<{ bookmarks: Bookmark[] }>(`/api/vaults/${vaultId}/bookmarks`);

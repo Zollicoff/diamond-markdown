@@ -97,6 +97,10 @@ Use small, pushable slices:
 - **Attachment API client extraction.** Move attachment upload/list/delete and
   rename/move payload construction out of the all-domain `vault-api` client
   into a focused API module while preserving the public `api.*` call surface.
+- **Search API client extraction.** Move search query serialization, response
+  fallback normalization, and saved-search mutation events out of the all-domain
+  `vault-api` client into a focused API module while preserving the public
+  `api.*` call surface.
 - **Import and migration helpers.** Add an Obsidian-vault import checklist:
    ignore `.obsidian`, detect attachment folders, flag media outside named
    attachment folders, preserve plugin settings and Canvas files unchanged, and
