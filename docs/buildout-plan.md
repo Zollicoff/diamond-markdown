@@ -126,6 +126,10 @@ Use small, pushable slices:
   note previews fresh after vault note and folder mutations through a tested
   request-refresh helper and vault-scoped event gate instead of inline
   component sequence checks.
+- **Canvas API client extraction.** Move Canvas fetch/mutation request
+  wrappers, mutation payload creation, and Canvas event emissions out of the
+  all-domain `vault-api` client into a focused API module while preserving the
+  public `api.*` call surface.
 - **Canvas text-card table alignment.** Preserve Markdown pipe-table alignment
    markers (`:---`, `:---:`, and `---:`) in Canvas text-card previews and render
    aligned header/body cells with helper and browser coverage.
