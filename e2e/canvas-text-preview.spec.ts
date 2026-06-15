@@ -110,6 +110,31 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', resolved[3])).toBe('/vault/vault%20id/note/Home.md');
 	});
 
+	test('parses safe inline Markdown image embeds', () => {
+		const inline = canvasTextPreviewInlines(
+			'Inline photo ![Roof inline|120x60](<../Images/roof photo.svg#diagram> "Roof") stays with text and ![unsafe](../../secret.svg)',
+			{ sourcePath: 'Boards/Board.canvas' }
+		);
+		expect(inline).toEqual([
+			{ kind: 'text', text: 'Inline photo ' },
+			{
+				kind: 'image',
+				text: 'Roof inline',
+				embed: {
+					path: 'Images/roof photo.svg',
+					suffix: '#diagram',
+					kind: 'image',
+					title: 'Roof inline',
+					alt: 'Roof inline',
+					width: 120,
+					height: 60
+				}
+			},
+			{ kind: 'text', text: ' stays with text and ![unsafe](../../secret.svg)' }
+		]);
+		expect(canvasTextEmbedHref('vault id', inline[1].embed!)).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.svg#diagram');
+	});
+
 	test('parses Canvas text-card blocks without mutating markdown text', () => {
 		const blocks = canvasTextPreviewBlocks([
 			'# Launch plan',

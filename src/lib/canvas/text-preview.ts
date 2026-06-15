@@ -12,7 +12,7 @@ import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comment
 
 export type CanvasTextEmbedKind = CanvasFileAssetKind | 'note' | 'canvas';
 
-export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link';
+export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link' | 'image';
 export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
 
 export interface CanvasTextInlineTarget {
@@ -28,6 +28,7 @@ export interface CanvasTextPreviewInline {
 	text: string;
 	href?: string;
 	target?: CanvasTextInlineTarget;
+	embed?: CanvasTextPreviewEmbed;
 }
 
 export type CanvasTextWikilinkResolver = (target: string, label: string | undefined) => CanvasTextInlineTarget | null;
@@ -407,6 +408,16 @@ function canvasTextInlineFromMarkdownLink(
 	return null;
 }
 
+function canvasTextInlineFromMarkdownImage(
+	label: string,
+	rawHref: string,
+	sourcePath: string | null | undefined
+): CanvasTextPreviewInline | null {
+	const embed = canvasTextEmbedFromMarkdownTarget(rawHref, sourcePath, canvasMarkdownImageMeta(label));
+	if (!embed || embed.kind !== 'image') return null;
+	return { kind: 'image', text: embed.title, embed };
+}
+
 function canvasTextMarkdownReference(
 	rawHref: string,
 	sourcePath: string | null | undefined
@@ -671,6 +682,9 @@ function firstInlineMatch(
 		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
 		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
 		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
+		inlineCandidate(value, /!\[([^\]\n]*)]\(([^)\n]+)\)/, (match) =>
+			canvasTextInlineFromMarkdownImage(match[1], match[2], options.sourcePath)
+		),
 		inlineCandidate(value, /\[([^\]\n]+)]\(([^)\n]+)\)/, (match) =>
 			canvasTextInlineFromMarkdownLink(match[1], match[2], options.sourcePath)
 		),
@@ -708,10 +722,11 @@ function inlinePriority(kind: CanvasTextPreviewInlineKind): number {
 		strong: 1,
 		strikethrough: 2,
 		highlight: 3,
-		link: 4,
-		wikilink: 5,
-		emphasis: 6,
-		text: 7
+		image: 4,
+		link: 5,
+		wikilink: 6,
+		emphasis: 7,
+		text: 8
 	};
 	return priorities[kind];
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {
+		canvasTextEmbedHref,
 		canvasTextInlineTargetHref,
 		type CanvasTextPreviewInline as CanvasTextPreviewInlinePart
 	} from '$lib/canvas/text-preview';
@@ -38,6 +39,20 @@
 		<del>{part.text}</del>
 	{:else if part.kind === 'highlight'}
 		<mark>{part.text}</mark>
+	{:else if part.kind === 'image' && part.embed}
+		{@const href = canvasTextEmbedHref(vaultId, part.embed)}
+		{#if href}
+			<img
+				class="inline-image"
+				src={href}
+				alt={part.embed.alt ?? part.embed.title}
+				width={part.embed.width ?? undefined}
+				height={part.embed.height ?? undefined}
+				loading="lazy"
+			/>
+		{:else}
+			{part.text}
+		{/if}
 	{:else if part.kind === 'wikilink'}
 		{@const href = canvasTextInlineTargetHref(vaultId, part)}
 		{#if href}
@@ -78,6 +93,17 @@
 		padding: 0 3px;
 		background: color-mix(in srgb, #facc15, transparent 72%);
 		color: var(--fg);
+	}
+	.inline-image {
+		display: inline-block;
+		max-width: min(100%, 150px);
+		max-height: 84px;
+		margin: 1px 2px;
+		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 48%);
+		border-radius: 5px;
+		background: color-mix(in srgb, var(--bg), transparent 6%);
+		object-fit: contain;
+		vertical-align: middle;
 	}
 	a,
 	.wikilink {
