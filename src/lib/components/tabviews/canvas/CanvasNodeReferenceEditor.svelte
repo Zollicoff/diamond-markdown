@@ -12,8 +12,9 @@
 		canvasOpenNodeLabel,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
+	import CanvasNodeAssetPreview from './CanvasNodeAssetPreview.svelte';
+	import CanvasNodeNotePreview from './CanvasNodeNotePreview.svelte';
 	import CanvasNodeRemoveButton from './CanvasNodeRemoveButton.svelte';
-	import CanvasTextPreview from './CanvasTextPreview.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -74,43 +75,16 @@
 </script>
 
 {#if assetPreview}
-	<a
-		class={`asset-preview asset-preview-${assetPreview.kind}`}
-		aria-label={`Preview raw canvas asset ${assetPreview.path}`}
-		href={assetPreview.href}
-		target="_blank"
-		rel="noopener noreferrer"
-	>
-		{#if assetPreview.kind === 'image'}
-			<img src={assetPreview.href} alt={`Canvas file preview ${assetPreview.path}`} loading="lazy" />
-		{:else}
-			<span class="asset-kind">{assetPreview.kind}</span>
-			<span class="asset-title">{assetPreview.title}</span>
-		{/if}
-	</a>
+	<CanvasNodeAssetPreview {assetPreview} />
 {/if}
 {#if notePreview}
-	<section class="note-preview-card" aria-label={`Canvas note preview ${notePreview.path}`}>
-		<div class="note-preview-head">
-			<span>Note preview</span>
-			{#if notePreview.truncated}
-				<span class="note-preview-state">truncated</span>
-			{/if}
-		</div>
-		{#if notePreview.status === 'ok'}
-			<CanvasTextPreview
-				{vaultId}
-				sourcePath={notePreview.path}
-				nodeId={`file-preview-${node.id}`}
-				draft={notePreview.body}
-				{resolveEmbedTarget}
-				{resolveWikilinkTarget}
-				emptyLabel="Empty note"
-			/>
-		{:else}
-			<p class="note-preview-status">{notePreview.detail ?? 'Preview unavailable'}</p>
-		{/if}
-	</section>
+	<CanvasNodeNotePreview
+		{vaultId}
+		nodeId={node.id}
+		{notePreview}
+		{resolveEmbedTarget}
+		{resolveWikilinkTarget}
+	/>
 {/if}
 <div class="node-ref-fields">
 	<label>
@@ -227,84 +201,6 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
-	}
-	.asset-preview {
-		display: grid;
-		place-items: center;
-		min-height: 44px;
-		max-height: 86px;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--bg), transparent 12%);
-		color: var(--fg-muted);
-		text-decoration: none;
-	}
-	.asset-preview:hover {
-		border-color: var(--accent);
-	}
-	.asset-preview img {
-		display: block;
-		width: 100%;
-		height: 100%;
-		max-height: 86px;
-		object-fit: cover;
-	}
-	.asset-preview-file,
-	.asset-preview-pdf,
-	.asset-preview-audio,
-	.asset-preview-video {
-		grid-template-columns: auto minmax(0, 1fr);
-		gap: 8px;
-		justify-content: start;
-		padding: 8px;
-	}
-	.asset-kind {
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 2px 5px;
-		color: var(--fg-dim);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-	}
-	.asset-title {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 0.74rem;
-	}
-	.note-preview-card {
-		display: grid;
-		gap: 5px;
-		min-height: 0;
-		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 48%);
-		border-radius: 6px;
-		padding: 6px;
-		background: color-mix(in srgb, var(--bg-elev), transparent 35%);
-	}
-	.note-preview-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 8px;
-		color: var(--fg-dim);
-		font-size: 0.62rem;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-	}
-	.note-preview-state {
-		color: var(--canvas-node-border, var(--accent));
-	}
-	.note-preview-card :global(.canvas-text-preview) {
-		max-height: 58px;
-		padding: 5px 6px;
-		font-size: 0.7rem;
-	}
-	.note-preview-status {
-		margin: 0;
-		color: var(--fg-dim);
-		font-size: 0.72rem;
 	}
 	.node-open,
 	.node-save {

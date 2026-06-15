@@ -108,6 +108,10 @@ Use small, pushable slices:
    link/image destination scanning for Canvas text previews into a pure helper
    module with direct coverage for parenthesized paths, angle destinations,
    titles, and safe URI decoding.
+- **Canvas reference preview split.** Keep Canvas file/URL reference editing
+   and open/save/delete actions in `CanvasNodeReferenceEditor` while moving raw
+   asset previews and Markdown note-card previews into focused presentation
+   components.
 - **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
    and file embeds from vault-local assets and copy non-image attachments into
    static publish output.
