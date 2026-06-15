@@ -7,9 +7,9 @@ export interface PointerOpenInput {
 	altKey?: boolean;
 }
 
-export function openModeForPointer(input: PointerOpenInput): OpenMode {
+export function openModeForPointer(input: PointerOpenInput, fallback: OpenMode = 'replace'): OpenMode {
 	if (input.button === 1) return 'new-tab';
 	if (input.metaKey || input.ctrlKey) return 'new-tab';
 	if (input.altKey) return 'new-pane';
-	return 'replace';
+	return fallback;
 }

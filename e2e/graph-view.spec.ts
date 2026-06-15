@@ -31,6 +31,7 @@ import {
 	toggleGraphPathSelection,
 	zoomGraphTransform
 } from '../src/lib/graph/interaction';
+import { openModeForPointer } from '../src/lib/workspace/open-mode';
 
 function node(path: string, title: string, degree: number, x = 0, y = 0): GNode {
 	return {
@@ -181,6 +182,10 @@ test.describe('graph view helpers', () => {
 		expect(toggleGraphPathSelection(['A.md', 'B.md'], 'A.md')).toEqual(['B.md']);
 		expect(graphNodeOpenTitle(node('Folder/Fallback.md', '', 0))).toBe('Fallback');
 		expect(graphNodeOpenTitle(node('Folder/Named.md', 'Named note', 0))).toBe('Named note');
+		expect(openModeForPointer({ button: 0 }, 'new-tab')).toBe('new-tab');
+		expect(openModeForPointer({ button: 0, altKey: true }, 'new-tab')).toBe('new-pane');
+		expect(openModeForPointer({ button: 1 }, 'new-tab')).toBe('new-tab');
+		expect(openModeForPointer({ button: 0, metaKey: true }, 'new-tab')).toBe('new-tab');
 	});
 
 	test('adapts API graph data into simulation nodes and drops dangling edges', () => {

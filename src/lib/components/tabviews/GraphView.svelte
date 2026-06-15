@@ -3,6 +3,7 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
 	import { buildGraphSimulationData } from '$lib/graph/data';
 	import {
 		type GNode,
@@ -303,8 +304,7 @@
 			return;
 		}
 		const title = graphNodeOpenTitle(n);
-		const mode = e.altKey ? 'new-pane' : 'new-tab';
-		openNote(vaultId, n.path, title, mode);
+		openNote(vaultId, n.path, title, openModeForPointer(e, 'new-tab'));
 	}
 
 	function onNodeKeydown(e: KeyboardEvent, n: GNode): void {

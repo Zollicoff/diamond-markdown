@@ -634,6 +634,9 @@ Use small, pushable slices:
   through a tested request queue and vault-scoped refresh helper
   (`refreshCanvasLinkTargetsForVaultEvent`) instead of inline component
   sequence state.
+- **Shared pointer open-mode helper alignment.** Keep normal note/search/tree
+  clicks on the existing replace behavior while letting surfaces like Graph
+  request a tested `new-tab` default through `openModeForPointer`.
 - **Canvas file-reference helper extraction.** Move Canvas file-card targets,
   vault-local asset URLs, media classification, subpath normalization, and URL
   node validation into a focused helper module while preserving the existing
