@@ -16,6 +16,7 @@
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
 	} from '$lib/canvas/text-preview';
+	import type { CanvasNotePreviewMap } from '$lib/canvas/note-previews';
 	import type { CanvasMutationState } from '$lib/canvas/mutations';
 	import CanvasBoard from './CanvasBoard.svelte';
 	import CanvasEdgeList from './CanvasEdgeList.svelte';
@@ -33,6 +34,7 @@
 		textDrafts: CanvasTextDrafts;
 		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
+		notePreviews: CanvasNotePreviewMap;
 		edgeLabelDrafts: CanvasEdgeLabelDrafts;
 		edgeRoutingDrafts: CanvasEdgeRoutingDrafts;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
@@ -79,6 +81,7 @@
 		textDrafts,
 		groupLabelDrafts,
 		refDrafts,
+		notePreviews,
 		edgeLabelDrafts,
 		edgeRoutingDrafts,
 		resolveEmbedTarget,
@@ -148,6 +151,7 @@
 		{textDrafts}
 		{groupLabelDrafts}
 		{refDrafts}
+		{notePreviews}
 		{resolveEmbedTarget}
 		{resolveWikilinkTarget}
 		{mutationState}

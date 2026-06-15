@@ -5,6 +5,12 @@ import path from 'node:path';
 import { FIXTURE_PATHS } from './setup-fixture';
 import type { CanvasDoc } from '../src/lib/types';
 import { duplicateCanvasRawNode } from '../src/lib/server/canvas';
+import { canvasNotePreviewBody } from '../src/lib/server/canvas-note-previews';
+import {
+	canvasNotePreviewForNode,
+	canvasNotePreviewMap,
+	canvasNotePreviewPaths
+} from '../src/lib/canvas/note-previews';
 import {
 	CANVAS_COLOR_OPTIONS,
 	CANVAS_EDGE_END_OPTIONS,
@@ -264,6 +270,15 @@ test.describe('canvas view helpers', () => {
 		expect(canvasNodeClass(groupNode)).toBe('canvas-node canvas-node-group');
 		expect(canvasLayeredNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['group', 'a', 'b']);
 		expect(canvasContentNodes([doc.nodes[0], groupNode, doc.nodes[1]]).map((node) => node.id)).toEqual(['a', 'b']);
+		expect(canvasNotePreviewPaths(doc.nodes)).toEqual(['Home.md']);
+		const notePreviewMap = canvasNotePreviewMap([
+			{ path: 'Home.md', title: 'Home', body: '# Home\n\nPreview body', status: 'ok', truncated: false }
+		]);
+		expect(canvasNotePreviewForNode(doc.nodes[1], notePreviewMap)?.body).toContain('Preview body');
+		expect(canvasNotePreviewForNode(doc.nodes[0], notePreviewMap)).toBeNull();
+		const longPreview = canvasNotePreviewBody(Array.from({ length: 90 }, (_, index) => `Line ${index + 1}`).join('\n'));
+		expect(longPreview.truncated).toBe(true);
+		expect(longPreview.body).toContain('...');
 		const duplicatedRawNode = duplicateCanvasRawNode([
 			{ id: 'raw-a', type: 'mystery', x: 12, y: 18, width: 260, height: 140, label: 'Keep me', pluginData: { preserved: true } }
 		], 'raw-a');
@@ -1143,7 +1158,18 @@ test('canvas file cards route notes with subpaths, Canvas files, and vault asset
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'canvas-file-routing-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, 'Images'), { recursive: true });
-	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\n## Markdown target\n\nTarget section\n');
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), [
+		'---',
+		'title: Launch Home',
+		'---',
+		'# Home',
+		'Intro with [[Nested Note|nested note]].',
+		'',
+		'## Markdown target',
+		'',
+		'Target section'
+	].join('\n'));
+	fs.writeFileSync(path.join(vaultDir, 'Nested Note.md'), '# Nested Note\n\nPreview target\n');
 	fs.writeFileSync(path.join(vaultDir, 'Nested.canvas'), JSON.stringify({
 		nodes: [{ id: 'nested-a', type: 'text', x: 0, y: 0, width: 220, height: 120, text: 'Nested Canvas card' }],
 		edges: []
@@ -1170,10 +1196,30 @@ test('canvas file cards route notes with subpaths, Canvas files, and vault asset
 	expect(created.ok()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
+	const previews = await request.post(`/api/vaults/${vault.id}/canvas/note-previews`, {
+		data: { paths: ['Home.md', 'Missing.md', 'Images/roof.svg', '../secret.md'] }
+	});
+	expect(previews.ok(), await previews.text()).toBe(true);
+	const previewBody = await previews.json() as {
+		previews: { path: string; title: string; body: string; status: string; detail?: string; truncated: boolean }[];
+	};
+	expect(previewBody.previews.find((preview) => preview.path === 'Home.md')).toMatchObject({
+		title: 'Launch Home',
+		status: 'ok',
+		truncated: false
+	});
+	expect(previewBody.previews.find((preview) => preview.path === 'Home.md')?.body).toContain('Target section');
+	expect(previewBody.previews.find((preview) => preview.path === 'Missing.md')?.status).toBe('missing');
+	expect(previewBody.previews.find((preview) => preview.path === 'Images/roof.svg')?.status).toBe('unsupported');
+	expect(previewBody.previews.find((preview) => preview.path === '../secret.md')?.status).toBe('invalid');
+
 	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	await expect(page.getByRole('button', { name: 'Open canvas file node Home.md' })).toHaveText('Open note');
 	await expect(page.getByLabel('Canvas file subpath for Home.md')).toHaveValue('#Markdown target');
+	const notePreview = page.getByLabel('Canvas note preview Home.md');
+	await expect(notePreview).toContainText('Target section');
+	await expect(notePreview.getByRole('link', { name: '[[nested note]]' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Open canvas file node Nested.canvas' })).toHaveText('Open Canvas');
 	await expect(page.getByRole('img', { name: 'Canvas file preview Images/roof.svg' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Preview raw canvas asset Images/roof.svg' })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);

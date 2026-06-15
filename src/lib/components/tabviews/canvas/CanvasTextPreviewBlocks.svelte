@@ -6,9 +6,10 @@
 	interface Props {
 		vaultId: string;
 		blocks: CanvasTextPreviewBlock[];
+		emptyLabel?: string;
 	}
 
-	let { vaultId, blocks }: Props = $props();
+	let { vaultId, blocks, emptyLabel = 'Empty text card' }: Props = $props();
 </script>
 
 {#snippet previewBlock(block: CanvasTextPreviewBlock)}
@@ -95,7 +96,7 @@
 		{@render previewBlock(block)}
 	{/each}
 {:else}
-	<p class="empty-preview">Empty text card</p>
+	<p class="empty-preview">{emptyLabel}</p>
 {/if}
 
 <style>

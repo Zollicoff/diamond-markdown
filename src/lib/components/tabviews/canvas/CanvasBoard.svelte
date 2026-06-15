@@ -21,6 +21,7 @@
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
 	} from '$lib/canvas/text-preview';
+	import type { CanvasNotePreviewMap } from '$lib/canvas/note-previews';
 	import {
 		canvasBoardZoomStyle,
 		canvasGridBackgroundSize,
@@ -42,6 +43,7 @@
 		textDrafts: CanvasTextDrafts;
 		groupLabelDrafts: CanvasGroupLabelDrafts;
 		refDrafts: CanvasNodeRefDrafts;
+		notePreviews: CanvasNotePreviewMap;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		mutationState: CanvasMutationState;
@@ -76,6 +78,7 @@
 		textDrafts,
 		groupLabelDrafts,
 		refDrafts,
+		notePreviews,
 		resolveEmbedTarget,
 		resolveWikilinkTarget,
 		mutationState,
@@ -146,6 +149,7 @@
 				refDraft={canvasNodeRefDraftFor(node, refDrafts)}
 				refChanged={canvasNodeRefDraftChanged(node, refDrafts)}
 				refCanSave={canSaveCanvasNodeRefDraft(node, refDrafts)}
+				{notePreviews}
 				{resolveEmbedTarget}
 				{resolveWikilinkTarget}
 				saving={nodeMutation.saving}

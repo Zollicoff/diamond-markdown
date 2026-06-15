@@ -13,6 +13,7 @@
 		draft: string;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
+		emptyLabel?: string;
 	}
 
 	let {
@@ -21,14 +22,15 @@
 		nodeId,
 		draft,
 		resolveEmbedTarget,
-		resolveWikilinkTarget
+		resolveWikilinkTarget,
+		emptyLabel = 'Empty text card'
 	}: Props = $props();
 
 	const previewBlocks = $derived(canvasTextPreviewBlocks(draft, { resolveEmbedTarget, resolveWikilinkTarget, sourcePath }));
 </script>
 
 <div class="canvas-text-preview" aria-label={`Canvas text preview for ${nodeId}`}>
-	<CanvasTextPreviewBlocks {vaultId} blocks={previewBlocks} />
+	<CanvasTextPreviewBlocks {vaultId} blocks={previewBlocks} {emptyLabel} />
 </div>
 
 <style>

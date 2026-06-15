@@ -7,7 +7,7 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, EditorDisplayPreference, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, CanvasDoc, CanvasMutationResult, CanvasNotePreview, EditorDisplayPreference, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import type { CanvasAddNodeType, CanvasEdgeEnd, CanvasEdgeSide } from './canvas/view';
 import { emit } from './events';
@@ -91,6 +91,15 @@ export const api = {
 
 	async canvas(vaultId: string, path: string): Promise<CanvasDoc> {
 		return json(`/api/vaults/${vaultId}/canvas?path=${encodeURIComponent(path)}`);
+	},
+
+	async canvasNotePreviews(vaultId: string, paths: string[]): Promise<CanvasNotePreview[]> {
+		const res = await json<{ previews: CanvasNotePreview[] }>(`/api/vaults/${vaultId}/canvas/note-previews`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ paths })
+		});
+		return res.previews ?? [];
 	},
 
 	async addCanvasTextNode(

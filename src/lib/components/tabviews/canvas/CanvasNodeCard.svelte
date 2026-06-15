@@ -13,6 +13,10 @@
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
 	} from '$lib/canvas/text-preview';
+	import {
+		canvasNotePreviewForNode,
+		type CanvasNotePreviewMap
+	} from '$lib/canvas/note-previews';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
 	import CanvasGroupNodeEditor from './CanvasGroupNodeEditor.svelte';
 	import CanvasNodeFallbackBody from './CanvasNodeFallbackBody.svelte';
@@ -32,6 +36,7 @@
 		refDraft: CanvasNodeRefDraft;
 		refChanged: boolean;
 		refCanSave: boolean;
+		notePreviews: CanvasNotePreviewMap;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
 		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		saving: boolean;
@@ -68,6 +73,7 @@
 		refDraft,
 		refChanged,
 		refCanSave,
+		notePreviews,
 		resolveEmbedTarget,
 		resolveWikilinkTarget,
 		saving,
@@ -157,9 +163,12 @@
 		<CanvasNodeReferenceEditor
 			{vaultId}
 			{node}
+			notePreview={canvasNotePreviewForNode(node, notePreviews)}
 			{refDraft}
 			{refChanged}
 			{refCanSave}
+			{resolveEmbedTarget}
+			{resolveWikilinkTarget}
 			{saving}
 			{deleting}
 			{disableDelete}

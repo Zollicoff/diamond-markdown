@@ -69,6 +69,12 @@
 		isCanvasLinkTargetRefreshEvent
 	} from '$lib/canvas/link-targets';
 	import {
+		CanvasNotePreviewRequestQueue,
+		canvasNotePreviewMap,
+		canvasNotePreviewPaths,
+		type CanvasNotePreviewMap
+	} from '$lib/canvas/note-previews';
+	import {
 		canDeleteCanvasNode,
 		canDuplicateCanvasNode,
 		canMutateCanvasEdge,
@@ -109,7 +115,9 @@
 	let resizeState = $state<CanvasNodeResizeState | null>(null);
 	let canvasZoom = $state(1);
 	let linkTargets = $state<NoteLinkTarget[]>([]);
+	let notePreviews = $state<CanvasNotePreviewMap>({});
 	const linkTargetRequests = new CanvasLinkTargetRequestQueue();
+	const notePreviewRequests = new CanvasNotePreviewRequestQueue();
 
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
@@ -141,6 +149,11 @@
 	async function loadLinkTargets(): Promise<void> {
 		const result = await linkTargetRequests.load(vaultId, api.linkTargets);
 		if (linkTargetRequests.isCurrent(result)) linkTargets = result.targets;
+	}
+
+	async function loadNotePreviews(paths: string[] = canvasNotePreviewPaths(doc?.nodes ?? [])): Promise<void> {
+		const result = await notePreviewRequests.load(vaultId, paths, api.canvasNotePreviews);
+		if (notePreviewRequests.isCurrent(result)) notePreviews = canvasNotePreviewMap(result.previews);
 	}
 
 	function setMutationState(patch: Partial<CanvasMutationState>): void {
@@ -612,17 +625,24 @@
 	});
 
 	$effect(() => {
+		void loadNotePreviews(canvasNotePreviewPaths(doc?.nodes ?? []));
+	});
+
+	$effect(() => {
 		const refresh = (event: { vaultId: string }): void => {
 			if (isCanvasLinkTargetRefreshEvent(vaultId, event)) void loadLinkTargets();
 		};
+		const refreshPreviews = (event: { vaultId: string }): void => {
+			if (event.vaultId === vaultId) void loadNotePreviews();
+		};
 		const offs = [
-			onBus('note:saved', refresh),
-			onBus('note:created', refresh),
-			onBus('note:deleted', refresh),
-			onBus('note:renamed', refresh),
-			onBus('folder:renamed', refresh),
-			onBus('folder:deleted', refresh),
-			onBus('tree:invalidate', refresh)
+			onBus('note:saved', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('note:created', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('note:deleted', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('note:renamed', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('folder:renamed', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('folder:deleted', (event) => { refresh(event); refreshPreviews(event); }),
+			onBus('tree:invalidate', (event) => { refresh(event); refreshPreviews(event); })
 		];
 		return () => offs.forEach((off) => off());
 	});
@@ -666,6 +686,7 @@
 		{textDrafts}
 		{groupLabelDrafts}
 		{refDrafts}
+		{notePreviews}
 		{edgeLabelDrafts}
 		{edgeRoutingDrafts}
 		{resolveEmbedTarget}

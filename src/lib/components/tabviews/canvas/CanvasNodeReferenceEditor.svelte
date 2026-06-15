@@ -1,5 +1,9 @@
 <script lang="ts">
-	import type { CanvasNode } from '$lib/types';
+	import type { CanvasNode, CanvasNotePreview } from '$lib/types';
+	import type {
+		CanvasTextEmbedResolver,
+		CanvasTextWikilinkResolver
+	} from '$lib/canvas/text-preview';
 	import {
 		canvasFileAssetPreview,
 		canvasFileOpenTarget,
@@ -9,13 +13,17 @@
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
 	import CanvasNodeRemoveButton from './CanvasNodeRemoveButton.svelte';
+	import CanvasTextPreview from './CanvasTextPreview.svelte';
 
 	interface Props {
 		vaultId: string;
 		node: CanvasNode;
+		notePreview: CanvasNotePreview | null;
 		refDraft: CanvasNodeRefDraft;
 		refChanged: boolean;
 		refCanSave: boolean;
+		resolveEmbedTarget: CanvasTextEmbedResolver;
+		resolveWikilinkTarget: CanvasTextWikilinkResolver;
 		saving: boolean;
 		deleting: boolean;
 		disableDelete: boolean;
@@ -28,9 +36,12 @@
 	let {
 		vaultId,
 		node,
+		notePreview,
 		refDraft,
 		refChanged,
 		refCanSave,
+		resolveEmbedTarget,
+		resolveWikilinkTarget,
 		saving,
 		deleting,
 		disableDelete,
@@ -77,6 +88,29 @@
 			<span class="asset-title">{assetPreview.title}</span>
 		{/if}
 	</a>
+{/if}
+{#if notePreview}
+	<section class="note-preview-card" aria-label={`Canvas note preview ${notePreview.path}`}>
+		<div class="note-preview-head">
+			<span>Note preview</span>
+			{#if notePreview.truncated}
+				<span class="note-preview-state">truncated</span>
+			{/if}
+		</div>
+		{#if notePreview.status === 'ok'}
+			<CanvasTextPreview
+				{vaultId}
+				sourcePath={notePreview.path}
+				nodeId={`file-preview-${node.id}`}
+				draft={notePreview.body}
+				{resolveEmbedTarget}
+				{resolveWikilinkTarget}
+				emptyLabel="Empty note"
+			/>
+		{:else}
+			<p class="note-preview-status">{notePreview.detail ?? 'Preview unavailable'}</p>
+		{/if}
+	</section>
 {/if}
 <div class="node-ref-fields">
 	<label>
@@ -239,6 +273,38 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.74rem;
+	}
+	.note-preview-card {
+		display: grid;
+		gap: 5px;
+		min-height: 0;
+		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 48%);
+		border-radius: 6px;
+		padding: 6px;
+		background: color-mix(in srgb, var(--bg-elev), transparent 35%);
+	}
+	.note-preview-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		color: var(--fg-dim);
+		font-size: 0.62rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+	.note-preview-state {
+		color: var(--canvas-node-border, var(--accent));
+	}
+	.note-preview-card :global(.canvas-text-preview) {
+		max-height: 58px;
+		padding: 5px 6px;
+		font-size: 0.7rem;
+	}
+	.note-preview-status {
+		margin: 0;
+		color: var(--fg-dim);
+		font-size: 0.72rem;
 	}
 	.node-open,
 	.node-save {

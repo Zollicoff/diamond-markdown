@@ -430,6 +430,17 @@ export interface CanvasMutationResult {
 	doc: CanvasDoc;
 }
 
+export type CanvasNotePreviewStatus = 'ok' | 'missing' | 'invalid' | 'unsupported';
+
+export interface CanvasNotePreview {
+	path: string;
+	title: string;
+	body: string;
+	status: CanvasNotePreviewStatus;
+	detail?: string;
+	truncated: boolean;
+}
+
 export interface SearchHit {
 	path: string;
 	title: string;
