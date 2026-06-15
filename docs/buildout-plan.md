@@ -208,9 +208,13 @@ Use small, pushable slices:
 - **Canvas Markdown title/space destinations.** Accept Markdown note, Canvas,
   and asset destinations with optional titles and angle-bracketed paths with
   spaces inside Canvas text-card previews while preserving traversal guards.
+- **Canvas parenthesized Markdown destinations.** Parse safe Markdown
+   image/embed destinations with balanced parentheses in filenames inside
+   Canvas text-card previews, preserving source-relative/vault-root resolution
+   and traversal guards.
 - **Canvas inline Markdown images.** Render safe source-relative and vault-root
-   Markdown image syntax inside Canvas text-card paragraph text using the same
-   raw asset route and traversal guards as standalone Canvas image embeds.
+  Markdown image syntax inside Canvas text-card paragraph text using the same
+  raw asset route and traversal guards as standalone Canvas image embeds.
 - **Canvas file-reference draft helper extraction.** Move Canvas file/URL card
    reference draft creation, change detection, and save gating into the focused
    file-reference helper module while preserving the existing `canvas/view`

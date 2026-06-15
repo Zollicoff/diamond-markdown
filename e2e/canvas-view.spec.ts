@@ -982,7 +982,14 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 		'<path d="M20 62 L80 24 L140 62 Z" fill="#f8fafc"/>',
 		'</svg>'
 	].join(''));
+	fs.writeFileSync(path.join(vaultDir, 'Images', 'roof (south).svg'), [
+		'<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">',
+		'<rect width="120" height="80" fill="#2563eb"/>',
+		'<path d="M12 54 L60 18 L108 54 Z" fill="#f8fafc"/>',
+		'</svg>'
+	].join(''));
 	fs.writeFileSync(path.join(vaultDir, 'Docs', 'panel.pdf'), '%PDF-1.4\n');
+	fs.writeFileSync(path.join(vaultDir, 'Docs', 'panel (final).pdf'), '%PDF-1.4\n');
 	fs.writeFileSync(path.join(vaultDir, 'Boards', 'Board.canvas'), JSON.stringify({
 		nodes: [
 			{
@@ -1006,8 +1013,10 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](../Docs/panel.pdf#page=2)',
+					'![Final packet](../Docs/panel (final).pdf#page=4)',
 					'![Root roof](/Images/roof.svg)',
 					'Inline image ![Inline roof|120x60](<../Images/roof.svg#diagram> "Roof") inside a sentence',
+					'Inline parenthesized image ![Roof south|90](../Images/roof (south).svg#diagram) inside a sentence',
 					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
 					'Markdown links [Launch markdown](../Home.md#Launch Plan), [Canvas markdown](Map.canvas), and [external](https://example.com)',
 					'Vault-root Markdown links [Root note](/References/Roof%20Photos.md#Meter) and [Root Canvas](/Boards/Map.canvas)',
@@ -1064,10 +1073,13 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');
 	await expect(preview.getByRole('link', { name: /Panel packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel\.pdf#page=2$/);
+	await expect(preview.getByRole('link', { name: /Final packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel%20\(final\)\.pdf#page=4$/);
 	await expect(preview.locator('img[alt="Root roof"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
 	await expect(preview.locator('img.inline-image[alt="Inline roof"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg#diagram$/);
 	await expect(preview.locator('img.inline-image[alt="Inline roof"]')).toHaveAttribute('width', '120');
 	await expect(preview.locator('img.inline-image[alt="Inline roof"]')).toHaveAttribute('height', '60');
+	await expect(preview.locator('img.inline-image[alt="Roof south"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof%20\(south\)\.svg#diagram$/);
+	await expect(preview.locator('img.inline-image[alt="Roof south"]')).toHaveAttribute('width', '90');
 	await expect(preview.getByRole('link', { name: /\[\[site photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
 	await expect(preview.getByRole('link', { name: /\[\[Home\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Launch link\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);

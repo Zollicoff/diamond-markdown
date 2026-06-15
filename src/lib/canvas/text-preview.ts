@@ -111,6 +111,13 @@ export function canvasTextPreviewInlines(value: string, options: CanvasTextPrevi
 	return inlines.filter((inline) => inline.text.length > 0);
 }
 
+interface CanvasMarkdownInlineSyntax {
+	index: number;
+	raw: string;
+	label: string;
+	href: string;
+}
+
 export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreviewOptions = {}): CanvasTextPreviewBlock[] {
 	const lines = stripObsidianCommentsOutsideCode(text).replace(/\r\n?/g, '\n').split('\n');
 	const blocks: CanvasTextPreviewBlock[] = [];
@@ -651,12 +658,12 @@ function canvasTextEmbedPreview(line: string, options: CanvasTextPreviewOptions 
 		return options.resolveEmbedTarget?.(target, meta) ?? null;
 	}
 
-	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\n]+)\)$/);
-	if (markdown) {
+	const markdown = canvasMarkdownInlineSyntaxCandidate(trimmed, true);
+	if (markdown && markdown.index === 0 && markdown.raw.length === trimmed.length) {
 		return canvasTextEmbedFromMarkdownTarget(
-			markdown[2].trim(),
+			markdown.href.trim(),
 			options.sourcePath,
-			canvasMarkdownImageMeta(markdown[1])
+			canvasMarkdownImageMeta(markdown.label)
 		);
 	}
 
@@ -670,7 +677,8 @@ function canvasAssetReferenceHasExtension(target: string): boolean {
 
 function isCanvasStandaloneEmbedSyntax(line: string): boolean {
 	const trimmed = line.trim();
-	return /^!\[\[[^\[\]\n]+]]$/.test(trimmed) || /^!\[[^\]\n]*]\([^\n)]+\)$/.test(trimmed);
+	const markdown = canvasMarkdownInlineSyntaxCandidate(trimmed, true);
+	return /^!\[\[[^\[\]\n]+]]$/.test(trimmed) || Boolean(markdown && markdown.index === 0 && markdown.raw.length === trimmed.length);
 }
 
 function firstInlineMatch(
@@ -682,11 +690,11 @@ function firstInlineMatch(
 		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
 		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
 		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
-		inlineCandidate(value, /!\[([^\]\n]*)]\(([^)\n]+)\)/, (match) =>
-			canvasTextInlineFromMarkdownImage(match[1], match[2], options.sourcePath)
+		inlineMarkdownCandidate(value, true, (match) =>
+			canvasTextInlineFromMarkdownImage(match.label, match.href, options.sourcePath)
 		),
-		inlineCandidate(value, /\[([^\]\n]+)]\(([^)\n]+)\)/, (match) =>
-			canvasTextInlineFromMarkdownLink(match[1], match[2], options.sourcePath)
+		inlineMarkdownCandidate(value, false, (match) =>
+			canvasTextInlineFromMarkdownLink(match.label, match.href, options.sourcePath)
 		),
 		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
 			const rawTarget = match[1].trim();
@@ -714,6 +722,106 @@ function inlineCandidate(
 	if (!match || match.index === undefined || !match[0]) return null;
 	const inline = createInline(match);
 	return inline ? { index: match.index, raw: match[0], inline } : null;
+}
+
+function inlineMarkdownCandidate(
+	value: string,
+	image: boolean,
+	createInline: (match: CanvasMarkdownInlineSyntax) => CanvasTextPreviewInline | null
+): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
+	let searchIndex = 0;
+	while (searchIndex < value.length) {
+		const match = canvasMarkdownInlineSyntaxCandidate(value, image, searchIndex);
+		if (!match) return null;
+		const inline = createInline(match);
+		if (inline) return { index: match.index, raw: match.raw, inline };
+		searchIndex = match.index + 1;
+	}
+	return null;
+}
+
+function canvasMarkdownInlineSyntaxCandidate(value: string, image: boolean, start = 0): CanvasMarkdownInlineSyntax | null {
+	const opener = image ? '![' : '[';
+	let searchIndex = start;
+	while (searchIndex < value.length) {
+		const index = value.indexOf(opener, searchIndex);
+		if (index < 0) return null;
+		if (!image && index > 0 && value[index - 1] === '!') {
+			searchIndex = index + 1;
+			continue;
+		}
+		const labelStart = index + opener.length;
+		const labelEnd = markdownClosingBracket(value, labelStart);
+		if (labelEnd < 0 || value[labelEnd + 1] !== '(') {
+			searchIndex = index + 1;
+			continue;
+		}
+		const hrefStart = labelEnd + 2;
+		const hrefEnd = markdownClosingParen(value, hrefStart);
+		if (hrefEnd < 0) {
+			searchIndex = index + 1;
+			continue;
+		}
+		return {
+			index,
+			raw: value.slice(index, hrefEnd + 1),
+			label: value.slice(labelStart, labelEnd),
+			href: value.slice(hrefStart, hrefEnd)
+		};
+	}
+	return null;
+}
+
+function markdownClosingBracket(value: string, start: number): number {
+	for (let index = start; index < value.length; index += 1) {
+		const char = value[index];
+		if (char === '\n' || char === '\r') return -1;
+		if (char === '\\') {
+			index += 1;
+			continue;
+		}
+		if (char === ']') return index;
+	}
+	return -1;
+}
+
+function markdownClosingParen(value: string, start: number): number {
+	let depth = 0;
+	let inAngleDestination = false;
+	let quote: '"' | "'" | null = null;
+	for (let index = start; index < value.length; index += 1) {
+		const char = value[index];
+		if (char === '\n' || char === '\r') return -1;
+		if (char === '\\') {
+			index += 1;
+			continue;
+		}
+		if (quote) {
+			if (char === quote) quote = null;
+			continue;
+		}
+		if (inAngleDestination) {
+			if (char === '>') inAngleDestination = false;
+			continue;
+		}
+		if (char === '<') {
+			inAngleDestination = true;
+			continue;
+		}
+		if (char === '"' || char === "'") {
+			quote = char;
+			continue;
+		}
+		if (char === '(') {
+			depth += 1;
+			continue;
+		}
+		if (char === ')') {
+			if (depth === 0) return index;
+			depth -= 1;
+		}
+	}
+	return -1;
 }
 
 function inlinePriority(kind: CanvasTextPreviewInlineKind): number {

@@ -133,6 +133,36 @@ test.describe('canvas text preview helpers', () => {
 			{ kind: 'text', text: ' stays with text and ![unsafe](../../secret.svg)' }
 		]);
 		expect(canvasTextEmbedHref('vault id', inline[1].embed!)).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.svg#diagram');
+
+		const parenthesized = canvasTextPreviewInlines(
+			'Inline photo ![Roof south|90](../Images/roof (south).svg#diagram) stays with text',
+			{ sourcePath: 'Boards/Board.canvas' }
+		);
+		expect(parenthesized[1]).toEqual({
+			kind: 'image',
+			text: 'Roof south',
+			embed: {
+				path: 'Images/roof (south).svg',
+				suffix: '#diagram',
+				kind: 'image',
+				title: 'Roof south',
+				alt: 'Roof south',
+				width: 90,
+				height: null
+			}
+		});
+		expect(canvasTextEmbedHref('vault id', parenthesized[1].embed!)).toBe('/api/vaults/vault%20id/raw/Images/roof%20(south).svg#diagram');
+
+		const recovered = canvasTextPreviewInlines(
+			'Unsafe first ![unsafe](../../secret.svg), safe second ![Roof south](../Images/roof (south).svg)',
+			{ sourcePath: 'Boards/Board.canvas' }
+		);
+		expect(recovered[0]).toEqual({ kind: 'text', text: 'Unsafe first ![unsafe](../../secret.svg), safe second ' });
+		expect(recovered[1]).toMatchObject({
+			kind: 'image',
+			text: 'Roof south',
+			embed: { path: 'Images/roof (south).svg', kind: 'image' }
+		});
 	});
 
 	test('parses Canvas text-card blocks without mutating markdown text', () => {
@@ -272,8 +302,25 @@ test.describe('canvas text preview helpers', () => {
 				}
 			}
 		]);
+		expect(canvasTextPreviewBlocks('![Panel packet](../Docs/panel (final).pdf#page=2)', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Docs/panel (final).pdf',
+					suffix: '#page=2',
+					kind: 'pdf',
+					title: 'Panel packet',
+					alt: 'Panel packet',
+					width: null,
+					height: null
+				}
+			}
+		]);
 		expect(canvasTextEmbedHref('vault id', { path: 'Images/roof.svg', suffix: '#diagram', kind: 'image' })).toBe('/api/vaults/vault%20id/raw/Images/roof.svg#diagram');
 		expect(canvasTextEmbedHref('vault id', { path: 'Images/roof photo.svg', suffix: '#diagram', kind: 'image' })).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.svg#diagram');
+		expect(canvasTextEmbedHref('vault id', { path: 'Docs/panel (final).pdf', suffix: '#page=2', kind: 'pdf' })).toBe('/api/vaults/vault%20id/raw/Docs/panel%20(final).pdf#page=2');
 
 		const noteEmbed = canvasTextPreviewBlocks('![[Home.md#Install Steps|Launch note]]')[0];
 		if (!noteEmbed || noteEmbed.type !== 'embed') throw new Error('expected note embed');

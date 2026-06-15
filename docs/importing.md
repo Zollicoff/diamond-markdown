@@ -219,6 +219,7 @@ wikilinks such as `[[Survey Photos#Meter|site photos]]` and
 explicit Canvas embed chips such as `![[Boards/Map.canvas]]`, and safe
 vault-local asset embed lines such as `![[Images/roof.png]]`,
 `![Roof](../Images/roof.png)`, `![Roof](<../Images/roof photo.png>)`,
+`![Roof](../Images/roof (south).png)`,
 or `![Roof](/Images/roof.png)`,
 plus safe inline Markdown images inside paragraph text,
 while leaving the raw card text editable. Canvas group
