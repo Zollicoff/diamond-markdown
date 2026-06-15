@@ -112,6 +112,9 @@ Use small, pushable slices:
    vault-root, wikilink subpath, and route-href reference normalization out of
    the main Canvas text-preview parser into a pure helper module with direct
    coverage.
+- **Canvas text-card table alignment.** Preserve Markdown pipe-table alignment
+   markers (`:---`, `:---:`, and `---:`) in Canvas text-card previews and render
+   aligned header/body cells with helper and browser coverage.
 - **Canvas reference preview split.** Keep Canvas file/URL reference editing
    and open/save/delete actions in `CanvasNodeReferenceEditor` while moving raw
    asset previews and Markdown note-card previews into focused presentation
@@ -556,8 +559,8 @@ Use small, pushable slices:
   the lightweight Canvas text-card preview, preserving open/closed fold markers
   while leaving raw card text editable.
 - **Canvas text-card tables.** Render simple Markdown pipe tables in the
-  lightweight Canvas text-card preview, with inline formatting inside cells and
-  compact overflow handling.
+  lightweight Canvas text-card preview, with separator alignment, inline
+  formatting inside cells, and compact overflow handling.
 - **Canvas text-card highlight and strikethrough.** Render Obsidian-style
   `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
   lightweight Canvas text-card preview while leaving the raw card text editable.

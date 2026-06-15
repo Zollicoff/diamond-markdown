@@ -67,7 +67,7 @@
 				<thead>
 					<tr>
 						{#each block.table.headers as cell}
-							<th><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></th>
+							<th style={`text-align: ${cell.align ?? 'left'}`}><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></th>
 						{/each}
 					</tr>
 				</thead>
@@ -75,7 +75,7 @@
 					{#each block.table.rows as row}
 						<tr>
 							{#each row as cell}
-								<td><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></td>
+								<td style={`text-align: ${cell.align ?? 'left'}`}><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></td>
 							{/each}
 						</tr>
 					{/each}

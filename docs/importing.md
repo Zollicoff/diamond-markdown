@@ -211,7 +211,7 @@ edge deletion with git-backed commits. Canvas text cards show a safe
 markdown-aware preview while preserving the raw editable text.
 Canvas text cards preview common Markdown plus H1-H6 headings, thematic
 breaks, hidden Obsidian comments, Obsidian callout blocks, highlights,
-strikethrough, simple Markdown tables, resolved note/title/alias inline
+strikethrough, aligned simple Markdown tables, resolved note/title/alias inline
 wikilinks such as `[[Survey Photos#Meter|site photos]]` and
 `[[Home.md#Install Steps|Launch link]]`, explicit Canvas links such as
 `[[Boards/Map.canvas|Map board]]`, resolved note embed chips such as

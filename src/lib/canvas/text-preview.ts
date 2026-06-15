@@ -27,6 +27,7 @@ export type CanvasTextEmbedKind = CanvasFileAssetKind | 'note' | 'canvas';
 
 export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link' | 'image';
 export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
+export type CanvasTextPreviewTableAlignment = 'left' | 'center' | 'right' | null;
 
 export interface CanvasTextPreviewInline {
 	kind: CanvasTextPreviewInlineKind;
@@ -55,6 +56,7 @@ export interface CanvasTextPreviewListItem {
 
 export interface CanvasTextPreviewTableCell {
 	inline: CanvasTextPreviewInline[];
+	align: CanvasTextPreviewTableAlignment;
 }
 
 export interface CanvasTextPreviewTable {
@@ -377,8 +379,8 @@ function canvasTablePreviewAt(
 	options: CanvasTextPreviewOptions
 ): { table: CanvasTextPreviewTable; nextIndex: number } | null {
 	const header = canvasTableRow(lines[index]);
-	const separator = canvasTableSeparator(lines[index + 1]);
-	if (!header || !separator || header.length < 2) return null;
+	const alignments = canvasTableSeparator(lines[index + 1]);
+	if (!header || !alignments || header.length < 2) return null;
 
 	const columnCount = header.length;
 	const rows: CanvasTextPreviewTableCell[][] = [];
@@ -386,13 +388,13 @@ function canvasTablePreviewAt(
 	while (nextIndex < lines.length) {
 		const row = canvasTableRow(lines[nextIndex]);
 		if (!row) break;
-		rows.push(canvasTableCells(row, columnCount, options));
+		rows.push(canvasTableCells(row, columnCount, options, alignments));
 		nextIndex += 1;
 	}
 
 	return {
 		table: {
-			headers: canvasTableCells(header, columnCount, options),
+			headers: canvasTableCells(header, columnCount, options, alignments),
 			rows
 		},
 		nextIndex
@@ -408,16 +410,30 @@ function canvasTableRow(line: string | undefined): string[] | null {
 	return cells.length >= 2 ? cells : null;
 }
 
-function canvasTableSeparator(line: string | undefined): boolean {
-	if (!line || !line.includes('|')) return false;
+function canvasTableSeparator(line: string | undefined): CanvasTextPreviewTableAlignment[] | null {
+	if (!line || !line.includes('|')) return null;
 	const body = line.trim().replace(/^\|/, '').replace(/\|$/, '');
 	const cells = body.split('|').map((cell) => cell.trim());
-	return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+	if (cells.length < 2) return null;
+	const alignments: CanvasTextPreviewTableAlignment[] = [];
+	for (const cell of cells) {
+		if (!/^:?-{3,}:?$/.test(cell)) return null;
+		const left = cell.startsWith(':');
+		const right = cell.endsWith(':');
+		alignments.push(left && right ? 'center' : right ? 'right' : left ? 'left' : null);
+	}
+	return alignments;
 }
 
-function canvasTableCells(values: string[], columnCount: number, options: CanvasTextPreviewOptions): CanvasTextPreviewTableCell[] {
+function canvasTableCells(
+	values: string[],
+	columnCount: number,
+	options: CanvasTextPreviewOptions,
+	alignments: CanvasTextPreviewTableAlignment[] = []
+): CanvasTextPreviewTableCell[] {
 	return Array.from({ length: columnCount }, (_, index) => ({
-		inline: canvasTextPreviewInlines(values[index] ?? '', options)
+		inline: canvasTextPreviewInlines(values[index] ?? '', options),
+		align: alignments[index] ?? null
 	}));
 }
 

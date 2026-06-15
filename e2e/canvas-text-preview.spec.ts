@@ -252,7 +252,7 @@ test.describe('canvas text preview helpers', () => {
 			'> [!WARNING]- Site survey',
 			'> Capture ==main panel== photos',
 			'| Step | Owner |',
-			'| --- | --- |',
+			'| :--- | ---: |',
 			'| Bill | [[Sandy]] |',
 			'```txt',
 			'main panel',
@@ -265,7 +265,21 @@ test.describe('canvas text preview helpers', () => {
 		expect(blocks[3]).toMatchObject({ type: 'unordered-list' });
 		expect(blocks[4]).toMatchObject({ type: 'quote' });
 		expect(blocks[5]).toMatchObject({ type: 'callout', kind: 'warning', fold: 'closed' });
-		expect(blocks[6]).toMatchObject({ type: 'table' });
+		expect(blocks[6]).toMatchObject({
+			type: 'table',
+			table: {
+				headers: [
+					{ inline: [{ kind: 'text', text: 'Step' }], align: 'left' },
+					{ inline: [{ kind: 'text', text: 'Owner' }], align: 'right' }
+				],
+				rows: [
+					[
+						{ inline: [{ kind: 'text', text: 'Bill' }], align: 'left' },
+						{ inline: [{ kind: 'wikilink', text: 'Sandy' }], align: 'right' }
+					]
+				]
+			}
+		});
 		expect(blocks[7]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
 	});
 
