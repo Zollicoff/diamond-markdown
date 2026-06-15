@@ -20,6 +20,14 @@ export interface CanvasFileAssetPreview {
 	actionLabel: string;
 }
 
+export interface CanvasNodeRefDraft {
+	value: string;
+	label: string;
+	subpath: string;
+}
+
+export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
+
 const CANVAS_IMAGE_ASSET_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
 const CANVAS_PDF_ASSET_RE = /\.pdf$/i;
 const CANVAS_AUDIO_ASSET_RE = /\.(mp3|wav|ogg|oga|m4a|flac|aac|opus)$/i;
@@ -147,4 +155,45 @@ export function canvasLinkNodeHref(node: CanvasNode): string | null {
 	} catch {
 		return null;
 	}
+}
+
+export function canvasNodeRefValue(node: CanvasNode): string {
+	if (node.type === 'file') return node.file ?? '';
+	if (node.type === 'link') return node.url ?? '';
+	return '';
+}
+
+export function canvasNodeRefDrafts(nodes: CanvasNode[]): CanvasNodeRefDrafts {
+	return Object.fromEntries(
+		nodes
+			.filter((node) => node.type === 'file' || node.type === 'link')
+			.map((node) => [node.id, {
+				value: canvasNodeRefValue(node),
+				label: node.label ?? '',
+				subpath: node.type === 'file' ? canvasFileNodeSubpath(node) ?? '' : ''
+			}])
+	);
+}
+
+export function canvasNodeRefDraftFor(node: CanvasNode, drafts: CanvasNodeRefDrafts): CanvasNodeRefDraft {
+	return drafts[node.id] ?? {
+		value: canvasNodeRefValue(node),
+		label: node.label ?? '',
+		subpath: node.type === 'file' ? canvasFileNodeSubpath(node) ?? '' : ''
+	};
+}
+
+export function canvasNodeRefDraftChanged(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
+	const draft = canvasNodeRefDraftFor(node, drafts);
+	const subpathChanged = node.type === 'file' && draft.subpath.trim() !== (canvasFileNodeSubpath(node) ?? '');
+	return draft.value.trim() !== canvasNodeRefValue(node) || draft.label.trim() !== (node.label ?? '') || subpathChanged;
+}
+
+export function canSaveCanvasNodeRefDraft(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
+	if (node.type !== 'file' && node.type !== 'link') return false;
+	if (!canvasNodeRefDraftChanged(node, drafts)) return false;
+	const draft = canvasNodeRefDraftFor(node, drafts);
+	if (!draft.value.trim()) return false;
+	if (node.type === 'file' && draft.subpath.trim() && !normalizeCanvasFileSubpath(draft.subpath)) return false;
+	return true;
 }

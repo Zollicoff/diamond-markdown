@@ -211,6 +211,10 @@ Use small, pushable slices:
 - **Canvas inline Markdown images.** Render safe source-relative and vault-root
    Markdown image syntax inside Canvas text-card paragraph text using the same
    raw asset route and traversal guards as standalone Canvas image embeds.
+- **Canvas file-reference draft helper extraction.** Move Canvas file/URL card
+   reference draft creation, change detection, and save gating into the focused
+   file-reference helper module while preserving the existing `canvas/view`
+   compatibility exports.
 - **Canvas Markdown file-card previews.** Render safe frontmatter-stripped
    Markdown note previews inside Canvas file cards that point at `.md` files,
    using the same lightweight Canvas markdown renderer and source-relative

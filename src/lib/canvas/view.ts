@@ -1,13 +1,14 @@
 import type { CanvasDoc, CanvasEdge, CanvasNode } from '$lib/types';
 import {
+	canvasNodeRefDrafts,
 	canvasFileNodeDisplayPath,
-	canvasFileNodeSubpath,
 	canvasFileOpenTarget,
-	canvasLinkNodeHref,
-	normalizeCanvasFileSubpath
+	canvasLinkNodeHref
 } from '$lib/canvas/files';
+import type { CanvasNodeRefDrafts } from '$lib/canvas/files';
 
 export {
+	canSaveCanvasNodeRefDraft,
 	canvasFileAssetKind,
 	canvasFileAssetPreview,
 	canvasFileNodeDisplayPath,
@@ -17,12 +18,16 @@ export {
 	canvasFileNodeTitle,
 	canvasFileOpenTarget,
 	canvasLinkNodeHref,
+	canvasNodeRefDraftChanged,
+	canvasNodeRefDraftFor,
+	canvasNodeRefDrafts,
+	canvasNodeRefValue,
 	canvasRawAssetHref,
 	isCanvasVaultRelativeAssetPath,
 	normalizeCanvasFileSubpath,
 	splitCanvasAssetReference
 } from '$lib/canvas/files';
-export type { CanvasFileAssetKind, CanvasFileAssetPreview, CanvasFileOpenTarget } from '$lib/canvas/files';
+export type { CanvasFileAssetKind, CanvasFileAssetPreview, CanvasFileOpenTarget, CanvasNodeRefDraft, CanvasNodeRefDrafts } from '$lib/canvas/files';
 export {
 	canvasTextEmbedHref,
 	canvasTextEmbedOpenTarget,
@@ -114,12 +119,6 @@ export interface CanvasEdgeRoutingDraft {
 	toEnd: CanvasEdgeEnd;
 }
 
-export interface CanvasNodeRefDraft {
-	value: string;
-	label: string;
-	subpath: string;
-}
-
 export interface CanvasDisplayColor {
 	accent: string;
 	fill: string;
@@ -135,7 +134,6 @@ export interface CanvasColorOption {
 
 export type CanvasTextDrafts = Record<string, string>;
 export type CanvasGroupLabelDrafts = Record<string, string>;
-export type CanvasNodeRefDrafts = Record<string, CanvasNodeRefDraft>;
 export type CanvasEdgeLabelDrafts = Record<string, string>;
 export type CanvasEdgeRoutingDrafts = Record<string, CanvasEdgeRoutingDraft>;
 export type CanvasAddNodeType = 'text' | 'file' | 'link' | 'group';
@@ -481,47 +479,6 @@ export function canvasGroupLabelChanged(node: CanvasNode, drafts: CanvasGroupLab
 
 export function canSaveCanvasGroupLabel(node: CanvasNode, drafts: CanvasGroupLabelDrafts): boolean {
 	return node.type === 'group' && canvasGroupLabelChanged(node, drafts);
-}
-
-export function canvasNodeRefValue(node: CanvasNode): string {
-	if (node.type === 'file') return node.file ?? '';
-	if (node.type === 'link') return node.url ?? '';
-	return '';
-}
-
-export function canvasNodeRefDrafts(nodes: CanvasNode[]): CanvasNodeRefDrafts {
-	return Object.fromEntries(
-		nodes
-			.filter((node) => node.type === 'file' || node.type === 'link')
-			.map((node) => [node.id, {
-				value: canvasNodeRefValue(node),
-				label: node.label ?? '',
-				subpath: node.type === 'file' ? canvasFileNodeSubpath(node) ?? '' : ''
-			}])
-	);
-}
-
-export function canvasNodeRefDraftFor(node: CanvasNode, drafts: CanvasNodeRefDrafts): CanvasNodeRefDraft {
-	return drafts[node.id] ?? {
-		value: canvasNodeRefValue(node),
-		label: node.label ?? '',
-		subpath: node.type === 'file' ? canvasFileNodeSubpath(node) ?? '' : ''
-	};
-}
-
-export function canvasNodeRefDraftChanged(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
-	const draft = canvasNodeRefDraftFor(node, drafts);
-	const subpathChanged = node.type === 'file' && draft.subpath.trim() !== (canvasFileNodeSubpath(node) ?? '');
-	return draft.value.trim() !== canvasNodeRefValue(node) || draft.label.trim() !== (node.label ?? '') || subpathChanged;
-}
-
-export function canSaveCanvasNodeRefDraft(node: CanvasNode, drafts: CanvasNodeRefDrafts): boolean {
-	if (node.type !== 'file' && node.type !== 'link') return false;
-	if (!canvasNodeRefDraftChanged(node, drafts)) return false;
-	const draft = canvasNodeRefDraftFor(node, drafts);
-	if (!draft.value.trim()) return false;
-	if (node.type === 'file' && draft.subpath.trim() && !normalizeCanvasFileSubpath(draft.subpath)) return false;
-	return true;
 }
 
 export function canvasNodePositionChanged(node: CanvasNode, x: number, y: number): boolean {
