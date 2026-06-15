@@ -254,6 +254,7 @@ test.describe('canvas text preview helpers', () => {
 			'| Step | Owner |',
 			'| :--- | ---: |',
 			'| Bill | [[Sandy]] |',
+			'| Utility \\| meter | Main \\| exterior |',
 			'```txt',
 			'main panel',
 			'```'
@@ -276,6 +277,10 @@ test.describe('canvas text preview helpers', () => {
 					[
 						{ inline: [{ kind: 'text', text: 'Bill' }], align: 'left' },
 						{ inline: [{ kind: 'wikilink', text: 'Sandy' }], align: 'right' }
+					],
+					[
+						{ inline: [{ kind: 'text', text: 'Utility | meter' }], align: 'left' },
+						{ inline: [{ kind: 'text', text: 'Main | exterior' }], align: 'right' }
 					]
 				]
 			}

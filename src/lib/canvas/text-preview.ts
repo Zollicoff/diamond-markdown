@@ -405,15 +405,13 @@ function canvasTableRow(line: string | undefined): string[] | null {
 	if (!line || !line.includes('|')) return null;
 	const trimmed = line.trim();
 	if (!trimmed || /^[-:|\s]+$/.test(trimmed)) return null;
-	const body = trimmed.replace(/^\|/, '').replace(/\|$/, '');
-	const cells = body.split('|').map((cell) => cell.trim());
+	const cells = canvasTableSplitCells(trimmed).map((cell) => cell.trim());
 	return cells.length >= 2 ? cells : null;
 }
 
 function canvasTableSeparator(line: string | undefined): CanvasTextPreviewTableAlignment[] | null {
 	if (!line || !line.includes('|')) return null;
-	const body = line.trim().replace(/^\|/, '').replace(/\|$/, '');
-	const cells = body.split('|').map((cell) => cell.trim());
+	const cells = canvasTableSplitCells(line.trim()).map((cell) => cell.trim());
 	if (cells.length < 2) return null;
 	const alignments: CanvasTextPreviewTableAlignment[] = [];
 	for (const cell of cells) {
@@ -423,6 +421,43 @@ function canvasTableSeparator(line: string | undefined): CanvasTextPreviewTableA
 		alignments.push(left && right ? 'center' : right ? 'right' : left ? 'left' : null);
 	}
 	return alignments;
+}
+
+function canvasTableSplitCells(row: string): string[] {
+	const body = canvasTableBody(row);
+	const cells: string[] = [];
+	let cell = '';
+	for (let index = 0; index < body.length; index += 1) {
+		const char = body[index];
+		if (char === '|' && !canvasPipeEscaped(body, index)) {
+			cells.push(cell);
+			cell = '';
+			continue;
+		}
+		if (char === '|' && canvasPipeEscaped(body, index)) {
+			cell = cell.slice(0, -1) + '|';
+			continue;
+		}
+		cell += char;
+	}
+	cells.push(cell);
+	return cells;
+}
+
+function canvasTableBody(row: string): string {
+	let start = 0;
+	let end = row.length;
+	if (row[start] === '|') start += 1;
+	if (end > start && row[end - 1] === '|' && !canvasPipeEscaped(row, end - 1)) end -= 1;
+	return row.slice(start, end);
+}
+
+function canvasPipeEscaped(value: string, pipeIndex: number): boolean {
+	let slashCount = 0;
+	for (let index = pipeIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
+		slashCount += 1;
+	}
+	return slashCount % 2 === 1;
 }
 
 function canvasTableCells(

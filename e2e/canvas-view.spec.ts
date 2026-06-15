@@ -1030,6 +1030,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'| :--- | ---: |',
 					'| Bill | [[Sandy]] |',
 					'| **Panel** | ==Runner== |',
+					'| Utility \\| meter | Main \\| exterior |',
 					'```txt',
 					'main panel',
 					'```'
@@ -1098,14 +1099,17 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('.preview-callout')).toContainText('tip');
 	await expect(preview.locator('.preview-callout')).toContainText('Site survey');
 	await expect(preview.locator('.preview-callout mark')).toHaveText('main panel');
-		await expect(preview.locator('table')).toContainText('Step');
-		await expect(preview.locator('table')).toContainText('Owner');
-		await expect(preview.locator('table th').nth(0)).toHaveCSS('text-align', 'left');
-		await expect(preview.locator('table th').nth(1)).toHaveCSS('text-align', 'right');
-		await expect(preview.locator('table td').nth(1)).toHaveCSS('text-align', 'right');
-		await expect(preview.locator('table .wikilink')).toHaveText('[[Sandy]]');
-		await expect(preview.locator('table strong')).toHaveText('Panel');
-		await expect(preview.locator('table mark')).toHaveText('Runner');
+	await expect(preview.locator('table')).toContainText('Step');
+	await expect(preview.locator('table')).toContainText('Owner');
+	await expect(preview.locator('table th').nth(0)).toHaveCSS('text-align', 'left');
+	await expect(preview.locator('table th').nth(1)).toHaveCSS('text-align', 'right');
+	await expect(preview.locator('table td').nth(1)).toHaveCSS('text-align', 'right');
+	await expect(preview.locator('table .wikilink')).toHaveText('[[Sandy]]');
+	await expect(preview.locator('table strong')).toHaveText('Panel');
+	await expect(preview.locator('table mark')).toHaveText('Runner');
+	await expect(preview.locator('table')).toContainText('Utility | meter');
+	await expect(preview.locator('table')).toContainText('Main | exterior');
+	await expect(preview.locator('table')).not.toContainText('Utility \\| meter');
 	await expect(preview.locator('pre')).toContainText('main panel');
 	await expect(page.locator('.canvas-node-text textarea')).toHaveValue(/# Launch plan/);
 	await preview.getByRole('link', { name: /\[\[Launch link\]\]/ }).click();
