@@ -5,6 +5,7 @@
 		CanvasTextEmbedResolver,
 		CanvasTextWikilinkResolver
 	} from '$lib/canvas/text-preview';
+	import CanvasNodeRemoveButton from './CanvasNodeRemoveButton.svelte';
 	import CanvasTextPreview from './CanvasTextPreview.svelte';
 
 	interface Props {
@@ -66,14 +67,7 @@
 	>
 		{saving ? 'Saving...' : 'Save text'}
 	</button>
-	<button
-		class="mini node-remove"
-		aria-label={`Remove canvas node ${title}`}
-		disabled={disableDelete}
-		onclick={() => void onDelete(node)}
-	>
-		{deleting ? 'Removing...' : 'Remove'}
-	</button>
+	<CanvasNodeRemoveButton {title} {deleting} {disableDelete} onRemove={() => onDelete(node)} />
 </div>
 
 <style>
@@ -109,8 +103,7 @@
 		gap: 6px;
 		justify-content: flex-end;
 	}
-	.node-save,
-	.node-remove {
+	.node-save {
 		padding: 2px 7px;
 		font-size: 0.7rem;
 	}

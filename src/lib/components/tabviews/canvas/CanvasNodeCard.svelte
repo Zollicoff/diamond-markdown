@@ -15,6 +15,7 @@
 	} from '$lib/canvas/text-preview';
 	import CanvasColorPalette from './CanvasColorPalette.svelte';
 	import CanvasGroupNodeEditor from './CanvasGroupNodeEditor.svelte';
+	import CanvasNodeFallbackBody from './CanvasNodeFallbackBody.svelte';
 	import CanvasNodeReferenceEditor from './CanvasNodeReferenceEditor.svelte';
 	import CanvasTextNodeEditor from './CanvasTextNodeEditor.svelte';
 
@@ -85,6 +86,7 @@
 	}: Props = $props();
 
 	const title = $derived(canvasNodeTitle(node));
+	const body = $derived(canvasNodeBody(node));
 </script>
 
 <article class={`${canvasNodeClass(node)}${moving ? ' moving' : ''}${resizing ? ' resizing' : ''}`} style={canvasNodeStyle(node, bounds)}>
@@ -151,30 +153,14 @@
 			{onOpenRef}
 			{onDelete}
 		/>
-	{:else if canvasNodeBody(node)}
-		<p>{canvasNodeBody(node)}</p>
-		<div class="node-actions">
-			<button
-				class="mini node-remove"
-				aria-label={`Remove canvas node ${title}`}
-				disabled={disableDelete}
-				onclick={() => void onDelete(node)}
-			>
-				{deleting ? 'Removing...' : 'Remove'}
-			</button>
-		</div>
 	{:else}
-		<p class="empty">No preview content</p>
-		<div class="node-actions">
-			<button
-				class="mini node-remove"
-				aria-label={`Remove canvas node ${title}`}
-				disabled={disableDelete}
-				onclick={() => void onDelete(node)}
-			>
-				{deleting ? 'Removing...' : 'Remove'}
-			</button>
-		</div>
+		<CanvasNodeFallbackBody
+			{title}
+			{body}
+			{deleting}
+			{disableDelete}
+			onDelete={() => onDelete(node)}
+		/>
 	{/if}
 	<button
 		type="button"
@@ -315,46 +301,5 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.86rem;
-	}
-	p {
-		margin: 0;
-		overflow: hidden;
-		color: var(--fg-muted);
-		font-size: 0.78rem;
-		line-height: 1.35;
-		white-space: pre-wrap;
-	}
-	.node-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		justify-content: flex-end;
-	}
-	.node-save,
-	.node-remove {
-		padding: 2px 7px;
-		font-size: 0.7rem;
-	}
-	.mini {
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 3px 9px;
-		color: var(--fg-muted);
-		font: inherit;
-		font-size: 0.76rem;
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.mini:hover {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.mini:disabled {
-		cursor: not-allowed;
-		opacity: 0.55;
-	}
-	p.empty {
-		color: var(--fg-dim);
-		font-style: italic;
 	}
 </style>

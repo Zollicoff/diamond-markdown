@@ -178,6 +178,9 @@ Use small, pushable slices:
 - **Canvas edge label editing.** Edit or clear existing Canvas edge labels
    from the board view through git-backed commits with stale-revision
    protection.
+- **Canvas node action split.** Share the Canvas node remove action and fallback
+   body rendering across text, group, file, URL, and unknown node cards so
+   `CanvasNodeCard` stays focused on node-frame composition.
 - **Canvas file and URL node creation.** Add Obsidian-compatible file and URL
    cards from the Canvas board view through git-backed commits with
    stale-revision protection.

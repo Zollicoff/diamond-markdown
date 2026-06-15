@@ -8,6 +8,7 @@
 		canvasOpenNodeLabel,
 		type CanvasNodeRefDraft
 	} from '$lib/canvas/view';
+	import CanvasNodeRemoveButton from './CanvasNodeRemoveButton.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -152,14 +153,7 @@
 	>
 		{saving ? 'Saving...' : `Save ${node.type === 'file' ? 'file' : 'URL'}`}
 	</button>
-	<button
-		class="mini node-remove"
-		aria-label={`Remove canvas node ${title}`}
-		disabled={disableDelete}
-		onclick={() => void onDelete(node)}
-	>
-		{deleting ? 'Removing...' : 'Remove'}
-	</button>
+	<CanvasNodeRemoveButton {title} {deleting} {disableDelete} onRemove={() => onDelete(node)} />
 </div>
 
 <style>
@@ -247,8 +241,7 @@
 		font-size: 0.74rem;
 	}
 	.node-open,
-	.node-save,
-	.node-remove {
+	.node-save {
 		padding: 2px 7px;
 		font-size: 0.7rem;
 	}
