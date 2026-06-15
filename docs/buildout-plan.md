@@ -453,6 +453,10 @@ Use small, pushable slices:
 - **Obsidian strict-line-break preference.** Honor `.obsidian/app.json`
   `strictLineBreaks` for Read mode, hover previews, and static publish output,
   preserving Diamond's strict default when the setting is absent.
+- **Obsidian local-trash preference.** Honor `.obsidian/app.json`
+  `trashOption: "local"` by moving deleted notes, Canvas files, folders, and
+  attachments into the vault `.trash/` folder while keeping active tree/search
+  surfaces hidden and git-backed.
 - **Obsidian Daily Notes settings.** Reuse safe `.obsidian/daily-notes.json`
    `folder`, `template`, and Moment-style date-format settings for the daily
    note command, with unsafe paths falling back to Diamond defaults.

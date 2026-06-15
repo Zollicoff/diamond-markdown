@@ -3,12 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { NoteDoc } from '$lib/types';
 import { BOOKMARKS_REL_PATH, removeBookmarksForPath } from './bookmarks';
-import { commitChange } from './git';
+import { commitChange, getVaultGit } from './git';
 import { splitFrontmatter } from './frontmatter';
 import { getIndex, removeNote, upsertNote } from './indexer';
 import { unlinkedMentionsForNote } from './mentions';
 import { renderMarkdown } from './markdown';
 import { ensureMdExt, resolveInVault } from './paths';
+import { moveToLocalTrash } from './trash';
 import type { Vault } from './vault';
 
 export interface SaveNoteInput {
@@ -118,10 +119,14 @@ export async function saveNote(vault: Vault, input: SaveNoteInput): Promise<Save
 export async function deleteNote(vault: Vault, inputPath: string): Promise<DeleteNoteResult> {
 	const rel = ensureMdExt(inputPath);
 	const abs = resolveInVault(vault, rel);
-	if (fs.existsSync(abs)) fs.unlinkSync(abs);
+	await getVaultGit(vault);
+	const trashed = moveToLocalTrash(vault, rel);
+	if (!trashed && fs.existsSync(abs)) fs.unlinkSync(abs);
 	removeNote(vault, rel);
 	const bookmarks = removeBookmarksForPath(vault, rel);
 	const files = bookmarks.changed ? [rel, BOOKMARKS_REL_PATH] : [rel];
-	const res = await commitChange(vault, files, 'delete', rel);
+	if (trashed) files.push(trashed.to);
+	const summary = trashed ? `${rel} -> ${trashed.to}` : rel;
+	const res = await commitChange(vault, files, 'delete', summary);
 	return { ok: true, sha: res?.sha ?? null, path: rel };
 }

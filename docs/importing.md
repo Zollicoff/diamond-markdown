@@ -56,11 +56,12 @@ attribute, safe integer `tabSize` values from 1 to 16 for editor indentation
 and tab rendering, `readableLineLength` for narrowing editor and reading
 surfaces, `strictLineBreaks` for Read mode, hover-preview, and static-publish
 line-break rendering, `defaultViewMode` plus `livePreview` for the initial note
-view mode, and `alwaysUpdateLinks` for note/folder rename and move operations.
+view mode, `alwaysUpdateLinks` for note/folder rename and move operations, and
+`trashOption: "local"` for portable vault-local delete-to-trash behavior.
 Explicit folder context actions such as New note here still use the selected
-folder. Other app settings such as `newLinkFormat` and `trashOption` are
-reported so migration mismatches are visible before opening the vault; Diamond
-does not rewrite existing note links during import.
+folder. Other app settings such as `newLinkFormat` and non-local trash modes
+are reported so migration mismatches are visible before opening the vault;
+Diamond does not rewrite existing note links during import.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same
@@ -164,6 +165,12 @@ a safe relative `attachmentFolderPath`; otherwise Diamond uses `Attachments/`.
 Uploads receive non-overwriting filenames, are committed to the vault git
 history, and insert Obsidian-style embed links.
 
+When `.obsidian/app.json` sets `trashOption: "local"`, Diamond follows the
+portable Obsidian trash behavior for note, Canvas, folder, and attachment
+delete actions by moving deleted vault files under `.trash/` and committing the
+move. The `.trash/` folder stays hidden from the active tree, search index, and
+attachment picker.
+
 After import, the attachment picker can move selected vault assets into a safe
 destination folder. Moves pick non-overwriting filenames and rewrite Obsidian
 embeds plus source-relative Markdown image links in the same git-backed commit.
@@ -221,7 +228,8 @@ initial state of the imported vault is captured explicitly.
 - It imports Obsidian search bookmarks as Diamond saved searches, but does not
   recreate Obsidian bookmark groups or convert non-note bookmarks into Diamond
   bookmarks.
-- It does not automatically apply every `.obsidian/app.json` UI preference.
+- It does not automatically apply every `.obsidian/app.json` UI preference or
+  non-local trash behavior.
 - It does not rewrite wikilinks or embeds.
 - It does not move attachments during import.
 - It does not delete or modify `.obsidian`.

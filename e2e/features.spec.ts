@@ -2727,6 +2727,50 @@ test('sync now pushes local commits and pulls fast-forward remote commits', asyn
 	expect(fs.existsSync(path.join(vaultDir, 'RemoteOnly.md'))).toBe(true);
 });
 
+test('Obsidian local trash keeps deleted notes, Canvas files, and folders inside vault trash', async ({ request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-local-trash-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Folder Trash Test'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ trashOption: 'local' }));
+	fs.writeFileSync(path.join(vaultDir, 'Loose.md'), '# Loose\n\nTrash me.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), '{"nodes":[],"edges":[]}\n');
+	fs.writeFileSync(path.join(vaultDir, 'Folder Trash Test', 'Inside.md'), '# Inside\n\nTrash folder.\n');
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Local Trash Vault', path: vaultDir }
+	});
+	expect(created.ok()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const deletedNote = await request.delete(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Loose.md')}`);
+	expect(deletedNote.ok(), await deletedNote.text()).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, 'Loose.md'))).toBe(false);
+	expect(fs.readFileSync(path.join(vaultDir, '.trash', 'Loose.md'), 'utf-8')).toContain('Trash me.');
+	const missingNote = await request.get(`/api/vaults/${vault.id}/note?path=${encodeURIComponent('Loose.md')}`);
+	expect(missingNote.status()).toBe(404);
+
+	const deletedCanvas = await request.delete(`/api/vaults/${vault.id}/canvas?path=${encodeURIComponent('Board.canvas')}`);
+	expect(deletedCanvas.ok(), await deletedCanvas.text()).toBe(true);
+	expect(fs.existsSync(path.join(vaultDir, 'Board.canvas'))).toBe(false);
+	expect(fs.existsSync(path.join(vaultDir, '.trash', 'Board.canvas'))).toBe(true);
+
+	const deletedFolder = await request.delete(`/api/vaults/${vault.id}/folder?path=${encodeURIComponent('Folder Trash Test')}&force=1`);
+	expect(deletedFolder.ok(), await deletedFolder.text()).toBe(true);
+	const body = await deletedFolder.json() as { removedNotes: number; sha: string | null };
+	expect(body.removedNotes).toBe(1);
+	expect(body.sha).toMatch(/^[a-f0-9]{7,}$/);
+	expect(fs.existsSync(path.join(vaultDir, 'Folder Trash Test'))).toBe(false);
+	expect(fs.readFileSync(path.join(vaultDir, '.trash', 'Folder Trash Test', 'Inside.md'), 'utf-8')).toContain('Trash folder.');
+
+	const tree = await request.get(`/api/vaults/${vault.id}/tree`);
+	expect(tree.ok()).toBe(true);
+	const treeText = await tree.text();
+	expect(treeText).not.toContain('.trash');
+	await expect.poll(() => git(vaultDir, ['status', '--short'])).toBe('');
+	expect(git(vaultDir, ['log', '--oneline', '--', '.trash'])).toContain('delete: Folder Trash Test/');
+});
+
 test('service worker is built with app-shell caching and API bypass', async ({ request }) => {
 	const res = await request.get('/service-worker.js');
 	expect(res.ok()).toBe(true);

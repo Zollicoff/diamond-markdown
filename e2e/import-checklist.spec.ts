@@ -936,6 +936,32 @@ test.describe('import checklist helpers', () => {
 		});
 	});
 
+	test('reports Obsidian local trash as the portable delete behavior', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-local-trash-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		fs.writeFileSync(appJson, JSON.stringify({ trashOption: 'local' }));
+		const local = readObsidianAppConfig(vaultDir);
+		expect(local.trashOption).toBe('local');
+		expect(local.settings.find((setting) => setting.id === 'trashOption')).toMatchObject({
+			label: 'Delete behavior',
+			value: 'local',
+			level: 'info',
+			detail: 'Diamond moves deleted notes, Canvas files, folders, and attachments into the vault .trash folder before committing the change.'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ trashOption: 'system' }));
+		const system = readObsidianAppConfig(vaultDir);
+		expect(system.trashOption).toBe('system');
+		expect(system.settings.find((setting) => setting.id === 'trashOption')).toMatchObject({
+			label: 'Delete behavior',
+			value: 'system',
+			level: 'warn'
+		});
+		expect(system.warnings).toContain('Obsidian trashOption "system" is not applied automatically; Diamond still records deletes in git history.');
+	});
+
 	test('uses safe Obsidian daily note settings for the daily-note plan', () => {
 		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-daily-'));
 		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });

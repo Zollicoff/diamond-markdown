@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Vault } from './vault';
 import { BOOKMARKS_REL_PATH, removeBookmarksForPath } from './bookmarks';
-import { commitChange } from './git';
+import { commitChange, getVaultGit } from './git';
 import { getIndex, removeNote } from './indexer';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import { renameFolderAtomically } from './rename';
+import { moveToLocalTrash, trashChildPath } from './trash';
 
 export interface CreateFolderResult {
 	ok: true;
@@ -108,13 +109,18 @@ export async function deleteFolder(vault: Vault, inputPath: string, force = fals
 
 	const deletedFiles = listFilesRecursively(abs, rel);
 	const removedNotes = notesUnderFolder(vault, rel);
+	await getVaultGit(vault);
+	const trashed = moveToLocalTrash(vault, rel);
 
-	fs.rmSync(abs, { recursive: true, force: true });
+	if (!trashed) fs.rmSync(abs, { recursive: true, force: true });
 	for (const note of removedNotes) removeNote(vault, note);
 	const bookmarks = removeBookmarksForPath(vault, rel, { folder: true });
 
-	const summary = `${rel}/ (${removedNotes.length} note${removedNotes.length === 1 ? '' : 's'})`;
-	const files = bookmarks.changed ? [...deletedFiles, BOOKMARKS_REL_PATH] : deletedFiles;
+	const summary = trashed
+		? `${rel}/ -> ${trashed.to}/ (${removedNotes.length} note${removedNotes.length === 1 ? '' : 's'})`
+		: `${rel}/ (${removedNotes.length} note${removedNotes.length === 1 ? '' : 's'})`;
+	const trashedFiles = trashed ? deletedFiles.map((file) => trashChildPath(trashed, file)) : [];
+	const files = bookmarks.changed ? [...deletedFiles, ...trashedFiles, BOOKMARKS_REL_PATH] : [...deletedFiles, ...trashedFiles];
 	const commit = files.length > 0
 		? await commitChange(vault, files, 'delete', summary)
 		: null;

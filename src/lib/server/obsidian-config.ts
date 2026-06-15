@@ -345,12 +345,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 
 	const trashOption = stringValue(body.trashOption);
 	if (trashOption) {
+		base.trashOption = trashOption;
 		base.settings.push(setting(
 			'trashOption',
 			'Delete behavior',
 			trashOption,
-			'Diamond delete actions are recoverable through git history rather than Obsidian trash settings.'
+			trashOption === 'local'
+				? 'Diamond moves deleted notes, Canvas files, folders, and attachments into the vault .trash folder before committing the change.'
+				: 'Diamond reports this setting for migration review; only Obsidian local trash is applied portably inside the vault.',
+			trashOption === 'local' ? 'info' : 'warn'
 		));
+		if (trashOption !== 'local') {
+			base.warnings.push(`Obsidian trashOption "${trashOption}" is not applied automatically; Diamond still records deletes in git history.`);
+		}
 	}
 
 	return base;

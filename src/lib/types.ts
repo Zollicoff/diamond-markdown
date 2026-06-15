@@ -56,6 +56,7 @@ export interface ObsidianAppConfigInfo {
 	defaultViewMode?: string;
 	livePreview?: boolean;
 	defaultMode?: NoteViewMode;
+	trashOption?: string;
 	settings: ObsidianAppConfigSetting[];
 	warnings: string[];
 }

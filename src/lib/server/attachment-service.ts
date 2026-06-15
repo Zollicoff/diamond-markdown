@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { commitChange } from './git';
+import { commitChange, getVaultGit } from './git';
 import { getIndex, upsertNote } from './indexer';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
@@ -10,6 +10,7 @@ import { replaceEmbeds } from './wikilink';
 import { resolveMarkdownImagePath } from './embed';
 import type { AttachmentKind, AttachmentRef } from '$lib/types';
 import { readObsidianAppConfig, safeVaultFolder } from './obsidian-config';
+import { moveToLocalTrash } from './trash';
 
 export interface AttachmentUploadResult {
 	ok: true;
@@ -291,8 +292,15 @@ export async function deleteAttachment(vault: Vault, inputPath: string): Promise
 	const stat = fs.statSync(abs);
 	if (!stat.isFile()) throw new Error('path is not an attachment file');
 
-	fs.rmSync(abs, { force: true });
-	const res = await commitChange(vault, [rel], 'delete', rel);
+	await getVaultGit(vault);
+	const trashed = moveToLocalTrash(vault, rel);
+	if (!trashed) fs.rmSync(abs, { force: true });
+	const res = await commitChange(
+		vault,
+		trashed ? [rel, trashed.to] : [rel],
+		'delete',
+		trashed ? `${rel} -> ${trashed.to}` : rel
+	);
 	return {
 		ok: true,
 		path: rel,

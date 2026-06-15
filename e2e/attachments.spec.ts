@@ -211,6 +211,37 @@ test.describe('attachment uploads', () => {
 		expect(preferredAttachmentFolder({ id: 'test', name: 'Test', path: vaultDir })).toBe('Attachments');
 	});
 
+	test('moves deleted attachments into Obsidian local trash when configured', async ({ request }) => {
+		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-attachment-trash-vault');
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		fs.mkdirSync(path.join(vaultDir, 'Attachments'), { recursive: true });
+		fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ trashOption: 'local' }));
+		fs.writeFileSync(path.join(vaultDir, 'Attachments', 'meter.png'), 'meter');
+
+		const created = await request.post('/api/vaults', {
+			data: { name: 'Obsidian Attachment Trash Vault', path: vaultDir }
+		});
+		expect(created.ok()).toBe(true);
+		const { vault } = await created.json() as { vault: { id: string } };
+
+		const removed = await request.delete(`/api/vaults/${vault.id}/attachment?path=${encodeURIComponent('Attachments/meter.png')}`);
+		expect(removed.ok(), await removed.text()).toBe(true);
+		const removeBody = await removed.json() as { path: string; sha: string | null };
+		expect(removeBody.path).toBe('Attachments/meter.png');
+		expect(removeBody.sha).toMatch(/^[a-f0-9]{7,}$/);
+		expect(fs.existsSync(path.join(vaultDir, 'Attachments', 'meter.png'))).toBe(false);
+		expect(fs.readFileSync(path.join(vaultDir, '.trash', 'Attachments', 'meter.png'), 'utf-8')).toBe('meter');
+
+		const listed = await request.get(`/api/vaults/${vault.id}/attachment`);
+		expect(listed.ok()).toBe(true);
+		const listBody = await listed.json() as { attachments: AttachmentRef[] };
+		expect(listBody.attachments.map((attachment) => attachment.path)).not.toContain('Attachments/meter.png');
+		expect(listBody.attachments.some((attachment) => attachment.path.includes('.trash'))).toBe(false);
+		expect(git(vaultDir, ['status', '--short'])).toBe('');
+		expect(git(vaultDir, ['log', '--oneline', '--', '.trash/Attachments/meter.png'])).toContain('delete: Attachments/meter.png -> .trash/Attachments/meter.png');
+	});
+
 	test('renames attachments and rewrites markdown references in one commit', async ({ request }) => {
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'attachment-rename-api-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });

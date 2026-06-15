@@ -21,7 +21,8 @@ import type { CanvasEdgeEnd, CanvasEdgeSide } from '$lib/canvas/view';
 import { escAttr, escHtml } from '$lib/util/strings';
 import { normalizeVaultPath, resolveInVault } from './paths';
 import type { Vault } from './vault';
-import { commitChange } from './git';
+import { commitChange, getVaultGit } from './git';
+import { moveToLocalTrash } from './trash';
 
 interface RawCanvasFile {
 	nodes?: unknown;
@@ -706,10 +707,18 @@ export async function renameCanvas(vault: Vault, fromInput: string, toInput: str
 export async function deleteCanvas(vault: Vault, inputPath: string): Promise<DeleteCanvasResult> {
 	const rel = ensureCanvasPath(inputPath);
 	const abs = resolveInVault(vault, rel);
+	let trashed: { to: string } | null = null;
 	if (fs.existsSync(abs)) {
 		if (!fs.statSync(abs).isFile()) throw new CanvasFileError('canvas path is not a file', 400);
-		fs.unlinkSync(abs);
+		await getVaultGit(vault);
+		trashed = moveToLocalTrash(vault, rel);
+		if (!trashed) fs.unlinkSync(abs);
 	}
-	const commit = await commitChange(vault, [rel], 'delete', rel);
+	const commit = await commitChange(
+		vault,
+		trashed ? [rel, trashed.to] : [rel],
+		'delete',
+		trashed ? `${rel} -> ${trashed.to}` : rel
+	);
 	return { ok: true, path: rel, sha: commit?.sha ?? null };
 }
