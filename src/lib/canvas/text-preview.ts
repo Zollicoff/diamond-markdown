@@ -413,10 +413,15 @@ function canvasTextMarkdownReference(
 ): { path: string; suffix: string } | null {
 	let href = rawHref.trim();
 	if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1).trim();
-	if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href) || href.startsWith('/')) return null;
+	if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)) return null;
 	const ref = splitCanvasAssetReference(href);
 	if (!ref.path) return null;
-	const path = normalizeCanvasMarkdownRelativePath(safeDecodeUri(ref.path), sourcePath);
+	const vaultRootPath = ref.path.startsWith('/');
+	const rawPath = vaultRootPath ? ref.path.slice(1) : ref.path;
+	const path = normalizeCanvasMarkdownRelativePath(
+		safeDecodeUri(rawPath),
+		vaultRootPath ? null : sourcePath
+	);
 	return path ? { path, suffix: ref.suffix } : null;
 }
 

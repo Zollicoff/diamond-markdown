@@ -88,6 +88,14 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', relativeMarkdownLinks[5])).toBe('/vault/vault%20id/note/References/Roof%20Photos.md#meter');
 		expect(relativeMarkdownLinks.at(-1)).toEqual({ kind: 'text', text: ', and [escaped](../../secret.md)' });
 
+		const vaultRootMarkdownLinks = canvasTextPreviewInlines(
+			'Review [Root note](/References/Roof%20Photos.md#Meter), [Root Canvas](/Boards/Map.canvas), and [root escaped](/../secret.md)',
+			{ sourcePath: 'Boards/Board.canvas' }
+		);
+		expect(canvasTextInlineTargetHref('vault id', vaultRootMarkdownLinks[1])).toBe('/vault/vault%20id/note/References/Roof%20Photos.md#meter');
+		expect(canvasTextInlineTargetHref('vault id', vaultRootMarkdownLinks[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
+		expect(vaultRootMarkdownLinks.at(-1)).toEqual({ kind: 'text', text: ', and [root escaped](/../secret.md)' });
+
 		const resolved = canvasTextPreviewInlines('Review [[Survey Photos#Meter|site photos]] and [[Launch Base]]', {
 			resolveWikilinkTarget: canvasTextNoteWikilinkResolver(noteTargets)
 		});

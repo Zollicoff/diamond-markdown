@@ -198,6 +198,9 @@ Use small, pushable slices:
 - **Canvas file-card type routing.** Route Canvas file cards by extension:
    Markdown files open as note tabs, `.canvas` files open as Canvas tabs, and
    unsupported asset paths stay editable without pretending to be note tabs.
+- **Canvas vault-root Markdown links.** Resolve leading-slash Markdown
+   note/Canvas links inside Canvas text cards as vault-root paths while
+   retaining traversal guards for unsafe root escapes.
 - **Canvas Markdown file-card previews.** Render safe frontmatter-stripped
    Markdown note previews inside Canvas file cards that point at `.md` files,
    using the same lightweight Canvas markdown renderer and source-relative
