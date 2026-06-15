@@ -118,6 +118,10 @@ Use small, pushable slices:
    vault-root, wikilink subpath, and route-href reference normalization out of
    the main Canvas text-preview parser into a pure helper module with direct
    coverage.
+- **Canvas latest-request helper extraction.** Share the deterministic
+  latest-request queue used by Canvas link-target and note-preview loaders, and
+  add direct note-preview queue coverage so stale async preview responses stay
+  testable outside `CanvasView`.
 - **Canvas text-card table alignment.** Preserve Markdown pipe-table alignment
    markers (`:---`, `:---:`, and `---:`) in Canvas text-card previews and render
    aligned header/body cells with helper and browser coverage.

@@ -1,4 +1,5 @@
 import type { CanvasNode, CanvasNotePreview } from '$lib/types';
+import { LatestRequestQueue } from '$lib/util/latest-request';
 import { canvasFileOpenTarget } from './files';
 
 export type CanvasNotePreviewMap = Record<string, CanvasNotePreview>;
@@ -10,24 +11,22 @@ export interface CanvasNotePreviewLoadResult {
 }
 
 export class CanvasNotePreviewRequestQueue {
-	private requestId = 0;
+	private queue = new LatestRequestQueue();
 
 	async load(
 		vaultId: string,
 		paths: string[],
 		fetcher: CanvasNotePreviewFetcher
 	): Promise<CanvasNotePreviewLoadResult> {
-		const requestId = ++this.requestId;
-		if (paths.length === 0) return { requestId, previews: [] };
-		try {
-			return { requestId, previews: await fetcher(vaultId, paths) };
-		} catch {
-			return { requestId, previews: [] };
-		}
+		const result = await this.queue.load(
+			() => paths.length > 0 ? fetcher(vaultId, paths) : Promise.resolve([]),
+			[] as CanvasNotePreview[]
+		);
+		return { requestId: result.requestId, previews: result.value };
 	}
 
 	isCurrent(result: CanvasNotePreviewLoadResult): boolean {
-		return result.requestId === this.requestId;
+		return this.queue.isCurrent(result);
 	}
 }
 

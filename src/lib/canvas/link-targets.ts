@@ -1,4 +1,5 @@
 import type { NoteLinkTarget } from '$lib/types';
+import { LatestRequestQueue } from '$lib/util/latest-request';
 
 export type CanvasLinkTargetFetcher = (vaultId: string) => Promise<NoteLinkTarget[]>;
 
@@ -12,19 +13,15 @@ export interface CanvasLinkTargetRefreshEvent {
 }
 
 export class CanvasLinkTargetRequestQueue {
-	private requestId = 0;
+	private queue = new LatestRequestQueue();
 
 	async load(vaultId: string, fetcher: CanvasLinkTargetFetcher): Promise<CanvasLinkTargetLoadResult> {
-		const requestId = ++this.requestId;
-		try {
-			return { requestId, targets: await fetcher(vaultId) };
-		} catch {
-			return { requestId, targets: [] };
-		}
+		const result = await this.queue.load(() => fetcher(vaultId), [] as NoteLinkTarget[]);
+		return { requestId: result.requestId, targets: result.value };
 	}
 
 	isCurrent(result: CanvasLinkTargetLoadResult): boolean {
-		return result.requestId === this.requestId;
+		return this.queue.isCurrent(result);
 	}
 }
 
