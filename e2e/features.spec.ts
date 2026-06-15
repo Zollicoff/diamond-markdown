@@ -183,6 +183,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		strictLineBreaks: false,
 		defaultViewMode: 'preview',
 		livePreview: true,
+		promptDelete: false,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -277,6 +278,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 			tabSize?: number;
 			readableLineLength?: boolean;
 			defaultMode?: string;
+			promptDelete?: boolean;
 			settings: { id: string; label: string; value: string; level: string; detail: string }[];
 			warnings: string[];
 		};
@@ -387,7 +389,8 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
-		defaultMode: 'read'
+		defaultMode: 'read',
+		promptDelete: false
 	});
 	expect(body.obsidianAppConfig.settings.map((setting) => setting.id)).toEqual([
 		'attachmentFolderPath',
@@ -403,6 +406,7 @@ test('Obsidian import check reports vault readiness without changing files', asy
 		'strictLineBreaks',
 		'livePreview',
 		'defaultViewMode',
+		'promptDelete',
 		'trashOption'
 	]);
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'attachmentFolderPath')).toMatchObject({
@@ -438,6 +442,11 @@ test('Obsidian import check reports vault readiness without changing files', asy
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
 		label: 'Default view mode',
 		value: 'Reading view',
+		level: 'info'
+	});
+	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'promptDelete')).toMatchObject({
+		label: 'Delete confirmation',
+		value: 'Disabled',
 		level: 'info'
 	});
 	expect(body.obsidianAppConfig.settings.find((setting) => setting.id === 'useMarkdownLinks')?.detail).toContain('editor link button inserts Markdown link syntax');
@@ -586,6 +595,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 		readableLineLength: true,
 		defaultViewMode: 'source',
 		livePreview: false,
+		promptDelete: false,
 		trashOption: 'local',
 		privateSetting: 'do-not-render-this-app-config-value'
 	}));
@@ -676,7 +686,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('1 asset file found outside named attachment folders; verify embed paths after import.');
 	await expect(page.locator('.import-card')).toContainText('No .git folder found; initialize Git before first GitHub sync.');
 	await expect(page.locator('.import-card')).toContainText('Obsidian app config');
-	await expect(page.locator('.import-card')).toContainText('13 supported app settings found.');
+	await expect(page.locator('.import-card')).toContainText('14 supported app settings found.');
 	await expect(page.locator('.import-card')).toContainText('Attachment folder');
 	await expect(page.locator('.import-card')).toContainText('Media/Uploads');
 	await expect(page.locator('.import-card')).toContainText('Configured new-note folder');
@@ -694,6 +704,7 @@ test('home add vault form previews Obsidian import checklist', async ({ page }) 
 	await expect(page.locator('.import-card')).toContainText('Default view mode');
 	await expect(page.locator('.import-card')).toContainText('Editing view');
 	await expect(page.locator('.import-card')).toContainText('Source mode');
+	await expect(page.locator('.import-card')).toContainText('Delete confirmation');
 	await expect(page.locator('.import-card')).toContainText('Update links on rename');
 	await expect(page.locator('.import-card')).toContainText('Disabled in Obsidian');
 	await expect(page.locator('.import-card')).not.toContainText('do-not-render-this-app-config-value');
@@ -1473,6 +1484,42 @@ test('delete note command uses an in-app confirmation dialog', async ({ page, re
 	await expect(dialog).toBeVisible();
 	await dialog.getByRole('button', { name: 'Delete' }).click();
 	await expect.poll(() => fs.existsSync(abs)).toBe(false);
+});
+
+test('note deletes honor Obsidian promptDelete false', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-prompt-delete-note-vault');
+	const notePath = 'Skip Delete Prompt.md';
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({ promptDelete: false }));
+	fs.writeFileSync(path.join(vaultDir, notePath), '# Skip Delete Prompt\n\nTemporary note.\n');
+
+	const registered = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Prompt Delete Note Vault', path: vaultDir }
+	});
+	expect(registered.ok(), await registered.text()).toBe(true);
+	const { vault } = await registered.json() as { vault: { id: string } };
+	const preference = await request.get(`/api/vaults/${vault.id}/delete-preferences`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toEqual({
+		confirmDeletes: false,
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	const file = page.locator('.file-link').filter({ hasText: 'Skip Delete Prompt' }).first();
+	await expect(file).toBeVisible();
+	await file.click({ button: 'right' });
+	const deleteResponse = page.waitForResponse((response) =>
+		response.url().includes(`/api/vaults/${vault.id}/note`) &&
+		response.request().method() === 'DELETE'
+	);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	const deleted = await deleteResponse;
+	expect(deleted.ok(), await deleted.text()).toBe(true);
+	await expect(page.getByRole('alertdialog', { name: 'Delete note' })).toHaveCount(0);
+	await expect.poll(() => fs.existsSync(path.join(vaultDir, notePath))).toBe(false);
 });
 
 test('delete folder command confirms before removing non-empty folders', async ({ page, request }) => {

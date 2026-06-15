@@ -68,14 +68,17 @@
 	async function deleteSelected(): Promise<void> {
 		if (selected.length === 0 || deleting || renaming || moving) return;
 		const count = selected.length;
-		const confirmed = await confirmDialog({
-			title: count === 1 ? 'Delete attachment' : `Delete ${count} attachments`,
-			message: count === 1
-				? `Delete "${selected[0].path}" from this vault? Existing notes that embed it will keep the now-missing reference.`
-				: `Delete ${count} selected attachments from this vault? Existing notes that embed them will keep the now-missing references.`,
-			confirmLabel: count === 1 ? 'Delete attachment' : 'Delete attachments',
-			tone: 'danger'
-		});
+		const preference = await api.deletePreferences(vaultId).catch(() => ({ confirmDeletes: true }));
+		const confirmed = preference.confirmDeletes
+			? await confirmDialog({
+				title: count === 1 ? 'Delete attachment' : `Delete ${count} attachments`,
+				message: count === 1
+					? `Delete "${selected[0].path}" from this vault? Existing notes that embed it will keep the now-missing reference.`
+					: `Delete ${count} selected attachments from this vault? Existing notes that embed them will keep the now-missing references.`,
+				confirmLabel: count === 1 ? 'Delete attachment' : 'Delete attachments',
+				tone: 'danger'
+			})
+			: true;
 		if (!confirmed) return;
 		deleting = true;
 		error = null;

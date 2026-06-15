@@ -18,7 +18,7 @@ import {
 	obsidianPluginSummary
 } from '../src/lib/import/checklist';
 import { linkInsertion, linkToolbarButton } from '../src/lib/editor/link-insertion';
-import { editorDisplayPreference, editorLinkPreference, markdownRenderPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
+import { deleteConfirmationPreference, editorDisplayPreference, editorLinkPreference, markdownRenderPreference, preferredObsidianNewNoteFolder, readObsidianAppConfig, safeVaultFolder, shouldUpdateLinksOnRename } from '../src/lib/server/obsidian-config';
 import { dailyNotePlan, obsidianDailyTemplatePath } from '../src/lib/server/obsidian-daily';
 import { readObsidianAppearanceConfig, vaultAppearancePreference } from '../src/lib/server/obsidian-appearance';
 import { readObsidianCorePlugins, readObsidianHotkeys } from '../src/lib/server/obsidian-core';
@@ -1017,6 +1017,37 @@ test.describe('import checklist helpers', () => {
 			readableLineLength: false,
 			folding: false,
 			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+	});
+
+	test('uses Obsidian delete confirmation preference for file deletes', () => {
+		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-delete-confirmation-'));
+		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
+
+		expect(deleteConfirmationPreference(vaultDir)).toEqual({
+			confirmDeletes: true,
+			source: 'diamond-default'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ promptDelete: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'promptDelete')).toMatchObject({
+			label: 'Delete confirmation',
+			value: 'Disabled'
+		});
+		expect(deleteConfirmationPreference(vaultDir)).toEqual({
+			confirmDeletes: false,
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ promptDelete: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'promptDelete')).toMatchObject({
+			label: 'Delete confirmation',
+			value: 'Enabled'
+		});
+		expect(deleteConfirmationPreference(vaultDir)).toEqual({
+			confirmDeletes: true,
 			source: 'obsidian-app-config'
 		});
 	});

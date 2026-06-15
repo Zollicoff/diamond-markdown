@@ -446,6 +446,43 @@ test.describe('attachment uploads', () => {
 		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
 	});
 
+	test('attachment picker deletes honor Obsidian promptDelete false', async ({ page, request }) => {
+		const notePath = 'Getting Started.md';
+		const vault = await createRegisteredVault(request, 'attachment-delete-no-prompt-vault', {
+			'.obsidian/app.json': JSON.stringify({ promptDelete: false }),
+			[notePath]: '# Getting Started\n\n'
+		});
+		const uploadedBody = await uploadAttachment(request, vault.id, 'skip prompt sample.pdf', 'application/pdf', Buffer.from('%PDF-1.4\n'));
+
+		const preference = await request.get(`/api/vaults/${vault.id}/delete-preferences`);
+		expect(preference.ok(), await preference.text()).toBe(true);
+		expect(await preference.json()).toEqual({
+			confirmDeletes: false,
+			source: 'obsidian-app-config'
+		});
+
+		await page.goto(`/vault/${vault.id}/note/${encodeURIComponent(notePath)}`);
+		await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByRole('button', { name: 'Insert attachment' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Insert attachment' });
+		await dialog.getByLabel('Filter attachments').fill('skip prompt sample');
+		await dialog.getByRole('option', { name: /skip prompt sample\.pdf/ }).click();
+		await expect(dialog.getByText('1 selected')).toBeVisible();
+		const deleteResponse = page.waitForResponse((response) =>
+			response.url().includes(`/api/vaults/${vault.id}/attachment`) &&
+			response.request().method() === 'DELETE'
+		);
+		await dialog.getByRole('button', { name: 'Delete selected' }).click();
+		const deleted = await deleteResponse;
+		expect(deleted.ok(), await deleted.text()).toBe(true);
+
+		await expect(page.getByRole('alertdialog', { name: 'Delete attachment' })).toHaveCount(0);
+		await expect(dialog.getByRole('option', { name: /skip prompt sample\.pdf/ })).toHaveCount(0);
+		await expect(page.getByText('Attachment deleted')).toBeVisible();
+		await expect.poll(() => fs.existsSync(path.join(vault.dir, uploadedBody.path))).toBe(false);
+		await expect.poll(() => git(vault.dir, ['status', '--short'])).toBe('');
+	});
+
 	test('renames a selected vault attachment from the picker', async ({ page, request }) => {
 		const notePath = 'Getting Started.md';
 		const vault = await createRegisteredVault(request, 'attachment-rename-picker-vault', {

@@ -58,6 +58,7 @@ export interface ObsidianAppConfigInfo {
 	strictLineBreaks?: boolean;
 	defaultViewMode?: string;
 	livePreview?: boolean;
+	promptDelete?: boolean;
 	defaultMode?: NoteViewMode;
 	trashOption?: string;
 	settings: ObsidianAppConfigSetting[];
@@ -240,6 +241,11 @@ export interface EditorDisplayPreference {
 	readableLineLength: boolean;
 	folding: boolean;
 	defaultMode: NoteViewMode;
+	source: 'obsidian-app-config' | 'diamond-default';
+}
+
+export interface DeleteConfirmationPreference {
+	confirmDeletes: boolean;
 	source: 'obsidian-app-config' | 'diamond-default';
 }
 

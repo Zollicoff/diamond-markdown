@@ -471,6 +471,10 @@ Use small, pushable slices:
 - **Obsidian strict-line-break preference.** Honor `.obsidian/app.json`
   `strictLineBreaks` for Read mode, hover previews, and static publish output,
   preserving Diamond's strict default when the setting is absent.
+- **Obsidian delete-confirmation preference.** Honor `.obsidian/app.json`
+  `promptDelete: false` for note, Canvas file, folder, and attachment delete
+  confirmation dialogs while keeping confirmation enabled by default and for
+  Canvas node/edge edit deletions.
 - **Obsidian local-trash preference.** Honor `.obsidian/app.json`
   `trashOption: "local"` by moving deleted notes, Canvas files, folders, and
   attachments into the vault `.trash/` folder while keeping active tree/search

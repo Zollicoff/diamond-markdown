@@ -6,6 +6,7 @@ import type {
 	EditorLinkPreference,
 	JsonFileStatus,
 	MarkdownRenderPreference,
+	DeleteConfirmationPreference,
 	NoteViewMode,
 	ObsidianAppConfigInfo,
 	ObsidianAppConfigSetting,
@@ -382,6 +383,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		}
 	}
 
+	const promptDelete = booleanValue(body.promptDelete);
+	if (promptDelete !== null) {
+		base.promptDelete = promptDelete;
+		base.settings.push(setting(
+			'promptDelete',
+			'Delete confirmation',
+			promptDelete ? 'Enabled' : 'Disabled',
+			promptDelete
+				? 'Diamond asks for confirmation before deleting notes, Canvas files, folders, and attachments in this imported vault.'
+				: 'Diamond skips the extra delete confirmation dialog for notes, Canvas files, folders, and attachments in this imported vault.'
+		));
+	}
+
 	const trashOption = stringValue(body.trashOption);
 	if (trashOption) {
 		base.trashOption = trashOption;
@@ -430,6 +444,14 @@ export function markdownRenderPreference(root: string): MarkdownRenderPreference
 		strictLineBreaks,
 		softLineBreaks: !strictLineBreaks,
 		source: config.strictLineBreaks === undefined ? 'diamond-default' : 'obsidian-app-config'
+	};
+}
+
+export function deleteConfirmationPreference(root: string): DeleteConfirmationPreference {
+	const config = readObsidianAppConfig(root);
+	return {
+		confirmDeletes: config.promptDelete !== false,
+		source: config.promptDelete === undefined ? 'diamond-default' : 'obsidian-app-config'
 	};
 }
 

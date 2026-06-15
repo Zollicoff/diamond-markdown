@@ -19,6 +19,12 @@ async function promptPath(title: string, label: string, confirmLabel: string, pl
 	return promptText({ title, label, placeholder, confirmLabel });
 }
 
+async function confirmVaultDelete(vaultId: string | undefined, options: Parameters<typeof confirmDialog>[0]): Promise<boolean> {
+	if (!vaultId) return false;
+	const preference = await api.deletePreferences(vaultId).catch(() => ({ confirmDeletes: true }));
+	return preference.confirmDeletes ? confirmDialog(options) : true;
+}
+
 function markdownNode(ctx: CommandContext): TreeNode | null {
 	const node = ctx.node;
 	if (!node || node.type !== 'file') return null;
@@ -92,7 +98,7 @@ export function registerFsCommands(): void {
 			const node = markdownNode(ctx);
 			if (!node) return;
 			const { vaultId } = ctx;
-			if (!(await confirmDialog({
+			if (!(await confirmVaultDelete(vaultId, {
 				title: 'Delete note',
 				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
 				confirmLabel: 'Delete',
@@ -130,7 +136,7 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			const node = canvasNode(ctx);
 			if (!node) return;
-			if (!(await confirmDialog({
+			if (!(await confirmVaultDelete(ctx.vaultId, {
 				title: 'Delete Canvas',
 				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
 				confirmLabel: 'Delete',
@@ -156,7 +162,7 @@ export function registerFsCommands(): void {
 			const msg = force
 				? `Delete folder "${ctx.node.path}" and everything inside it?`
 				: `Delete empty folder "${ctx.node.path}"?`;
-			if (!(await confirmDialog({
+			if (!(await confirmVaultDelete(ctx.vaultId, {
 				title: force ? 'Delete folder and contents' : 'Delete folder',
 				message: msg,
 				confirmLabel: 'Delete',

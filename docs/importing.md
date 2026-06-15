@@ -26,7 +26,8 @@ an existing Obsidian vault. The preflight reports:
 - supported `.obsidian/app.json` settings, including safe attachment folder,
   new-note folder, link style, link-update preference, link format,
   line-number display, spellcheck, tab size, readable line length, strict
-  line-break rendering, initial view mode, and trash preference
+  line-break rendering, initial view mode, delete confirmation, and trash
+  preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
@@ -59,7 +60,8 @@ integer `tabSize` values from 1 to 16 for editor indentation and tab rendering,
 `foldHeading` / `foldIndent` for editor fold controls,
 `strictLineBreaks` for Read mode, hover-preview, and static-publish line-break
 rendering, `defaultViewMode` plus `livePreview` for the initial note view mode,
-`alwaysUpdateLinks` for note/folder rename and move operations, and
+`alwaysUpdateLinks` for note/folder rename and move operations, `promptDelete`
+for note, Canvas file, folder, and attachment delete confirmation dialogs, and
 `trashOption: "local"` for portable vault-local delete-to-trash behavior.
 Explicit folder context actions such as New note here still use the selected
 folder. Other app settings such as `newLinkFormat` and non-local trash modes
