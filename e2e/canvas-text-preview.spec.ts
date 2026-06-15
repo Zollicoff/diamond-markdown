@@ -9,6 +9,11 @@ import {
 	canvasTextPreviewBlocks,
 	canvasTextPreviewInlines
 } from '../src/lib/canvas/text-preview';
+import {
+	canvasMarkdownInlineSyntaxCandidate,
+	canvasMarkdownLinkDestination,
+	safeDecodeCanvasMarkdownUri
+} from '../src/lib/canvas/markdown-destinations';
 
 const noteTargets = [
 	{ path: 'Home.md', title: 'Home', aliases: ['Launch Base'], stem: 'home' },
@@ -21,6 +26,38 @@ const noteTargets = [
 ];
 
 test.describe('canvas text preview helpers', () => {
+	test('scans balanced Canvas Markdown destinations', () => {
+		expect(
+			canvasMarkdownInlineSyntaxCandidate(
+				'Inline ![Roof south|90](../Images/roof (south).svg#diagram) stays',
+				true
+			)
+		).toEqual({
+			index: 7,
+			raw: '![Roof south|90](../Images/roof (south).svg#diagram)',
+			label: 'Roof south|90',
+			href: '../Images/roof (south).svg#diagram'
+		});
+
+		const link = canvasMarkdownInlineSyntaxCandidate('Skip ![image](roof.svg), use [Note](Home.md#Plan)', false);
+		expect(link).toMatchObject({
+			raw: '[Note](Home.md#Plan)',
+			label: 'Note',
+			href: 'Home.md#Plan'
+		});
+		expect(link?.index).toBeGreaterThan(0);
+
+		expect(canvasMarkdownLinkDestination('<../Images/roof photo.svg#diagram> "Roof"')).toBe(
+			'../Images/roof photo.svg#diagram'
+		);
+		expect(canvasMarkdownLinkDestination('../Images/roof (south).svg#diagram')).toBe(
+			'../Images/roof (south).svg#diagram'
+		);
+		expect(canvasMarkdownLinkDestination('<../Images/roof photo.svg#diagram> unquoted title')).toBeNull();
+		expect(safeDecodeCanvasMarkdownUri('References/Roof%20Photos.md#Meter')).toBe('References/Roof Photos.md#Meter');
+		expect(safeDecodeCanvasMarkdownUri('References/%E0%A4%A.md')).toBe('References/%E0%A4%A.md');
+	});
+
 	test('parses inline marks, explicit links, and resolved note aliases', () => {
 		expect(canvasTextPreviewInlines('Use **bill** with *roof* ~~old plan~~ ==priority== `photo` [[Home|label]] [site](https://example.com)')).toEqual([
 			{ kind: 'text', text: 'Use ' },

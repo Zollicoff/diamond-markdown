@@ -104,6 +104,10 @@ Use small, pushable slices:
 - **Markdown image asset compatibility.** Resolve standard Markdown image links
    relative to their source note, preserve Obsidian-style alt/size metadata, and
    copy local image assets during static publish.
+- **Canvas Markdown destination helper extraction.** Move balanced Markdown
+   link/image destination scanning for Canvas text previews into a pure helper
+   module with direct coverage for parenthesized paths, angle destinations,
+   titles, and safe URI decoding.
 - **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
    and file embeds from vault-local assets and copy non-image attachments into
    static publish output.
