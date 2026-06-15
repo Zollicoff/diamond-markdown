@@ -7,7 +7,8 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
+import type { Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
+import { attachmentsApi } from './api/attachments';
 import { canvasApi } from './api/canvas';
 import { pluginsApi } from './api/plugins';
 import { json } from './api/request';
@@ -100,64 +101,12 @@ export const api = {
 		return { sha: res.sha };
 	},
 
+	...attachmentsApi,
+
 	async deleteNote(vaultId: string, path: string): Promise<void> {
 		await json(`/api/vaults/${vaultId}/note?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
 		emit('note:deleted', { vaultId, path });
 		emit('tree:invalidate', { vaultId });
-	},
-
-	async uploadAttachment(vaultId: string, file: File): Promise<AttachmentUploadResult> {
-		const form = new FormData();
-		form.append('file', file);
-		const res = await json<AttachmentUploadResult>(`/api/vaults/${vaultId}/attachment`, {
-			method: 'POST',
-			body: form
-		});
-		emit('tree:invalidate', { vaultId });
-		return res;
-	},
-
-	async attachments(vaultId: string): Promise<AttachmentRef[]> {
-		const res = await json<{ attachments: AttachmentRef[] }>(`/api/vaults/${vaultId}/attachment`);
-		return res.attachments ?? [];
-	},
-
-	async deleteAttachment(vaultId: string, path: string): Promise<void> {
-		await json(`/api/vaults/${vaultId}/attachment?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
-		emit('tree:invalidate', { vaultId });
-	},
-
-	async renameAttachment(
-		vaultId: string,
-		from: string,
-		to: string
-	): Promise<{ from: string; to: string; linksUpdated: number; touched: string[]; sha: string | null }> {
-		const res = await json<{ from: string; to: string; linksUpdated: number; touched: string[]; sha: string | null }>(
-			`/api/vaults/${vaultId}/attachment`,
-			{
-				method: 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ from, to })
-			}
-		);
-		for (const path of res.touched) {
-			emit('note:saved', { vaultId, path, sha: res.sha });
-		}
-		emit('tree:invalidate', { vaultId });
-		return res;
-	},
-
-	async moveAttachments(vaultId: string, paths: string[], folder: string): Promise<AttachmentMoveResult> {
-		const res = await json<AttachmentMoveResult>(`/api/vaults/${vaultId}/attachment`, {
-			method: 'PATCH',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ paths, folder })
-		});
-		for (const path of res.touched) {
-			emit('note:saved', { vaultId, path, sha: res.sha });
-		}
-		emit('tree:invalidate', { vaultId });
-		return res;
 	},
 
 	async renameNote(vaultId: string, from: string, to: string): Promise<{ linksUpdated: number; touched: string[]; sha: string | null }> {
