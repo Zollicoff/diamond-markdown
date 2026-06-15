@@ -14,6 +14,7 @@ import {
 	canvasMarkdownLinkDestination,
 	safeDecodeCanvasMarkdownUri
 } from '../src/lib/canvas/markdown-destinations';
+import { canvasTextTablePreviewAt } from '../src/lib/canvas/text-preview-tables';
 import {
 	canvasTextInternalTarget,
 	canvasTextMarkdownReference,
@@ -305,6 +306,62 @@ test.describe('canvas text preview helpers', () => {
 			}
 		});
 		expect(blocks[7]).toEqual({ type: 'code', language: 'txt', code: 'main panel' });
+	});
+
+	test('parses Canvas table helpers with alignment, padding, and escaped pipes', () => {
+		const table = canvasTextTablePreviewAt(
+			[
+				'| Step | Owner | Status |',
+				'| :--- | :---: | ---: |',
+				'| Utility \\| meter | [[Sandy]] | **ready** |',
+				'| Bill only |',
+				'| Extra | Center | Right | ignored |',
+				'after table'
+			],
+			0,
+			canvasTextPreviewInlines
+		);
+
+		expect(table).toEqual({
+			nextIndex: 5,
+			table: {
+				headers: [
+					{ inline: [{ kind: 'text', text: 'Step' }], align: 'left' },
+					{ inline: [{ kind: 'text', text: 'Owner' }], align: 'center' },
+					{ inline: [{ kind: 'text', text: 'Status' }], align: 'right' }
+				],
+				rows: [
+					[
+						{ inline: [{ kind: 'text', text: 'Utility | meter' }], align: 'left' },
+						{ inline: [{ kind: 'wikilink', text: 'Sandy' }], align: 'center' },
+						{ inline: [{ kind: 'strong', text: 'ready' }], align: 'right' }
+					],
+					[
+						{ inline: [{ kind: 'text', text: 'Bill only' }], align: 'left' },
+						{ inline: [], align: 'center' },
+						{ inline: [], align: 'right' }
+					],
+					[
+						{ inline: [{ kind: 'text', text: 'Extra' }], align: 'left' },
+						{ inline: [{ kind: 'text', text: 'Center' }], align: 'center' },
+						{ inline: [{ kind: 'text', text: 'Right' }], align: 'right' }
+					]
+				]
+			}
+		});
+
+		expect(canvasTextTablePreviewAt(['| One |', '| --- |'], 0, canvasTextPreviewInlines)).toBeNull();
+		expect(canvasTextPreviewBlocks('| Step | Owner |\n| --- | --- |\n| Bill only |')[0]).toMatchObject({
+			type: 'table',
+			table: {
+				rows: [
+					[
+						{ inline: [{ kind: 'text', text: 'Bill only' }] },
+						{ inline: [] }
+					]
+				]
+			}
+		});
 	});
 
 	test('hides Obsidian comments in Canvas text previews outside code', () => {

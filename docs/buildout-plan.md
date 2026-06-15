@@ -128,6 +128,10 @@ Use small, pushable slices:
 - **Canvas text-card escaped table pipes.** Preserve escaped pipe characters
    (`\|`) inside Canvas text-card Markdown table cells while still splitting on
    real column delimiters, with parser and browser coverage.
+- **Canvas table parser extraction.** Move Canvas text-card table scanning,
+   alignment, escaped-pipe handling, and padded missing-cell behavior into a
+   pure helper with direct coverage, keeping the main text-preview parser
+   focused on block orchestration.
 - **Canvas text-card escaped inline punctuation.** Keep backslash-escaped
    Markdown inline punctuation literal in Canvas text-card previews, including
    escaped emphasis/link/image/wikilink openers, while preserving real
@@ -580,8 +584,8 @@ Use small, pushable slices:
   while leaving raw card text editable.
 - **Canvas text-card tables.** Render simple Markdown pipe tables in the
   lightweight Canvas text-card preview, with separator alignment, inline
-  formatting inside cells, escaped pipe characters, and compact overflow
-  handling.
+  formatting inside cells, escaped pipe characters, padded missing body cells,
+  and compact overflow handling.
 - **Canvas text-card highlight and strikethrough.** Render Obsidian-style
   `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
   lightweight Canvas text-card preview while leaving the raw card text editable.

@@ -19,15 +19,21 @@ import {
 	splitCanvasWikilinkTarget
 } from '$lib/canvas/text-preview-references';
 import type { CanvasTextInlineTarget } from '$lib/canvas/text-preview-references';
+import { canvasTextTablePreviewAt } from '$lib/canvas/text-preview-tables';
+import type { CanvasTextPreviewTable } from '$lib/canvas/text-preview-tables';
 import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 export type { CanvasTextInlineTarget } from '$lib/canvas/text-preview-references';
+export type {
+	CanvasTextPreviewTable,
+	CanvasTextPreviewTableAlignment,
+	CanvasTextPreviewTableCell
+} from '$lib/canvas/text-preview-tables';
 
 export type CanvasTextEmbedKind = CanvasFileAssetKind | 'note' | 'canvas';
 
 export type CanvasTextPreviewInlineKind = 'text' | 'strong' | 'emphasis' | 'strikethrough' | 'highlight' | 'code' | 'wikilink' | 'link' | 'image';
 export type CanvasTextPreviewCalloutFold = 'open' | 'closed' | null;
-export type CanvasTextPreviewTableAlignment = 'left' | 'center' | 'right' | null;
 
 export interface CanvasTextPreviewInline {
 	kind: CanvasTextPreviewInlineKind;
@@ -52,16 +58,6 @@ export interface CanvasTextPreviewOptions {
 export interface CanvasTextPreviewListItem {
 	inline: CanvasTextPreviewInline[];
 	checked?: boolean;
-}
-
-export interface CanvasTextPreviewTableCell {
-	inline: CanvasTextPreviewInline[];
-	align: CanvasTextPreviewTableAlignment;
-}
-
-export interface CanvasTextPreviewTable {
-	headers: CanvasTextPreviewTableCell[];
-	rows: CanvasTextPreviewTableCell[][];
 }
 
 export interface CanvasTextPreviewEmbed {
@@ -209,7 +205,7 @@ export function canvasTextPreviewBlocks(text: string, options: CanvasTextPreview
 			continue;
 		}
 
-		const table = canvasTablePreviewAt(lines, index, options);
+		const table = canvasTextTablePreviewAt(lines, index, (value) => canvasTextPreviewInlines(value, options));
 		if (table) {
 			flushParagraph();
 			flushList();
@@ -371,105 +367,6 @@ function canvasCalloutTitle(kind: string, title: string | undefined): string {
 function isCanvasThematicBreak(line: string): boolean {
 	const trimmed = line.trim();
 	return /^([-*_])(?:\s*\1){2,}\s*$/.test(trimmed);
-}
-
-function canvasTablePreviewAt(
-	lines: string[],
-	index: number,
-	options: CanvasTextPreviewOptions
-): { table: CanvasTextPreviewTable; nextIndex: number } | null {
-	const header = canvasTableRow(lines[index]);
-	const alignments = canvasTableSeparator(lines[index + 1]);
-	if (!header || !alignments || header.length < 2) return null;
-
-	const columnCount = header.length;
-	const rows: CanvasTextPreviewTableCell[][] = [];
-	let nextIndex = index + 2;
-	while (nextIndex < lines.length) {
-		const row = canvasTableRow(lines[nextIndex]);
-		if (!row) break;
-		rows.push(canvasTableCells(row, columnCount, options, alignments));
-		nextIndex += 1;
-	}
-
-	return {
-		table: {
-			headers: canvasTableCells(header, columnCount, options, alignments),
-			rows
-		},
-		nextIndex
-	};
-}
-
-function canvasTableRow(line: string | undefined): string[] | null {
-	if (!line || !line.includes('|')) return null;
-	const trimmed = line.trim();
-	if (!trimmed || /^[-:|\s]+$/.test(trimmed)) return null;
-	const cells = canvasTableSplitCells(trimmed).map((cell) => cell.trim());
-	return cells.length >= 2 ? cells : null;
-}
-
-function canvasTableSeparator(line: string | undefined): CanvasTextPreviewTableAlignment[] | null {
-	if (!line || !line.includes('|')) return null;
-	const cells = canvasTableSplitCells(line.trim()).map((cell) => cell.trim());
-	if (cells.length < 2) return null;
-	const alignments: CanvasTextPreviewTableAlignment[] = [];
-	for (const cell of cells) {
-		if (!/^:?-{3,}:?$/.test(cell)) return null;
-		const left = cell.startsWith(':');
-		const right = cell.endsWith(':');
-		alignments.push(left && right ? 'center' : right ? 'right' : left ? 'left' : null);
-	}
-	return alignments;
-}
-
-function canvasTableSplitCells(row: string): string[] {
-	const body = canvasTableBody(row);
-	const cells: string[] = [];
-	let cell = '';
-	for (let index = 0; index < body.length; index += 1) {
-		const char = body[index];
-		if (char === '|' && !canvasPipeEscaped(body, index)) {
-			cells.push(cell);
-			cell = '';
-			continue;
-		}
-		if (char === '|' && canvasPipeEscaped(body, index)) {
-			cell = cell.slice(0, -1) + '|';
-			continue;
-		}
-		cell += char;
-	}
-	cells.push(cell);
-	return cells;
-}
-
-function canvasTableBody(row: string): string {
-	let start = 0;
-	let end = row.length;
-	if (row[start] === '|') start += 1;
-	if (end > start && row[end - 1] === '|' && !canvasPipeEscaped(row, end - 1)) end -= 1;
-	return row.slice(start, end);
-}
-
-function canvasPipeEscaped(value: string, pipeIndex: number): boolean {
-	let slashCount = 0;
-	for (let index = pipeIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
-		slashCount += 1;
-	}
-	return slashCount % 2 === 1;
-}
-
-function canvasTableCells(
-	values: string[],
-	columnCount: number,
-	options: CanvasTextPreviewOptions,
-	alignments: CanvasTextPreviewTableAlignment[] = []
-): CanvasTextPreviewTableCell[] {
-	return Array.from({ length: columnCount }, (_, index) => ({
-		inline: canvasTextPreviewInlines(values[index] ?? '', options),
-		align: alignments[index] ?? null
-	}));
 }
 
 function canvasImageSizeSpec(raw: string): Pick<CanvasTextPreviewEmbed, 'width' | 'height'> | null {

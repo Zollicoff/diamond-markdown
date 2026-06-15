@@ -212,7 +212,7 @@ markdown-aware preview while preserving the raw editable text.
 Canvas text cards preview common Markdown plus H1-H6 headings, thematic
 breaks, hidden Obsidian comments, Obsidian callout blocks, highlights,
 strikethrough, backslash-escaped inline punctuation, aligned simple Markdown
-tables with escaped pipes, resolved note/title/alias inline wikilinks such as
+tables with escaped pipes and padded missing body cells, resolved note/title/alias inline wikilinks such as
 `[[Survey Photos#Meter|site photos]]` and
 `[[Home.md#Install Steps|Launch link]]`, explicit Canvas links such as
 `[[Boards/Map.canvas|Map board]]`, resolved note embed chips such as

@@ -112,7 +112,7 @@ runtime compatibility is a non-goal.
 - **Deeper Canvas parity.** Canvas previews, zoom controls, markdown-aware text
   cards with H1-H6 headings, thematic breaks, callouts, highlights,
   strikethrough, backslash-escaped inline punctuation, aligned simple tables
-  with escaped pipes, resolved note/title/alias inline wikilinks and
+  with escaped pipes and padded missing body cells, resolved note/title/alias inline wikilinks and
   source-relative/vault-root Markdown note/Canvas links and asset embeds,
   including parenthesized filenames, note embed chips, explicit Canvas links
   and embed chips, Markdown file-card note previews, file-card subpaths, SVG
