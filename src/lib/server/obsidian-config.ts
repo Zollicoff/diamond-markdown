@@ -252,6 +252,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const showInlineTitle = booleanValue(body.showInlineTitle);
+	if (showInlineTitle !== null) {
+		base.showInlineTitle = showInlineTitle;
+		base.settings.push(setting(
+			'showInlineTitle',
+			'Inline note title',
+			showInlineTitle ? 'Visible' : 'Hidden',
+			showInlineTitle
+				? 'Diamond shows the note file title above the editor and reading surface for this imported vault.'
+				: 'Diamond keeps the note title in the pane chrome instead of repeating it above the note body.'
+		));
+	}
+
 	const spellcheck = booleanValue(body.spellcheck);
 	if (spellcheck !== null) {
 		base.spellcheck = spellcheck;
@@ -399,11 +412,12 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 	const defaultMode = config.defaultMode ?? 'live';
 	return {
 		lineNumbers: config.showLineNumber !== false,
+		showInlineTitle: config.showInlineTitle === true,
 		spellcheck: config.spellcheck === true,
 		tabSize: config.tabSize ?? 4,
 		readableLineLength: config.readableLineLength === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined
+		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

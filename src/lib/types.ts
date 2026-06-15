@@ -49,6 +49,7 @@ export interface ObsidianAppConfigInfo {
 	alwaysUpdateLinks?: boolean;
 	newLinkFormat?: string;
 	showLineNumber?: boolean;
+	showInlineTitle?: boolean;
 	spellcheck?: boolean;
 	tabSize?: number;
 	readableLineLength?: boolean;
@@ -231,6 +232,7 @@ export interface EditorLinkPreference {
 
 export interface EditorDisplayPreference {
 	lineNumbers: boolean;
+	showInlineTitle: boolean;
 	spellcheck: boolean;
 	tabSize: number;
 	readableLineLength: boolean;

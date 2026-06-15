@@ -755,13 +755,14 @@ test.describe('import checklist helpers', () => {
 		});
 	});
 
-	test('uses Obsidian line-number preference for editor display', () => {
+	test('uses Obsidian editor display preferences', () => {
 		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-editor-display-'));
 		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
 
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -776,6 +777,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: false,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -786,6 +788,37 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: true }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ showInlineTitle: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showInlineTitle')).toMatchObject({
+			label: 'Inline note title',
+			value: 'Visible'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: true,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ showInlineTitle: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showInlineTitle')).toMatchObject({
+			label: 'Inline note title',
+			value: 'Hidden'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -800,6 +833,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: true,
 			tabSize: 4,
 			readableLineLength: false,
@@ -810,6 +844,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ spellcheck: false }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -824,6 +859,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 8,
 			readableLineLength: false,
@@ -840,6 +876,7 @@ test.describe('import checklist helpers', () => {
 		expect(unsafeTabSize.warnings).toContain("Obsidian tabSize is outside Diamond's supported range and will be ignored.");
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -854,6 +891,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: true,
@@ -864,6 +902,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ readableLineLength: false }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -878,6 +917,7 @@ test.describe('import checklist helpers', () => {
 		});
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -888,6 +928,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: false }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
@@ -898,6 +939,7 @@ test.describe('import checklist helpers', () => {
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: true }));
 		expect(editorDisplayPreference(vaultDir)).toEqual({
 			lineNumbers: true,
+			showInlineTitle: false,
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,

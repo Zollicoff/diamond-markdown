@@ -1321,12 +1321,13 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 	expect(text).not.toContain('MARK:[[]]');
 });
 
-test('editor display honors Obsidian line-number preference', async ({ page, request }) => {
+test('editor display honors Obsidian app preferences', async ({ page, request }) => {
 	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-editor-display-vault');
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
 		showLineNumber: false,
+		showInlineTitle: true,
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true
@@ -1343,6 +1344,7 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	expect(preference.ok(), await preference.text()).toBe(true);
 	expect(await preference.json()).toEqual({
 		lineNumbers: false,
+		showInlineTitle: true,
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
@@ -1351,6 +1353,9 @@ test('editor display honors Obsidian line-number preference', async ({ page, req
 	});
 
 	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	const inlineTitle = page.locator('.inline-title').first();
+	await expect(inlineTitle).toBeVisible({ timeout: 10_000 });
+	await expect(inlineTitle).toHaveText('Home');
 	const editorHost = page.locator('.editor').first();
 	await expect(editorHost).toHaveClass(/readable-line-length/, { timeout: 10_000 });
 	const editor = editorHost.locator('.cm-editor').first();
@@ -1381,6 +1386,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 	expect(preference.ok(), await preference.text()).toBe(true);
 	expect(await preference.json()).toEqual({
 		lineNumbers: true,
+		showInlineTitle: false,
 		spellcheck: false,
 		tabSize: 4,
 		readableLineLength: true,

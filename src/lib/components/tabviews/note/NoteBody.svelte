@@ -3,6 +3,7 @@
 	import type { LinkResolver } from '$lib/editor/live-preview';
 	import type { EditorLinkStyle, NoteDoc, NoteViewMode } from '$lib/types';
 	import type { NoteViewComponent } from '$lib/note/lazy-components';
+	import { noteTitleFromPath } from '$lib/note/view';
 
 	interface Props {
 		vaultId: string;
@@ -10,6 +11,7 @@
 		mode: NoteViewMode;
 		linkStyle: EditorLinkStyle;
 		showLineNumbers: boolean;
+		showInlineTitle: boolean;
 		spellcheck: boolean;
 		tabSize: number;
 		readableLineLength: boolean;
@@ -38,6 +40,7 @@
 		mode,
 		linkStyle,
 		showLineNumbers,
+		showInlineTitle,
 		spellcheck,
 		tabSize,
 		readableLineLength,
@@ -59,6 +62,8 @@
 		onEditorReady,
 		onAttachExisting
 	}: Props = $props();
+
+	const inlineTitle = $derived(doc ? noteTitleFromPath(doc.path) : '');
 </script>
 
 {#if mode !== 'read' && ToolbarView}
@@ -71,7 +76,11 @@
 	</div>
 {/if}
 
-<div class="body">
+{#if doc && showInlineTitle}
+	<div class="inline-title" aria-label="Note title">{inlineTitle}</div>
+{/if}
+
+<div class="body" class:inline-title-visible={doc && showInlineTitle}>
 	{#if !doc}
 		<div class="loading">Loading...</div>
 	{:else if viewLoadError}
@@ -111,6 +120,21 @@
 		background: var(--bg-elev);
 		color: var(--fg-dim);
 		font-size: 0.82rem;
+	}
+	.inline-title {
+		padding: 24px 48px 8px;
+		color: var(--fg);
+		font-family: var(--sans);
+		font-size: 2rem;
+		font-weight: 800;
+		line-height: 1.12;
+		border-bottom: 1px solid transparent;
+	}
+	.body.inline-title-visible :global(.preview) {
+		padding-top: 16px;
+	}
+	.body.inline-title-visible :global(.cm-content) {
+		padding-top: 16px;
 	}
 	.loading { padding: 2rem; color: var(--fg-dim); }
 	.loading.err { color: var(--danger); }

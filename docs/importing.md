@@ -51,12 +51,13 @@ attachments, a safe `newFileLocation: "folder"` plus `newFileFolderPath` as the
 default destination for generic New Note commands, `useMarkdownLinks` for the
 editor link button's inserted syntax, local Markdown note links for navigation,
 backlinks, and static publish output, `showLineNumber` for the editor
-line-number gutter, `spellcheck` for the markdown editor's browser spellcheck
-attribute, safe integer `tabSize` values from 1 to 16 for editor indentation
-and tab rendering, `readableLineLength` for narrowing editor and reading
-surfaces, `strictLineBreaks` for Read mode, hover-preview, and static-publish
-line-break rendering, `defaultViewMode` plus `livePreview` for the initial note
-view mode, `alwaysUpdateLinks` for note/folder rename and move operations, and
+line-number gutter, `showInlineTitle` for the note-body file title row,
+`spellcheck` for the markdown editor's browser spellcheck attribute, safe
+integer `tabSize` values from 1 to 16 for editor indentation and tab rendering,
+`readableLineLength` for narrowing editor and reading surfaces,
+`strictLineBreaks` for Read mode, hover-preview, and static-publish line-break
+rendering, `defaultViewMode` plus `livePreview` for the initial note view mode,
+`alwaysUpdateLinks` for note/folder rename and move operations, and
 `trashOption: "local"` for portable vault-local delete-to-trash behavior.
 Explicit folder context actions such as New note here still use the selected
 folder. Other app settings such as `newLinkFormat` and non-local trash modes

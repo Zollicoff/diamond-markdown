@@ -69,6 +69,7 @@
 	let spellcheck = $state(false);
 	let tabSize = $state(4);
 	let readableLineLength = $state(false);
+	let showInlineTitle = $state(false);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -116,6 +117,7 @@
 		const id = vaultId;
 		untrack(() => {
 			showLineNumbers = true;
+			showInlineTitle = false;
 			spellcheck = false;
 			tabSize = 4;
 			readableLineLength = false;
@@ -123,6 +125,7 @@
 				.then((preference) => {
 					if (id === vaultId) {
 						showLineNumbers = preference.lineNumbers;
+						showInlineTitle = preference.showInlineTitle;
 						spellcheck = preference.spellcheck;
 						tabSize = preference.tabSize;
 						readableLineLength = preference.readableLineLength;
@@ -131,6 +134,7 @@
 				.catch(() => {
 					if (id === vaultId) {
 						showLineNumbers = true;
+						showInlineTitle = false;
 						spellcheck = false;
 						tabSize = 4;
 						readableLineLength = false;
@@ -375,6 +379,7 @@
 		{mode}
 		{linkStyle}
 		{showLineNumbers}
+		{showInlineTitle}
 		{spellcheck}
 		{tabSize}
 		{readableLineLength}

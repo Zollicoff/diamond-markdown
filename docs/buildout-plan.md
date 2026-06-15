@@ -561,6 +561,10 @@ Use small, pushable slices:
 - **Obsidian highlight rendering.** Render paired `==highlight==` spans in
   Live Preview, Read mode, and static publish, preserving nested inline markdown
   and leaving code literals unchanged.
+- **Obsidian inline-title preference.** Honor `.obsidian/app.json`
+  `showInlineTitle` by showing the note file title above the editor and
+  reading surface for imported vaults that request it, while keeping Diamond's
+  existing chrome-only title behavior when the setting is absent or disabled.
 
 ## Next Implementation Slices
 
