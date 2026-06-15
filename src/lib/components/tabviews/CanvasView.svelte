@@ -70,7 +70,8 @@
 	} from '$lib/canvas/pointer-session';
 	import {
 		CanvasLinkTargetRequestQueue,
-		isCanvasLinkTargetRefreshEvent
+		refreshCanvasLinkTargets,
+		refreshCanvasLinkTargetsForVaultEvent
 	} from '$lib/canvas/link-targets';
 	import {
 		CanvasNotePreviewRequestQueue,
@@ -153,8 +154,9 @@
 	const resolveEmbedTarget = $derived(canvasTextNoteEmbedResolver(linkTargets));
 
 	async function loadLinkTargets(): Promise<void> {
-		const result = await linkTargetRequests.load(vaultId, api.linkTargets);
-		if (linkTargetRequests.isCurrent(result)) linkTargets = result.targets;
+		await refreshCanvasLinkTargets(linkTargetRequests, vaultId, api.linkTargets, (targets) => {
+			linkTargets = targets;
+		});
 	}
 
 	async function loadNotePreviews(paths: string[] = canvasNotePreviewPaths(doc?.nodes ?? [])): Promise<void> {
@@ -640,7 +642,7 @@
 
 	$effect(() => {
 		const refresh = (event: { vaultId: string }): void => {
-			if (isCanvasLinkTargetRefreshEvent(vaultId, event)) void loadLinkTargets();
+			refreshCanvasLinkTargetsForVaultEvent(vaultId, event, loadLinkTargets);
 		};
 		const refreshPreviews = (event: { vaultId: string }): void => {
 			if (event.vaultId === vaultId) void loadNotePreviews();

@@ -12,6 +12,9 @@ export interface CanvasLinkTargetRefreshEvent {
 	vaultId: string;
 }
 
+export type CanvasLinkTargetApplier = (targets: NoteLinkTarget[]) => void;
+export type CanvasLinkTargetLoader = () => void | Promise<void>;
+
 export class CanvasLinkTargetRequestQueue {
 	private queue = new LatestRequestQueue();
 
@@ -25,9 +28,30 @@ export class CanvasLinkTargetRequestQueue {
 	}
 }
 
+export async function refreshCanvasLinkTargets(
+	queue: CanvasLinkTargetRequestQueue,
+	vaultId: string,
+	fetcher: CanvasLinkTargetFetcher,
+	applyTargets: CanvasLinkTargetApplier
+): Promise<CanvasLinkTargetLoadResult> {
+	const result = await queue.load(vaultId, fetcher);
+	if (queue.isCurrent(result)) applyTargets(result.targets);
+	return result;
+}
+
 export function isCanvasLinkTargetRefreshEvent(
 	vaultId: string,
 	event: CanvasLinkTargetRefreshEvent
 ): boolean {
 	return event.vaultId === vaultId;
+}
+
+export function refreshCanvasLinkTargetsForVaultEvent(
+	vaultId: string,
+	event: CanvasLinkTargetRefreshEvent,
+	loadTargets: CanvasLinkTargetLoader
+): boolean {
+	if (!isCanvasLinkTargetRefreshEvent(vaultId, event)) return false;
+	void loadTargets();
+	return true;
 }

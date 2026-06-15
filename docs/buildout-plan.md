@@ -631,8 +631,9 @@ Use small, pushable slices:
   group save state, and group delete controls into `CanvasGroupNodeEditor`.
 - **Canvas link-target refresh extraction.** Keep Canvas text-card
   note/title/alias link resolution fresh after vault note and folder mutations
-  through a tested request queue and vault-scoped refresh helper instead of
-  inline component sequence state.
+  through a tested request queue and vault-scoped refresh helper
+  (`refreshCanvasLinkTargetsForVaultEvent`) instead of inline component
+  sequence state.
 - **Canvas file-reference helper extraction.** Move Canvas file-card targets,
   vault-local asset URLs, media classification, subpath normalization, and URL
   node validation into a focused helper module while preserving the existing

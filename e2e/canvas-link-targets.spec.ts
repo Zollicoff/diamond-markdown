@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import type { NoteLinkTarget } from '../src/lib/types';
 import {
 	CanvasLinkTargetRequestQueue,
-	isCanvasLinkTargetRefreshEvent
+	isCanvasLinkTargetRefreshEvent,
+	refreshCanvasLinkTargets,
+	refreshCanvasLinkTargetsForVaultEvent
 } from '../src/lib/canvas/link-targets';
 
 function target(path: string, title: string): NoteLinkTarget {
@@ -66,8 +68,65 @@ test.describe('canvas link target loading', () => {
 		expect(queue.isCurrent(result)).toBe(true);
 	});
 
+	test('applies only current helper refresh results', async () => {
+		const queue = new CanvasLinkTargetRequestQueue();
+		const older = deferred<NoteLinkTarget[]>();
+		const newer = deferred<NoteLinkTarget[]>();
+		const applied: NoteLinkTarget[][] = [];
+
+		const olderRefresh = refreshCanvasLinkTargets(
+			queue,
+			'vault-a',
+			async () => older.promise,
+			(targets) => applied.push(targets)
+		);
+		const newerRefresh = refreshCanvasLinkTargets(
+			queue,
+			'vault-a',
+			async () => newer.promise,
+			(targets) => applied.push(targets)
+		);
+
+		newer.resolve([target('New.md', 'New')]);
+		await expect(newerRefresh).resolves.toMatchObject({ targets: [target('New.md', 'New')] });
+		expect(applied).toEqual([[target('New.md', 'New')]]);
+
+		older.resolve([target('Old.md', 'Old')]);
+		await expect(olderRefresh).resolves.toMatchObject({ targets: [target('Old.md', 'Old')] });
+		expect(applied).toEqual([[target('New.md', 'New')]]);
+	});
+
+	test('applies empty targets for current helper refresh failures', async () => {
+		const queue = new CanvasLinkTargetRequestQueue();
+		const applied: NoteLinkTarget[][] = [];
+
+		const result = await refreshCanvasLinkTargets(
+			queue,
+			'vault-a',
+			async () => {
+				throw new Error('index unavailable');
+			},
+			(targets) => applied.push(targets)
+		);
+
+		expect(result.targets).toEqual([]);
+		expect(applied).toEqual([[]]);
+	});
+
 	test('refreshes only for the active vault', () => {
 		expect(isCanvasLinkTargetRefreshEvent('vault-a', { vaultId: 'vault-a' })).toBe(true);
 		expect(isCanvasLinkTargetRefreshEvent('vault-a', { vaultId: 'vault-b' })).toBe(false);
+	});
+
+	test('runs helper refresh loaders only for active-vault events', () => {
+		const loaded: string[] = [];
+
+		expect(refreshCanvasLinkTargetsForVaultEvent('vault-a', { vaultId: 'vault-b' }, () => {
+			loaded.push('wrong');
+		})).toBe(false);
+		expect(refreshCanvasLinkTargetsForVaultEvent('vault-a', { vaultId: 'vault-a' }, () => {
+			loaded.push('active');
+		})).toBe(true);
+		expect(loaded).toEqual(['active']);
 	});
 });
