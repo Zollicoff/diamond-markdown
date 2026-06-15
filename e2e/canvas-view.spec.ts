@@ -945,7 +945,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 		'</svg>'
 	].join(''));
 	fs.writeFileSync(path.join(vaultDir, 'Docs', 'panel.pdf'), '%PDF-1.4\n');
-	fs.writeFileSync(path.join(vaultDir, 'Board.canvas'), JSON.stringify({
+	fs.writeFileSync(path.join(vaultDir, 'Boards', 'Board.canvas'), JSON.stringify({
 		nodes: [
 			{
 				id: 'a',
@@ -969,7 +969,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
 					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
-					'Markdown links [Launch markdown](Home.md#Launch Plan), [Canvas markdown](Boards/Map.canvas), and [external](https://example.com)',
+					'Markdown links [Launch markdown](../Home.md#Launch Plan), [Canvas markdown](Map.canvas), and [external](https://example.com)',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'- [ ] Missing [[Missing Alias]] stays visible',
@@ -1006,7 +1006,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 		})
 	]));
 
-	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Board.canvas')}`, { waitUntil: 'domcontentloaded' });
+	await page.goto(`/vault/${vault.id}/canvas/${encodeURI('Boards/Board.canvas')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.canvas-view')).toBeVisible({ timeout: 5_000 });
 	const preview = page.locator('.canvas-text-preview').first();
 	await expect(preview).toContainText('Launch plan');

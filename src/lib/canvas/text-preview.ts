@@ -39,6 +39,7 @@ export type CanvasTextEmbedResolver = (
 export interface CanvasTextPreviewOptions {
 	resolveWikilinkTarget?: CanvasTextWikilinkResolver;
 	resolveEmbedTarget?: CanvasTextEmbedResolver;
+	sourcePath?: string | null;
 }
 
 export interface CanvasTextPreviewListItem {
@@ -384,12 +385,17 @@ function canvasTextInlineTargetFromWikilink(target: string, label: string | unde
 	return null;
 }
 
-function canvasTextInlineFromMarkdownLink(label: string, rawHref: string): CanvasTextPreviewInline | null {
+function canvasTextInlineFromMarkdownLink(
+	label: string,
+	rawHref: string,
+	sourcePath: string | null | undefined
+): CanvasTextPreviewInline | null {
 	const text = label.trim();
 	const href = rawHref.trim();
 	if (!text || !href) return null;
 	if (/^https?:\/\/[^)\s]+$/i.test(href)) return { kind: 'link', text, href };
-	const ref = splitCanvasAssetReference(href);
+	const ref = canvasTextMarkdownReference(href, sourcePath);
+	if (!ref) return null;
 	if (/\.(md|markdown)$/i.test(ref.path)) {
 		const target = canvasTextInternalTarget('note', ref.path, ref.suffix, text);
 		return target ? { kind: 'link', text, target } : null;
@@ -399,6 +405,45 @@ function canvasTextInlineFromMarkdownLink(label: string, rawHref: string): Canva
 		return target ? { kind: 'link', text, target } : null;
 	}
 	return null;
+}
+
+function canvasTextMarkdownReference(
+	rawHref: string,
+	sourcePath: string | null | undefined
+): { path: string; suffix: string } | null {
+	let href = rawHref.trim();
+	if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1).trim();
+	if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href) || href.startsWith('/')) return null;
+	const ref = splitCanvasAssetReference(href);
+	if (!ref.path) return null;
+	const path = normalizeCanvasMarkdownRelativePath(safeDecodeUri(ref.path), sourcePath);
+	return path ? { path, suffix: ref.suffix } : null;
+}
+
+function normalizeCanvasMarkdownRelativePath(rawPath: string, sourcePath: string | null | undefined): string | null {
+	const normalizedSource = sourcePath?.trim().replace(/\\/g, '/') ?? '';
+	const slash = normalizedSource.lastIndexOf('/');
+	const base = slash >= 0 ? normalizedSource.slice(0, slash) : '';
+	const stack: string[] = [];
+	for (const segment of `${base ? `${base}/` : ''}${rawPath}`.replace(/\\/g, '/').split('/')) {
+		if (!segment || segment === '.') continue;
+		if (segment === '..') {
+			if (stack.length === 0) return null;
+			stack.pop();
+			continue;
+		}
+		stack.push(segment);
+	}
+	const path = stack.join('/');
+	return path && isCanvasVaultRelativeAssetPath(path) ? path : null;
+}
+
+function safeDecodeUri(input: string): string {
+	try {
+		return decodeURI(input);
+	} catch {
+		return input;
+	}
 }
 
 function splitCanvasWikilinkTarget(target: string): { path: string; suffix: string } {
@@ -583,7 +628,7 @@ function firstInlineMatch(
 		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
 		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
 		inlineCandidate(value, /\[([^\]\n]+)]\(([^)\n]+)\)/, (match) =>
-			canvasTextInlineFromMarkdownLink(match[1], match[2])
+			canvasTextInlineFromMarkdownLink(match[1], match[2], options.sourcePath)
 		),
 		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
 			const rawTarget = match[1].trim();

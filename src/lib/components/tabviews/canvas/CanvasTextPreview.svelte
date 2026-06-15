@@ -8,6 +8,7 @@
 
 	interface Props {
 		vaultId: string;
+		sourcePath: string;
 		nodeId: string;
 		draft: string;
 		resolveEmbedTarget: CanvasTextEmbedResolver;
@@ -16,13 +17,14 @@
 
 	let {
 		vaultId,
+		sourcePath,
 		nodeId,
 		draft,
 		resolveEmbedTarget,
 		resolveWikilinkTarget
 	}: Props = $props();
 
-	const previewBlocks = $derived(canvasTextPreviewBlocks(draft, { resolveEmbedTarget, resolveWikilinkTarget }));
+	const previewBlocks = $derived(canvasTextPreviewBlocks(draft, { resolveEmbedTarget, resolveWikilinkTarget, sourcePath }));
 </script>
 
 <div class="canvas-text-preview" aria-label={`Canvas text preview for ${nodeId}`}>

@@ -639,6 +639,7 @@
 
 	<CanvasStage
 		{vaultId}
+		sourcePath={path}
 		{loading}
 		{error}
 		{doc}

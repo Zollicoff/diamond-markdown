@@ -22,6 +22,7 @@
 
 	interface Props {
 		vaultId: string;
+		sourcePath: string;
 		loading: boolean;
 		error: string | null;
 		doc: CanvasDoc | null;
@@ -66,6 +67,7 @@
 
 	let {
 		vaultId,
+		sourcePath,
 		loading,
 		error,
 		doc,
@@ -137,6 +139,7 @@
 	/>
 	<CanvasBoard
 		{vaultId}
+		{sourcePath}
 		{nodes}
 		{bounds}
 		{lines}

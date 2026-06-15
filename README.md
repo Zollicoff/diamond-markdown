@@ -17,7 +17,7 @@ Obsidian is great. It's also Electron, its sync is proprietary and paid, and its
 - **Multi-vault from day one.** Different folders, different indexes, one app.
 - **Open source (MIT).**
 
-If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, Canvas previews with markdown-aware text cards plus callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks, standard Markdown note/Canvas links, note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, zoomable node positioning/resizing/color/routing edits, and real version history in a browser, Diamond Markdown is for you.
+If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, Canvas previews with markdown-aware text cards plus callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks, source-relative Markdown note/Canvas links, note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, zoomable node positioning/resizing/color/routing edits, and real version history in a browser, Diamond Markdown is for you.
 
 ## Status
 
@@ -111,7 +111,7 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
 - Obsidian import support that preserves `.obsidian`, surfaces plugin, appearance, graph, core-plugin, and hotkey settings as migration guidance with known Diamond command mappings, imports note-level Obsidian bookmarks plus search bookmarks, and honors safe attachment/new-note/daily-note/link-style/editor-display/inline-title/readable-line-length settings plus link-update and local-trash preferences
 - Obsidian export package from Settings that preserves vault files and `.obsidian` config while excluding Diamond metadata, generated publish output, and Git internals
-- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, hidden Obsidian comments, callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks, standard Markdown note/Canvas links, note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, file-card heading/block subpaths, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
+- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, hidden Obsidian comments, callouts, highlights, strikethrough, simple tables, resolved note/title/alias inline wikilinks, source-relative Markdown note/Canvas links, note embed chips, explicit Canvas links and embed chips, and safe vault-local asset embeds, file-card heading/block subpaths, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node positioning/resizing, node/edge color edits, and edge routing controls
 - Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)

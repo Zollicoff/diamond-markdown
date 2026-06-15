@@ -35,6 +35,7 @@
 
 	interface Props {
 		vaultId: string;
+		sourcePath: string;
 		nodes: CanvasNode[];
 		bounds: CanvasBounds;
 		lines: CanvasEdgeLine[];
@@ -67,6 +68,7 @@
 
 	let {
 		vaultId,
+		sourcePath,
 		nodes,
 		bounds,
 		lines,
@@ -131,6 +133,7 @@
 			{@const nodeMutation = canvasNodeMutationFlags(node.id, mutationState)}
 			<CanvasNodeCard
 				{vaultId}
+				{sourcePath}
 				{node}
 				{bounds}
 				draft={canvasDraftFor(node, textDrafts)}

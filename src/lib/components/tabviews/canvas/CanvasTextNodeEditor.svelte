@@ -9,6 +9,7 @@
 
 	interface Props {
 		vaultId: string;
+		sourcePath: string;
 		node: CanvasNode;
 		draft: string;
 		changed: boolean;
@@ -24,6 +25,7 @@
 
 	let {
 		vaultId,
+		sourcePath,
 		node,
 		draft,
 		changed,
@@ -43,6 +45,7 @@
 <div class="text-node-content">
 	<CanvasTextPreview
 		{vaultId}
+		{sourcePath}
 		nodeId={node.id}
 		{draft}
 		{resolveEmbedTarget}

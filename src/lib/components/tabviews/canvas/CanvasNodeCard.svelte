@@ -20,6 +20,7 @@
 
 	interface Props {
 		vaultId: string;
+		sourcePath: string;
 		node: CanvasNode;
 		bounds: CanvasBounds;
 		draft: string;
@@ -52,6 +53,7 @@
 
 	let {
 		vaultId,
+		sourcePath,
 		node,
 		bounds,
 		draft,
@@ -121,6 +123,7 @@
 	{:else if node.type === 'text'}
 		<CanvasTextNodeEditor
 			{vaultId}
+			{sourcePath}
 			{node}
 			{draft}
 			{changed}
