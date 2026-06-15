@@ -2,8 +2,9 @@
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { EditorApi } from '$lib/editor/commands';
+	import type { LinkInsertionContext } from '$lib/editor/link-insertion';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteViewMode } from '$lib/types';
+	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteLinkTarget, NoteViewMode } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
@@ -65,6 +66,8 @@
 	let ToolbarView = $state<NoteViewComponent | null>(null);
 	let viewLoadError = $state<string | null>(null);
 	let linkStyle = $state<EditorLinkStyle>('wikilink');
+	let newLinkFormat = $state<string | null>(null);
+	let linkTargets = $state<NoteLinkTarget[]>([]);
 	let showLineNumbers = $state(true);
 	let spellcheck = $state(false);
 	let tabSize = $state(4);
@@ -93,6 +96,15 @@
 		}
 	}
 
+	async function refreshLinkTargets(id = vaultId): Promise<void> {
+		try {
+			const targets = await api.linkTargets(id);
+			if (id === vaultId) linkTargets = targets;
+		} catch {
+			if (id === vaultId) linkTargets = [];
+		}
+	}
+
 	$effect(() => {
 		// Reload whenever the note we're showing changes.
 		if (path !== loadedPath || vaultId !== loadedVault) {
@@ -107,13 +119,28 @@
 		const id = vaultId;
 		untrack(() => {
 			linkStyle = 'wikilink';
+			newLinkFormat = null;
 			api.linkStyle(id)
 				.then((preference) => {
-					if (id === vaultId) linkStyle = preference.style;
+					if (id === vaultId) {
+						linkStyle = preference.style;
+						newLinkFormat = preference.newLinkFormat;
+					}
 				})
 				.catch(() => {
-					if (id === vaultId) linkStyle = 'wikilink';
+					if (id === vaultId) {
+						linkStyle = 'wikilink';
+						newLinkFormat = null;
+					}
 				});
+		});
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			linkTargets = [];
+			void refreshLinkTargets(id);
 		});
 	});
 
@@ -171,6 +198,9 @@
 				if (e.vaultId === vaultId && e.from === path) {
 					setTimeout(() => void load(), 0);
 				}
+			}),
+			onBus('tree:invalidate', (e) => {
+				if (e.vaultId === vaultId) void refreshLinkTargets(e.vaultId);
 			}),
 			onBus('template:insert', (e) => {
 				// Only the focused note view should consume the template insert.
@@ -320,6 +350,11 @@
 	const isConflict = $derived(isStaleRevisionError(err));
 	const waitingForEditor = $derived(mode !== 'read' && (!EditorView || !ToolbarView));
 	const waitingForPreview = $derived(mode === 'read' && !PreviewView);
+	const linkContext = $derived<LinkInsertionContext>({
+		sourcePath: path,
+		newLinkFormat,
+		targets: linkTargets
+	});
 
 	function openHistory(): void {
 		emitBus('history:open', { vaultId, path });
@@ -394,6 +429,7 @@
 		{doc}
 		{mode}
 		{linkStyle}
+		{linkContext}
 		{showLineNumbers}
 		{showInlineTitle}
 		{spellcheck}

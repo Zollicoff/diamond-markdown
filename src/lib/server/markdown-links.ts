@@ -27,15 +27,24 @@ export function resolveMarkdownNoteReference(
 	if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
 		trimmed = trimmed.slice(1, -1).trim();
 	}
-	if (!trimmed || LOCAL_HREF_RE.test(trimmed) || trimmed.startsWith('/')) return null;
+	if (!trimmed || LOCAL_HREF_RE.test(trimmed)) return null;
 
 	const ref = splitAssetReference(trimmed);
 	if (!ref.path || !MARKDOWN_NOTE_EXT_RE.test(ref.path)) return null;
 
-	const decoded = safeDecodeUri(ref.path);
+	const vaultAbsolute = ref.path.startsWith('/');
+	const decoded = safeDecodeUri(vaultAbsolute ? ref.path.slice(1) : ref.path);
 	const baseDir = sourcePath ? path.posix.dirname(sourcePath) : '.';
-	const resolved = path.posix.normalize(path.posix.join(baseDir === '.' ? '' : baseDir, decoded));
-	if (!resolved || resolved === '.' || resolved === '..' || resolved.startsWith('../')) {
+	const resolved = path.posix.normalize(
+		vaultAbsolute ? decoded : path.posix.join(baseDir === '.' ? '' : baseDir, decoded)
+	);
+	if (
+		!resolved ||
+		resolved === '.' ||
+		resolved === '..' ||
+		resolved.startsWith('../') ||
+		path.posix.isAbsolute(resolved)
+	) {
 		return null;
 	}
 	return { target: resolved, suffix: ref.suffix };

@@ -1,15 +1,16 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
-	import { linkToolbarButton } from '$lib/editor/link-insertion';
+	import { linkToolbarButton, type LinkInsertionContext } from '$lib/editor/link-insertion';
 	import type { EditorLinkStyle } from '$lib/types';
 
 	interface Props {
 		api: EditorApi | null;
 		linkStyle?: EditorLinkStyle;
+		linkContext?: LinkInsertionContext;
 		onAttachExisting?: () => void;
 	}
 
-	let { api, linkStyle = 'wikilink', onAttachExisting }: Props = $props();
+	let { api, linkStyle = 'wikilink', linkContext, onAttachExisting }: Props = $props();
 
 	function act(fn: (api: EditorApi) => void): void {
 		if (!api) return;
@@ -38,7 +39,7 @@
 			{ icon: '❝',     title: 'Quote',            action: (a) => a.prependLines('> ') }
 		],
 		[
-			{ icon: linkButton.icon, title: linkButton.title, action: (a) => a.insertNoteLink(linkStyle) },
+			{ icon: linkButton.icon, title: linkButton.title, action: (a) => a.insertNoteLink(linkStyle, linkContext) },
 			{ icon: '{ }',   title: 'Code block',       action: (a) => a.insertCodeBlock() }
 		]
 	]);

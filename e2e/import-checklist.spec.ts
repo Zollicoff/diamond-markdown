@@ -755,6 +755,13 @@ test.describe('import checklist helpers', () => {
 			source: 'diamond-default'
 		});
 
+		fs.writeFileSync(appJson, JSON.stringify({ newLinkFormat: 'absolute' }));
+		expect(editorLinkPreference(vaultDir)).toEqual({
+			style: 'wikilink',
+			newLinkFormat: 'absolute',
+			source: 'obsidian-app-config'
+		});
+
 		fs.writeFileSync(appJson, JSON.stringify({
 			useMarkdownLinks: true,
 			newLinkFormat: 'relative'
@@ -770,6 +777,42 @@ test.describe('import checklist helpers', () => {
 			text: '[Solar Plan]()',
 			anchorOffset: 13,
 			headOffset: 13
+		});
+		const solarTarget = {
+			path: 'Plans/Solar Plan.md',
+			title: 'Solar Plan',
+			aliases: ['Solar'],
+			stem: 'Solar Plan'
+		};
+		const relativeLink = '[Solar Plan](../Plans/Solar%20Plan.md)';
+		expect(linkInsertion('Solar Plan', 'markdown', {
+			sourcePath: 'Notes/Home.md',
+			newLinkFormat: 'relative',
+			targets: [solarTarget]
+		})).toEqual({
+			text: relativeLink,
+			anchorOffset: relativeLink.length,
+			headOffset: relativeLink.length
+		});
+		const absoluteLink = '[Solar](/Plans/Solar%20Plan.md)';
+		expect(linkInsertion('Solar', 'markdown', {
+			sourcePath: 'Notes/Home.md',
+			newLinkFormat: 'absolute',
+			targets: [solarTarget]
+		})).toEqual({
+			text: absoluteLink,
+			anchorOffset: absoluteLink.length,
+			headOffset: absoluteLink.length
+		});
+		const shortestLink = '[Solar Plan](Solar%20Plan.md)';
+		expect(linkInsertion('Solar Plan', 'markdown', {
+			sourcePath: 'Plans/Home.md',
+			newLinkFormat: 'shortest',
+			targets: [solarTarget]
+		})).toEqual({
+			text: shortestLink,
+			anchorOffset: shortestLink.length,
+			headOffset: shortestLink.length
 		});
 		expect(linkInsertion('Solar Plan', 'wikilink')).toEqual({
 			text: '[[Solar Plan]]',

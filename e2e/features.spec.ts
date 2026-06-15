@@ -1383,7 +1383,10 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 		useMarkdownLinks: true,
 		newLinkFormat: 'relative'
 	}));
-	fs.writeFileSync(path.join(vaultDir, 'Home.md'), '# Home\n\nLink style test.\n');
+	fs.mkdirSync(path.join(vaultDir, 'Notes'), { recursive: true });
+	fs.mkdirSync(path.join(vaultDir, 'Projects'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, 'Notes', 'Home.md'), '# Home\n\nLink style test.\n');
+	fs.writeFileSync(path.join(vaultDir, 'Projects', 'Solar Plan.md'), '# Solar Plan\n');
 
 	const created = await request.post('/api/vaults', {
 		data: { name: 'Obsidian Markdown Link Style', path: vaultDir }
@@ -1399,7 +1402,7 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 		source: 'obsidian-app-config'
 	});
 
-	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Notes/Home.md')}`, { waitUntil: 'domcontentloaded' });
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
 	await page.getByRole('tab', { name: 'Source' }).click();
 	await expect(page.getByRole('button', { name: 'Markdown link' })).toBeVisible();
@@ -1412,6 +1415,18 @@ test('editor link button honors Obsidian Markdown-link preference', async ({ pag
 	const text = await editor.innerText();
 	expect(text).toContain('MARK:[]()');
 	expect(text).not.toContain('MARK:[[]]');
+
+	await page.keyboard.press('Meta+End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('TARGET:Solar Plan');
+	await page.keyboard.down('Shift');
+	for (let i = 0; i < 'Solar Plan'.length; i += 1) {
+		await page.keyboard.press('ArrowLeft');
+	}
+	await page.keyboard.up('Shift');
+	await page.getByRole('button', { name: 'Markdown link' }).click();
+	const linkedText = await editor.innerText();
+	expect(linkedText).toContain('TARGET:[Solar Plan](../Projects/Solar%20Plan.md)');
 });
 
 test('editor display honors Obsidian app preferences', async ({ page, request }) => {

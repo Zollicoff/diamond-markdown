@@ -75,9 +75,13 @@ for note, Canvas file, folder, and attachment delete confirmation dialogs, and
 the tree and opens them through the raw asset route instead of treating them as
 editable notes.
 Explicit folder context actions such as New note here still use the selected
-folder. Other app settings such as `newLinkFormat` and non-local trash modes
-are reported so migration mismatches are visible before opening the vault;
-Diamond does not rewrite existing note links during import.
+folder. When Markdown links are enabled, `newLinkFormat` controls how the
+editor toolbar inserts a selected existing note name (`relative`,
+vault-absolute, or shortest resolvable Markdown path), and Diamond resolves
+those local Markdown note links for navigation, backlinks, and static publish.
+Diamond does not rewrite existing note links during import. Non-local trash
+modes are reported so migration mismatches are visible before opening the
+vault.
 
 When `.obsidian/daily-notes.json` is present, the daily-note command reuses safe
 `folder`, `template`, and `format` settings. Date formats support the same

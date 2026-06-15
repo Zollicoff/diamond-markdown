@@ -9,7 +9,7 @@
 import { EditorView } from '@codemirror/view';
 import { slugifyHeading } from '$lib/util/strings';
 import { blockReferenceId } from '$lib/markdown/wikilinks';
-import { linkInsertion } from './link-insertion';
+import { linkInsertion, type LinkInsertionContext } from './link-insertion';
 import type { EditorLinkStyle } from '$lib/types';
 
 export interface EditorApi {
@@ -28,7 +28,7 @@ export interface EditorApi {
 	/** Insert a wikilink `[[target]]` (uses selection as target if any). */
 	insertWikilink(): void;
 	/** Insert a note link using the vault's configured link style. */
-	insertNoteLink(style?: EditorLinkStyle): void;
+	insertNoteLink(style?: EditorLinkStyle, context?: LinkInsertionContext): void;
 	/** Insert a fenced code block, preserving the selection as the body. */
 	insertCodeBlock(lang?: string): void;
 	/** Scroll the editor to a markdown heading or Obsidian block id anchor. */
@@ -145,11 +145,11 @@ export function makeEditorApi(getView: () => EditorView | null): EditorApi {
 			});
 		},
 
-		insertNoteLink(style = 'wikilink') {
+		insertNoteLink(style = 'wikilink', context) {
 			withView((view) => {
 				const { from, to } = view.state.selection.main;
 				const sel = view.state.sliceDoc(from, to);
-				const insertion = linkInsertion(sel, style);
+				const insertion = linkInsertion(sel, style, context);
 				view.dispatch({
 					changes: { from, to, insert: insertion.text },
 					selection: {

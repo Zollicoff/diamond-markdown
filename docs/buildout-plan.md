@@ -252,6 +252,10 @@ Use small, pushable slices:
    Obsidian wikilinks and Markdown link syntax without changing existing note
    content; local Markdown note links also resolve for in-app navigation,
    backlinks, outgoing links, and static publish output.
+- **Obsidian new-link-format preference.** Honor `.obsidian/app.json`
+   `newLinkFormat` for selected existing notes inserted through the Markdown
+   link toolbar action, choosing relative, vault-root, or shortest resolvable
+   Markdown paths while preserving existing note content.
 - **Obsidian editor line-number preference.** Honor `.obsidian/app.json`
    `showLineNumber` by showing or hiding CodeMirror's line-number gutter per
    vault while keeping Diamond's default line numbers when the setting is

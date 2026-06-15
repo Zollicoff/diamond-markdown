@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
+	import type { LinkInsertionContext } from '$lib/editor/link-insertion';
 	import type { LinkResolver } from '$lib/editor/live-preview';
 	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteViewMode } from '$lib/types';
 	import type { NoteViewComponent } from '$lib/note/lazy-components';
@@ -10,6 +11,7 @@
 		doc: NoteDoc | null;
 		mode: NoteViewMode;
 		linkStyle: EditorLinkStyle;
+		linkContext: LinkInsertionContext;
 		showLineNumbers: boolean;
 		showInlineTitle: boolean;
 		spellcheck: boolean;
@@ -43,6 +45,7 @@
 		doc,
 		mode,
 		linkStyle,
+		linkContext,
 		showLineNumbers,
 		showInlineTitle,
 		spellcheck,
@@ -75,7 +78,7 @@
 </script>
 
 {#if mode !== 'read' && ToolbarView}
-	<ToolbarView api={editorApi} {linkStyle} onAttachExisting={onAttachExisting} />
+	<ToolbarView api={editorApi} {linkStyle} {linkContext} onAttachExisting={onAttachExisting} />
 {/if}
 
 {#if uploadingAttachments > 0}

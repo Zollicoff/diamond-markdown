@@ -492,6 +492,11 @@ test.describe('Obsidian image embed variants', () => {
 			target: 'Target.md',
 			suffix: '#details'
 		});
+		expect(resolveMarkdownNoteReference('/Target.md#details', 'Notes/Source.md')).toEqual({
+			target: 'Target.md',
+			suffix: '#details'
+		});
+		expect(resolveMarkdownNoteReference('/../Target.md#details', 'Notes/Source.md')).toBeNull();
 
 		const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'markdown-note-link-vault');
 		fs.rmSync(vaultDir, { recursive: true, force: true });
