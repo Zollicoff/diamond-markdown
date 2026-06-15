@@ -533,6 +533,10 @@ Use small, pushable slices:
   focused on draft parsing and preview containment while moving markdown
   block, inline, embed, and internal navigation rendering into a focused
   `CanvasTextPreviewBlocks` component.
+- **Canvas text-preview inline/embed renderer split.** Keep
+  `CanvasTextPreviewBlocks` focused on block layout and callout recursion while
+  moving inline marks/links and standalone embed rendering/navigation into
+  focused renderer components.
 - **Desktop release workflow.** Add `.github/workflows/desktop-release.yml` to
   run the web release gate, desktop preflight, self-contained Tauri build, and
   unsigned bundle artifact upload across macOS, Windows, and Linux.

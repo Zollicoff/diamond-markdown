@@ -1,16 +1,7 @@
 <script lang="ts">
-	import {
-		canvasTextEmbedHref,
-		canvasTextEmbedOpenTarget,
-		canvasTextEmbedRouteHref,
-		canvasTextInlineTargetHref,
-		type CanvasTextPreviewBlock,
-		type CanvasTextPreviewEmbed,
-		type CanvasTextPreviewInline
-	} from '$lib/canvas/text-preview';
-	import { openCanvas, openNote } from '$lib/workspace/actions';
-	import { replaceLocationHash } from '$lib/workspace/hash';
-	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import type { CanvasTextPreviewBlock } from '$lib/canvas/text-preview';
+	import CanvasTextPreviewEmbed from './CanvasTextPreviewEmbed.svelte';
+	import CanvasTextPreviewInline from './CanvasTextPreviewInline.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -18,77 +9,26 @@
 	}
 
 	let { vaultId, blocks }: Props = $props();
-
-	function openInternalEmbed(embed: CanvasTextPreviewEmbed, event: MouseEvent): void {
-		const target = canvasTextEmbedOpenTarget(embed);
-		if (!target) return;
-		event.preventDefault();
-		if (target.kind === 'canvas') {
-			openCanvas(vaultId, target.path, target.title, openModeForPointer(event));
-			return;
-		}
-		replaceLocationHash(target.hash);
-		openNote(vaultId, target.path, target.title, openModeForPointer(event));
-	}
-
-	function openInternalInline(part: CanvasTextPreviewInline, event: MouseEvent): void {
-		const target = part.target;
-		if (!target) return;
-		event.preventDefault();
-		if (target.kind === 'canvas') {
-			openCanvas(vaultId, target.path, target.title, openModeForPointer(event));
-			return;
-		}
-		replaceLocationHash(target.hash);
-		openNote(vaultId, target.path, target.title, openModeForPointer(event));
-	}
 </script>
-
-{#snippet inline(parts: CanvasTextPreviewInline[])}
-	{#each parts as part}
-		{#if part.kind === 'strong'}
-			<strong>{part.text}</strong>
-		{:else if part.kind === 'emphasis'}
-			<em>{part.text}</em>
-		{:else if part.kind === 'code'}
-			<code>{part.text}</code>
-		{:else if part.kind === 'strikethrough'}
-			<del>{part.text}</del>
-		{:else if part.kind === 'highlight'}
-			<mark>{part.text}</mark>
-		{:else if part.kind === 'wikilink'}
-			{@const href = canvasTextInlineTargetHref(vaultId, part)}
-			{#if href}
-				<a class="wikilink" href={href} onclick={(event) => openInternalInline(part, event)}>[[{part.text}]]</a>
-			{:else}
-				<span class="wikilink">[[{part.text}]]</span>
-			{/if}
-		{:else if part.kind === 'link' && part.href}
-			<a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
-		{:else}
-			{part.text}
-		{/if}
-	{/each}
-{/snippet}
 
 {#snippet previewBlock(block: CanvasTextPreviewBlock)}
 	{#if block.type === 'heading'}
 		<p class={`preview-heading level-${block.level}`}>
-			{@render inline(block.inline)}
+			<CanvasTextPreviewInline {vaultId} parts={block.inline} />
 		</p>
 	{:else if block.type === 'paragraph'}
 		<p>
-			{@render inline(block.inline)}
+			<CanvasTextPreviewInline {vaultId} parts={block.inline} />
 		</p>
 	{:else if block.type === 'quote'}
 		<blockquote>
-			{@render inline(block.inline)}
+			<CanvasTextPreviewInline {vaultId} parts={block.inline} />
 		</blockquote>
 	{:else if block.type === 'callout'}
 		<div class={`preview-callout callout-${block.kind}`} data-fold={block.fold ?? 'none'}>
 			<div class="callout-title">
 				<span class="callout-kind">{block.kind}</span>
-				<span>{@render inline(block.title)}</span>
+				<span><CanvasTextPreviewInline {vaultId} parts={block.title} /></span>
 				{#if block.fold}
 					<span class="callout-fold" aria-label={`${block.fold} callout`}>{block.fold === 'closed' ? '-' : '+'}</span>
 				{/if}
@@ -108,7 +48,7 @@
 					{#if item.checked !== undefined}
 						<span class="task-state" aria-hidden="true">{item.checked ? 'x' : ''}</span>
 					{/if}
-					<span>{@render inline(item.inline)}</span>
+					<span><CanvasTextPreviewInline {vaultId} parts={item.inline} /></span>
 				</li>
 			{/each}
 		</ul>
@@ -116,7 +56,7 @@
 		<ol>
 			{#each block.items as item}
 				<li>
-					<span>{@render inline(item.inline)}</span>
+					<span><CanvasTextPreviewInline {vaultId} parts={item.inline} /></span>
 				</li>
 			{/each}
 		</ol>
@@ -126,7 +66,7 @@
 				<thead>
 					<tr>
 						{#each block.table.headers as cell}
-							<th>{@render inline(cell.inline)}</th>
+							<th><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></th>
 						{/each}
 					</tr>
 				</thead>
@@ -134,7 +74,7 @@
 					{#each block.table.rows as row}
 						<tr>
 							{#each row as cell}
-								<td>{@render inline(cell.inline)}</td>
+								<td><CanvasTextPreviewInline {vaultId} parts={cell.inline} /></td>
 							{/each}
 						</tr>
 					{/each}
@@ -142,36 +82,7 @@
 			</table>
 		</div>
 	{:else if block.type === 'embed'}
-		{@const href = canvasTextEmbedHref(vaultId, block.embed)}
-		{@const routeHref = canvasTextEmbedRouteHref(vaultId, block.embed)}
-		{#if routeHref}
-			<a
-				class={`preview-embed preview-embed-${block.embed.kind}`}
-				href={routeHref}
-				onclick={(event) => openInternalEmbed(block.embed, event)}
-			>
-				<span>{block.embed.title}</span>
-				<small>{block.embed.kind.toUpperCase()}</small>
-			</a>
-		{:else if href}
-			{#if block.embed.kind === 'image'}
-				<figure class="preview-embed preview-embed-image">
-					<img
-						src={href}
-						alt={block.embed.alt ?? block.embed.title}
-						width={block.embed.width ?? undefined}
-						height={block.embed.height ?? undefined}
-						loading="lazy"
-					/>
-					<figcaption>{block.embed.title}</figcaption>
-				</figure>
-			{:else}
-				<a class={`preview-embed preview-embed-${block.embed.kind}`} href={href} target="_blank" rel="noopener noreferrer">
-					<span>{block.embed.title}</span>
-					<small>{block.embed.kind.toUpperCase()}</small>
-				</a>
-			{/if}
-		{/if}
+		<CanvasTextPreviewEmbed {vaultId} embed={block.embed} />
 	{:else if block.type === 'thematic-break'}
 		<hr />
 	{:else if block.type === 'code'}
@@ -285,56 +196,6 @@
 	.table-scroll:last-child {
 		margin-bottom: 0;
 	}
-	.preview-embed {
-		margin: 0 0 5px;
-	}
-	.preview-embed:last-child {
-		margin-bottom: 0;
-	}
-	.preview-embed-image {
-		display: grid;
-		gap: 4px;
-	}
-	.preview-embed-image img {
-		display: block;
-		max-width: min(100%, 240px);
-		max-height: 120px;
-		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 48%);
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--bg), transparent 6%);
-		object-fit: contain;
-	}
-	.preview-embed-image figcaption {
-		overflow: hidden;
-		color: var(--fg-dim);
-		font-size: 0.66rem;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	a.preview-embed {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 8px;
-		border: 1px solid color-mix(in srgb, var(--canvas-node-border, var(--border)), transparent 45%);
-		border-radius: 6px;
-		padding: 6px 7px;
-		background: color-mix(in srgb, var(--bg-elev), transparent 24%);
-		color: var(--accent);
-		text-decoration: none;
-	}
-	a.preview-embed span {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	a.preview-embed small {
-		flex: 0 0 auto;
-		color: var(--fg-dim);
-		font-family: var(--mono);
-		font-size: 0.58rem;
-	}
 	table {
 		width: 100%;
 		min-width: 180px;
@@ -380,25 +241,6 @@
 		line-height: 1;
 		text-transform: uppercase;
 	}
-	code {
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 0 3px;
-		background: color-mix(in srgb, var(--bg), transparent 10%);
-		color: var(--fg);
-		font-family: var(--mono);
-		font-size: 0.7rem;
-	}
-	del {
-		color: var(--fg-dim);
-		text-decoration-thickness: 1.5px;
-	}
-	mark {
-		border-radius: 3px;
-		padding: 0 3px;
-		background: color-mix(in srgb, #facc15, transparent 72%);
-		color: var(--fg);
-	}
 	pre {
 		overflow: auto;
 		border: 1px solid var(--border);
@@ -411,11 +253,6 @@
 		padding: 0;
 		background: transparent;
 		white-space: pre;
-	}
-	a,
-	.wikilink {
-		color: var(--accent);
-		text-decoration: none;
 	}
 	.empty-preview {
 		color: var(--fg-dim);
