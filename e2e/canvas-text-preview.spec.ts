@@ -96,6 +96,13 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', vaultRootMarkdownLinks[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
 		expect(vaultRootMarkdownLinks.at(-1)).toEqual({ kind: 'text', text: ', and [root escaped](/../secret.md)' });
 
+		const titledMarkdownLinks = canvasTextPreviewInlines(
+			'Review [space note](<../References/Roof Photos.md#Meter> "Open meter") and [titled Canvas](Map.canvas "Open board")',
+			{ sourcePath: 'Boards/Board.canvas' }
+		);
+		expect(canvasTextInlineTargetHref('vault id', titledMarkdownLinks[1])).toBe('/vault/vault%20id/note/References/Roof%20Photos.md#meter');
+		expect(canvasTextInlineTargetHref('vault id', titledMarkdownLinks[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
+
 		const resolved = canvasTextPreviewInlines('Review [[Survey Photos#Meter|site photos]] and [[Launch Base]]', {
 			resolveWikilinkTarget: canvasTextNoteWikilinkResolver(noteTargets)
 		});
@@ -221,6 +228,22 @@ test.describe('canvas text preview helpers', () => {
 					alt: 'Root panel',
 					width: null,
 					height: null
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![Roof photo|320x180](<../Images/roof photo.svg#diagram> "Roof")', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Images/roof photo.svg',
+					suffix: '#diagram',
+					kind: 'image',
+					title: 'Roof photo',
+					alt: 'Roof photo',
+					width: 320,
+					height: 180
 				}
 			}
 		]);

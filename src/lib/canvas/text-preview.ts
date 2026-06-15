@@ -411,8 +411,7 @@ function canvasTextMarkdownReference(
 	rawHref: string,
 	sourcePath: string | null | undefined
 ): { path: string; suffix: string } | null {
-	let href = rawHref.trim();
-	if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1).trim();
+	const href = canvasMarkdownLinkDestination(rawHref);
 	if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)) return null;
 	const ref = splitCanvasAssetReference(href);
 	if (!ref.path) return null;
@@ -441,6 +440,25 @@ function normalizeCanvasMarkdownRelativePath(rawPath: string, sourcePath: string
 	}
 	const path = stack.join('/');
 	return path && isCanvasVaultRelativeAssetPath(path) ? path : null;
+}
+
+function canvasMarkdownLinkDestination(rawHref: string): string | null {
+	const href = rawHref.trim();
+	if (!href || /[\r\n]/.test(href)) return null;
+	if (href.startsWith('<')) {
+		const close = href.indexOf('>');
+		if (close <= 1) return null;
+		const destination = href.slice(1, close).trim();
+		const title = href.slice(close + 1).trim();
+		if (title && !canvasMarkdownOptionalTitle(title)) return null;
+		return destination || null;
+	}
+	const titled = href.match(/^(.+?)\s+("[^"\n]*"|'[^'\n]*'|\([^()\n]*\))$/);
+	return titled?.[1]?.trim() || href;
+}
+
+function canvasMarkdownOptionalTitle(value: string): boolean {
+	return /^"[^"\n]*"$/.test(value) || /^'[^'\n]*'$/.test(value) || /^\([^()\n]*\)$/.test(value);
 }
 
 function safeDecodeUri(input: string): string {
@@ -622,7 +640,7 @@ function canvasTextEmbedPreview(line: string, options: CanvasTextPreviewOptions 
 		return options.resolveEmbedTarget?.(target, meta) ?? null;
 	}
 
-	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\s]+)\)$/);
+	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\n]+)\)$/);
 	if (markdown) {
 		return canvasTextEmbedFromMarkdownTarget(
 			markdown[2].trim(),

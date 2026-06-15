@@ -205,6 +205,9 @@ Use small, pushable slices:
    image/embed syntax inside Canvas text cards relative to the source
    `.canvas` file, while treating leading-slash targets as vault-root paths
    and retaining traversal guards for unsafe escapes.
+- **Canvas Markdown title/space destinations.** Accept Markdown note, Canvas,
+  and asset destinations with optional titles and angle-bracketed paths with
+  spaces inside Canvas text-card previews while preserving traversal guards.
 - **Canvas Markdown file-card previews.** Render safe frontmatter-stripped
    Markdown note previews inside Canvas file cards that point at `.md` files,
    using the same lightweight Canvas markdown renderer and source-relative
