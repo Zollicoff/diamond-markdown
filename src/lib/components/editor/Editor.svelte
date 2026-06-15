@@ -19,6 +19,7 @@
 		tabSize?: number;
 		readableLineLength?: boolean;
 		autoPairBrackets?: boolean;
+		autoPairMarkdown?: boolean;
 		folding?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
@@ -41,6 +42,7 @@
 		tabSize = 4,
 		readableLineLength = false,
 		autoPairBrackets = true,
+		autoPairMarkdown = true,
 		folding = false,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
@@ -61,6 +63,7 @@
 	const contentAttributeCompartment = new Compartment();
 	const tabSizeCompartment = new Compartment();
 	const autoPairBracketsCompartment = new Compartment();
+	const autoPairMarkdownCompartment = new Compartment();
 	const foldingCompartment = new Compartment();
 	const foldKeymapCompartment = new Compartment();
 
@@ -69,7 +72,14 @@
 		'[': ']',
 		'{': '}',
 		'"': '"',
-		"'": "'",
+		"'": "'"
+	};
+
+	const AUTO_PAIR_MARKDOWN: Record<string, string> = {
+		'*': '*',
+		'_': '_',
+		'~': '~',
+		'=': '=',
 		'`': '`'
 	};
 
@@ -116,13 +126,43 @@
 		return EditorState.tabSize.of(normalized);
 	}
 
-	function autoPairBracketsExtension(enabled: boolean): Extension {
+	function autoPairInputExtension(enabled: boolean, pairs: Record<string, string>): Extension {
 		if (!enabled) return [];
+		const closeOnly = Object.fromEntries(
+			Object.entries(pairs)
+				.filter(([open, close]) => open !== close)
+				.map(([open, close]) => [close, open])
+		);
 		return EditorView.inputHandler.of((view, _from, _to, text) => {
-			const close = AUTO_PAIR_BRACKETS[text];
-			if (!close) return false;
+			const close = pairs[text];
+			if (!close) {
+				if (!closeOnly[text]) return false;
+				const ranges = view.state.selection.ranges;
+				const canSkip = ranges.every(
+					(range) =>
+						range.empty &&
+						range.to < view.state.doc.length &&
+						view.state.sliceDoc(range.to, range.to + text.length) === text
+				);
+				if (!canSkip) return false;
+				view.dispatch({
+					selection: EditorSelection.create(
+						ranges.map((range) => EditorSelection.cursor(range.to + text.length))
+					),
+					userEvent: 'input.type'
+				});
+				return true;
+			}
 			const transaction = view.state.changeByRange((range) => {
 				const selected = view.state.sliceDoc(range.from, range.to);
+				const previous = range.from > 0 ? view.state.sliceDoc(range.from - text.length, range.from) : '';
+				const next = range.to < view.state.doc.length ? view.state.sliceDoc(range.to, range.to + close.length) : '';
+				if (!selected && next === close && previous !== text) {
+					return {
+						changes: [],
+						range: EditorSelection.cursor(range.to + close.length)
+					};
+				}
 				const insert = `${text}${selected}${close}`;
 				const anchor = range.from + text.length;
 				const head = anchor + selected.length;
@@ -134,6 +174,14 @@
 			view.dispatch({ ...transaction, userEvent: 'input.type' });
 			return true;
 		});
+	}
+
+	function autoPairBracketsExtension(enabled: boolean): Extension {
+		return autoPairInputExtension(enabled, AUTO_PAIR_BRACKETS);
+	}
+
+	function autoPairMarkdownExtension(enabled: boolean): Extension {
+		return autoPairInputExtension(enabled, AUTO_PAIR_MARKDOWN);
 	}
 
 	function foldingExtension(enabled: boolean): Extension {
@@ -216,6 +264,7 @@
 			contentAttributeCompartment.of(contentAttributeExtension(spellcheck)),
 			tabSizeCompartment.of(editorTabSizeExtension(tabSize)),
 			autoPairBracketsCompartment.of(autoPairBracketsExtension(autoPairBrackets)),
+			autoPairMarkdownCompartment.of(autoPairMarkdownExtension(autoPairMarkdown)),
 			foldingCompartment.of(foldingExtension(folding)),
 			history(),
 			highlightActiveLine(),
@@ -379,6 +428,11 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: autoPairBracketsCompartment.reconfigure(autoPairBracketsExtension(autoPairBrackets)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({ effects: autoPairMarkdownCompartment.reconfigure(autoPairMarkdownExtension(autoPairMarkdown)) });
 	});
 
 	$effect(() => {

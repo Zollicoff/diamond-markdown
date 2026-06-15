@@ -1425,6 +1425,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		tabSize: 8,
 		readableLineLength: true,
 		autoPairBrackets: true,
+		autoPairMarkdown: true,
 		foldHeading: true,
 		foldIndent: true
 	}));
@@ -1445,6 +1446,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		tabSize: 8,
 		readableLineLength: true,
 		autoPairBrackets: true,
+		autoPairMarkdown: true,
 		folding: true,
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
@@ -1463,11 +1465,28 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 	await expect(editor.locator('.cm-content')).toHaveCSS('tab-size', '8');
 	await expect(editor.locator('.cm-content')).toHaveCSS('max-width', '820px');
 	await expect(editor.locator('.cm-foldGutter')).toHaveCount(1);
+	await page.getByRole('tab', { name: 'Source' }).click();
 	await editor.locator('.cm-content').click();
 	await page.keyboard.press('Meta+End');
 	await page.keyboard.press('Enter');
-	await page.keyboard.type('PAIR:(');
-	await expect.poll(async () => editor.locator('.cm-content').innerText()).toContain('PAIR:()');
+	await page.keyboard.type('BRACKET:(');
+	const editorText = async () => editor.locator('.cm-content').innerText();
+	await expect.poll(editorText).toContain('BRACKET:()');
+	await page.keyboard.type(')');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('PAIR:(ok)');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('STAR:*');
+	await expect.poll(editorText).toContain('STAR:**');
+	await page.keyboard.press('ArrowRight');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('MARK:*ok*');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('HIGHLIGHT:==');
+	await expect.poll(editorText).toContain('PAIR:(ok)');
+	await expect.poll(editorText).toContain('STAR:**');
+	await expect.poll(editorText).toContain('MARK:*ok*');
+	await expect.poll(editorText).toContain('HIGHLIGHT:====');
 });
 
 test('vault shell applies safe Obsidian appearance preferences', async ({ page, request }) => {
@@ -1535,6 +1554,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 		tabSize: 4,
 		readableLineLength: true,
 		autoPairBrackets: true,
+		autoPairMarkdown: true,
 		folding: false,
 		defaultMode: 'read',
 		source: 'obsidian-app-config'

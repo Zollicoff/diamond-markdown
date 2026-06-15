@@ -70,6 +70,7 @@
 	let tabSize = $state(4);
 	let readableLineLength = $state(false);
 	let autoPairBrackets = $state(true);
+	let autoPairMarkdown = $state(true);
 	let folding = $state(false);
 	let showInlineTitle = $state(false);
 
@@ -124,6 +125,7 @@
 			tabSize = 4;
 			readableLineLength = false;
 			autoPairBrackets = true;
+			autoPairMarkdown = true;
 			folding = false;
 			api.editorPreferences(id)
 				.then((preference) => {
@@ -134,6 +136,7 @@
 						tabSize = preference.tabSize;
 						readableLineLength = preference.readableLineLength;
 						autoPairBrackets = preference.autoPairBrackets;
+						autoPairMarkdown = preference.autoPairMarkdown;
 						folding = preference.folding;
 					}
 				})
@@ -145,6 +148,7 @@
 						tabSize = 4;
 						readableLineLength = false;
 						autoPairBrackets = true;
+						autoPairMarkdown = true;
 						folding = false;
 					}
 				});
@@ -392,6 +396,7 @@
 		{tabSize}
 		{readableLineLength}
 		{autoPairBrackets}
+		{autoPairMarkdown}
 		{folding}
 		{content}
 		{editorApi}

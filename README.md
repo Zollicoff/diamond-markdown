@@ -77,10 +77,10 @@ Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 - Imported Obsidian vaults can reuse safe `.obsidian/app.json`
   `defaultViewMode` / `livePreview`, `showLineNumber`, `showInlineTitle`,
   `spellcheck`, `tabSize` / `readableLineLength`, and `foldHeading` /
-  `foldIndent` editor preferences, `autoPairBrackets` bracket/quote/backtick
-  pairing, `strictLineBreaks` reading/publish behavior, `promptDelete`
-  file-delete confirmation behavior, and `showUnsupportedFiles` raw-asset tree
-  visibility
+  `foldIndent` editor preferences, `autoPairBrackets` bracket/quote pairing,
+  `autoPairMarkdown` emphasis/highlight/strikethrough/backtick pairing,
+  `strictLineBreaks` reading/publish behavior, `promptDelete` file-delete
+  confirmation behavior, and `showUnsupportedFiles` raw-asset tree visibility
 - Editor toolbar (bold, italic, headings, lists, code, etc.)
 - Word count + reading time in status bar
 

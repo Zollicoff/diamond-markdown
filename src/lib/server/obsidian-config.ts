@@ -335,8 +335,21 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 			'Auto-pair brackets',
 			autoPairBrackets ? 'Enabled' : 'Disabled',
 			autoPairBrackets
-				? 'Diamond auto-pairs brackets, quotes, and backticks in the markdown editor for this imported vault.'
-				: 'Diamond leaves bracket, quote, and backtick insertion unpaired for this imported vault.'
+				? 'Diamond auto-pairs brackets and quotes in the markdown editor for this imported vault.'
+				: 'Diamond leaves bracket and quote insertion unpaired for this imported vault.'
+		));
+	}
+
+	const autoPairMarkdown = booleanValue(body.autoPairMarkdown);
+	if (autoPairMarkdown !== null) {
+		base.autoPairMarkdown = autoPairMarkdown;
+		base.settings.push(setting(
+			'autoPairMarkdown',
+			'Auto-pair Markdown syntax',
+			autoPairMarkdown ? 'Enabled' : 'Disabled',
+			autoPairMarkdown
+				? 'Diamond auto-pairs Markdown emphasis, highlight, strikethrough, and backtick markers in the markdown editor for this imported vault.'
+				: 'Diamond leaves Markdown emphasis, highlight, strikethrough, and backtick marker insertion unpaired for this imported vault.'
 		));
 	}
 
@@ -496,9 +509,10 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 		tabSize: config.tabSize ?? 4,
 		readableLineLength: config.readableLineLength === true,
 		autoPairBrackets: config.autoPairBrackets !== false,
+		autoPairMarkdown: config.autoPairMarkdown !== false,
 		folding: config.foldHeading === true || config.foldIndent === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.autoPairBrackets === undefined && config.foldHeading === undefined && config.foldIndent === undefined
+		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.autoPairBrackets === undefined && config.autoPairMarkdown === undefined && config.foldHeading === undefined && config.foldIndent === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

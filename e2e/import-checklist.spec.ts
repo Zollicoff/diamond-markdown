@@ -790,6 +790,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
@@ -807,6 +808,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -820,6 +822,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -837,6 +840,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -854,6 +858,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -871,6 +876,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -884,6 +890,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -901,6 +908,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 8,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -920,6 +928,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
@@ -937,6 +946,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: true,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -950,6 +960,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -967,6 +978,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: false,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -984,6 +996,43 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ autoPairMarkdown: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairMarkdown')).toMatchObject({
+			label: 'Auto-pair Markdown syntax',
+			value: 'Disabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			autoPairBrackets: true,
+			autoPairMarkdown: false,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ autoPairMarkdown: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairMarkdown')).toMatchObject({
+			label: 'Auto-pair Markdown syntax',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -1001,6 +1050,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: true,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -1014,6 +1064,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -1031,6 +1082,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: true,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -1048,6 +1100,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
@@ -1061,6 +1114,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
@@ -1074,6 +1128,7 @@ test.describe('import checklist helpers', () => {
 			tabSize: 4,
 			readableLineLength: false,
 			autoPairBrackets: true,
+			autoPairMarkdown: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'

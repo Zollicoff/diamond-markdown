@@ -16,6 +16,7 @@
 		tabSize: number;
 		readableLineLength: boolean;
 		autoPairBrackets: boolean;
+		autoPairMarkdown: boolean;
 		folding: boolean;
 		content: string;
 		editorApi: EditorApi | null;
@@ -47,6 +48,7 @@
 		tabSize,
 		readableLineLength,
 		autoPairBrackets,
+		autoPairMarkdown,
 		folding,
 		content,
 		editorApi,
@@ -102,6 +104,7 @@
 			{tabSize}
 			{readableLineLength}
 			{autoPairBrackets}
+			{autoPairMarkdown}
 			{folding}
 			{resolveLink}
 			onChange={onContentChange}

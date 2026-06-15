@@ -55,6 +55,7 @@ export interface ObsidianAppConfigInfo {
 	tabSize?: number;
 	readableLineLength?: boolean;
 	autoPairBrackets?: boolean;
+	autoPairMarkdown?: boolean;
 	foldHeading?: boolean;
 	foldIndent?: boolean;
 	strictLineBreaks?: boolean;
@@ -242,6 +243,7 @@ export interface EditorDisplayPreference {
 	tabSize: number;
 	readableLineLength: boolean;
 	autoPairBrackets: boolean;
+	autoPairMarkdown: boolean;
 	folding: boolean;
 	defaultMode: NoteViewMode;
 	source: 'obsidian-app-config' | 'diamond-default';

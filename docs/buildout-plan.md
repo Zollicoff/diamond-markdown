@@ -466,8 +466,11 @@ Use small, pushable slices:
   vaults while keeping Diamond's full-width default when the setting is absent
   or disabled.
 - **Obsidian bracket auto-pair preference.** Honor `.obsidian/app.json`
-  `autoPairBrackets` by enabling or disabling bracket, quote, and backtick
-  pairing in the markdown editor.
+  `autoPairBrackets` by enabling or disabling bracket and quote pairing in
+  the markdown editor.
+- **Obsidian Markdown auto-pair preference.** Honor `.obsidian/app.json`
+  `autoPairMarkdown` by enabling or disabling emphasis, highlight,
+  strikethrough, and backtick marker pairing in the markdown editor.
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by showing CodeMirror fold controls for imported vaults
   that request editor folding.
@@ -611,8 +614,12 @@ Use small, pushable slices:
   reading surface for imported vaults that request it, while keeping Diamond's
   existing chrome-only title behavior when the setting is absent or disabled.
 - **Obsidian bracket auto-pair preference.** Honor `.obsidian/app.json`
-  `autoPairBrackets` by pairing brackets, quotes, and backticks in the
-  markdown editor when enabled and leaving insertion unpaired when disabled.
+  `autoPairBrackets` by pairing brackets and quotes in the markdown editor
+  when enabled and leaving insertion unpaired when disabled.
+- **Obsidian Markdown auto-pair preference.** Honor `.obsidian/app.json`
+  `autoPairMarkdown` by pairing Markdown emphasis, highlight, strikethrough,
+  and backtick markers in the markdown editor when enabled and leaving
+  insertion unpaired when disabled.
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by enabling editor fold controls for imported vaults that
   request foldable headings or indented blocks.

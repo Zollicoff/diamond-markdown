@@ -57,8 +57,9 @@ line-number gutter, `showInlineTitle` for the note-body file title row,
 `spellcheck` for the markdown editor's browser spellcheck attribute, safe
 integer `tabSize` values from 1 to 16 for editor indentation and tab rendering,
 `readableLineLength` for narrowing editor and reading surfaces,
-`autoPairBrackets` for bracket, quote, and backtick pairing in the markdown
-editor,
+`autoPairBrackets` for bracket and quote pairing,
+`autoPairMarkdown` for emphasis, highlight, strikethrough, and backtick marker
+pairing in the markdown editor,
 `foldHeading` / `foldIndent` for editor fold controls,
 `strictLineBreaks` for Read mode, hover-preview, and static-publish line-break
 rendering, `defaultViewMode` plus `livePreview` for the initial note view mode,
