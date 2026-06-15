@@ -14,6 +14,14 @@ import {
 	canvasMarkdownLinkDestination,
 	safeDecodeCanvasMarkdownUri
 } from '../src/lib/canvas/markdown-destinations';
+import {
+	canvasMarkdownImageMeta,
+	canvasObsidianEmbedMeta,
+	canvasTextEmbedFromMarkdownTarget,
+	canvasTextEmbedFromTarget,
+	canvasTextEmbedPreview,
+	isCanvasStandaloneEmbedSyntax
+} from '../src/lib/canvas/text-preview-embeds';
 import { canvasTextTablePreviewAt } from '../src/lib/canvas/text-preview-tables';
 import {
 	canvasTextInternalTarget,
@@ -95,6 +103,97 @@ test.describe('canvas text preview helpers', () => {
 			'/vault/vault%20id/note/References/Roof%20Photos.md#meter'
 		);
 		expect(canvasTextInternalTarget('canvas', 'Boards/Map.canvas', '#Nope', 'Map')).toBeNull();
+	});
+
+	test('parses Canvas embed helper metadata and targets directly', () => {
+		expect(canvasObsidianEmbedMeta('Roof photo|320x180')).toEqual({
+			alt: 'Roof photo',
+			width: 320,
+			height: 180
+		});
+		expect(canvasObsidianEmbedMeta('320')).toEqual({
+			alt: null,
+			width: 320,
+			height: null
+		});
+		expect(canvasMarkdownImageMeta('Roof inline|120x60')).toEqual({
+			alt: 'Roof inline',
+			width: 120,
+			height: 60
+		});
+		expect(canvasMarkdownImageMeta('120')).toEqual({
+			alt: null,
+			width: 120,
+			height: null
+		});
+
+		const imageMeta = { alt: 'Roof photo', width: 320, height: 180 };
+		expect(canvasTextEmbedFromTarget('Images/roof.svg#diagram', imageMeta)).toEqual({
+			path: 'Images/roof.svg',
+			suffix: '#diagram',
+			kind: 'image',
+			title: 'Roof photo',
+			...imageMeta
+		});
+		expect(canvasTextEmbedFromTarget('Home.md#Install Steps', { alt: 'Launch note', width: null, height: null })).toEqual({
+			path: 'Home.md',
+			suffix: '#Install Steps',
+			kind: 'note',
+			title: 'Launch note',
+			alt: 'Launch note',
+			width: null,
+			height: null
+		});
+		expect(canvasTextEmbedFromTarget('Boards/Map.canvas', { alt: 'Map board', width: null, height: null })).toEqual({
+			path: 'Boards/Map.canvas',
+			suffix: '',
+			kind: 'canvas',
+			title: 'Map board',
+			alt: 'Map board',
+			width: null,
+			height: null
+		});
+		expect(canvasTextEmbedFromTarget('Boards/Map.canvas#Card', { alt: 'Map board', width: null, height: null })).toBeNull();
+
+		expect(
+			canvasTextEmbedFromMarkdownTarget('<../Images/roof photo.svg#diagram> "Roof"', 'Boards/Board.canvas', imageMeta)
+		).toEqual({
+			path: 'Images/roof photo.svg',
+			suffix: '#diagram',
+			kind: 'image',
+			title: 'Roof photo',
+			...imageMeta
+		});
+		expect(
+			canvasTextEmbedFromMarkdownTarget('/Docs/panel.pdf?page=2', 'Boards/Board.canvas', {
+				alt: 'Panel packet',
+				width: null,
+				height: null
+			})
+		).toEqual({
+			path: 'Docs/panel.pdf',
+			suffix: '?page=2',
+			kind: 'pdf',
+			title: 'Panel packet',
+			alt: 'Panel packet',
+			width: null,
+			height: null
+		});
+		expect(canvasTextEmbedFromMarkdownTarget('../../secret.svg', 'Boards/Board.canvas', imageMeta)).toBeNull();
+
+		expect(canvasTextEmbedPreview('![[Survey Photos#Meter|site photos]]', {
+			resolveEmbedTarget: canvasTextNoteEmbedResolver(noteTargets)
+		})).toMatchObject({
+			path: 'References/Roof Photos.md',
+			suffix: '#Meter',
+			kind: 'note',
+			title: 'site photos'
+		});
+		expect(canvasTextEmbedPreview('![[Unknown Alias]]', {
+			resolveEmbedTarget: canvasTextNoteEmbedResolver(noteTargets)
+		})).toBeNull();
+		expect(isCanvasStandaloneEmbedSyntax('![[../secret.png]]')).toBe(true);
+		expect(isCanvasStandaloneEmbedSyntax('![Escaped](../../secret.png)')).toBe(true);
 	});
 
 	test('parses inline marks, explicit links, and resolved note aliases', () => {

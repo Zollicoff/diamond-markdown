@@ -132,6 +132,10 @@ Use small, pushable slices:
    alignment, escaped-pipe handling, and padded missing-cell behavior into a
    pure helper with direct coverage, keeping the main text-preview parser
    focused on block orchestration.
+- **Canvas embed parser extraction.** Move Obsidian/Markdown embed metadata
+   parsing, source-relative asset resolution, target classification, and
+   unresolved-alias fallback into a pure helper with direct coverage, keeping
+   the main text-preview parser focused on block and inline orchestration.
 - **Canvas text-card escaped inline punctuation.** Keep backslash-escaped
    Markdown inline punctuation literal in Canvas text-card previews, including
    escaped emphasis/link/image/wikilink openers, while preserving real
