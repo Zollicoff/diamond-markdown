@@ -14,6 +14,12 @@ import {
 	canvasMarkdownLinkDestination,
 	safeDecodeCanvasMarkdownUri
 } from '../src/lib/canvas/markdown-destinations';
+import {
+	canvasTextInternalTarget,
+	canvasTextMarkdownReference,
+	canvasTextTargetRouteHref,
+	splitCanvasWikilinkTarget
+} from '../src/lib/canvas/text-preview-references';
 
 const noteTargets = [
 	{ path: 'Home.md', title: 'Home', aliases: ['Launch Base'], stem: 'home' },
@@ -56,6 +62,38 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasMarkdownLinkDestination('<../Images/roof photo.svg#diagram> unquoted title')).toBeNull();
 		expect(safeDecodeCanvasMarkdownUri('References/Roof%20Photos.md#Meter')).toBe('References/Roof Photos.md#Meter');
 		expect(safeDecodeCanvasMarkdownUri('References/%E0%A4%A.md')).toBe('References/%E0%A4%A.md');
+	});
+
+	test('normalizes Canvas text-preview internal references', () => {
+		expect(canvasTextMarkdownReference('../Images/roof%20photo.svg#diagram', 'Boards/Board.canvas')).toEqual({
+			path: 'Images/roof photo.svg',
+			suffix: '#diagram'
+		});
+		expect(canvasTextMarkdownReference('/Docs/panel.pdf?page=2', 'Boards/Board.canvas')).toEqual({
+			path: 'Docs/panel.pdf',
+			suffix: '?page=2'
+		});
+		expect(canvasTextMarkdownReference('../../secret.md', 'Boards/Board.canvas')).toBeNull();
+		expect(canvasTextMarkdownReference('/../secret.md', 'Boards/Board.canvas')).toBeNull();
+		expect(canvasTextMarkdownReference('https://example.com/file.md', 'Boards/Board.canvas')).toBeNull();
+		expect(canvasTextMarkdownReference('#Local', 'Boards/Board.canvas')).toBeNull();
+
+		expect(splitCanvasWikilinkTarget('References/Roof Photos.md#Meter')).toEqual({
+			path: 'References/Roof Photos.md',
+			suffix: '#Meter'
+		});
+		const note = canvasTextInternalTarget('note', 'References/Roof Photos.md', '#Meter', 'Roof');
+		expect(note).toEqual({
+			kind: 'note',
+			path: 'References/Roof Photos.md',
+			title: 'Roof',
+			subpath: '#Meter',
+			hash: 'meter'
+		});
+		expect(note ? canvasTextTargetRouteHref('vault id', note) : null).toBe(
+			'/vault/vault%20id/note/References/Roof%20Photos.md#meter'
+		);
+		expect(canvasTextInternalTarget('canvas', 'Boards/Map.canvas', '#Nope', 'Map')).toBeNull();
 	});
 
 	test('parses inline marks, explicit links, and resolved note aliases', () => {

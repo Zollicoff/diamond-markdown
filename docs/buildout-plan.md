@@ -108,6 +108,10 @@ Use small, pushable slices:
    link/image destination scanning for Canvas text previews into a pure helper
    module with direct coverage for parenthesized paths, angle destinations,
    titles, and safe URI decoding.
+- **Canvas text-preview reference helper extraction.** Move source-relative,
+   vault-root, wikilink subpath, and route-href reference normalization out of
+   the main Canvas text-preview parser into a pure helper module with direct
+   coverage.
 - **Canvas reference preview split.** Keep Canvas file/URL reference editing
    and open/save/delete actions in `CanvasNodeReferenceEditor` while moving raw
    asset previews and Markdown note-card previews into focused presentation
