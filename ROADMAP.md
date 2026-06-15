@@ -111,9 +111,10 @@ runtime compatibility is a non-goal.
 - **Deeper Canvas parity.** Canvas previews, zoom controls, markdown-aware text
   cards with H1-H6 headings, thematic breaks, callouts, highlights,
   strikethrough, simple tables, resolved note/title/alias inline wikilinks and
-  note embed chips, explicit Canvas links and embed chips, and safe vault-local
-  asset embeds, Markdown file-card note previews, file-card subpaths, SVG
-  export, git-backed editing, and node duplication exist; full visual
+  source-relative/vault-root Markdown note/Canvas links and asset embeds, note
+  embed chips, explicit Canvas links and embed chips, Markdown file-card note
+  previews, file-card subpaths, SVG export, git-backed editing, and node
+  duplication exist; full visual
   whiteboard parity would need its own focused track.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.

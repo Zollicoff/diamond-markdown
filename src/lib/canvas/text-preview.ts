@@ -563,6 +563,23 @@ function canvasTextEmbedFromTarget(
 ): CanvasTextPreviewEmbed | null {
 	const ref = splitCanvasAssetReference(target);
 	if (!ref.path || !isCanvasVaultRelativeAssetPath(ref.path)) return null;
+	return canvasTextEmbedFromReference(ref, meta);
+}
+
+function canvasTextEmbedFromMarkdownTarget(
+	target: string,
+	sourcePath: string | null | undefined,
+	meta: Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'>
+): CanvasTextPreviewEmbed | null {
+	const ref = canvasTextMarkdownReference(target, sourcePath);
+	return ref ? canvasTextEmbedFromReference(ref, meta) : null;
+}
+
+function canvasTextEmbedFromReference(
+	ref: { path: string; suffix: string },
+	meta: Pick<CanvasTextPreviewEmbed, 'alt' | 'width' | 'height'>
+): CanvasTextPreviewEmbed | null {
+	if (!isCanvasVaultRelativeAssetPath(ref.path)) return null;
 	const title = meta.alt ?? ref.path.split('/').pop()?.replace(/\.(md|markdown|canvas)$/i, '') ?? ref.path;
 	if (/\.(md|markdown)$/i.test(ref.path)) {
 		if (ref.suffix && !normalizeCanvasFileSubpath(ref.suffix)) return null;
@@ -607,7 +624,11 @@ function canvasTextEmbedPreview(line: string, options: CanvasTextPreviewOptions 
 
 	const markdown = trimmed.match(/^!\[([^\]\n]*)]\(([^)\s]+)\)$/);
 	if (markdown) {
-		return canvasTextEmbedFromTarget(markdown[2].trim(), canvasMarkdownImageMeta(markdown[1]));
+		return canvasTextEmbedFromMarkdownTarget(
+			markdown[2].trim(),
+			options.sourcePath,
+			canvasMarkdownImageMeta(markdown[1])
+		);
 	}
 
 	return null;

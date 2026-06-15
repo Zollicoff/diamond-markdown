@@ -217,8 +217,8 @@ wikilinks such as `[[Survey Photos#Meter|site photos]]` and
 `[[Boards/Map.canvas|Map board]]`, resolved note embed chips such as
 `![[Survey Photos#Meter|Survey note]]` or `![[Home.md#Install Steps]]`,
 explicit Canvas embed chips such as `![[Boards/Map.canvas]]`, and safe
-vault-local asset embed lines such as `![[Images/roof.png]]` or
-`![Roof](Images/roof.png)`,
+vault-local asset embed lines such as `![[Images/roof.png]]`,
+`![Roof](../Images/roof.png)`, or `![Roof](/Images/roof.png)`,
 while leaving the raw card text editable. Canvas group
 nodes are rendered behind cards and can be created from the Canvas toolbar.
 Canvas node and edge colors

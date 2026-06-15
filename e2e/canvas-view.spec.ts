@@ -1005,7 +1005,8 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Survey Photos#Meter|Survey note]]',
 					'![[Boards/Map.canvas|Canvas map]]',
 					'![[Images/roof.svg|Roof photo|160x90]]',
-					'![Panel packet](Docs/panel.pdf#page=2)',
+					'![Panel packet](../Docs/panel.pdf#page=2)',
+					'![Root roof](/Images/roof.svg)',
 					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
 					'Markdown links [Launch markdown](../Home.md#Launch Plan), [Canvas markdown](Map.canvas), and [external](https://example.com)',
 					'Vault-root Markdown links [Root note](/References/Roof%20Photos.md#Meter) and [Root Canvas](/Boards/Map.canvas)',
@@ -1062,6 +1063,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('width', '160');
 	await expect(preview.locator('img[alt="Roof photo"]')).toHaveAttribute('height', '90');
 	await expect(preview.getByRole('link', { name: /Panel packet PDF/ })).toHaveAttribute('href', /\/api\/vaults\/[^/]+\/raw\/Docs\/panel\.pdf#page=2$/);
+	await expect(preview.locator('img[alt="Root roof"]')).toHaveAttribute('src', /\/api\/vaults\/[^/]+\/raw\/Images\/roof\.svg$/);
 	await expect(preview.getByRole('link', { name: /\[\[site photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md#meter$/);
 	await expect(preview.getByRole('link', { name: /\[\[Home\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Launch link\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);

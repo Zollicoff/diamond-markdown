@@ -201,6 +201,10 @@ Use small, pushable slices:
 - **Canvas vault-root Markdown links.** Resolve leading-slash Markdown
    note/Canvas links inside Canvas text cards as vault-root paths while
    retaining traversal guards for unsafe root escapes.
+- **Canvas source-relative Markdown embeds.** Resolve standard Markdown
+   image/embed syntax inside Canvas text cards relative to the source
+   `.canvas` file, while treating leading-slash targets as vault-root paths
+   and retaining traversal guards for unsafe escapes.
 - **Canvas Markdown file-card previews.** Render safe frontmatter-stripped
    Markdown note previews inside Canvas file cards that point at `.md` files,
    using the same lightweight Canvas markdown renderer and source-relative
@@ -529,9 +533,9 @@ Use small, pushable slices:
   `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
   lightweight Canvas text-card preview while leaving the raw card text editable.
 - **Canvas text-card asset embeds.** Render standalone Obsidian embeds and
-  Markdown image syntax that point at safe vault-local assets inside Canvas
-  text-card previews, using the existing raw-asset route and preserving the raw
-  editable card text.
+  source-relative or vault-root Markdown image syntax that points at safe
+  vault-local assets inside Canvas text-card previews, using the existing
+  raw-asset route and preserving the raw editable card text.
 - **Canvas text-card note and Canvas embeds.** Render explicit standalone
   `![[Note.md#Heading]]` and `![[Board.canvas]]` lines as internal preview
   chips in Canvas text cards, preserving safe heading/block subpaths and

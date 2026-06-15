@@ -192,7 +192,40 @@ test.describe('canvas text preview helpers', () => {
 				}
 			}
 		]);
+		expect(canvasTextPreviewBlocks('![Relative roof](../Images/roof%20photo.svg#diagram)', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Images/roof photo.svg',
+					suffix: '#diagram',
+					kind: 'image',
+					title: 'Relative roof',
+					alt: 'Relative roof',
+					width: null,
+					height: null
+				}
+			}
+		]);
+		expect(canvasTextPreviewBlocks('![Root panel](/Docs/panel.pdf?page=2)', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{
+				type: 'embed',
+				embed: {
+					path: 'Docs/panel.pdf',
+					suffix: '?page=2',
+					kind: 'pdf',
+					title: 'Root panel',
+					alt: 'Root panel',
+					width: null,
+					height: null
+				}
+			}
+		]);
 		expect(canvasTextEmbedHref('vault id', { path: 'Images/roof.svg', suffix: '#diagram', kind: 'image' })).toBe('/api/vaults/vault%20id/raw/Images/roof.svg#diagram');
+		expect(canvasTextEmbedHref('vault id', { path: 'Images/roof photo.svg', suffix: '#diagram', kind: 'image' })).toBe('/api/vaults/vault%20id/raw/Images/roof%20photo.svg#diagram');
 
 		const noteEmbed = canvasTextPreviewBlocks('![[Home.md#Install Steps|Launch note]]')[0];
 		if (!noteEmbed || noteEmbed.type !== 'embed') throw new Error('expected note embed');
@@ -213,6 +246,16 @@ test.describe('canvas text preview helpers', () => {
 	test('keeps unsafe or unresolved embeds literal', () => {
 		expect(canvasTextPreviewBlocks('![[../secret.png]]')).toEqual([
 			{ type: 'paragraph', inline: [{ kind: 'text', text: '![[../secret.png]]' }] }
+		]);
+		expect(canvasTextPreviewBlocks('![Escaped](../../secret.png)', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![Escaped](../../secret.png)' }] }
+		]);
+		expect(canvasTextPreviewBlocks('![Root escaped](/../secret.png)', {
+			sourcePath: 'Boards/Board.canvas'
+		})).toEqual([
+			{ type: 'paragraph', inline: [{ kind: 'text', text: '![Root escaped](/../secret.png)' }] }
 		]);
 		expect(canvasTextPreviewBlocks('![[Unknown Alias]]', {
 			resolveEmbedTarget: canvasTextNoteEmbedResolver(noteTargets)
