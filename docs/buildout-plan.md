@@ -112,6 +112,9 @@ Use small, pushable slices:
    and open/save/delete actions in `CanvasNodeReferenceEditor` while moving raw
    asset previews and Markdown note-card previews into focused presentation
    components.
+- **Canvas reference controls split.** Keep Canvas file/URL reference
+   composition in `CanvasNodeReferenceEditor` while moving editable fields and
+   open/save/delete controls into focused presentation components.
 - **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
    and file embeds from vault-local assets and copy non-image attachments into
    static publish output.
