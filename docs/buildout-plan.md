@@ -81,6 +81,10 @@ Use small, pushable slices:
 - **Git sync recovery command copy.** Keep manual recovery visible while making
   generated setup/resolution command blocks directly copyable with app-level
   toast feedback.
+- **Git sync API client extraction.** Move sync status/action request payloads
+  and tree invalidation after pull/sync out of the all-domain `vault-api`
+  client into a focused API module while preserving the public `api.*` call
+  surface.
 - **Note view split.** Extract metadata, wikilink navigation, save/reload, and
    link-create behavior from `NoteView` so the component focuses on layout and
    editor/preview switching.

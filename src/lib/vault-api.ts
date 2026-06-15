@@ -7,10 +7,11 @@
  * without explicit wiring.
  */
 
-import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, GitSyncResult, GitSyncStatus, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
+import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
 import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { canvasApi } from './api/canvas';
 import { json } from './api/request';
+import { syncApi } from './api/sync';
 import { emit } from './events';
 
 export const api = {
@@ -353,61 +354,7 @@ export const api = {
 		return res;
 	},
 
-	async syncStatus(vaultId: string): Promise<GitSyncStatus> {
-		return json(`/api/vaults/${vaultId}/sync`);
-	},
-
-	async setSyncRemote(vaultId: string, remoteUrl: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'set-remote', remoteUrl })
-		});
-	},
-
-	async checkSync(vaultId: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'check' })
-		});
-	},
-
-	async fetchSync(vaultId: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'fetch' })
-		});
-	},
-
-	async pullSync(vaultId: string): Promise<GitSyncResult> {
-		const res = await json<GitSyncResult>(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'pull' })
-		});
-		emit('tree:invalidate', { vaultId });
-		return res;
-	},
-
-	async pushSync(vaultId: string): Promise<GitSyncResult> {
-		return json(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'push' })
-		});
-	},
-
-	async syncNow(vaultId: string): Promise<GitSyncResult> {
-		const res = await json<GitSyncResult>(`/api/vaults/${vaultId}/sync`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ action: 'sync' })
-		});
-		emit('tree:invalidate', { vaultId });
-		return res;
-	},
+	...syncApi,
 
 	async plugins(vaultId: string): Promise<PluginListResponse> {
 		return json(`/api/vaults/${vaultId}/plugins`);
