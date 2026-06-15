@@ -584,6 +584,10 @@ Use small, pushable slices:
   vault-local asset URLs, media classification, subpath normalization, and URL
   node validation into a focused helper module while preserving the existing
   `view.ts` compatibility exports.
+- **Canvas color helper extraction.** Move Obsidian Canvas color
+  normalization, palette values, node CSS styles, and SVG export color helpers
+  into a focused module while preserving the existing `view.ts` compatibility
+  exports.
 - **Canvas text-preview parser extraction.** Move Canvas text-card inline,
   block, embed, wikilink, callout, and table parsing into a focused helper
   module while preserving the existing `view.ts` compatibility exports.
