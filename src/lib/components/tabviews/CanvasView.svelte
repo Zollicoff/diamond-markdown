@@ -74,7 +74,11 @@
 		canSaveCanvasNodeContent,
 		canSaveCanvasNodeColor,
 		canStartCanvasNodeMove,
-		canStartCanvasNodeResize
+		canStartCanvasNodeResize,
+		clearCanvasPointerMutationState,
+		idleCanvasMutationState,
+		patchCanvasMutationState,
+		type CanvasMutationState
 	} from '$lib/canvas/mutations';
 	import CanvasHeader from './canvas/CanvasHeader.svelte';
 	import CanvasStage from './canvas/CanvasStage.svelte';
@@ -94,14 +98,7 @@
 	let refDrafts = $state<CanvasNodeRefDrafts>({});
 	let addingNode = $state(false);
 	let addingEdge = $state(false);
-	let savingNodeId = $state<string | null>(null);
-	let movingNodeId = $state<string | null>(null);
-	let moveSavingNodeId = $state<string | null>(null);
-	let resizingNodeId = $state<string | null>(null);
-	let resizeSavingNodeId = $state<string | null>(null);
-	let deletingNodeId = $state<string | null>(null);
-	let savingEdgeId = $state<string | null>(null);
-	let deletingEdgeId = $state<string | null>(null);
+	let mutationState = $state<CanvasMutationState>(idleCanvasMutationState());
 	let edgeLabelDrafts = $state<CanvasEdgeLabelDrafts>({});
 	let edgeRoutingDrafts = $state<CanvasEdgeRoutingDrafts>({});
 	let edgeFromNodeId = $state('');
@@ -113,16 +110,6 @@
 	let linkTargets = $state<NoteLinkTarget[]>([]);
 	const linkTargetRequests = new CanvasLinkTargetRequestQueue();
 
-	const mutationState = $derived({
-		savingNodeId,
-		movingNodeId,
-		moveSavingNodeId,
-		resizingNodeId,
-		resizeSavingNodeId,
-		deletingNodeId,
-		savingEdgeId,
-		deletingEdgeId
-	});
 	const movedNodes = $derived(canvasNodesWithPosition(
 		doc?.nodes ?? [],
 		dragState ? canvasNodeDragPosition(dragState) : null
@@ -153,6 +140,10 @@
 	async function loadLinkTargets(): Promise<void> {
 		const result = await linkTargetRequests.load(vaultId, api.linkTargets);
 		if (linkTargetRequests.isCurrent(result)) linkTargets = result.targets;
+	}
+
+	function setMutationState(patch: Partial<CanvasMutationState>): void {
+		mutationState = patchCanvasMutationState(mutationState, patch);
 	}
 
 	function setCanvasZoom(zoom: number): void {
@@ -247,7 +238,7 @@
 
 	async function saveTextNode(node: CanvasNode): Promise<void> {
 		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canvasDraftChanged(node, textDrafts)) return;
-		savingNodeId = node.id;
+		setMutationState({ savingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasTextNode(vaultId, path, node.id, canvasDraftFor(node, textDrafts), doc.revision);
@@ -256,13 +247,13 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingNodeId = null;
+			setMutationState({ savingNodeId: null });
 		}
 	}
 
 	async function saveGroupLabel(node: CanvasNode): Promise<void> {
 		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canSaveCanvasGroupLabel(node, groupLabelDrafts)) return;
-		savingNodeId = node.id;
+		setMutationState({ savingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasGroupLabel(
@@ -277,7 +268,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingNodeId = null;
+			setMutationState({ savingNodeId: null });
 		}
 	}
 
@@ -285,7 +276,7 @@
 		if (!doc || !canSaveCanvasNodeContent(mutationState) || !canSaveCanvasNodeRefDraft(node, refDrafts)) return;
 		if (node.type !== 'file' && node.type !== 'link') return;
 		const draft = canvasNodeRefDraftFor(node, refDrafts);
-		savingNodeId = node.id;
+		setMutationState({ savingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasNodeReference(
@@ -303,13 +294,13 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingNodeId = null;
+			setMutationState({ savingNodeId: null });
 		}
 	}
 
 	async function saveNodeColor(node: CanvasNode, color: string): Promise<void> {
 		if (!doc || !canSaveCanvasNodeColor(mutationState)) return;
-		savingNodeId = node.id;
+		setMutationState({ savingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasNodeColor(vaultId, path, node.id, color, doc.revision);
@@ -318,7 +309,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingNodeId = null;
+			setMutationState({ savingNodeId: null });
 		}
 	}
 
@@ -331,7 +322,7 @@
 			tone: 'danger'
 		});
 		if (!confirmed) return;
-		deletingNodeId = node.id;
+		setMutationState({ deletingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.deleteCanvasNode(vaultId, path, node.id, doc.revision);
@@ -340,7 +331,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			deletingNodeId = null;
+			setMutationState({ deletingNodeId: null });
 		}
 	}
 
@@ -376,7 +367,7 @@
 			tone: 'danger'
 		});
 		if (!confirmed) return;
-		deletingEdgeId = edge.id;
+		setMutationState({ deletingEdgeId: edge.id });
 		error = null;
 		try {
 			const res = await api.deleteCanvasEdge(vaultId, path, edge.id, doc.revision);
@@ -385,13 +376,13 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			deletingEdgeId = null;
+			setMutationState({ deletingEdgeId: null });
 		}
 	}
 
 	async function saveEdgeLabel(edge: CanvasEdgeSummary): Promise<void> {
 		if (!doc || !canMutateCanvasEdge(mutationState) || !canvasEdgeLabelChanged(edge, edgeLabelDrafts)) return;
-		savingEdgeId = edge.id;
+		setMutationState({ savingEdgeId: edge.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasEdgeLabel(
@@ -406,13 +397,13 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingEdgeId = null;
+			setMutationState({ savingEdgeId: null });
 		}
 	}
 
 	async function saveEdgeColor(edge: CanvasEdgeSummary, color: string): Promise<void> {
 		if (!doc || !canMutateCanvasEdge(mutationState)) return;
-		savingEdgeId = edge.id;
+		setMutationState({ savingEdgeId: edge.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasEdgeColor(vaultId, path, edge.id, color, doc.revision);
@@ -421,13 +412,13 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingEdgeId = null;
+			setMutationState({ savingEdgeId: null });
 		}
 	}
 
 	async function saveEdgeRouting(edge: CanvasEdgeSummary): Promise<void> {
 		if (!doc || !canMutateCanvasEdge(mutationState) || !canvasEdgeRoutingChanged(edge, edgeRoutingDrafts)) return;
-		savingEdgeId = edge.id;
+		setMutationState({ savingEdgeId: edge.id });
 		error = null;
 		try {
 			const res = await api.updateCanvasEdgeRouting(
@@ -442,7 +433,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			savingEdgeId = null;
+			setMutationState({ savingEdgeId: null });
 		}
 	}
 
@@ -473,12 +464,12 @@
 		const finished = dragState;
 		cleanupDragListeners();
 		dragState = null;
-		movingNodeId = null;
+		mutationState = clearCanvasPointerMutationState(mutationState);
 
 		const node = doc?.nodes.find((candidate) => candidate.id === finished.nodeId);
 		if (!doc || !node || !canvasNodePositionChanged(node, finished.currentX, finished.currentY)) return;
 
-		moveSavingNodeId = node.id;
+		setMutationState({ moveSavingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.moveCanvasNode(
@@ -494,7 +485,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			moveSavingNodeId = null;
+			setMutationState({ moveSavingNodeId: null });
 		}
 	}
 
@@ -506,13 +497,13 @@
 		if (!isCanvasNodeDragPointer(dragState, event)) return;
 		cleanupDragListeners();
 		dragState = null;
-		movingNodeId = null;
+		mutationState = clearCanvasPointerMutationState(mutationState);
 	}
 
 	function startMoveNode(node: CanvasNode, event: PointerEvent): void {
 		if (!doc || !canStartCanvasNodeMove(mutationState)) return;
 		event.preventDefault();
-		movingNodeId = node.id;
+		setMutationState({ movingNodeId: node.id });
 		dragState = createCanvasNodeDragState(node, event, canvasZoom);
 		window.addEventListener('pointermove', moveNodePointer);
 		window.addEventListener('pointerup', handleMovePointerUp);
@@ -524,12 +515,12 @@
 		const finished = resizeState;
 		cleanupResizeListeners();
 		resizeState = null;
-		resizingNodeId = null;
+		mutationState = clearCanvasPointerMutationState(mutationState);
 
 		const node = doc?.nodes.find((candidate) => candidate.id === finished.nodeId);
 		if (!doc || !node || !canvasNodeSizeChanged(node, finished.currentWidth, finished.currentHeight)) return;
 
-		resizeSavingNodeId = node.id;
+		setMutationState({ resizeSavingNodeId: node.id });
 		error = null;
 		try {
 			const res = await api.resizeCanvasNode(
@@ -545,7 +536,7 @@
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
-			resizeSavingNodeId = null;
+			setMutationState({ resizeSavingNodeId: null });
 		}
 	}
 
@@ -557,14 +548,14 @@
 		if (!isCanvasNodeResizePointer(resizeState, event)) return;
 		cleanupResizeListeners();
 		resizeState = null;
-		resizingNodeId = null;
+		mutationState = clearCanvasPointerMutationState(mutationState);
 	}
 
 	function startResizeNode(node: CanvasNode, event: PointerEvent): void {
 		if (!doc || !canStartCanvasNodeResize(mutationState)) return;
 		event.preventDefault();
 		event.stopPropagation();
-		resizingNodeId = node.id;
+		setMutationState({ resizingNodeId: node.id });
 		resizeState = createCanvasNodeResizeState(node, event, canvasZoom);
 		window.addEventListener('pointermove', resizeNodePointer);
 		window.addEventListener('pointerup', handleResizePointerUp);
@@ -578,8 +569,7 @@
 		cleanupResizeListeners();
 		dragState = null;
 		resizeState = null;
-		movingNodeId = null;
-		resizingNodeId = null;
+		mutationState = idleCanvasMutationState();
 		canvasZoom = 1;
 		loading = true;
 		error = null;

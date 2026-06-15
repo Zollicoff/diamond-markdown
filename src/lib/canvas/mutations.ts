@@ -23,6 +23,37 @@ export interface CanvasEdgeMutationFlags {
 	disabled: boolean;
 }
 
+const IDLE_CANVAS_MUTATION_STATE: CanvasMutationState = {
+	savingNodeId: null,
+	movingNodeId: null,
+	moveSavingNodeId: null,
+	resizingNodeId: null,
+	resizeSavingNodeId: null,
+	deletingNodeId: null,
+	savingEdgeId: null,
+	deletingEdgeId: null
+};
+
+export function idleCanvasMutationState(
+	overrides: Partial<CanvasMutationState> = {}
+): CanvasMutationState {
+	return { ...IDLE_CANVAS_MUTATION_STATE, ...overrides };
+}
+
+export function patchCanvasMutationState(
+	state: CanvasMutationState,
+	patch: Partial<CanvasMutationState>
+): CanvasMutationState {
+	return { ...state, ...patch };
+}
+
+export function clearCanvasPointerMutationState(state: CanvasMutationState): CanvasMutationState {
+	return patchCanvasMutationState(state, {
+		movingNodeId: null,
+		resizingNodeId: null
+	});
+}
+
 export function canSaveCanvasNodeContent(state: CanvasMutationState): boolean {
 	return !state.savingNodeId;
 }

@@ -116,7 +116,10 @@ import {
 	canSaveCanvasNodeColor,
 	canStartCanvasNodeMove,
 	canStartCanvasNodeResize,
+	clearCanvasPointerMutationState,
+	idleCanvasMutationState,
 	isCanvasNodeDeleteDisabled,
+	patchCanvasMutationState,
 	type CanvasMutationState
 } from '../src/lib/canvas/mutations';
 
@@ -164,7 +167,8 @@ test.describe('canvas view helpers', () => {
 		expect(canvasZoomLayerStyle({ width: 640, height: 360 }, 1.25)).toBe('width: 800px; height: 450px');
 		expect(canvasBoardZoomStyle({ width: 640, height: 360 }, 0.8)).toBe('width: 640px; height: 360px; transform: scale(0.8)');
 		expect(canvasGridBackgroundSize(0.5)).toBe('18px 18px');
-		const idleMutationState = {
+		const idleMutationState = idleCanvasMutationState();
+		expect(idleMutationState).toEqual({
 			savingNodeId: null,
 			movingNodeId: null,
 			moveSavingNodeId: null,
@@ -173,7 +177,29 @@ test.describe('canvas view helpers', () => {
 			deletingNodeId: null,
 			savingEdgeId: null,
 			deletingEdgeId: null
-		} satisfies CanvasMutationState;
+		} satisfies CanvasMutationState);
+		expect(idleCanvasMutationState({ savingNodeId: 'a' })).toEqual({
+			...idleMutationState,
+			savingNodeId: 'a'
+		});
+		const activePointerState = patchCanvasMutationState(idleMutationState, {
+			movingNodeId: 'a',
+			resizingNodeId: 'b',
+			moveSavingNodeId: 'a',
+			savingEdgeId: 'edge-a-b'
+		});
+		expect(activePointerState).toEqual({
+			...idleMutationState,
+			movingNodeId: 'a',
+			resizingNodeId: 'b',
+			moveSavingNodeId: 'a',
+			savingEdgeId: 'edge-a-b'
+		});
+		expect(clearCanvasPointerMutationState(activePointerState)).toEqual({
+			...activePointerState,
+			movingNodeId: null,
+			resizingNodeId: null
+		});
 		expect(canSaveCanvasNodeContent(idleMutationState)).toBe(true);
 		expect(canSaveCanvasNodeColor(idleMutationState)).toBe(true);
 		expect(canDeleteCanvasNode(idleMutationState)).toBe(true);

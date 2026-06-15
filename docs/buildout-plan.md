@@ -544,10 +544,10 @@ Use small, pushable slices:
   artifact manifests containing source commit/ref, package and Tauri versions,
   runner platform, requested bundle targets, file sizes, and SHA-256 hashes so
   unsigned CI bundles are ready for later GitHub Release publishing policy.
-- **Canvas mutation-state helper extraction.** Move repeated Canvas node/edge
-  busy-state guards into a focused helper with deterministic coverage so the
-  Canvas view stays oriented around loading, mutation orchestration, and
-  pointer lifecycle rather than duplicated interlock logic.
+- **Canvas mutation-state helper extraction.** Centralize Canvas node/edge
+  busy-state guards, idle state creation, patching, and pointer-active clears
+  in a focused helper with deterministic coverage so the Canvas view stays
+  oriented around loading, mutation orchestration, and pointer lifecycle.
 - **Saved-search delete confirmation.** Route saved-search deletion through
   the shared in-app confirmation dialog and cover both cancel and confirm paths
   so git-backed search metadata is not removed by a single accidental chip
