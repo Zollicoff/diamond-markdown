@@ -139,6 +139,9 @@ Use small, pushable slices:
 - **Canvas reference controls split.** Keep Canvas file/URL reference
    composition in `CanvasNodeReferenceEditor` while moving editable fields and
    open/save/delete controls into focused presentation components.
+- **Canvas node chrome split.** Keep `CanvasNodeCard` focused on node-frame
+   composition and type-specific body routing while moving the drag/color/
+   duplicate header and resize handle into focused presentation components.
 - **Attachment embed compatibility.** Render Obsidian-style PDF, audio, video,
    and file embeds from vault-local assets and copy non-image attachments into
    static publish output.
