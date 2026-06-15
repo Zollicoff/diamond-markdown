@@ -620,6 +620,9 @@ Use small, pushable slices:
 - **Canvas edge layer split.** Keep Canvas board zoom, viewport measurement,
   and node-card rendering in `CanvasBoard` while moving SVG edge markers,
   edge lines, and edge labels into a focused `CanvasEdgeLayer` component.
+- **Canvas zoom controls split.** Keep Canvas viewport measurement and board
+  scaling in `CanvasBoard` while moving zoom controls, button state, and zoom
+  control styling into a focused `CanvasZoomControls` component.
 - **Canvas group node editor split.** Keep Canvas node shell/chrome and
   node-type routing in `CanvasNodeCard` while moving group label editing,
   group save state, and group delete controls into `CanvasGroupNodeEditor`.
