@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { gitSyncBusyActionLabel, type GitSyncBusyAction } from '$lib/sync/status';
+
 	interface Props {
 		canSync: boolean;
 		canCheck: boolean;
@@ -6,6 +8,7 @@
 		canPull: boolean;
 		canPush: boolean;
 		isBusy: boolean;
+		busyAction: GitSyncBusyAction | null;
 		onRefresh: () => void;
 		onSync: () => void;
 		onCheck: () => void;
@@ -21,6 +24,7 @@
 		canPull,
 		canPush,
 		isBusy,
+		busyAction,
 		onRefresh,
 		onSync,
 		onCheck,
@@ -28,15 +32,19 @@
 		onPull,
 		onPush
 	}: Props = $props();
+
+	function actionLabel(action: GitSyncBusyAction, idle: string): string {
+		return busyAction === action ? (gitSyncBusyActionLabel(action) ?? idle) : idle;
+	}
 </script>
 
 <div class="actions">
-	<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh</button>
-	<button class="action-btn primary" onclick={onSync} disabled={!canSync}>Sync now</button>
-	<button class="action-btn" onclick={onCheck} disabled={!canCheck}>Check remote</button>
-	<button class="action-btn" onclick={onFetch} disabled={!canFetch}>Fetch</button>
-	<button class="action-btn" onclick={onPull} disabled={!canPull}>Pull</button>
-	<button class="action-btn" onclick={onPush} disabled={!canPush}>Push</button>
+	<button class="action-btn" aria-busy={busyAction === 'status'} onclick={onRefresh} disabled={isBusy}>{actionLabel('status', 'Refresh')}</button>
+	<button class="action-btn primary" aria-busy={busyAction === 'sync'} onclick={onSync} disabled={!canSync}>{actionLabel('sync', 'Sync now')}</button>
+	<button class="action-btn" aria-busy={busyAction === 'check'} onclick={onCheck} disabled={!canCheck}>{actionLabel('check', 'Check remote')}</button>
+	<button class="action-btn" aria-busy={busyAction === 'fetch'} onclick={onFetch} disabled={!canFetch}>{actionLabel('fetch', 'Fetch')}</button>
+	<button class="action-btn" aria-busy={busyAction === 'pull'} onclick={onPull} disabled={!canPull}>{actionLabel('pull', 'Pull')}</button>
+	<button class="action-btn" aria-busy={busyAction === 'push'} onclick={onPush} disabled={!canPush}>{actionLabel('push', 'Push')}</button>
 </div>
 
 <style>

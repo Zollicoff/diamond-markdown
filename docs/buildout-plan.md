@@ -75,6 +75,9 @@ Use small, pushable slices:
    `GitSyncPanel`; move remaining branch/status rendering helpers into modules.
 - **Git sync component split.** Keep `GitSyncPanel` focused on orchestration
    by moving status-card and recovery-state markup into dedicated components.
+- **Git sync busy-state clarity.** Keep conservative sync semantics while
+  making in-flight operations explicit in the remote form, status card, action
+  bar, and recovery panels.
 - **Note view split.** Extract metadata, wikilink navigation, save/reload, and
    link-create behavior from `NoteView` so the component focuses on layout and
    editor/preview switching.

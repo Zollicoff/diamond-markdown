@@ -2,9 +2,12 @@ import type { GitSyncStatus } from '../types';
 
 export type GitSyncIndicator = 'loading' | 'ok' | 'warn' | 'danger';
 export type GitSyncRecoveryKind = 'setup' | 'local-changes' | 'remote-changes' | 'conflicts' | 'diverged' | null;
+export type GitSyncBusyAction = 'status' | 'sync' | 'check' | 'fetch' | 'pull' | 'push' | 'remote';
 
 export interface GitSyncUiState {
 	isBusy: boolean;
+	busyAction: GitSyncBusyAction | null;
+	busyLabel: string | null;
 	canSaveRemote: boolean;
 	canCheck: boolean;
 	canFetch: boolean;
@@ -13,6 +16,18 @@ export interface GitSyncUiState {
 	canSync: boolean;
 	indicator: GitSyncIndicator;
 	recovery: GitSyncRecoveryKind;
+}
+
+export function gitSyncBusyActionLabel(action: GitSyncBusyAction | null): string | null {
+	if (!action) return null;
+	if (action === 'status') return 'Refreshing...';
+	if (action === 'sync') return 'Syncing...';
+	if (action === 'check') return 'Checking...';
+	if (action === 'fetch') return 'Fetching...';
+	if (action === 'pull') return 'Pulling...';
+	if (action === 'push') return 'Pushing...';
+	if (action === 'remote') return 'Saving...';
+	return null;
 }
 
 export function classifyGitSyncRecovery(status: GitSyncStatus | null): GitSyncRecoveryKind {
@@ -37,12 +52,14 @@ export function gitSyncIndicator(status: GitSyncStatus | null): GitSyncIndicator
 export function buildGitSyncUiState(
 	status: GitSyncStatus | null,
 	remoteUrl: string,
-	busy: string | null
+	busy: GitSyncBusyAction | null
 ): GitSyncUiState {
 	const isBusy = busy !== null;
 	const canRunSync = !!status && status.initialized && !!status.remoteUrl && status.clean && status.conflicted.length === 0 && !status.diverged && !isBusy;
 	return {
 		isBusy,
+		busyAction: busy,
+		busyLabel: gitSyncBusyActionLabel(busy),
 		canSaveRemote: remoteUrl.trim().length > 0 && (status?.initialized ?? true) && !isBusy,
 		canCheck: !!status?.initialized && !!status.remoteUrl && !isBusy,
 		canFetch: !!status?.initialized && !!status.remoteUrl && !isBusy,

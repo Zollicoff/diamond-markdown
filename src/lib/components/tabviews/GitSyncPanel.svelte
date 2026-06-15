@@ -4,7 +4,7 @@
 	import type { GitSyncStatus } from '$lib/types';
 	import { buildGitSyncResolutionCommands, buildGitSyncSetupCommands } from '$lib/sync/commands';
 	import { buildGitSyncRecoveryCopy } from '$lib/sync/recovery';
-	import { buildGitSyncUiState } from '$lib/sync/status';
+	import { buildGitSyncUiState, type GitSyncBusyAction } from '$lib/sync/status';
 	import GitSyncActionBar from './sync/GitSyncActionBar.svelte';
 	import GitSyncRecoveryPanel from './sync/GitSyncRecoveryPanel.svelte';
 	import GitSyncRemoteForm from './sync/GitSyncRemoteForm.svelte';
@@ -19,7 +19,7 @@
 
 	let status = $state<GitSyncStatus | null>(null);
 	let remoteUrl = $state('');
-	let busy = $state<string | null>(null);
+	let busy = $state<GitSyncBusyAction | null>(null);
 	let message = $state<string | null>(null);
 	let error = $state<string | null>(null);
 
@@ -46,7 +46,7 @@
 	}
 
 	async function run<T extends { status: GitSyncStatus; message: string }>(
-		name: string,
+		name: Exclude<GitSyncBusyAction, 'status'>,
 		fn: () => Promise<T>
 	): Promise<void> {
 		busy = name;
@@ -76,11 +76,12 @@
 		{remoteUrl}
 		canSaveRemote={ui.canSaveRemote}
 		isBusy={ui.isBusy}
+		busyAction={ui.busyAction}
 		onRemoteUrlChange={(value) => (remoteUrl = value)}
 		onSaveRemote={() => run('remote', () => api.setSyncRemote(vaultId, remoteUrl))}
 	/>
 
-	<GitSyncStatusCard {status} indicator={ui.indicator} />
+	<GitSyncStatusCard {status} indicator={ui.indicator} busyLabel={ui.busyLabel} />
 
 	<GitSyncActionBar
 		canSync={ui.canSync}
@@ -89,6 +90,7 @@
 		canPull={ui.canPull}
 		canPush={ui.canPush}
 		isBusy={ui.isBusy}
+		busyAction={ui.busyAction}
 		onRefresh={loadStatus}
 		onSync={() => run('sync', () => api.syncNow(vaultId))}
 		onCheck={() => run('check', () => api.checkSync(vaultId))}
@@ -106,6 +108,7 @@
 		canSync={ui.canSync}
 		canPull={ui.canPull}
 		isBusy={ui.isBusy}
+		busyAction={ui.busyAction}
 		onSync={() => run('sync', () => api.syncNow(vaultId))}
 		onPull={() => run('pull', () => api.pullSync(vaultId))}
 		onRefresh={loadStatus}

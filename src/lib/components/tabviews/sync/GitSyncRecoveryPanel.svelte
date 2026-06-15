@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { GitSyncStatus } from '$lib/types';
 	import type { GitSyncRecoveryCopy } from '$lib/sync/recovery';
-	import type { GitSyncRecoveryKind } from '$lib/sync/status';
+	import { gitSyncBusyActionLabel, type GitSyncBusyAction, type GitSyncRecoveryKind } from '$lib/sync/status';
 	import {
 		buildGitSyncDivergedSections,
 		buildGitSyncLocalChangeItems,
@@ -20,6 +20,7 @@
 		canSync: boolean;
 		canPull: boolean;
 		isBusy: boolean;
+		busyAction: GitSyncBusyAction | null;
 		onSync?: () => void;
 		onPull?: () => void;
 		onRefresh?: () => void;
@@ -34,6 +35,7 @@
 		canSync,
 		canPull,
 		isBusy,
+		busyAction,
 		onSync,
 		onPull,
 		onRefresh
@@ -43,6 +45,10 @@
 	const remoteChangeItems = $derived(buildGitSyncPathItems(status?.remoteChanges ?? []));
 	const conflictItems = $derived(buildGitSyncPathItems(status?.conflicted ?? []));
 	const divergedSections = $derived.by(() => status ? buildGitSyncDivergedSections(status) : []);
+
+	function actionLabel(action: GitSyncBusyAction, idle: string): string {
+		return busyAction === action ? (gitSyncBusyActionLabel(action) ?? idle) : idle;
+	}
 </script>
 
 {#if recovery === 'setup' && copy}
@@ -57,9 +63,9 @@
 		<GitSyncRecoveryHeader {copy} />
 		<p>{copy.body}</p>
 		<div class="panel-actions">
-			<button class="action-btn primary" onclick={() => onSync?.()} disabled={!canSync}>Sync now</button>
-			<button class="action-btn" onclick={() => onPull?.()} disabled={!canPull}>Pull only</button>
-			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh</button>
+			<button class="action-btn primary" aria-busy={busyAction === 'sync'} onclick={() => onSync?.()} disabled={!canSync}>{actionLabel('sync', 'Sync now')}</button>
+			<button class="action-btn" aria-busy={busyAction === 'pull'} onclick={() => onPull?.()} disabled={!canPull}>{actionLabel('pull', 'Pull only')}</button>
+			<button class="action-btn" aria-busy={busyAction === 'status'} onclick={onRefresh} disabled={isBusy}>{actionLabel('status', 'Refresh')}</button>
 		</div>
 		<div class="change-box remote incoming-files">
 			<h3>Incoming files</h3>
@@ -74,7 +80,7 @@
 		<GitSyncRecoveryHeader {copy} />
 		<p>{copy.body}</p>
 		<div class="panel-actions">
-			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh after commit or stash</button>
+			<button class="action-btn" aria-busy={busyAction === 'status'} onclick={onRefresh} disabled={isBusy}>{actionLabel('status', 'Refresh after commit or stash')}</button>
 		</div>
 		<GitSyncCommandBlock commands={resolutionCommands} />
 		<div class="change-box local local-files">
@@ -97,7 +103,7 @@
 		<GitSyncRecoveryHeader {copy} />
 		<p>{copy.body}</p>
 		<div class="panel-actions">
-			<button class="action-btn" onclick={onRefresh} disabled={isBusy}>Refresh after resolve</button>
+			<button class="action-btn" aria-busy={busyAction === 'status'} onclick={onRefresh} disabled={isBusy}>{actionLabel('status', 'Refresh after resolve')}</button>
 		</div>
 		<GitSyncCommandBlock commands={resolutionCommands} />
 

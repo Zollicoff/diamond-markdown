@@ -5,16 +5,17 @@
 	interface Props {
 		status: GitSyncStatus | null;
 		indicator: GitSyncIndicator;
+		busyLabel?: string | null;
 	}
 
-	let { status, indicator }: Props = $props();
+	let { status, indicator, busyLabel = null }: Props = $props();
 </script>
 
 <div class="sync-status">
 	<div class="status-main">
 		<div class="dot" class:ok={indicator === 'ok'} class:warn={indicator === 'warn'} class:danger={indicator === 'danger'}></div>
 		<div class="status-copy">
-			<div class="status-title">{status?.message ?? 'Checking sync status...'}</div>
+			<div class="status-title">{busyLabel ?? status?.message ?? 'Checking sync status...'}</div>
 			<div class="status-meta mono">
 				{#if status}
 					{#if status.initialized}

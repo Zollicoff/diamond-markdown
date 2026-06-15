@@ -3,6 +3,7 @@ import type { GitSyncStatus } from '../src/lib/types';
 import {
 	buildGitSyncUiState,
 	classifyGitSyncRecovery,
+	gitSyncBusyActionLabel,
 	gitSyncIndicator
 } from '../src/lib/sync/status';
 import { buildGitSyncRecoveryCopy } from '../src/lib/sync/recovery';
@@ -79,6 +80,8 @@ test.describe('git sync UI state', () => {
 		const busy = buildGitSyncUiState(status({ canPull: true, canPush: false, behind: 1 }), 'https://github.com/owner/repo.git', 'pull');
 		expect(busy).toMatchObject({
 			isBusy: true,
+			busyAction: 'pull',
+			busyLabel: 'Pulling...',
 			canSaveRemote: false,
 			canCheck: false,
 			canFetch: false,
@@ -130,6 +133,17 @@ test.describe('git sync UI state', () => {
 			canSync: false,
 			recovery: 'setup'
 		});
+	});
+
+	test('labels in-flight sync actions explicitly', () => {
+		expect(gitSyncBusyActionLabel(null)).toBeNull();
+		expect(gitSyncBusyActionLabel('status')).toBe('Refreshing...');
+		expect(gitSyncBusyActionLabel('sync')).toBe('Syncing...');
+		expect(gitSyncBusyActionLabel('check')).toBe('Checking...');
+		expect(gitSyncBusyActionLabel('fetch')).toBe('Fetching...');
+		expect(gitSyncBusyActionLabel('pull')).toBe('Pulling...');
+		expect(gitSyncBusyActionLabel('push')).toBe('Pushing...');
+		expect(gitSyncBusyActionLabel('remote')).toBe('Saving...');
 	});
 
 	test('builds setup and recovery copy with matching operator commands', () => {

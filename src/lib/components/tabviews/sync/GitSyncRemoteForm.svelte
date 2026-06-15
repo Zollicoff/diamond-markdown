@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { gitSyncBusyActionLabel, type GitSyncBusyAction } from '$lib/sync/status';
+
 	interface Props {
 		remoteUrl: string;
 		canSaveRemote: boolean;
 		isBusy: boolean;
+		busyAction: GitSyncBusyAction | null;
 		onRemoteUrlChange: (value: string) => void;
 		onSaveRemote: () => void;
 	}
@@ -11,9 +14,12 @@
 		remoteUrl,
 		canSaveRemote,
 		isBusy,
+		busyAction,
 		onRemoteUrlChange,
 		onSaveRemote
 	}: Props = $props();
+
+	const saveLabel = $derived(busyAction === 'remote' ? (gitSyncBusyActionLabel(busyAction) ?? 'Saving...') : 'Save');
 </script>
 
 <div class="row">
@@ -38,7 +44,7 @@
 			oninput={(event) => onRemoteUrlChange(event.currentTarget.value)}
 			disabled={isBusy}
 		/>
-		<button class="small-btn" disabled={!canSaveRemote}>Save</button>
+		<button class="small-btn" aria-busy={busyAction === 'remote'} disabled={!canSaveRemote}>{saveLabel}</button>
 	</form>
 </div>
 
