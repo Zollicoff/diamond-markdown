@@ -45,8 +45,15 @@
 		{:else}
 			<span class="wikilink">[[{part.text}]]</span>
 		{/if}
-	{:else if part.kind === 'link' && part.href}
-		<a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+	{:else if part.kind === 'link'}
+		{@const href = canvasTextInlineTargetHref(vaultId, part) ?? part.href}
+		{#if part.target && href}
+			<a href={href} onclick={(event) => openInternalInline(part, event)}>{part.text}</a>
+		{:else if href}
+			<a href={href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+		{:else}
+			{part.text}
+		{/if}
 	{:else}
 		{part.text}
 	{/if}

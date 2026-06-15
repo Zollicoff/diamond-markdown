@@ -43,6 +43,42 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', explicit[1])).toBe('/vault/vault%20id/note/Home.md#install-steps');
 		expect(canvasTextInlineTargetHref('vault id', explicit[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
 
+		const markdownLinks = canvasTextPreviewInlines(
+			'Review [Launch markdown](Home.md#Launch Plan), [Canvas markdown](Boards/Map.canvas), [site](https://example.com), [panel](Docs/panel.pdf#page=2), and [unsafe](../secret.md)'
+		);
+		expect(markdownLinks).toEqual([
+			{ kind: 'text', text: 'Review ' },
+			{
+				kind: 'link',
+				text: 'Launch markdown',
+				target: {
+					kind: 'note',
+					path: 'Home.md',
+					title: 'Launch markdown',
+					subpath: '#Launch Plan',
+					hash: 'launch-plan'
+				}
+			},
+			{ kind: 'text', text: ', ' },
+			{
+				kind: 'link',
+				text: 'Canvas markdown',
+				target: {
+					kind: 'canvas',
+					path: 'Boards/Map.canvas',
+					title: 'Canvas markdown',
+					subpath: null,
+					hash: null
+				}
+			},
+			{ kind: 'text', text: ', ' },
+			{ kind: 'link', text: 'site', href: 'https://example.com' },
+			{ kind: 'text', text: ', [panel](Docs/panel.pdf#page=2), and [unsafe](../secret.md)' }
+		]);
+		expect(canvasTextInlineTargetHref('vault id', markdownLinks[1])).toBe('/vault/vault%20id/note/Home.md#launch-plan');
+		expect(canvasTextInlineTargetHref('vault id', markdownLinks[3])).toBe('/vault/vault%20id/canvas/Boards/Map.canvas');
+		expect(canvasTextInlineTargetHref('vault id', markdownLinks[5])).toBeNull();
+
 		const resolved = canvasTextPreviewInlines('Review [[Survey Photos#Meter|site photos]] and [[Launch Base]]', {
 			resolveWikilinkTarget: canvasTextNoteWikilinkResolver(noteTargets)
 		});

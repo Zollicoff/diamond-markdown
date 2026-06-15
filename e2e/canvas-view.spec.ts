@@ -969,6 +969,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'![[Images/roof.svg|Roof photo|160x90]]',
 					'![Panel packet](Docs/panel.pdf#page=2)',
 					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
+					'Markdown links [Launch markdown](Home.md#Launch Plan), [Canvas markdown](Boards/Map.canvas), and [external](https://example.com)',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'- [ ] Missing [[Missing Alias]] stays visible',
@@ -1026,6 +1027,10 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.getByRole('link', { name: /\[\[Home\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Launch link\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
 	await expect(preview.getByRole('link', { name: /\[\[Map board\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
+	await expect(preview.getByRole('link', { name: 'Launch markdown' })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/Home\.md#launch-plan$/);
+	await expect(preview.getByRole('link', { name: 'Canvas markdown' })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
+	await expect(preview.getByRole('link', { name: 'external' })).toHaveAttribute('href', 'https://example.com');
+	await expect(preview.getByRole('link', { name: 'external' })).toHaveAttribute('target', '_blank');
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('del')).toHaveText('old bill');
 	await expect(preview.getByRole('link', { name: /\[\[Roof Photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md$/);

@@ -384,6 +384,23 @@ function canvasTextInlineTargetFromWikilink(target: string, label: string | unde
 	return null;
 }
 
+function canvasTextInlineFromMarkdownLink(label: string, rawHref: string): CanvasTextPreviewInline | null {
+	const text = label.trim();
+	const href = rawHref.trim();
+	if (!text || !href) return null;
+	if (/^https?:\/\/[^)\s]+$/i.test(href)) return { kind: 'link', text, href };
+	const ref = splitCanvasAssetReference(href);
+	if (/\.(md|markdown)$/i.test(ref.path)) {
+		const target = canvasTextInternalTarget('note', ref.path, ref.suffix, text);
+		return target ? { kind: 'link', text, target } : null;
+	}
+	if (/\.canvas$/i.test(ref.path)) {
+		const target = canvasTextInternalTarget('canvas', ref.path, ref.suffix, text);
+		return target ? { kind: 'link', text, target } : null;
+	}
+	return null;
+}
+
 function splitCanvasWikilinkTarget(target: string): { path: string; suffix: string } {
 	const normalized = target.trim().replace(/\\/g, '/');
 	const marker = normalized.indexOf('#');
@@ -565,11 +582,9 @@ function firstInlineMatch(
 		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
 		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
 		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
-		inlineCandidate(value, /\[([^\]\n]+)]\((https?:\/\/[^)\s]+)\)/i, (match) => ({
-			kind: 'link',
-			text: match[1],
-			href: match[2]
-		})),
+		inlineCandidate(value, /\[([^\]\n]+)]\(([^)\n]+)\)/, (match) =>
+			canvasTextInlineFromMarkdownLink(match[1], match[2])
+		),
 		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
 			const rawTarget = match[1].trim();
 			const label = match[2]?.trim();
@@ -590,11 +605,12 @@ function firstInlineMatch(
 function inlineCandidate(
 	value: string,
 	pattern: RegExp,
-	createInline: (match: RegExpMatchArray) => CanvasTextPreviewInline
+	createInline: (match: RegExpMatchArray) => CanvasTextPreviewInline | null
 ): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
 	const match = value.match(pattern);
 	if (!match || match.index === undefined || !match[0]) return null;
-	return { index: match.index, raw: match[0], inline: createInline(match) };
+	const inline = createInline(match);
+	return inline ? { index: match.index, raw: match[0], inline } : null;
 }
 
 function inlinePriority(kind: CanvasTextPreviewInlineKind): number {

@@ -504,6 +504,10 @@ Use small, pushable slices:
   wikilinks through the vault index by path, title, stem, or alias, preserving
   heading/block subpaths while leaving missing links inert and `.canvas` links
   explicit.
+- **Canvas text-card Markdown note links.** Route safe standard Markdown
+  `[label](Note.md#Heading)` and `[label](Board.canvas)` links inside Canvas
+  text-card previews through the same internal note/Canvas navigation while
+  leaving unsupported or unsafe local links literal.
 - **Canvas text-card resolved note embeds.** Resolve standalone Canvas
   text-card note embed chips through the same vault index by path, title,
   stem, or alias, preserving heading/block subpaths while leaving missing
