@@ -259,8 +259,8 @@ Use small, pushable slices:
    the setting is absent or unsafe.
 - **Search view presentation split.** Keep query execution, saved-search
    mutations, result paging, and virtual window orchestration in `SearchView`
-   while moving header controls, saved-search chrome, and result-list DOM/CSS
-   into focused presentation components.
+   while moving query controls, display/facet controls, saved-search chrome,
+   and result-list DOM/CSS into focused presentation components.
 - **Search session helper extraction.** Move Search tab request limits,
    pagination offsets, load-more gating, result merging, saved-search draft
    naming, save-button state, and abort classification into a focused search
@@ -555,9 +555,10 @@ Use small, pushable slices:
 - **Canvas destructive-action confirmations.** Route Canvas node and edge
   removal through shared in-app confirmation dialogs and cover cancel/confirm
   paths so board edits do not accidentally prune cards or connected edges.
-- **Saved-search presentation split.** Keep search query, grouping, facets,
-  and result orchestration in `SearchHeader`/`SearchView` while moving the
-  saved-search name/chip controls into a focused presentation component.
+- **Search header controls split.** Keep `SearchHeader` focused on composing
+  the header surface and result-status copy while moving query/mode/save
+  controls and group/folder facet controls into focused presentation
+  components.
 - **Canvas text-card heading/rule compatibility.** Render H1-H6 headings and
   Markdown thematic breaks inside Canvas text-card previews while preserving
   the raw editable card text.
