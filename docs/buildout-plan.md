@@ -563,6 +563,9 @@ Use small, pushable slices:
   readiness, samples, and top-level import composition while moving Obsidian
   core-plugin, hotkey, bookmark, and community-plugin migration guidance into
   focused presentation components.
+- **Canvas edge list item split.** Keep `CanvasEdgeList` focused on edge-list
+  composition while moving each edge's label, color, routing, and delete
+  controls into a focused row component.
 - **Canvas text-card heading/rule compatibility.** Render H1-H6 headings and
   Markdown thematic breaks inside Canvas text-card previews while preserving
   the raw editable card text.
