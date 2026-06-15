@@ -559,6 +559,10 @@ Use small, pushable slices:
   the header surface and result-status copy while moving query/mode/save
   controls and group/folder facet controls into focused presentation
   components.
+- **Import checklist guidance split.** Keep `VaultImportChecklist` focused on
+  readiness, samples, and top-level import composition while moving Obsidian
+  core-plugin, hotkey, bookmark, and community-plugin migration guidance into
+  focused presentation components.
 - **Canvas text-card heading/rule compatibility.** Render H1-H6 headings and
   Markdown thematic breaks inside Canvas text-card previews while preserving
   the raw editable card text.
