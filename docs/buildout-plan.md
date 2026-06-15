@@ -588,6 +588,10 @@ Use small, pushable slices:
   normalization, palette values, node CSS styles, and SVG export color helpers
   into a focused module while preserving the existing `view.ts` compatibility
   exports.
+- **Draft unsigned desktop release publishing.** Extend the desktop workflow
+  so `v*` tags wait for the cross-platform artifact matrix, package each
+  unsigned platform artifact directory, and create or update a draft GitHub
+  Release while keeping signed/notarized public release claims out of scope.
 - **Canvas text-preview parser extraction.** Move Canvas text-card inline,
   block, embed, wikilink, callout, and table parsing into a focused helper
   module while preserving the existing `view.ts` compatibility exports.

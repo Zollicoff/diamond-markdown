@@ -179,6 +179,12 @@ Required:
 
 For the full desktop release plan, see `docs/desktop-release.md`.
 
+For unsigned desktop release rehearsal, push a `v*` tag only after the release
+gate is clean. The desktop workflow must complete the macOS, Windows, and Linux
+matrix, then create or update a draft GitHub Release with zipped unsigned
+platform artifact directories attached. Do not publish that draft as a public
+signed release until signing, notarization, and installer policy are ready.
+
 The Playwright webServer must remain launched through
 `scripts/playwright-webserver.mjs` instead of inline shell syntax, and release
 Playwright should stay routed through `scripts/verify-playwright-batches.mjs`

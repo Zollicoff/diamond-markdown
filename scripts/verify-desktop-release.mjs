@@ -39,6 +39,20 @@ function requireScript(pkg, name) {
 	if (!pkg.scripts?.[name]) errors.push(`Missing package script: ${name}`);
 }
 
+function readText(rel) {
+	const abs = path.join(repoRoot, rel);
+	try {
+		return fs.readFileSync(abs, 'utf-8');
+	} catch (err) {
+		errors.push(`${rel} is not readable: ${err instanceof Error ? err.message : String(err)}`);
+		return '';
+	}
+}
+
+function requireText(text, needle, label) {
+	if (!text.includes(needle)) errors.push(`Desktop workflow is missing ${label}.`);
+}
+
 function hostTriple() {
 	try {
 		return execFileSync('rustc', ['--print', 'host-tuple'], { cwd: repoRoot, encoding: 'utf-8' }).trim();
@@ -83,6 +97,7 @@ function checkGitIgnored(rel) {
 const pkg = readJson('package.json');
 const tauri = readJson('src-tauri/tauri.conf.json');
 const sidecar = readJson('src-tauri/tauri.sidecar.conf.json');
+const desktopWorkflow = readText('.github/workflows/desktop-release.yml');
 
 for (const script of [
 	'build',
@@ -104,6 +119,14 @@ if (tauri.bundle?.targets !== 'all') errors.push('Tauri bundle.targets should re
 if (pkg.scripts?.['desktop:build:self-contained'] !== 'node scripts/build-desktop-artifacts.mjs') {
 	errors.push('desktop:build:self-contained must use scripts/build-desktop-artifacts.mjs for CI-safe bundle target selection.');
 }
+
+requireText(desktopWorkflow, "tags:\n      - 'v*'", 'the v* tag release trigger');
+requireText(desktopWorkflow, 'publish-draft-release:', 'the draft release publishing job');
+requireText(desktopWorkflow, "if: startsWith(github.ref, 'refs/tags/v')", 'the tag-only draft release guard');
+requireText(desktopWorkflow, 'actions/download-artifact@v4', 'desktop artifact download before release publishing');
+requireText(desktopWorkflow, 'contents: write', 'release job contents write permission');
+requireText(desktopWorkflow, 'gh release create', 'GitHub Release creation');
+requireText(desktopWorkflow, 'gh release upload', 'GitHub Release upload/update path');
 
 if (tauri.bundle?.resources?.['../build/'] !== 'backend/build') {
 	errors.push('Tauri bundle resources must map ../build/ to backend/build.');

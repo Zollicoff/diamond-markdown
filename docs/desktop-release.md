@@ -2,8 +2,9 @@
 
 Diamond's desktop shell is releaseable only when the web app, Node backend
 resources, Tauri bundle config, and host-specific Node sidecar are all prepared
-for the target platform. The current automation verifies the current host. It
-does not yet publish signed cross-platform artifacts.
+for the target platform. The current automation verifies the current host and
+can rehearse unsigned cross-platform publishing from release tags. It does not
+yet publish signed/notarized cross-platform artifacts.
 
 ## Current-Host Preflight
 
@@ -117,19 +118,22 @@ Each matrix entry runs on macOS, Windows, and Linux:
 - `npm run desktop:write-artifact-manifest`
 
 The workflow uploads `src-tauri/target/release/bundle/**` as unsigned desktop
-artifacts for each platform, including the generated manifest. The macOS CI
-target is `.app`, not `.dmg`, because DMG packaging runs Finder AppleScript
-and belongs with the signed release publishing step. The release verifier is
-runner-shell neutral: Playwright fixture setup and the preview server are launched through
+artifacts for each platform, including the generated manifest. On `v*` tag
+pushes, it waits for the full matrix, downloads the uploaded platform artifact
+directories, zips each directory, and creates or updates a draft GitHub Release
+with those unsigned archives attached. The macOS CI target is `.app`, not
+`.dmg`, because DMG packaging runs Finder AppleScript and belongs with the
+signed release publishing step. The release verifier is runner-shell neutral:
+Playwright fixture setup and the preview server are launched through
 `scripts/playwright-webserver.mjs`, full-suite Playwright runs are batched
 through `scripts/verify-playwright-batches.mjs`, system Chrome/Edge is used
 when available instead of downloading Playwright browsers in CI, and
 `scripts/verify-release.mjs` resolves `npm.cmd` on Windows.
 
 The workflow does not make a signed public release by itself. Signing,
-notarization, release-note generation, and attaching artifacts to a GitHub
-Release remain explicit release-runner responsibilities until those credentials
-and policies are configured.
+notarization, final release notes, and public installer policy remain explicit
+release-runner responsibilities until those credentials and policies are
+configured.
 
 ## Claim Boundary
 
@@ -139,10 +143,12 @@ It is accurate to claim:
 - Current-host self-contained bundle inputs can be verified.
 - GitHub Actions is configured to build and upload unsigned self-contained
   desktop artifacts and SHA-256 manifests across the configured matrix.
+- `v*` release tags create or update a draft GitHub Release with zipped
+  unsigned platform artifact directories attached.
 - The release plan identifies required sidecars, signing inputs, artifact
   manifests, and artifacts.
 
 Do not claim signed cross-platform desktop release publishing is shipped until
 the matrix workflow is verified with the required signing/notarization secrets,
-DMG or installer policy is finalized, and artifacts are attached to a GitHub
-Release.
+DMG or installer policy is finalized, and signed/notarized artifacts are
+attached to a public GitHub Release.

@@ -100,6 +100,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] **Current-platform self-contained desktop runtime** — optional Tauri sidecar config plus `desktop:prepare-node-sidecar` / `desktop:build:self-contained` scripts bundle the current host's Node runtime instead of requiring system Node.
 - [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
 - [x] **Unsigned desktop artifact CI** — `.github/workflows/desktop-release.yml` runs the web release gate, desktop preflight, self-contained Tauri build, SHA-256 artifact manifest generation, and unsigned bundle artifact upload on macOS / Windows / Linux.
+- [x] **Draft unsigned release publishing** — `v*` tag pushes create or update a draft GitHub Release with zipped unsigned platform artifact directories attached after the full desktop artifact matrix passes.
 - [ ] **Signed cross-platform release publishing** — configure signing/notarization secrets, release notes, and GitHub Release attachment policy for every published macOS / Windows / Linux target.
 
 Deliberately smaller plugin surface than Obsidian's — too much API = too much
