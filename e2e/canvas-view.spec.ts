@@ -1020,6 +1020,7 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 					'Review [[Survey Photos#Meter|site photos]], [[Home#Launch Plan]], [[Home.md#Launch Plan|Launch link]], and [[Boards/Map.canvas|Map board]]',
 					'Markdown links [Launch markdown](../Home.md#Launch Plan), [Canvas markdown](Map.canvas), and [external](https://example.com)',
 					'Vault-root Markdown links [Root note](/References/Roof%20Photos.md#Meter) and [Root Canvas](/Boards/Map.canvas)',
+					'Escaped markers \\*literal\\*, \\[[Home]], \\[site](https://example.com), and \\![Roof](../Images/roof.svg)',
 					'- [x] Capture **utility bill** and ~~old bill~~',
 					'- [ ] Upload [[Roof Photos]]',
 					'- [ ] Missing [[Missing Alias]] stays visible',
@@ -1091,6 +1092,9 @@ test('canvas text cards render a safe markdown preview while remaining editable'
 	await expect(preview.getByRole('link', { name: 'Root Canvas' })).toHaveAttribute('href', /\/vault\/[^/]+\/canvas\/Boards\/Map\.canvas$/);
 	await expect(preview.getByRole('link', { name: 'external' })).toHaveAttribute('href', 'https://example.com');
 	await expect(preview.getByRole('link', { name: 'external' })).toHaveAttribute('target', '_blank');
+	await expect(preview).toContainText('Escaped markers *literal*, [[Home]], [site](https://example.com), and ![Roof](../Images/roof.svg)');
+	await expect(preview.locator('.wikilink').filter({ hasText: '[[Home]]' })).toHaveCount(1);
+	await expect(preview.locator('img[alt="Roof"]')).toHaveCount(0);
 	await expect(preview.locator('strong').first()).toHaveText('utility bill');
 	await expect(preview.locator('del')).toHaveText('old bill');
 	await expect(preview.getByRole('link', { name: /\[\[Roof Photos\]\]/ })).toHaveAttribute('href', /\/vault\/[^/]+\/note\/References\/Roof%20Photos\.md$/);

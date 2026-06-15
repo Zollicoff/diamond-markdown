@@ -118,6 +118,10 @@ Use small, pushable slices:
 - **Canvas text-card escaped table pipes.** Preserve escaped pipe characters
    (`\|`) inside Canvas text-card Markdown table cells while still splitting on
    real column delimiters, with parser and browser coverage.
+- **Canvas text-card escaped inline punctuation.** Keep backslash-escaped
+   Markdown inline punctuation literal in Canvas text-card previews, including
+   escaped emphasis/link/image/wikilink openers, while preserving real
+   unescaped inline formatting and navigation.
 - **Canvas reference preview split.** Keep Canvas file/URL reference editing
    and open/save/delete actions in `CanvasNodeReferenceEditor` while moving raw
    asset previews and Markdown note-card previews into focused presentation
@@ -568,6 +572,10 @@ Use small, pushable slices:
 - **Canvas text-card highlight and strikethrough.** Render Obsidian-style
   `==highlight==` and common Markdown `~~strikethrough~~` inline marks in the
   lightweight Canvas text-card preview while leaving the raw card text editable.
+- **Canvas text-card escaped inline punctuation.** Preserve backslash-escaped
+  Markdown punctuation such as `\*literal\*`, `\[[Note]]`, and
+  `\[label](target)` as literal preview text while still parsing real
+  unescaped inline marks and links.
 - **Canvas text-card asset embeds.** Render standalone Obsidian embeds and
   source-relative or vault-root Markdown image syntax that points at safe
   vault-local assets inside Canvas text-card previews, using the existing

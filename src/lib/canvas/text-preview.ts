@@ -106,11 +106,11 @@ export function canvasTextPreviewInlines(value: string, options: CanvasTextPrevi
 	while (remaining.length > 0) {
 		const match = firstInlineMatch(remaining, options);
 		if (!match) {
-			inlines.push({ kind: 'text', text: remaining });
+			inlines.push({ kind: 'text', text: canvasMarkdownUnescapeText(remaining) });
 			break;
 		}
 		if (match.index > 0) {
-			inlines.push({ kind: 'text', text: remaining.slice(0, match.index) });
+			inlines.push({ kind: 'text', text: canvasMarkdownUnescapeText(remaining.slice(0, match.index)) });
 		}
 		inlines.push(match.inline);
 		remaining = remaining.slice(match.index + match.raw.length);
@@ -331,7 +331,7 @@ function canvasTextInlineFromMarkdownLink(
 	rawHref: string,
 	sourcePath: string | null | undefined
 ): CanvasTextPreviewInline | null {
-	const text = label.trim();
+	const text = canvasMarkdownUnescapeText(label).trim();
 	const href = rawHref.trim();
 	if (!text || !href) return null;
 	if (/^https?:\/\/[^)\s]+$/i.test(href)) return { kind: 'link', text, href };
@@ -353,7 +353,7 @@ function canvasTextInlineFromMarkdownImage(
 	rawHref: string,
 	sourcePath: string | null | undefined
 ): CanvasTextPreviewInline | null {
-	const embed = canvasTextEmbedFromMarkdownTarget(rawHref, sourcePath, canvasMarkdownImageMeta(label));
+	const embed = canvasTextEmbedFromMarkdownTarget(rawHref, sourcePath, canvasMarkdownImageMeta(canvasMarkdownUnescapeText(label)));
 	if (!embed || embed.kind !== 'image') return null;
 	return { kind: 'image', text: embed.title, embed };
 }
@@ -597,9 +597,9 @@ function firstInlineMatch(
 ): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
 	const candidates = [
 		inlineCandidate(value, /`([^`]+)`/, (match) => ({ kind: 'code', text: match[1] })),
-		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: match[1] })),
-		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: match[1] })),
-		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: match[1] })),
+		inlineCandidate(value, /\*\*([^*\n]+)\*\*/, (match) => ({ kind: 'strong', text: canvasMarkdownUnescapeText(match[1]) })),
+		inlineCandidate(value, /~~([^~\n]+)~~/, (match) => ({ kind: 'strikethrough', text: canvasMarkdownUnescapeText(match[1]) })),
+		inlineCandidate(value, /==([^=\n]+)==/, (match) => ({ kind: 'highlight', text: canvasMarkdownUnescapeText(match[1]) })),
 		inlineMarkdownCandidate(value, true, (match) =>
 			canvasTextInlineFromMarkdownImage(match.label, match.href, options.sourcePath)
 		),
@@ -608,7 +608,7 @@ function firstInlineMatch(
 		),
 		inlineCandidate(value, /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?]]/, (match) => {
 			const rawTarget = match[1].trim();
-			const label = match[2]?.trim();
+			const label = match[2] ? canvasMarkdownUnescapeText(match[2]).trim() : undefined;
 			const target = canvasTextInlineTargetFromWikilink(rawTarget, label) ?? options.resolveWikilinkTarget?.(rawTarget, label);
 			const displayTarget = splitCanvasWikilinkTarget(rawTarget).path || rawTarget;
 			return {
@@ -617,7 +617,7 @@ function firstInlineMatch(
 				...(target ? { target } : {})
 			};
 		}),
-		inlineCandidate(value, /\*([^*\n]+)\*/, (match) => ({ kind: 'emphasis', text: match[1] }))
+		inlineCandidate(value, /\*([^*\n]+)\*/, (match) => ({ kind: 'emphasis', text: canvasMarkdownUnescapeText(match[1]) }))
 	].filter((candidate): candidate is { index: number; raw: string; inline: CanvasTextPreviewInline } => Boolean(candidate));
 
 	return candidates.sort((a, b) => a.index - b.index || inlinePriority(a.inline.kind) - inlinePriority(b.inline.kind))[0] ?? null;
@@ -628,10 +628,19 @@ function inlineCandidate(
 	pattern: RegExp,
 	createInline: (match: RegExpMatchArray) => CanvasTextPreviewInline | null
 ): { index: number; raw: string; inline: CanvasTextPreviewInline } | null {
-	const match = value.match(pattern);
-	if (!match || match.index === undefined || !match[0]) return null;
-	const inline = createInline(match);
-	return inline ? { index: match.index, raw: match[0], inline } : null;
+	const matcher = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+	let match: RegExpExecArray | null;
+	while ((match = matcher.exec(value))) {
+		if (!match[0]) continue;
+		if (canvasMarkdownDelimiterEscaped(value, match.index)) {
+			if (matcher.lastIndex <= match.index) matcher.lastIndex = match.index + 1;
+			continue;
+		}
+		const inline = createInline(match);
+		if (inline) return { index: match.index, raw: match[0], inline };
+		if (matcher.lastIndex <= match.index) matcher.lastIndex = match.index + 1;
+	}
+	return null;
 }
 
 function inlineMarkdownCandidate(
@@ -663,4 +672,20 @@ function inlinePriority(kind: CanvasTextPreviewInlineKind): number {
 		text: 8
 	};
 	return priorities[kind];
+}
+
+function canvasMarkdownDelimiterEscaped(value: string, markerIndex: number): boolean {
+	const marker = value[markerIndex];
+	if (markerIndex >= 2 && value[markerIndex - 1] === marker && value[markerIndex - 2] === '\\') {
+		return true;
+	}
+	let slashCount = 0;
+	for (let index = markerIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
+		slashCount += 1;
+	}
+	return slashCount % 2 === 1;
+}
+
+function canvasMarkdownUnescapeText(value: string): string {
+	return value.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1');
 }

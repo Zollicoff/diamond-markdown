@@ -22,8 +22,10 @@ async function openVault(page: Page): Promise<void> {
 }
 
 async function openSettingsSection(page: Page, section: string): Promise<void> {
-	await page.getByLabel('Settings').click();
-	await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 10_000 });
+	await clickUntilVisible(
+		page.getByLabel('Settings'),
+		page.getByRole('heading', { name: 'Settings', exact: true })
+	);
 	const navButton = page.getByRole('button', { name: section, exact: true });
 	await expect(navButton).toBeVisible({ timeout: 10_000 });
 	await navButton.click();

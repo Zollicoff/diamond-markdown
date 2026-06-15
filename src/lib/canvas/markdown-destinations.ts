@@ -38,6 +38,10 @@ export function canvasMarkdownInlineSyntaxCandidate(
 	while (searchIndex < value.length) {
 		const index = value.indexOf(opener, searchIndex);
 		if (index < 0) return null;
+		if (markdownDelimiterEscaped(value, index)) {
+			searchIndex = index + 1;
+			continue;
+		}
 		if (!image && index > 0 && value[index - 1] === '!') {
 			searchIndex = index + 1;
 			continue;
@@ -62,6 +66,14 @@ export function canvasMarkdownInlineSyntaxCandidate(
 		};
 	}
 	return null;
+}
+
+function markdownDelimiterEscaped(value: string, markerIndex: number): boolean {
+	let slashCount = 0;
+	for (let index = markerIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
+		slashCount += 1;
+	}
+	return slashCount % 2 === 1;
 }
 
 function canvasMarkdownOptionalTitle(value: string): boolean {

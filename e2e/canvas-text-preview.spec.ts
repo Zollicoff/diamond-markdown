@@ -185,6 +185,25 @@ test.describe('canvas text preview helpers', () => {
 		expect(canvasTextInlineTargetHref('vault id', resolved[3])).toBe('/vault/vault%20id/note/Home.md');
 	});
 
+	test('keeps backslash-escaped inline punctuation literal', () => {
+		expect(canvasMarkdownInlineSyntaxCandidate('\\[site](https://example.com)', false)).toBeNull();
+		expect(canvasMarkdownInlineSyntaxCandidate('\\![Roof](../Images/roof.svg)', true)).toBeNull();
+
+		expect(canvasTextPreviewInlines([
+			'Keep \\*stars\\*, \\**strong\\**, \\~~strike\\~~, \\==mark\\==, \\`code\\`,',
+			'\\[[Home]], \\[site](https://example.com), and \\![Roof](../Images/roof.svg).',
+			'Real **bold \\#tag** and [site\\]](https://example.com)'
+		].join(' '))).toEqual([
+			{
+				kind: 'text',
+				text: 'Keep *stars*, **strong**, ~~strike~~, ==mark==, `code`, [[Home]], [site](https://example.com), and ![Roof](../Images/roof.svg). Real '
+			},
+			{ kind: 'strong', text: 'bold #tag' },
+			{ kind: 'text', text: ' and ' },
+			{ kind: 'link', text: 'site]', href: 'https://example.com' }
+		]);
+	});
+
 	test('parses safe inline Markdown image embeds', () => {
 		const inline = canvasTextPreviewInlines(
 			'Inline photo ![Roof inline|120x60](<../Images/roof photo.svg#diagram> "Roof") stays with text and ![unsafe](../../secret.svg)',
