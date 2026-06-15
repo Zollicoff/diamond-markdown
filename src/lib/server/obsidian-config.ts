@@ -327,6 +327,19 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	const autoPairBrackets = booleanValue(body.autoPairBrackets);
+	if (autoPairBrackets !== null) {
+		base.autoPairBrackets = autoPairBrackets;
+		base.settings.push(setting(
+			'autoPairBrackets',
+			'Auto-pair brackets',
+			autoPairBrackets ? 'Enabled' : 'Disabled',
+			autoPairBrackets
+				? 'Diamond auto-pairs brackets, quotes, and backticks in the markdown editor for this imported vault.'
+				: 'Diamond leaves bracket, quote, and backtick insertion unpaired for this imported vault.'
+		));
+	}
+
 	const foldHeading = booleanValue(body.foldHeading);
 	if (foldHeading !== null) {
 		base.foldHeading = foldHeading;
@@ -482,9 +495,10 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 		spellcheck: config.spellcheck === true,
 		tabSize: config.tabSize ?? 4,
 		readableLineLength: config.readableLineLength === true,
+		autoPairBrackets: config.autoPairBrackets !== false,
 		folding: config.foldHeading === true || config.foldIndent === true,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.foldHeading === undefined && config.foldIndent === undefined
+		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.autoPairBrackets === undefined && config.foldHeading === undefined && config.foldIndent === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

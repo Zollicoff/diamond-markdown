@@ -69,6 +69,7 @@
 	let spellcheck = $state(false);
 	let tabSize = $state(4);
 	let readableLineLength = $state(false);
+	let autoPairBrackets = $state(true);
 	let folding = $state(false);
 	let showInlineTitle = $state(false);
 
@@ -122,6 +123,7 @@
 			spellcheck = false;
 			tabSize = 4;
 			readableLineLength = false;
+			autoPairBrackets = true;
 			folding = false;
 			api.editorPreferences(id)
 				.then((preference) => {
@@ -131,6 +133,7 @@
 						spellcheck = preference.spellcheck;
 						tabSize = preference.tabSize;
 						readableLineLength = preference.readableLineLength;
+						autoPairBrackets = preference.autoPairBrackets;
 						folding = preference.folding;
 					}
 				})
@@ -141,6 +144,7 @@
 						spellcheck = false;
 						tabSize = 4;
 						readableLineLength = false;
+						autoPairBrackets = true;
 						folding = false;
 					}
 				});
@@ -387,6 +391,7 @@
 		{spellcheck}
 		{tabSize}
 		{readableLineLength}
+		{autoPairBrackets}
 		{folding}
 		{content}
 		{editorApi}

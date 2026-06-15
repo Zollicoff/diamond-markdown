@@ -465,6 +465,9 @@ Use small, pushable slices:
   `readableLineLength` by narrowing editor and reading surfaces for imported
   vaults while keeping Diamond's full-width default when the setting is absent
   or disabled.
+- **Obsidian bracket auto-pair preference.** Honor `.obsidian/app.json`
+  `autoPairBrackets` by enabling or disabling bracket, quote, and backtick
+  pairing in the markdown editor.
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by showing CodeMirror fold controls for imported vaults
   that request editor folding.
@@ -607,6 +610,9 @@ Use small, pushable slices:
   `showInlineTitle` by showing the note file title above the editor and
   reading surface for imported vaults that request it, while keeping Diamond's
   existing chrome-only title behavior when the setting is absent or disabled.
+- **Obsidian bracket auto-pair preference.** Honor `.obsidian/app.json`
+  `autoPairBrackets` by pairing brackets, quotes, and backticks in the
+  markdown editor when enabled and leaving insertion unpaired when disabled.
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by enabling editor fold controls for imported vaults that
   request foldable headings or indented blocks.

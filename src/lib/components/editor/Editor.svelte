@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
-	import { EditorState, type Extension, Compartment } from '@codemirror/state';
+	import { EditorState, EditorSelection, type Extension, Compartment } from '@codemirror/state';
 	import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 	import { markdown } from '@codemirror/lang-markdown';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
@@ -18,6 +18,7 @@
 		spellcheck?: boolean;
 		tabSize?: number;
 		readableLineLength?: boolean;
+		autoPairBrackets?: boolean;
 		folding?: boolean;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
@@ -39,6 +40,7 @@
 		spellcheck = false,
 		tabSize = 4,
 		readableLineLength = false,
+		autoPairBrackets = true,
 		folding = false,
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
@@ -58,8 +60,18 @@
 	const lineNumberCompartment = new Compartment();
 	const contentAttributeCompartment = new Compartment();
 	const tabSizeCompartment = new Compartment();
+	const autoPairBracketsCompartment = new Compartment();
 	const foldingCompartment = new Compartment();
 	const foldKeymapCompartment = new Compartment();
+
+	const AUTO_PAIR_BRACKETS: Record<string, string> = {
+		'(': ')',
+		'[': ']',
+		'{': '}',
+		'"': '"',
+		"'": "'",
+		'`': '`'
+	};
 
 	interface WikilinkWidgetEventDetail {
 		target: string;
@@ -102,6 +114,26 @@
 	function editorTabSizeExtension(size: number): Extension {
 		const normalized = Number.isInteger(size) && size >= 1 && size <= 16 ? size : 4;
 		return EditorState.tabSize.of(normalized);
+	}
+
+	function autoPairBracketsExtension(enabled: boolean): Extension {
+		if (!enabled) return [];
+		return EditorView.inputHandler.of((view, _from, _to, text) => {
+			const close = AUTO_PAIR_BRACKETS[text];
+			if (!close) return false;
+			const transaction = view.state.changeByRange((range) => {
+				const selected = view.state.sliceDoc(range.from, range.to);
+				const insert = `${text}${selected}${close}`;
+				const anchor = range.from + text.length;
+				const head = anchor + selected.length;
+				return {
+					changes: { from: range.from, to: range.to, insert },
+					range: EditorSelection.range(anchor, head)
+				};
+			});
+			view.dispatch({ ...transaction, userEvent: 'input.type' });
+			return true;
+		});
 	}
 
 	function foldingExtension(enabled: boolean): Extension {
@@ -183,6 +215,7 @@
 			lineNumberCompartment.of(lineNumberExtension(showLineNumbers)),
 			contentAttributeCompartment.of(contentAttributeExtension(spellcheck)),
 			tabSizeCompartment.of(editorTabSizeExtension(tabSize)),
+			autoPairBracketsCompartment.of(autoPairBracketsExtension(autoPairBrackets)),
 			foldingCompartment.of(foldingExtension(folding)),
 			history(),
 			highlightActiveLine(),
@@ -341,6 +374,11 @@
 	$effect(() => {
 		if (!view) return;
 		view.dispatch({ effects: tabSizeCompartment.reconfigure(editorTabSizeExtension(tabSize)) });
+	});
+
+	$effect(() => {
+		if (!view) return;
+		view.dispatch({ effects: autoPairBracketsCompartment.reconfigure(autoPairBracketsExtension(autoPairBrackets)) });
 	});
 
 	$effect(() => {

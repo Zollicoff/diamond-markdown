@@ -1424,6 +1424,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
+		autoPairBrackets: true,
 		foldHeading: true,
 		foldIndent: true
 	}));
@@ -1443,6 +1444,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		spellcheck: true,
 		tabSize: 8,
 		readableLineLength: true,
+		autoPairBrackets: true,
 		folding: true,
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
@@ -1461,6 +1463,11 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 	await expect(editor.locator('.cm-content')).toHaveCSS('tab-size', '8');
 	await expect(editor.locator('.cm-content')).toHaveCSS('max-width', '820px');
 	await expect(editor.locator('.cm-foldGutter')).toHaveCount(1);
+	await editor.locator('.cm-content').click();
+	await page.keyboard.press('Meta+End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.type('PAIR:(');
+	await expect.poll(async () => editor.locator('.cm-content').innerText()).toContain('PAIR:()');
 });
 
 test('vault shell applies safe Obsidian appearance preferences', async ({ page, request }) => {
@@ -1527,6 +1534,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 		spellcheck: false,
 		tabSize: 4,
 		readableLineLength: true,
+		autoPairBrackets: true,
 		folding: false,
 		defaultMode: 'read',
 		source: 'obsidian-app-config'

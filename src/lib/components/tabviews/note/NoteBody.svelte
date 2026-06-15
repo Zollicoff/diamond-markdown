@@ -15,6 +15,7 @@
 		spellcheck: boolean;
 		tabSize: number;
 		readableLineLength: boolean;
+		autoPairBrackets: boolean;
 		folding: boolean;
 		content: string;
 		editorApi: EditorApi | null;
@@ -45,6 +46,7 @@
 		spellcheck,
 		tabSize,
 		readableLineLength,
+		autoPairBrackets,
 		folding,
 		content,
 		editorApi,
@@ -99,6 +101,7 @@
 			{spellcheck}
 			{tabSize}
 			{readableLineLength}
+			{autoPairBrackets}
 			{folding}
 			{resolveLink}
 			onChange={onContentChange}

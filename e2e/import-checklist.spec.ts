@@ -789,6 +789,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
@@ -805,6 +806,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -817,6 +819,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -833,6 +836,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -849,6 +853,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -865,6 +870,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: true,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -877,6 +883,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -893,6 +900,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 8,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -911,6 +919,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'diamond-default'
@@ -927,6 +936,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: true,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -939,6 +949,41 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ autoPairBrackets: false }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairBrackets')).toMatchObject({
+			label: 'Auto-pair brackets',
+			value: 'Disabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			autoPairBrackets: false,
+			folding: false,
+			defaultMode: 'live',
+			source: 'obsidian-app-config'
+		});
+
+		fs.writeFileSync(appJson, JSON.stringify({ autoPairBrackets: true }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairBrackets')).toMatchObject({
+			label: 'Auto-pair brackets',
+			value: 'Enabled'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual({
+			lineNumbers: true,
+			showInlineTitle: false,
+			spellcheck: false,
+			tabSize: 4,
+			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -955,6 +1000,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: true,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -967,6 +1013,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -983,6 +1030,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: true,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
@@ -999,6 +1047,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
@@ -1011,6 +1060,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
@@ -1023,6 +1073,7 @@ test.describe('import checklist helpers', () => {
 			spellcheck: false,
 			tabSize: 4,
 			readableLineLength: false,
+			autoPairBrackets: true,
 			folding: false,
 			defaultMode: 'live',
 			source: 'obsidian-app-config'
