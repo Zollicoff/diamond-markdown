@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { EditorLinkStyle, NoteDoc, NoteViewMode } from '$lib/types';
+	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteViewMode } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
 	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
@@ -72,6 +72,7 @@
 	let autoPairBrackets = $state(true);
 	let autoPairMarkdown = $state(true);
 	let folding = $state(false);
+	let propertiesInDocument = $state<EditorPropertiesInDocumentMode>('source');
 	let showInlineTitle = $state(false);
 
 	let loadedPath: string | null = null;
@@ -127,6 +128,7 @@
 			autoPairBrackets = true;
 			autoPairMarkdown = true;
 			folding = false;
+			propertiesInDocument = 'source';
 			api.editorPreferences(id)
 				.then((preference) => {
 					if (id === vaultId) {
@@ -138,6 +140,7 @@
 						autoPairBrackets = preference.autoPairBrackets;
 						autoPairMarkdown = preference.autoPairMarkdown;
 						folding = preference.folding;
+						propertiesInDocument = preference.propertiesInDocument;
 					}
 				})
 				.catch(() => {
@@ -150,6 +153,7 @@
 						autoPairBrackets = true;
 						autoPairMarkdown = true;
 						folding = false;
+						propertiesInDocument = 'source';
 					}
 				});
 		});
@@ -398,6 +402,7 @@
 		{autoPairBrackets}
 		{autoPairMarkdown}
 		{folding}
+		{propertiesInDocument}
 		{content}
 		{editorApi}
 		{uploadingAttachments}

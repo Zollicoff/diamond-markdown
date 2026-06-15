@@ -9,6 +9,7 @@
 	import { tags } from '@lezer/highlight';
 	import { livePreview, type LinkResolver } from '$lib/editor/live-preview';
 	import { makeEditorApi, type EditorApi } from '$lib/editor/commands';
+	import type { EditorPropertiesInDocumentMode } from '$lib/types';
 
 	interface Props {
 		value: string;
@@ -21,6 +22,7 @@
 		autoPairBrackets?: boolean;
 		autoPairMarkdown?: boolean;
 		folding?: boolean;
+		propertiesInDocument?: EditorPropertiesInDocumentMode;
 		resolveLink?: LinkResolver;
 		onChange?: (v: string) => void;
 		onSave?: () => void;
@@ -44,6 +46,7 @@
 		autoPairBrackets = true,
 		autoPairMarkdown = true,
 		folding = false,
+		propertiesInDocument = 'source',
 		resolveLink = (t: string) => ({ resolved: true, href: undefined }),
 		onChange,
 		onSave,
@@ -108,7 +111,7 @@
 	]);
 
 	function previewExtension(m: 'live' | 'source'): Extension {
-		return m === 'live' ? livePreview(resolveLink) : [];
+		return m === 'live' ? livePreview(resolveLink, { propertiesInDocument }) : [];
 	}
 
 	function lineNumberExtension(show: boolean): Extension {
@@ -374,6 +377,9 @@
 						color: 'var(--fg)',
 						borderRadius: '3px',
 						padding: '0 2px'
+					},
+					'.cm-hidden-frontmatter': {
+						display: 'none'
 					}
 				},
 				{ dark: true }

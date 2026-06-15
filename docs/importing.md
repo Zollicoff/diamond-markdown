@@ -26,8 +26,9 @@ an existing Obsidian vault. The preflight reports:
 - supported `.obsidian/app.json` settings, including safe attachment folder,
   new-note folder, link style, link-update preference, link format,
   unsupported-file visibility, line-number display, spellcheck, tab size,
-  readable line length, strict line-break rendering, initial view mode, delete
-  confirmation, and trash preference
+  readable line length, properties-in-document frontmatter display, strict
+  line-break rendering, initial view mode, delete confirmation, and trash
+  preference
 - safe `.obsidian/daily-notes.json` folder, template, and date-format settings
 - safe `.obsidian/templates.json` folder plus default date/time-format settings
 - `.obsidian/appearance.json` theme settings and CSS snippet filenames as
@@ -61,6 +62,10 @@ integer `tabSize` values from 1 to 16 for editor indentation and tab rendering,
 `autoPairMarkdown` for emphasis, highlight, strikethrough, and backtick marker
 pairing in the markdown editor,
 `foldHeading` / `foldIndent` for editor fold controls,
+`propertiesInDocument: "hidden"` to hide YAML frontmatter in Live mode while
+leaving Source mode editable, `propertiesInDocument: "source"` to keep raw YAML
+visible, and reports `propertiesInDocument: "visible"` as migration guidance
+because Diamond does not implement Obsidian's editable Properties UI,
 `strictLineBreaks` for Read mode, hover-preview, and static-publish line-break
 rendering, `defaultViewMode` plus `livePreview` for the initial note view mode,
 `alwaysUpdateLinks` for note/folder rename and move operations, `promptDelete`

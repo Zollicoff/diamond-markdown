@@ -474,6 +474,10 @@ Use small, pushable slices:
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by showing CodeMirror fold controls for imported vaults
   that request editor folding.
+- **Obsidian properties-in-document preference.** Honor `.obsidian/app.json`
+  `propertiesInDocument: "hidden"` by hiding YAML frontmatter in Live mode,
+  keep `"source"` as raw YAML, and report `"visible"` as migration guidance
+  because Diamond does not implement Obsidian's editable Properties UI.
 - **Obsidian strict-line-break preference.** Honor `.obsidian/app.json`
   `strictLineBreaks` for Read mode, hover previews, and static publish output,
   preserving Diamond's strict default when the setting is absent.
@@ -623,6 +627,10 @@ Use small, pushable slices:
 - **Obsidian folding preferences.** Honor `.obsidian/app.json` `foldHeading`
   and `foldIndent` by enabling editor fold controls for imported vaults that
   request foldable headings or indented blocks.
+- **Obsidian properties-in-document preference.** Honor `.obsidian/app.json`
+  `propertiesInDocument: "hidden"` by hiding YAML frontmatter in Live mode,
+  keep `"source"` as raw YAML, and report `"visible"` as migration guidance
+  because Diamond does not implement Obsidian's editable Properties UI.
 
 ## Next Implementation Slices
 

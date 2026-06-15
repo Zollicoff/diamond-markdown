@@ -1448,6 +1448,7 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 		autoPairBrackets: true,
 		autoPairMarkdown: true,
 		folding: true,
+		propertiesInDocument: 'source',
 		defaultMode: 'live',
 		source: 'obsidian-app-config'
 	});
@@ -1487,6 +1488,61 @@ test('editor display honors Obsidian app preferences', async ({ page, request })
 	await expect.poll(editorText).toContain('STAR:**');
 	await expect.poll(editorText).toContain('MARK:*ok*');
 	await expect.poll(editorText).toContain('HIGHLIGHT:====');
+});
+
+test('live preview honors Obsidian hidden properties preference', async ({ page, request }) => {
+	const vaultDir = path.join(FIXTURE_PATHS.FIXTURE_ROOT, 'obsidian-hidden-properties-vault');
+	fs.rmSync(vaultDir, { recursive: true, force: true });
+	fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
+	fs.writeFileSync(path.join(vaultDir, '.obsidian', 'app.json'), JSON.stringify({
+		propertiesInDocument: 'hidden'
+	}));
+	fs.writeFileSync(path.join(vaultDir, 'Home.md'), [
+		'---',
+		'title: Hidden Properties',
+		'tags:',
+		'  - private',
+		'---',
+		'# Hidden Properties',
+		'',
+		'Visible body.'
+	].join('\n'));
+
+	const created = await request.post('/api/vaults', {
+		data: { name: 'Obsidian Hidden Properties', path: vaultDir }
+	});
+	expect(created.ok(), await created.text()).toBe(true);
+	const { vault } = await created.json() as { vault: { id: string } };
+
+	const preference = await request.get(`/api/vaults/${vault.id}/editor-preferences`);
+	expect(preference.ok(), await preference.text()).toBe(true);
+	expect(await preference.json()).toEqual({
+		lineNumbers: true,
+		showInlineTitle: false,
+		spellcheck: false,
+		tabSize: 4,
+		readableLineLength: false,
+		autoPairBrackets: true,
+		autoPairMarkdown: true,
+		folding: false,
+		propertiesInDocument: 'hidden',
+		defaultMode: 'live',
+		source: 'obsidian-app-config'
+	});
+
+	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Home.md')}`, { waitUntil: 'domcontentloaded' });
+	const editor = page.locator('.cm-content').first();
+	await expect(editor).toBeVisible({ timeout: 10_000 });
+	const renderedEditorText = async () => editor.evaluate((element) => (element as HTMLElement).innerText);
+	await expect.poll(renderedEditorText).toContain('Visible body.');
+	expect(await renderedEditorText()).not.toContain('title: Hidden Properties');
+	expect(await renderedEditorText()).not.toContain('private');
+	expect(await editor.locator('.cm-hidden-frontmatter').count()).toBeGreaterThan(0);
+
+	await page.getByRole('tab', { name: 'Source' }).click();
+	await expect.poll(renderedEditorText).toContain('title: Hidden Properties');
+	await expect.poll(renderedEditorText).toContain('private');
+	await expect(editor.locator('.cm-hidden-frontmatter')).toHaveCount(0);
 });
 
 test('vault shell applies safe Obsidian appearance preferences', async ({ page, request }) => {
@@ -1556,6 +1612,7 @@ test('note panes honor Obsidian default view mode preference', async ({ page, re
 		autoPairBrackets: true,
 		autoPairMarkdown: true,
 		folding: false,
+		propertiesInDocument: 'source',
 		defaultMode: 'read',
 		source: 'obsidian-app-config'
 	});

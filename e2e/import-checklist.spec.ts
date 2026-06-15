@@ -782,8 +782,7 @@ test.describe('import checklist helpers', () => {
 		const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diamondmd-obsidian-editor-display-'));
 		fs.mkdirSync(path.join(vaultDir, '.obsidian'), { recursive: true });
 		const appJson = path.join(vaultDir, '.obsidian', 'app.json');
-
-		expect(editorDisplayPreference(vaultDir)).toEqual({
+		const expectedDisplay = (overrides = {}) => ({
 			lineNumbers: true,
 			showInlineTitle: false,
 			spellcheck: false,
@@ -792,127 +791,72 @@ test.describe('import checklist helpers', () => {
 			autoPairBrackets: true,
 			autoPairMarkdown: true,
 			folding: false,
+			propertiesInDocument: 'source',
 			defaultMode: 'live',
-			source: 'diamond-default'
+			source: 'diamond-default',
+			...overrides
 		});
+
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay());
 
 		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: false }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showLineNumber')).toMatchObject({
 			label: 'Line numbers',
 			value: 'Hidden'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			lineNumbers: false,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ showLineNumber: true }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ showInlineTitle: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showInlineTitle')).toMatchObject({
 			label: 'Inline note title',
 			value: 'Visible'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			showInlineTitle: true,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ showInlineTitle: false }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'showInlineTitle')).toMatchObject({
 			label: 'Inline note title',
 			value: 'Hidden'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ spellcheck: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'spellcheck')).toMatchObject({
 			label: 'Spellcheck',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			spellcheck: true,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ spellcheck: false }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ tabSize: 8 }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'tabSize')).toMatchObject({
 			label: 'Tab size',
 			value: '8 spaces'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			tabSize: 8,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ tabSize: 24 }));
 		const unsafeTabSize = readObsidianAppConfig(vaultDir);
@@ -921,218 +865,146 @@ test.describe('import checklist helpers', () => {
 			level: 'warn'
 		});
 		expect(unsafeTabSize.warnings).toContain("Obsidian tabSize is outside Diamond's supported range and will be ignored.");
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
-			source: 'diamond-default'
-		});
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay());
 
 		fs.writeFileSync(appJson, JSON.stringify({ readableLineLength: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'readableLineLength')).toMatchObject({
 			label: 'Readable line length',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			readableLineLength: true,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ readableLineLength: false }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ autoPairBrackets: false }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairBrackets')).toMatchObject({
 			label: 'Auto-pair brackets',
 			value: 'Disabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			autoPairBrackets: false,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ autoPairBrackets: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairBrackets')).toMatchObject({
 			label: 'Auto-pair brackets',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ autoPairMarkdown: false }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairMarkdown')).toMatchObject({
 			label: 'Auto-pair Markdown syntax',
 			value: 'Disabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			autoPairMarkdown: false,
-			folding: false,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ autoPairMarkdown: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'autoPairMarkdown')).toMatchObject({
 			label: 'Auto-pair Markdown syntax',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ foldHeading: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'foldHeading')).toMatchObject({
 			label: 'Fold headings',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			folding: true,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ foldHeading: false }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ foldIndent: true }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'foldIndent')).toMatchObject({
 			label: 'Fold indented blocks',
 			value: 'Enabled'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			folding: true,
-			defaultMode: 'live',
 			source: 'obsidian-app-config'
+		}));
+
+		fs.writeFileSync(appJson, JSON.stringify({ propertiesInDocument: 'hidden' }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'propertiesInDocument')).toMatchObject({
+			label: 'Properties in document',
+			value: 'Hidden'
 		});
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
+			propertiesInDocument: 'hidden',
+			source: 'obsidian-app-config'
+		}));
+
+		fs.writeFileSync(appJson, JSON.stringify({ propertiesInDocument: 'source' }));
+		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'propertiesInDocument')).toMatchObject({
+			label: 'Properties in document',
+			value: 'Source'
+		});
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
+			source: 'obsidian-app-config'
+		}));
+
+		fs.writeFileSync(appJson, JSON.stringify({ propertiesInDocument: 'visible' }));
+		const visibleProperties = readObsidianAppConfig(vaultDir);
+		expect(visibleProperties.settings.find((setting) => setting.id === 'propertiesInDocument')).toMatchObject({
+			label: 'Properties in document',
+			value: 'Visible',
+			level: 'warn'
+		});
+		expect(visibleProperties.warnings).toContain('Obsidian propertiesInDocument "visible" uses Obsidian\'s Properties UI; Diamond keeps raw YAML visible instead.');
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
+			source: 'obsidian-app-config'
+		}));
+
+		fs.writeFileSync(appJson, JSON.stringify({ propertiesInDocument: 'collapsed' }));
+		const invalidProperties = readObsidianAppConfig(vaultDir);
+		expect(invalidProperties.settings.find((setting) => setting.id === 'propertiesInDocument')).toMatchObject({
+			label: 'Properties in document',
+			level: 'warn'
+		});
+		expect(invalidProperties.warnings).toContain('Obsidian propertiesInDocument is unsupported and will not change Diamond\'s frontmatter display.');
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay());
 
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'preview' }));
 		expect(readObsidianAppConfig(vaultDir).settings.find((setting) => setting.id === 'defaultViewMode')).toMatchObject({
 			label: 'Default view mode',
 			value: 'Reading view'
 		});
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			defaultMode: 'read',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: false }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			defaultMode: 'source',
 			source: 'obsidian-app-config'
-		});
+		}));
 
 		fs.writeFileSync(appJson, JSON.stringify({ defaultViewMode: 'source', livePreview: true }));
-		expect(editorDisplayPreference(vaultDir)).toEqual({
-			lineNumbers: true,
-			showInlineTitle: false,
-			spellcheck: false,
-			tabSize: 4,
-			readableLineLength: false,
-			autoPairBrackets: true,
-			autoPairMarkdown: true,
-			folding: false,
-			defaultMode: 'live',
+		expect(editorDisplayPreference(vaultDir)).toEqual(expectedDisplay({
 			source: 'obsidian-app-config'
-		});
+		}));
 	});
 
 	test('uses Obsidian delete confirmation preference for file deletes', () => {

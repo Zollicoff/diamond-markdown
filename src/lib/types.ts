@@ -58,6 +58,7 @@ export interface ObsidianAppConfigInfo {
 	autoPairMarkdown?: boolean;
 	foldHeading?: boolean;
 	foldIndent?: boolean;
+	propertiesInDocument?: PropertiesInDocumentMode;
 	strictLineBreaks?: boolean;
 	defaultViewMode?: string;
 	livePreview?: boolean;
@@ -229,6 +230,8 @@ export interface NewNoteLocation {
 
 export type EditorLinkStyle = 'wikilink' | 'markdown';
 export type NoteViewMode = 'live' | 'source' | 'read';
+export type PropertiesInDocumentMode = 'source' | 'hidden' | 'visible';
+export type EditorPropertiesInDocumentMode = 'source' | 'hidden';
 
 export interface EditorLinkPreference {
 	style: EditorLinkStyle;
@@ -245,6 +248,7 @@ export interface EditorDisplayPreference {
 	autoPairBrackets: boolean;
 	autoPairMarkdown: boolean;
 	folding: boolean;
+	propertiesInDocument: EditorPropertiesInDocumentMode;
 	defaultMode: NoteViewMode;
 	source: 'obsidian-app-config' | 'diamond-default';
 }

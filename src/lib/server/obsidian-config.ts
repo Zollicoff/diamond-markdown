@@ -7,6 +7,7 @@ import type {
 	JsonFileStatus,
 	MarkdownRenderPreference,
 	DeleteConfirmationPreference,
+	PropertiesInDocumentMode,
 	NoteViewMode,
 	ObsidianAppConfigInfo,
 	ObsidianAppConfigSetting,
@@ -32,6 +33,12 @@ function booleanValue(value: unknown): boolean | null {
 function safeTabSize(value: unknown): number | null {
 	if (typeof value !== 'number' || !Number.isInteger(value)) return null;
 	return value >= 1 && value <= 16 ? value : null;
+}
+
+function propertiesInDocumentValue(value: unknown): PropertiesInDocumentMode | null {
+	const raw = stringValue(value);
+	if (raw === 'source' || raw === 'hidden' || raw === 'visible') return raw;
+	return null;
 }
 
 function readJsonFile(abs: string): { status: JsonFileStatus; value?: unknown; bytes?: number } {
@@ -95,6 +102,18 @@ function defaultViewModeLabel(value: string): string {
 	if (value === 'live') return 'Live preview';
 	if (value === 'read') return 'Read mode';
 	return value;
+}
+
+function propertiesInDocumentLabel(value: PropertiesInDocumentMode): string {
+	if (value === 'source') return 'Source';
+	if (value === 'hidden') return 'Hidden';
+	return 'Visible';
+}
+
+function propertiesInDocumentDetail(value: PropertiesInDocumentMode): string {
+	if (value === 'hidden') return 'Diamond hides YAML frontmatter in Live mode for this imported vault while Source mode keeps the raw file editable.';
+	if (value === 'source') return 'Diamond shows raw YAML frontmatter in Live and Source modes for this imported vault.';
+	return 'Reported for migration review; Diamond does not implement Obsidian\'s editable Properties UI and keeps raw YAML available in Live and Source modes.';
 }
 
 function defaultViewModeDetail(mode: NoteViewMode | null, livePreview: boolean | null): string {
@@ -379,6 +398,32 @@ export function readObsidianAppConfig(root: string): ObsidianAppConfigInfo {
 		));
 	}
 
+	if ('propertiesInDocument' in body) {
+		const propertiesInDocument = propertiesInDocumentValue(body.propertiesInDocument);
+		if (propertiesInDocument) {
+			base.propertiesInDocument = propertiesInDocument;
+			base.settings.push(setting(
+				'propertiesInDocument',
+				'Properties in document',
+				propertiesInDocumentLabel(propertiesInDocument),
+				propertiesInDocumentDetail(propertiesInDocument),
+				propertiesInDocument === 'visible' ? 'warn' : 'info'
+			));
+			if (propertiesInDocument === 'visible') {
+				base.warnings.push('Obsidian propertiesInDocument "visible" uses Obsidian\'s Properties UI; Diamond keeps raw YAML visible instead.');
+			}
+		} else {
+			base.settings.push(setting(
+				'propertiesInDocument',
+				'Properties in document',
+				String(body.propertiesInDocument ?? ''),
+				'Ignored because Diamond only recognizes source, hidden, and visible.',
+				'warn'
+			));
+			base.warnings.push('Obsidian propertiesInDocument is unsupported and will not change Diamond\'s frontmatter display.');
+		}
+	}
+
 	const strictLineBreaks = booleanValue(body.strictLineBreaks);
 	if (strictLineBreaks !== null) {
 		base.strictLineBreaks = strictLineBreaks;
@@ -502,6 +547,7 @@ export function deleteConfirmationPreference(root: string): DeleteConfirmationPr
 export function editorDisplayPreference(root: string): EditorDisplayPreference {
 	const config = readObsidianAppConfig(root);
 	const defaultMode = config.defaultMode ?? 'live';
+	const propertiesInDocument = config.propertiesInDocument === 'hidden' ? 'hidden' : 'source';
 	return {
 		lineNumbers: config.showLineNumber !== false,
 		showInlineTitle: config.showInlineTitle === true,
@@ -511,8 +557,9 @@ export function editorDisplayPreference(root: string): EditorDisplayPreference {
 		autoPairBrackets: config.autoPairBrackets !== false,
 		autoPairMarkdown: config.autoPairMarkdown !== false,
 		folding: config.foldHeading === true || config.foldIndent === true,
+		propertiesInDocument,
 		defaultMode,
-		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.autoPairBrackets === undefined && config.autoPairMarkdown === undefined && config.foldHeading === undefined && config.foldIndent === undefined
+		source: config.showLineNumber === undefined && config.showInlineTitle === undefined && config.defaultMode === undefined && config.spellcheck === undefined && config.tabSize === undefined && config.readableLineLength === undefined && config.autoPairBrackets === undefined && config.autoPairMarkdown === undefined && config.foldHeading === undefined && config.foldIndent === undefined && config.propertiesInDocument === undefined
 			? 'diamond-default'
 			: 'obsidian-app-config'
 	};

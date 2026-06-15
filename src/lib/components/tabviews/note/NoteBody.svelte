@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { EditorLinkStyle, NoteDoc, NoteViewMode } from '$lib/types';
+	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteViewMode } from '$lib/types';
 	import type { NoteViewComponent } from '$lib/note/lazy-components';
 	import { noteTitleFromPath } from '$lib/note/view';
 
@@ -18,6 +18,7 @@
 		autoPairBrackets: boolean;
 		autoPairMarkdown: boolean;
 		folding: boolean;
+		propertiesInDocument: EditorPropertiesInDocumentMode;
 		content: string;
 		editorApi: EditorApi | null;
 		uploadingAttachments: number;
@@ -50,6 +51,7 @@
 		autoPairBrackets,
 		autoPairMarkdown,
 		folding,
+		propertiesInDocument,
 		content,
 		editorApi,
 		uploadingAttachments,
@@ -106,6 +108,7 @@
 			{autoPairBrackets}
 			{autoPairMarkdown}
 			{folding}
+			{propertiesInDocument}
 			{resolveLink}
 			onChange={onContentChange}
 			onSave={onSave}
