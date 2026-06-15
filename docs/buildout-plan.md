@@ -136,6 +136,10 @@ Use small, pushable slices:
    parsing, source-relative asset resolution, target classification, and
    unresolved-alias fallback into a pure helper with direct coverage, keeping
    the main text-preview parser focused on block and inline orchestration.
+- **Canvas inline parser extraction.** Move inline mark parsing, Markdown
+   link/image routing, wikilink alias resolution, delimiter escaping, and
+   unescape behavior into a pure helper with direct coverage, keeping the main
+   text-preview parser focused on block orchestration.
 - **Canvas text-card escaped inline punctuation.** Keep backslash-escaped
    Markdown inline punctuation literal in Canvas text-card previews, including
    escaped emphasis/link/image/wikilink openers, while preserving real

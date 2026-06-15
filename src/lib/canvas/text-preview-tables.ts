@@ -1,4 +1,4 @@
-import type { CanvasTextPreviewInline } from '$lib/canvas/text-preview';
+import type { CanvasTextPreviewInline } from '$lib/canvas/text-preview-inlines';
 
 export type CanvasTextPreviewTableAlignment = 'left' | 'center' | 'right' | null;
 

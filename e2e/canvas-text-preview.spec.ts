@@ -22,6 +22,12 @@ import {
 	canvasTextEmbedPreview,
 	isCanvasStandaloneEmbedSyntax
 } from '../src/lib/canvas/text-preview-embeds';
+import {
+	canvasMarkdownUnescapeText as canvasMarkdownUnescapeInlineText,
+	canvasTextInlineTargetHref as canvasTextInlineTargetHrefDirect,
+	canvasTextNoteWikilinkResolver as canvasTextNoteWikilinkResolverDirect,
+	canvasTextPreviewInlines as canvasTextPreviewInlinesDirect
+} from '../src/lib/canvas/text-preview-inlines';
 import { canvasTextTablePreviewAt } from '../src/lib/canvas/text-preview-tables';
 import {
 	canvasTextInternalTarget,
@@ -194,6 +200,38 @@ test.describe('canvas text preview helpers', () => {
 		})).toBeNull();
 		expect(isCanvasStandaloneEmbedSyntax('![[../secret.png]]')).toBe(true);
 		expect(isCanvasStandaloneEmbedSyntax('![Escaped](../../secret.png)')).toBe(true);
+	});
+
+	test('parses Canvas inline helper marks and routed targets directly', () => {
+		expect(canvasMarkdownUnescapeInlineText('\\*literal\\* \\[site\\](https://example.com) \\#tag')).toBe(
+			'*literal* [site](https://example.com) #tag'
+		);
+
+		const parts = canvasTextPreviewInlinesDirect(
+			'Use **bill** and [Root note](/References/Roof%20Photos.md#Meter), ![Roof|80](../Images/roof.svg), [[Survey Photos#Meter|site photos]], and \\![literal](../Images/roof.svg)',
+			{
+				sourcePath: 'Boards/Board.canvas',
+				resolveWikilinkTarget: canvasTextNoteWikilinkResolverDirect(noteTargets)
+			}
+		);
+
+		expect(parts[1]).toEqual({ kind: 'strong', text: 'bill' });
+		expect(canvasTextInlineTargetHrefDirect('vault id', parts[3])).toBe(
+			'/vault/vault%20id/note/References/Roof%20Photos.md#meter'
+		);
+		expect(parts[5]).toMatchObject({
+			kind: 'image',
+			text: 'Roof',
+			embed: {
+				path: 'Images/roof.svg',
+				kind: 'image',
+				width: 80
+			}
+		});
+		expect(canvasTextInlineTargetHrefDirect('vault id', parts[7])).toBe(
+			'/vault/vault%20id/note/References/Roof%20Photos.md#meter'
+		);
+		expect(parts.at(-1)).toEqual({ kind: 'text', text: ', and ![literal](../Images/roof.svg)' });
 	});
 
 	test('parses inline marks, explicit links, and resolved note aliases', () => {
