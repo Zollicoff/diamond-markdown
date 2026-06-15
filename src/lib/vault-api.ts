@@ -8,8 +8,8 @@
  */
 
 import type { AttachmentMoveResult, AttachmentRef, AttachmentUploadResult, Bookmark, BookmarkMutationResult, DeleteConfirmationPreference, EditorDisplayPreference, EditorLinkPreference, NewNoteLocation, NoteDoc, NoteLinkTarget, SavedSearch, SavedSearchMode, SavedSearchMutationResult, SearchHit, SearchResponse, TreeNode, VaultAppearancePreference, VaultImportAnalysis, VaultRef } from './types';
-import type { PluginCatalogResponse, PluginInstallResponse, PluginListResponse } from './plugins/types';
 import { canvasApi } from './api/canvas';
+import { pluginsApi } from './api/plugins';
 import { json } from './api/request';
 import { syncApi } from './api/sync';
 import { emit } from './events';
@@ -355,32 +355,5 @@ export const api = {
 	},
 
 	...syncApi,
-
-	async plugins(vaultId: string): Promise<PluginListResponse> {
-		return json(`/api/vaults/${vaultId}/plugins`);
-	},
-
-	async pluginCatalog(): Promise<PluginCatalogResponse> {
-		return json('/api/plugins/catalog');
-	},
-
-	async installPlugin(vaultId: string, manifestUrl: string, replace = false): Promise<PluginInstallResponse> {
-		const res = await json<PluginInstallResponse>(`/api/vaults/${vaultId}/plugins`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ manifestUrl, replace })
-		});
-		emit('plugins:reload', { vaultId });
-		return res;
-	},
-
-	async installCatalogPlugin(vaultId: string, catalogId: string, replace = false): Promise<PluginInstallResponse> {
-		const res = await json<PluginInstallResponse>(`/api/vaults/${vaultId}/plugins`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ catalogId, replace })
-		});
-		emit('plugins:reload', { vaultId });
-		return res;
-	}
+	...pluginsApi
 };
