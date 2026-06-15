@@ -103,6 +103,10 @@ import {
 	updateCanvasNodeResizeState
 } from '../src/lib/canvas/drag';
 import {
+	bindCanvasPointerSession,
+	type CanvasPointerSessionTarget
+} from '../src/lib/canvas/pointer-session';
+import {
 	canZoomCanvasIn,
 	canZoomCanvasOut,
 	canvasBoardZoomStyle,
@@ -146,6 +150,48 @@ function gitStatus(cwd: string): string {
 }
 
 test.describe('canvas view helpers', () => {
+	test('binds Canvas pointer sessions with idempotent cleanup', () => {
+		type Listener = (event: PointerEvent) => void;
+		const listeners = new Map<string, Set<Listener>>();
+		const calls: string[] = [];
+		const target: CanvasPointerSessionTarget = {
+			addEventListener(type, listener) {
+				calls.push(`add:${type}`);
+				const bucket = listeners.get(type) ?? new Set<Listener>();
+				bucket.add(listener);
+				listeners.set(type, bucket);
+			},
+			removeEventListener(type, listener) {
+				calls.push(`remove:${type}`);
+				listeners.get(type)?.delete(listener);
+			}
+		};
+		const handled: string[] = [];
+		const cleanup = bindCanvasPointerSession(target, {
+			move: (event) => handled.push(`move:${event.pointerId}`),
+			up: (event) => handled.push(`up:${event.pointerId}`),
+			cancel: (event) => handled.push(`cancel:${event.pointerId}`)
+		});
+
+		expect(calls).toEqual(['add:pointermove', 'add:pointerup', 'add:pointercancel']);
+		listeners.get('pointermove')?.forEach((listener) => listener({ pointerId: 4 } as PointerEvent));
+		listeners.get('pointerup')?.forEach((listener) => listener({ pointerId: 4 } as PointerEvent));
+		listeners.get('pointercancel')?.forEach((listener) => listener({ pointerId: 9 } as PointerEvent));
+		expect(handled).toEqual(['move:4', 'up:4', 'cancel:9']);
+
+		cleanup();
+		cleanup();
+		expect(calls).toEqual([
+			'add:pointermove',
+			'add:pointerup',
+			'add:pointercancel',
+			'remove:pointermove',
+			'remove:pointerup',
+			'remove:pointercancel'
+		]);
+		expect([...listeners.values()].every((bucket) => bucket.size === 0)).toBe(true);
+	});
+
 	test('computes board bounds, node copy, and edge line positions', () => {
 		const doc = {
 			path: 'Board.canvas',

@@ -65,6 +65,10 @@
 		stepCanvasZoom
 	} from '$lib/canvas/viewport';
 	import {
+		bindCanvasPointerSession,
+		type CanvasPointerSessionCleanup
+	} from '$lib/canvas/pointer-session';
+	import {
 		CanvasLinkTargetRequestQueue,
 		isCanvasLinkTargetRefreshEvent
 	} from '$lib/canvas/link-targets';
@@ -114,6 +118,8 @@
 	let dragState = $state<CanvasNodeDragState | null>(null);
 	let resizeState = $state<CanvasNodeResizeState | null>(null);
 	let canvasZoom = $state(1);
+	let dragSessionCleanup: CanvasPointerSessionCleanup | null = null;
+	let resizeSessionCleanup: CanvasPointerSessionCleanup | null = null;
 	let linkTargets = $state<NoteLinkTarget[]>([]);
 	let notePreviews = $state<CanvasNotePreviewMap>({});
 	const linkTargetRequests = new CanvasLinkTargetRequestQueue();
@@ -467,15 +473,13 @@
 	}
 
 	function cleanupDragListeners(): void {
-		window.removeEventListener('pointermove', moveNodePointer);
-		window.removeEventListener('pointerup', handleMovePointerUp);
-		window.removeEventListener('pointercancel', handleMovePointerCancel);
+		dragSessionCleanup?.();
+		dragSessionCleanup = null;
 	}
 
 	function cleanupResizeListeners(): void {
-		window.removeEventListener('pointermove', resizeNodePointer);
-		window.removeEventListener('pointerup', handleResizePointerUp);
-		window.removeEventListener('pointercancel', handleResizePointerCancel);
+		resizeSessionCleanup?.();
+		resizeSessionCleanup = null;
 	}
 
 	function moveNodePointer(event: PointerEvent): void {
@@ -534,9 +538,12 @@
 		event.preventDefault();
 		setMutationState({ movingNodeId: node.id });
 		dragState = createCanvasNodeDragState(node, event, canvasZoom);
-		window.addEventListener('pointermove', moveNodePointer);
-		window.addEventListener('pointerup', handleMovePointerUp);
-		window.addEventListener('pointercancel', handleMovePointerCancel);
+		cleanupDragListeners();
+		dragSessionCleanup = bindCanvasPointerSession(window, {
+			move: moveNodePointer,
+			up: handleMovePointerUp,
+			cancel: handleMovePointerCancel
+		});
 	}
 
 	async function finishResizePointer(event: PointerEvent): Promise<void> {
@@ -586,9 +593,12 @@
 		event.stopPropagation();
 		setMutationState({ resizingNodeId: node.id });
 		resizeState = createCanvasNodeResizeState(node, event, canvasZoom);
-		window.addEventListener('pointermove', resizeNodePointer);
-		window.addEventListener('pointerup', handleResizePointerUp);
-		window.addEventListener('pointercancel', handleResizePointerCancel);
+		cleanupResizeListeners();
+		resizeSessionCleanup = bindCanvasPointerSession(window, {
+			move: resizeNodePointer,
+			up: handleResizePointerUp,
+			cancel: handleResizePointerCancel
+		});
 	}
 
 	$effect(() => {

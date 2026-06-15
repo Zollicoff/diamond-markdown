@@ -623,6 +623,9 @@ Use small, pushable slices:
 - **Canvas zoom controls split.** Keep Canvas viewport measurement and board
   scaling in `CanvasBoard` while moving zoom controls, button state, and zoom
   control styling into a focused `CanvasZoomControls` component.
+- **Canvas pointer-session helper extraction.** Keep Canvas drag/resize save
+  orchestration in `CanvasView` while moving pointer listener binding and
+  idempotent cleanup into a focused helper with deterministic coverage.
 - **Canvas group node editor split.** Keep Canvas node shell/chrome and
   node-type routing in `CanvasNodeCard` while moving group label editing,
   group save state, and group delete controls into `CanvasGroupNodeEditor`.
