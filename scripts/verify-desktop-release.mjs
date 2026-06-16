@@ -42,7 +42,7 @@ function requireScript(pkg, name) {
 function readText(rel) {
 	const abs = path.join(repoRoot, rel);
 	try {
-		return fs.readFileSync(abs, 'utf-8');
+		return fs.readFileSync(abs, 'utf-8').replace(/\r\n?/g, '\n');
 	} catch (err) {
 		errors.push(`${rel} is not readable: ${err instanceof Error ? err.message : String(err)}`);
 		return '';
