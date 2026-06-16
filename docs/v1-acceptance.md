@@ -97,7 +97,7 @@ Initial snapshot: 2026-06-15, branch `codex/diamond-buildout`, commit
 | --- | --- | --- |
 | Repository state | Pass | Branch was exact-verified at the snapshot commit. |
 | Release verification | Pass | Latest release gate passed with 238 discovered Playwright tests across 115 batches. |
-| Basic install/run | Needs fresh-checkout smoke | Build passes in release verification; fresh-checkout install/run should be smoked before release packet. |
+| Basic install/run | Pass | Fresh checkout at commit `03da6b9a7d153e2b70b51331863e3a70082f68ce` passed `npm install`, `npm run build -- --logLevel warn`, `node build`, and `curl -I /` with HTTP 200. |
 | Vault lifecycle | Pass | `npm run verify:v1-smoke` opens the default fixture vault and registers disposable vaults for import/export, search, sync, and trash flows. |
 | Notes | Pass | Existing tests cover note CRUD, stale revisions, history, delete preferences, and git commits. |
 | Markdown rendering | Pass | Existing tests cover core render pipeline, Obsidian syntax, embeds, comments, highlights, and static publish. |
@@ -110,7 +110,7 @@ Initial snapshot: 2026-06-15, branch `codex/diamond-buildout`, commit
 | Import/export | Pass | `npm run verify:v1-smoke` covers import preflight and Obsidian-ready ZIP export. |
 | Self-hosting security | Pass | Release verification covers audit, Basic Auth, read-only mode, path traversal, and raw asset safety tests. |
 | Documentation | Pass | Public docs were aligned to the finite v1 claim; remaining parity gaps are documented as known limitations/non-goals. |
-| Release packet | Missing | Create only after blocker audit and v1 smokes pass. |
+| Release packet | Pass | See `docs/releases/v1-candidate-2026-06-15.md`. |
 
 V1 smoke result on 2026-06-15:
 
@@ -120,6 +120,32 @@ npm run verify:v1-smoke
 5 Canvas smoke tests passed.
 8 focused feature smoke tests passed.
 V1 smoke verification passed.
+```
+
+Final release verification on 2026-06-15:
+
+```text
+npm run verify:release
+npm audit --audit-level=moderate: found 0 vulnerabilities.
+svelte-check: 0 errors and 0 warnings.
+Production build output verified.
+Basic Auth smoke passed.
+Read-only smoke passed.
+Playwright e2e suite passed: 238 discovered tests across 115 batches.
+Release verification passed.
+```
+
+Fresh-checkout install/run verification on 2026-06-15:
+
+```text
+git clone --branch codex/diamond-buildout --single-branch https://github.com/Zollicoff/diamond-markdown.git /tmp/diamond-v1-fresh.wqbacm/diamondmarkdown
+git rev-parse HEAD: 03da6b9a7d153e2b70b51331863e3a70082f68ce
+node --version: v24.16.0
+npm --version: 11.13.0
+npm install: added 274 packages, audited 275 packages, found 0 vulnerabilities.
+npm run build -- --logLevel warn: passed.
+node build: listened on http://127.0.0.1:4197.
+curl -I --fail http://127.0.0.1:4197/: HTTP/1.1 200 OK.
 ```
 
 ## Completion Rule
