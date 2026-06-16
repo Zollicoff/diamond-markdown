@@ -65,15 +65,12 @@ The main remaining product risks are:
 
 ## Highest-Value Next Slices
 
-1. **Signed desktop release publishing.** Configure signing/notarization
-   secrets, installer policy, release notes, and GitHub Release attachment
-   automation once Zach is ready to publish public desktop installers.
-2. **Canvas/import polish.** Continue daily-driver compatibility work around
-   deeper Canvas interaction parity and remaining Obsidian config edge cases
-   without executing Obsidian plugins, themes, or CSS snippets.
-3. **Verification hardening.** Keep expanding targeted coverage around
-   dialog-driven destructive actions, sync recovery flows, and release-facing
-   claim changes while keeping the release suite batchable.
+1. **v1 acceptance smoke.** Use `docs/v1-acceptance.md` to run the finite
+   release-shaped checks before adding more parity features.
+2. **Blocker-only fixes.** Fix v1 smoke failures and public-claim mismatches;
+   defer non-blocking Canvas/plugin/theme/offline parity work.
+3. **Release packet.** Record verification output, known limitations, install
+   commands, and exact commit/remote hashes before calling v1 complete.
 
 ## Current Product Line
 

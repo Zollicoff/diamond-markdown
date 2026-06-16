@@ -755,17 +755,16 @@ Use small, pushable slices:
 
 ## Next Implementation Slices
 
-1. **Signed desktop release publishing.** Configure signing/notarization
-   secrets, release notes, installer policy, and GitHub Release attachment
-   automation once Zach is ready to publish public desktop installers.
-2. **Obsidian compatibility gaps.** Add verified handling for more daily-driver
-   import edges such as deeper Canvas formatting support and remaining
-   Obsidian config interpretation without executing Obsidian plugins.
-3. **Verification hardening.** Add tests for remaining dialog-driven
-   destructive actions and sync recovery flows, and keep release checks
-   batched when the full suite grows.
-4. **Component diet.** Continue extracting large views only when the split
-   directly supports a product-facing feature or verification gap.
+1. **v1 smoke and blocker audit.** Run the disposable-vault, Canvas, GitHub
+   sync, import/export, and fresh install/run checks from
+   `docs/v1-acceptance.md`; record exact pass/fail status.
+2. **Blocker-only fixes.** Fix only issues that prevent the v1 acceptance gate
+   from passing or make public docs overclaim shipped behavior.
+3. **Release packet.** Create `docs/releases/v1-*.md` with commit hash,
+   verification commands, smoke results, install/run commands, and known
+   limitations.
+4. **Final release verification.** Run `npm run verify:release`, exact-verify
+   the pushed branch against `git ls-remote`, and only then call v1 complete.
 
 ## Verification Gates
 

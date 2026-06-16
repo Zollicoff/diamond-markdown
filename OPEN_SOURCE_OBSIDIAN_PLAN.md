@@ -33,13 +33,21 @@ Risks:
   go through `src/lib/server/paths.ts`.
 - The plugin system is intentionally small. Expanding it toward full Obsidian
   API compatibility would lock in maintenance burden and is not a core goal.
-- Desktop has a Tauri shell and current-host self-contained preflight, but
-  cross-platform release automation, signing, notarization, and artifact upload
-  remain open.
+- Desktop has a Tauri shell, current-host self-contained preflight, unsigned
+  cross-platform artifact CI, and draft unsigned release publishing. Signing,
+  notarization, and public installer policy remain open.
 
 ## Next Moves
 
-### 1. Keep The Core Verified
+### 1. Finish The v1 Gate
+
+- Use `docs/v1-acceptance.md` as the finite definition of done.
+- Freeze non-blocking parity work until the v1 smoke, documentation audit, and
+  release packet are complete.
+- Fix only issues that block the v1 acceptance criteria or make public claims
+  inaccurate.
+
+### 2. Keep The Core Verified
 
 - Preserve zero-error `npm run check` as a release gate.
 - Keep route-level tests around path traversal, symlink escape prevention, raw
@@ -50,7 +58,7 @@ Risks:
   audit, type checking, production build, auth/read-only smoke, and browser
   coverage.
 
-### 2. Make It Safe To Self-Host
+### 3. Make It Safe To Self-Host
 
 - Keep documenting localhost/Tailscale/reverse-proxy deployment as the safe
   default; there is no built-in multi-user authorization model yet.
@@ -60,7 +68,7 @@ Risks:
   future work can hide more write controls in the UI.
 - Keep raw asset serving sandboxed and non-executable.
 
-### 3. Make Sync Real
+### 4. Make Sync Real
 
 - Maintain the explicit git status/sync/fetch/pull/push UI per vault.
 - Keep write APIs blocked after fetch when the remote is behind, diverged, or
@@ -70,7 +78,7 @@ Risks:
 - Treat background sync and automatic conflict resolution as future work only
   if they can preserve git transparency.
 
-### 4. Improve Daily-Driver UX
+### 5. Improve Daily-Driver UX
 
 - Continue mobile polish around touch-friendly dense controls and context menus.
 - Keep service-worker behavior limited to the app shell and immutable assets;
@@ -80,7 +88,7 @@ Risks:
 - Continue import helpers for remaining Obsidian configuration edges without
   executing Obsidian plugins or silently rewriting vault files.
 
-### 5. Scale Large Vaults
+### 6. Scale Large Vaults
 
 - Keep the persisted vault index cache warm across restarts.
 - File tree and search result virtualization are present; preserve coverage as
@@ -91,7 +99,7 @@ Risks:
 - Graph scale paths exist; keep cosmetic graph parity secondary to correctness
   and responsiveness.
 
-### 6. Plugin System, Small And Late
+### 7. Plugin System, Small And Late
 
 - Keep the plugin surface intentionally small: commands, markdown
   postprocessors, editor commands, settings panels, and right-panel views.
@@ -100,7 +108,7 @@ Risks:
   editor access.
 - Do not chase full Obsidian plugin API parity.
 
-### 7. Open-Source Readiness
+### 8. Open-Source Readiness
 
 - Keep `SECURITY.md`, self-hosting guidance, release checklist, and parity audit
   current as product claims change.

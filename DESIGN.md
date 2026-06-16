@@ -6,7 +6,9 @@ Architectural notes. Read this before shipping a structural change.
 
 1. **The filesystem is the database.** Every piece of user-visible state lives in a `.md` file (or its frontmatter). The server keeps derived indexes (backlinks, tags, full-text) in memory, but they're always reconstructable from scratch.
 2. **Git is the versioning layer.** Not bolted on — load-bearing. Every save is a commit. The UI can show history because git already knows.
-3. **No Electron, no native wrapper.** If a feature can't be done in a browser, it doesn't ship. Mobile works by default.
+3. **Web-first core, optional native shell.** The product is a browser-first
+   SvelteKit app. The Tauri desktop shell wraps the same built server/app and
+   must not become a separate product surface.
 4. **Vanilla CSS, no UI framework.** Keeps the bundle small, keeps us honest about what we're building.
 5. **Server-side path safety is non-negotiable.** Every request-handler resolves paths *inside* a vault; anything resolving outside the vault is rejected.
 
@@ -17,7 +19,9 @@ Architectural notes. Read this before shipping a structural change.
 - **marked** for markdown → HTML, with a wikilink extension
 - **DOMPurify** to sanitize rendered HTML
 - **simple-git** for `git init`, commit, log, diff
-- **Fuse.js** for fuzzy search (small vaults). Will migrate to a trigram index if we grow past ~5k notes.
+- **Fuse.js** for quick switching and a persisted server-side vault index for
+  ranked full-text search.
+- **Tauri v2** for the optional desktop shell.
 - **No SQLite.** Simplicity over performance until we need it.
 
 ## Directory layout
@@ -347,13 +351,24 @@ operations remain server-authoritative.
 
 ## Security model
 
-Single-user by default. Authentication is not built in — deploy behind Tailscale, a reverse proxy, or on localhost.
+Single-user by default. Built-in Basic Auth is a small shared-password gate for
+single-user deployments. For broader exposure, deploy behind Tailscale,
+localhost, or a trusted authenticated reverse proxy.
 
-If anyone wants multi-user someday, the right move is a thin auth layer in front that maps user → vault set; the filesystem model stays the same.
+If anyone wants multi-user someday, the right move is a thin authorization
+layer that maps user → vault set; the filesystem model stays the same.
 
 ## Open questions
 
-- **Live preview**: CodeMirror 6 decorations can hide markdown syntax and render inline — the technique Obsidian uses. Shipping this well is a v0.3 target, not v0.1. MVP is source + split preview.
-- **Image embeds**: `![[image.png]]`. Need to serve arbitrary asset files; straightforward but needs a separate `/api/vaults/[id]/asset/[...path]` endpoint.
-- **Mobile editor ergonomics**: CodeMirror is fine on iPad, awkward on phone. May need a simpler mobile editor mode.
-- **Large vaults (10k+ notes)**: switch from JSON config + in-memory index to SQLite with FTS5. Defer until someone hits the wall.
+- **Signed desktop distribution**: unsigned artifacts and draft releases exist;
+  signed/notarized public installers need credentials and release policy.
+- **Sync automation**: current sync is conservative and explicit. Background
+  sync or automatic conflict handling must preserve git transparency before it
+  becomes core.
+- **Full plugin trust model**: workers, iframes, and capability proxies exist,
+  but Diamond does not yet have a complete arbitrary-plugin permission system.
+- **Canvas parity boundary**: core Canvas read/edit workflows exist; full
+  Obsidian visual whiteboard parity would need its own focused track.
+- **Large real-world vaults**: current index caching, tree virtualization,
+  search paging, and graph scale paths are verified. SQLite/FTS remains a
+  future option only if real vaults outgrow the current model.
