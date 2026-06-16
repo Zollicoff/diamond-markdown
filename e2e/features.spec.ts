@@ -2539,7 +2539,9 @@ test('live preview hides Obsidian comments outside code', async ({ page, request
 	expect(created.ok(), await created.text()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Comment Check.md')}`, { waitUntil: 'domcontentloaded' });
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Comment Check' }).click();
 	const editor = page.locator('.cm-content').first();
 	await expect(editor).toBeVisible({ timeout: 5_000 });
 	await page.locator('.rail').first().click({ force: true });
@@ -2583,7 +2585,9 @@ test('live preview renders Obsidian highlights outside code', async ({ page, req
 	expect(created.ok(), await created.text()).toBe(true);
 	const { vault } = await created.json() as { vault: { id: string } };
 
-	await page.goto(`/vault/${vault.id}/note/${encodeURIComponent('Highlight Check.md')}`, { waitUntil: 'domcontentloaded' });
+	await page.goto(`/vault/${vault.id}`, { waitUntil: 'domcontentloaded' });
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.locator('.tree .file-link').filter({ hasText: 'Highlight Check' }).click();
 	const editor = page.locator('.cm-content').first();
 	await expect(editor).toBeVisible({ timeout: 5_000 });
 	await page.locator('.rail').first().click({ force: true });

@@ -26,7 +26,8 @@
 		"verify:auth": "node scripts/smoke-basic-auth.mjs",
 		"verify:desktop-release": "npm run build -- --logLevel warn && npm run desktop:prepare-node-sidecar && node scripts/verify-desktop-release.mjs",
 		"verify:readonly": "node scripts/smoke-readonly.mjs",
-		"verify:release": "node scripts/verify-release.mjs"
+		"verify:release": "node scripts/verify-release.mjs",
+		"verify:v1-smoke": "node scripts/verify-v1-smoke.mjs"
 	},
 	"overrides": {
 		"cookie": "0.7.2"

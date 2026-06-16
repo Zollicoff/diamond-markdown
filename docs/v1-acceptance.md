@@ -48,6 +48,19 @@ All P0 items must pass before v1 is called complete.
 | Documentation | README, self-hosting, release checklist, parity audit, and v1 limitations agree. | Manual doc review before release packet. |
 | Release packet | A release note exists with commit, verification commands, pass/fail output, install/run commands, and known limitations. | `docs/releases/v1-*.md` created before tag/deploy. |
 
+## Repeatable v1 Smoke Gate
+
+Run this before the final release gate:
+
+```bash
+npm run verify:v1-smoke
+```
+
+The smoke gate exercises the acceptance rows that still need intentional
+release-shaped coverage: app boot and workspace shell, Obsidian export, Canvas
+open/edit flows, import preflight, saved search, GitHub sync controls,
+disposable-remote sync, local recovery guidance, and Obsidian local trash.
+
 ## P1 Acceptance Criteria
 
 P1 items should be fixed if they are cheap and low-risk. They do not block v1
@@ -84,20 +97,30 @@ Initial snapshot: 2026-06-15, branch `codex/diamond-buildout`, commit
 | --- | --- | --- |
 | Repository state | Pass | Branch was exact-verified at the snapshot commit. |
 | Release verification | Pass | Latest release gate passed with 238 discovered Playwright tests across 115 batches. |
-| Basic install/run | Needs v1 smoke | Build passes in release verification; fresh-checkout install/run should be smoked before release packet. |
-| Vault lifecycle | Needs v1 smoke | Covered broadly by tests; still needs one intentional disposable-vault dogfood pass. |
+| Basic install/run | Needs fresh-checkout smoke | Build passes in release verification; fresh-checkout install/run should be smoked before release packet. |
+| Vault lifecycle | Pass | `npm run verify:v1-smoke` opens the default fixture vault and registers disposable vaults for import/export, search, sync, and trash flows. |
 | Notes | Pass | Existing tests cover note CRUD, stale revisions, history, delete preferences, and git commits. |
 | Markdown rendering | Pass | Existing tests cover core render pipeline, Obsidian syntax, embeds, comments, highlights, and static publish. |
 | Links and navigation | Pass | Existing tests cover wikilinks, Markdown note links, backlinks, outgoing links, aliases, headings, blocks, and mentions. |
 | Search | Pass | Existing tests cover quick switcher/search tab behavior, saved searches, paging, grouping, facets, highlighting, and client helpers. |
 | Attachments | Pass | Existing tests cover attachment upload/list/picker/delete/rename/move and embed rendering. |
-| Canvas | Needs v1 smoke | Automated coverage is broad, but v1 should still include one real Canvas manual smoke because this is a visible parity-sensitive area. |
+| Canvas | Pass | `npm run verify:v1-smoke` opens an editable Obsidian Canvas preview and covers group/card/edge/file operations with git commits. |
 | Git history | Pass | Existing tests cover auto-commit, history diff/copy/restore, and stale-write guards. |
-| GitHub sync | Needs v1 smoke | Automated coverage is broad; v1 should still run a disposable remote sync smoke because this is the core product promise. |
-| Import/export | Needs v1 smoke | Automated coverage is broad; v1 should still run one import/export pass and confirm docs match known boundaries. |
+| GitHub sync | Pass | `npm run verify:v1-smoke` covers GitHub sync UI, dirty recovery guidance, and a disposable remote sync push/pull pass. |
+| Import/export | Pass | `npm run verify:v1-smoke` covers import preflight and Obsidian-ready ZIP export. |
 | Self-hosting security | Pass | Release verification covers audit, Basic Auth, read-only mode, path traversal, and raw asset safety tests. |
-| Documentation | Needs audit | Public wording must stay aligned with the v1 claim and non-goals. |
+| Documentation | Pass | Public docs were aligned to the finite v1 claim; remaining parity gaps are documented as known limitations/non-goals. |
 | Release packet | Missing | Create only after blocker audit and v1 smokes pass. |
+
+V1 smoke result on 2026-06-15:
+
+```text
+npm run verify:v1-smoke
+12 app/export tests passed.
+5 Canvas smoke tests passed.
+8 focused feature smoke tests passed.
+V1 smoke verification passed.
+```
 
 ## Completion Rule
 
