@@ -9,31 +9,49 @@
  *       styles.css
  *       <slug>.html  (one per public note)
  *       images/<copied>
+ *       assets/<copied>
  *
  * Wikilinks from a public note to another public note become
  * <a href="<slug>.html">. Wikilinks to private / missing notes become
  * inert .wikilink--broken spans. Backlinks show public-to-public only.
- * Image embeds are copied into images/ with rewritten src.
+ * Image embeds are copied into images/ with rewritten src. Other attachment
+ * embeds are copied into assets/ with rewritten src/href values.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { marked } from 'marked';
-import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags } from './wikilink';
+import { marked, Renderer, type Tokens } from 'marked';
+import { replaceWikilinks, replaceEmbeds, isImagePath, parseInlineTags, wikilinkFragment } from './wikilink';
 import { splitFrontmatter } from './frontmatter';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
-import { getIndex, resolveTarget } from './indexer';
+import { getIndex, resolveTarget, type VaultIndex } from './indexer';
 import { purify } from './sanitize';
-import { slugify, escHtml, escAttr } from '$lib/util/strings';
+import {
+	attachmentEmbedKind,
+	embedImageAttrs,
+	parseMarkdownImageText,
+	renderAttachmentEmbedHtml,
+	resolveMarkdownImageReference,
+	splitAssetReference
+} from './embed';
+import { markdownNoteHash, resolveMarkdownNoteReference } from './markdown-links';
+import { renderObsidianCallout } from './callouts';
+import { useObsidianMarkedExtensions } from './marked-obsidian';
+import { addObsidianBlockIds } from './block-ids';
+import { markdownRenderPreference } from './obsidian-config';
+import { slugify, slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
+useObsidianMarkedExtensions(marked);
 
 export interface PublishReport {
 	outDir: string;
 	totalNotes: number;
 	publicNotes: number;
 	imagesCopied: number;
+	attachmentsCopied: number;
 	skipped: { path: string; reason: string }[];
 }
 
@@ -52,10 +70,11 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 		}
 		const { frontmatter, body } = splitFrontmatter(raw);
 		if (frontmatter.public !== true) continue;
+		const visibleBody = stripObsidianCommentsOutsideCode(body);
 		notes.set(meta.notePath, {
 			title: typeof frontmatter.title === 'string' ? frontmatter.title : meta.title,
 			body,
-			tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.filter((x): x is string => typeof x === 'string') : parseInlineTags(body)
+			tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.filter((x): x is string => typeof x === 'string') : parseInlineTags(visibleBody)
 		});
 	}
 
@@ -90,6 +109,7 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 	fs.rmSync(outDir, { recursive: true, force: true });
 	fs.mkdirSync(outDir, { recursive: true });
 	fs.mkdirSync(path.join(outDir, 'images'), { recursive: true });
+	fs.mkdirSync(path.join(outDir, 'assets'), { recursive: true });
 
 	// Make sure git ignores the output. Rebuildable artifact, not vault content.
 	ensureGitignoreEntry(vault, '.diamond-publish/');
@@ -97,8 +117,10 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 	// Styles.
 	fs.writeFileSync(path.join(outDir, 'styles.css'), STYLES);
 
-	// Render each public note, collecting images as we go.
-	const imagesCopied = new Set<string>();
+	// Render each public note, collecting vault-local assets as we go.
+	const imagesCopied = new Map<string, string>();
+	const attachmentsCopied = new Map<string, string>();
+	const softLineBreaks = markdownRenderPreference(vault.path).softLineBreaks;
 	const skipped: PublishReport['skipped'] = [];
 
 	for (const [notePath, data] of notes) {
@@ -111,7 +133,9 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 				slugs,
 				idx,
 				imagesCopied,
-				outDir
+				attachmentsCopied,
+				outDir,
+				softLineBreaks
 			);
 			const html = wrapPage({
 				title: data.title,
@@ -134,6 +158,7 @@ export async function publishVault(vault: Vault): Promise<PublishReport> {
 		totalNotes: idx.notes.size,
 		publicNotes: notes.size,
 		imagesCopied: imagesCopied.size,
+		attachmentsCopied: attachmentsCopied.size,
 		skipped
 	};
 }
@@ -144,44 +169,39 @@ function renderBodyForPublish(
 	sourcePath: string,
 	slugs: Map<string, string>,
 	idx: ReturnType<typeof getIndex>,
-	imagesCopied: Set<string>,
-	outDir: string
+	imagesCopied: Map<string, string>,
+	attachmentsCopied: Map<string, string>,
+	outDir: string,
+	softLineBreaks: boolean
 ): string {
-	const processed = processOutsideCode(body, (chunk) => {
+	const withoutComments = stripObsidianCommentsOutsideCode(body);
+	const processed = processOutsideCode(withoutComments, (chunk) => {
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
-			if (!isImagePath(e.target)) {
-				const display = e.alt ?? e.target;
-				return escHtml(display);
-			}
-			// Copy the image into outDir/images and rewrite src to a relative path.
-			let copied: string | null = null;
-			try {
-				const abs = resolveInVault(vault, e.target);
-				if (fs.existsSync(abs)) {
-					const imgSlug = path.basename(e.target);
-					const dest = path.join(outDir, 'images', imgSlug);
-					// Collision: prefix with a short hash of the path.
-					let finalSlug = imgSlug;
-					if (fs.existsSync(dest) && !imagesCopied.has(e.target)) {
-						const hash = hashString(e.target).slice(0, 6);
-						finalSlug = `${hash}-${imgSlug}`;
-					}
-					fs.copyFileSync(abs, path.join(outDir, 'images', finalSlug));
-					copied = finalSlug;
-					imagesCopied.add(e.target);
+			if (isImagePath(e.target)) {
+				const ref = splitAssetReference(e.target);
+				const copied = copyImageForPublish(vault, ref.path, imagesCopied, outDir);
+				if (!copied) {
+					return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
 				}
-			} catch { /* ignore */ }
-			const alt = e.alt ?? path.basename(e.target);
-			if (!copied) {
-				return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
+				return `<img src="images/${encodeURI(copied)}${escAttr(ref.suffix)}" ${embedImageAttrs({ ...e, target: ref.path })}>`;
 			}
-			return `<img src="images/${encodeURI(copied)}" alt="${escAttr(alt)}" loading="lazy">`;
+			const attachmentKind = attachmentEmbedKind(e.target);
+			if (attachmentKind) {
+				const ref = splitAssetReference(e.target);
+				const copied = copyAttachmentForPublish(vault, ref.path, attachmentsCopied, outDir);
+				if (!copied) {
+					return `<span class="broken-embed">[missing: ${escHtml(e.target)}]</span>`;
+				}
+				return renderAttachmentEmbedHtml({ ...e, target: ref.path }, `assets/${encodeURI(copied)}${ref.suffix}`, attachmentKind);
+			}
+			const display = e.alt ?? e.target;
+			return escHtml(display);
 		});
 		const withLinks = replaceWikilinks(withEmbeds, (link) => {
 			const resolved = resolveTarget(idx, link.target);
 			const display = link.display ?? link.target;
 			if (resolved && slugs.has(resolved)) {
-				return `<a class="wikilink" href="${slugs.get(resolved)}.html">${escHtml(display)}</a>`;
+				return `<a class="wikilink" href="${slugs.get(resolved)}.html${wikilinkFragment(link)}">${escHtml(display)}</a>`;
 			}
 			return `<span class="wikilink wikilink--broken" title="not published">${escHtml(display)}</span>`;
 		});
@@ -191,10 +211,120 @@ function renderBodyForPublish(
 		});
 	});
 
-	const raw = marked.parse(processed) as string;
-	return purify.sanitize(raw, {
-		ALLOWED_ATTR: ['href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel', 'loading', 'width', 'height']
+	const raw = marked.parse(processed, {
+		breaks: softLineBreaks,
+		renderer: createPublishRenderer(vault, idx, slugs, sourcePath, imagesCopied, outDir, softLineBreaks)
+	}) as string;
+	return purify.sanitize(addObsidianBlockIds(addHeadingIds(raw)), {
+		ALLOWED_ATTR: [
+			'href', 'class', 'data-target', 'title', 'src', 'alt', 'id', 'target', 'rel',
+			'loading', 'width', 'height', 'aria-label', 'controls', 'preload', 'download', 'open'
+		]
 	});
+}
+
+function addHeadingIds(html: string): string {
+	return html.replace(/<h([1-6])>([\s\S]*?)<\/h\1>/g, (_w, level: string, inner: string) => {
+		const text = inner.replace(/<[^>]+>/g, '').trim();
+		const id = slugifyHeading(text);
+		return `<h${level} id="${escAttr(id)}">${inner}</h${level}>`;
+	});
+}
+
+function copyImageForPublish(
+	vault: Vault,
+	target: string,
+	imagesCopied: Map<string, string>,
+	outDir: string
+): string | null {
+	return copyAssetForPublish(vault, target, imagesCopied, outDir, 'images');
+}
+
+function copyAttachmentForPublish(
+	vault: Vault,
+	target: string,
+	attachmentsCopied: Map<string, string>,
+	outDir: string
+): string | null {
+	return copyAssetForPublish(vault, target, attachmentsCopied, outDir, 'assets');
+}
+
+function copyAssetForPublish(
+	vault: Vault,
+	target: string,
+	copiedAssets: Map<string, string>,
+	outDir: string,
+	subdir: 'images' | 'assets'
+): string | null {
+	try {
+		const existing = copiedAssets.get(target);
+		if (existing) return existing;
+
+		const abs = resolveInVault(vault, target);
+		if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return null;
+
+		const assetSlug = path.basename(target);
+		const dest = path.join(outDir, subdir, assetSlug);
+		// Collision: prefix with a short hash of the path.
+		let finalSlug = assetSlug;
+		if (fs.existsSync(dest)) {
+			const hash = hashString(target).slice(0, 6);
+			finalSlug = `${hash}-${assetSlug}`;
+		}
+		fs.copyFileSync(abs, path.join(outDir, subdir, finalSlug));
+		copiedAssets.set(target, finalSlug);
+		return finalSlug;
+	} catch {
+		return null;
+	}
+}
+
+function createPublishRenderer(
+	vault: Vault,
+	idx: VaultIndex,
+	slugs: Map<string, string>,
+	sourcePath: string,
+	imagesCopied: Map<string, string>,
+	outDir: string,
+	softLineBreaks: boolean
+): Renderer<string, string> {
+	const renderer = new Renderer();
+	renderer.blockquote = (token) => {
+		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
+			async: false,
+			breaks: softLineBreaks,
+			renderer
+		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
+	};
+	renderer.image = ({ href, title, text }: Tokens.Image) => {
+		const meta = parseMarkdownImageText(text);
+		const localRef = resolveMarkdownImageReference(href, sourcePath);
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+
+		if (!localRef) {
+			return `<img src="${escAttr(href)}" ${embedImageAttrs({ target: href, ...meta })}${titleAttr}>`;
+		}
+
+		const copied = copyImageForPublish(vault, localRef.path, imagesCopied, outDir);
+		if (!copied) {
+			return `<span class="broken-embed">[missing: ${escHtml(localRef.path)}]</span>`;
+		}
+		return `<img src="images/${encodeURI(copied)}${escAttr(localRef.suffix)}" ${embedImageAttrs({ target: localRef.path, ...meta })}${titleAttr}>`;
+	};
+	renderer.link = ({ href, title, tokens }: Tokens.Link) => {
+		const label = renderer.parser.parseInline(tokens);
+		const ref = resolveMarkdownNoteReference(href, sourcePath);
+		if (ref) {
+			const resolved = resolveTarget(idx, ref.target);
+			if (resolved && slugs.has(resolved)) {
+				return `<a class="wikilink" href="${slugs.get(resolved)}.html${escAttr(markdownNoteHash(ref.suffix))}" data-target="${escAttr(resolved)}">${label}</a>`;
+			}
+			return `<span class="wikilink wikilink--broken" title="not published">${label}</span>`;
+		}
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		return `<a href="${escAttr(href)}"${titleAttr}>${label}</a>`;
+	};
+	return renderer;
 }
 
 function wrapPage(opts: {
@@ -323,6 +453,9 @@ const STYLES = `/* DiamondMD static export — minimal readable defaults */
 	--accent: #5b3df5;
 	--border: #e1e1e1;
 	--broken: #b00020;
+	--success: #1a7f37;
+	--warn: #9a6700;
+	--danger: #cf222e;
 }
 @media (prefers-color-scheme: dark) {
 	:root {
@@ -333,6 +466,9 @@ const STYLES = `/* DiamondMD static export — minimal readable defaults */
 		--accent: #9f8bff;
 		--border: #2a2c31;
 		--broken: #ff7a88;
+		--success: #3fb950;
+		--warn: #d29922;
+		--danger: #f85149;
 	}
 }
 
@@ -373,10 +509,60 @@ body {
 	margin: 1em 0; padding: 0.4em 1em;
 	border-left: 3px solid var(--border); color: var(--fg-dim); font-style: italic;
 }
+.note mark {
+	background: color-mix(in srgb, var(--warn), transparent 72%);
+	color: var(--fg);
+	border-radius: 3px;
+	padding: 0 2px;
+}
+.note .callout {
+	--callout-accent: var(--accent);
+	--callout-bg: color-mix(in srgb, var(--callout-accent), transparent 91%);
+	margin: 1em 0;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--callout-accent), var(--border) 55%);
+	border-left-width: 4px;
+	border-radius: 7px;
+	background: var(--callout-bg);
+	font-style: normal;
+}
+.note .callout-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--fg);
+	font-weight: 700;
+}
+.note .callout-title::before {
+	content: '!';
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	background: var(--callout-accent);
+	color: var(--bg);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.72em;
+}
+.note summary.callout-title { cursor: pointer; }
+.note .callout-body { margin-top: 8px; color: var(--fg-dim); }
+.note .callout-body > :last-child { margin-bottom: 0; }
+.note .callout-note, .note .callout-info, .note .callout-todo { --callout-accent: #0969da; }
+.note .callout-tip, .note .callout-hint, .note .callout-success { --callout-accent: var(--success); }
+.note .callout-warning, .note .callout-caution, .note .callout-important { --callout-accent: var(--warn); }
+.note .callout-danger, .note .callout-error, .note .callout-failure, .note .callout-bug { --callout-accent: var(--danger); }
+.note .callout-example, .note .callout-question, .note .callout-abstract, .note .callout-summary, .note .callout-quote, .note .callout-cite { --callout-accent: var(--accent); }
 .note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; }
 .note pre { background: var(--bg-soft); padding: 14px 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); }
 .note pre code { background: transparent; padding: 0; }
 .note img { max-width: 100%; border-radius: 6px; margin: 0.6em 0; }
+.note .embed-attachment { margin: 1em 0; max-width: 100%; }
+.note .embed-attachment figcaption { margin-top: 6px; color: var(--fg-dim); font-size: 0.82em; }
+.note .embed-audio audio, .note .embed-video video { width: 100%; max-width: 100%; }
+.note .embed-video video { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-soft); }
+.note .embed-file { display: inline-flex; align-items: center; max-width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-soft); text-decoration: none; }
+.note .embed-file-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .note a { color: var(--accent); }
 .note a.wikilink { font-weight: 500; }
 .note .wikilink--broken { color: var(--broken); font-style: italic; border-bottom: 1px dotted var(--broken); }

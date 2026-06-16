@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { api } from '$lib/vault-api';
+	import { on as onBus } from '$lib/events';
+	import type { SearchHit } from '$lib/types';
 
 	interface Props {
 		vaultId: string;
@@ -10,34 +13,22 @@
 
 	let open = $state(false);
 	let query = $state('');
-	let results = $state<{ path: string; title: string; snippet?: string }[]>([]);
+	let results = $state<SearchHit[]>([]);
 	let fullText = $state(false);
 	let selectedIdx = $state(0);
 	let inputEl: HTMLInputElement | null = $state(null);
 	let controller: AbortController | null = null;
 
+	function show(nextFullText: boolean): void {
+		open = true;
+		fullText = nextFullText;
+		query = '';
+		selectedIdx = 0;
+		results = [];
+		setTimeout(() => inputEl?.focus(), 0);
+	}
+
 	function handleKey(e: KeyboardEvent): void {
-		const mod = e.metaKey || e.ctrlKey;
-		if (mod && e.key === 'k' && !e.shiftKey) {
-			e.preventDefault();
-			open = true;
-			fullText = false;
-			query = '';
-			selectedIdx = 0;
-			results = [];
-			setTimeout(() => inputEl?.focus(), 0);
-			return;
-		}
-		if (mod && e.key === 'F' && e.shiftKey) {
-			e.preventDefault();
-			open = true;
-			fullText = true;
-			query = '';
-			selectedIdx = 0;
-			results = [];
-			setTimeout(() => inputEl?.focus(), 0);
-			return;
-		}
 		if (open && e.key === 'Escape') {
 			open = false;
 			return;
@@ -59,8 +50,15 @@
 	}
 
 	onMount(() => {
+		const offSwitcher = onBus('switcher:open', (event) => {
+			if (event.vaultId !== vaultId) return;
+			show(Boolean(event.fullText));
+		});
 		window.addEventListener('keydown', handleKey);
-		return () => window.removeEventListener('keydown', handleKey);
+		return () => {
+			offSwitcher();
+			window.removeEventListener('keydown', handleKey);
+		};
 	});
 
 	async function runSearch(): Promise<void> {
@@ -68,18 +66,18 @@
 		if (!query.trim()) { results = []; return; }
 		controller = new AbortController();
 		try {
-			const url = `/api/vaults/${vaultId}/search?q=${encodeURIComponent(query)}${fullText ? '&full=1' : ''}`;
-			const res = await fetch(url, { signal: controller.signal });
-			if (!res.ok) return;
-			const data = await res.json();
-			results = data.results ?? [];
+			results = await api.search(vaultId, query, {
+				full: fullText,
+				limit: 25,
+				signal: controller.signal
+			});
 			selectedIdx = 0;
 		} catch (e) {
 			if ((e as Error).name !== 'AbortError') console.error(e);
 		}
 	}
 
-	function pick(r: { path: string } | undefined): void {
+	function pick(r: SearchHit | undefined): void {
 		if (!r) return;
 		open = false;
 		goto(`/vault/${vaultId}/note/${encodeURI(r.path)}`);

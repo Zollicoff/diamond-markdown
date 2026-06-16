@@ -1,8 +1,8 @@
 # Diamond Markdown
 
-> A self-hosted markdown knowledge base. Obsidian-style wikilinks, backlinks, graph, and live preview — but web-first (no Electron) and git-native for sync and history.
+> A self-hosted markdown knowledge base. Obsidian-style wikilinks, backlinks, unlinked mentions, graph, and live preview — but web-first (no Electron) and git-native for sync and history.
 
-Diamond Markdown is a single SvelteKit app. Point it at a folder of `.md` files, get a full knowledge-base UI in any browser. Every save is a git commit, so your history is real, diffable, and portable — and syncing across devices is a `git push` away.
+Diamond Markdown is a single SvelteKit app. Point it at a folder of `.md` files, get a full knowledge-base UI in any browser. Every save is a git commit, so your history is real, diffable, and portable — and syncing across devices is a safe Settings action or `git push` away.
 
 Marketing site: [diamondmarkdown.com](https://diamondmarkdown.com)
 
@@ -11,16 +11,17 @@ Marketing site: [diamondmarkdown.com](https://diamondmarkdown.com)
 Obsidian is great. It's also Electron, its sync is proprietary and paid, and its plugin model locks you to their runtime. Diamond Markdown makes a different set of trade-offs:
 
 - **Web-first.** Works on desktop, tablet, and phone browsers. Nothing to install per device. PWA install gets you a home-screen icon.
-- **Git-native versioning.** Every save is a commit. Real history, real diffs, real branches. Sync is just `git push` / `git pull` — no proprietary protocol.
+- **Git-native versioning.** Every save is a commit. Real history, real diffs, real branches. Sync uses ordinary `git fetch`, fast-forward pull, and push semantics — no proprietary protocol.
 - **Markdown files, flat on disk.** No lock-in. Uninstall Diamond Markdown tomorrow and your notes are still there.
+- **Portable exports.** Download an Obsidian-ready ZIP of the vault files from Settings when you want a clean handoff package.
 - **Multi-vault from day one.** Different folders, different indexes, one app.
 - **Open source (MIT).**
 
-If you want Obsidian's plugin ecosystem and Canvas, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow in a browser with real version history, Diamond Markdown is for you.
+If you want Obsidian's full plugin ecosystem and full Canvas whiteboard parity, stick with Obsidian. If you want the core wikilink + backlink + graph + live-preview workflow, Canvas previews with markdown-aware text cards plus callouts, highlights, strikethrough, backslash-escaped inline punctuation, aligned simple tables with escaped pipes and padded missing cells, resolved note/title/alias inline wikilinks, source-relative and vault-root Markdown note/Canvas links and asset embeds including parenthesized filenames, note embed chips, explicit Canvas links and embed chips, zoomable node positioning/resizing/color/routing edits, and real version history in a browser, Diamond Markdown is for you.
 
 ## Status
 
-Pre-1.0, active development. v0.2 is feature-complete against Obsidian's core (math, mermaid, code highlighting, footnotes, embeds, hover preview, outline, themes, templates, bookmarks, recent notes, PWA, daily notes, static publish). See [ROADMAP.md](./ROADMAP.md) for the plan.
+Pre-1.0, active development. The core Obsidian-style note workflow is implemented: wikilinks, backlinks, graph, live preview, math, Mermaid, code highlighting, footnotes, embeds, hover preview, outline, themes, templates, bookmarks, recent notes, PWA app shell, daily notes, static publish, conservative GitHub sync, and broad Canvas compatibility. The remaining work is mainly around release automation, deeper Canvas polish, and intentionally scoped plugin/desktop/offline boundaries. See [ROADMAP.md](./ROADMAP.md) and [docs/obsidian-parity-audit.md](./docs/obsidian-parity-audit.md) for the current claim boundary.
 
 ## Run
 
@@ -40,18 +41,32 @@ npm run build
 node build            # production server via adapter-node
 ```
 
+Desktop shell:
+
+```sh
+npm run build
+npm run desktop:dev   # Tauri v2 shell, local loopback backend
+```
+
 On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Documents/Diamond Markdown` and registers it as your default vault. Override with the `DIAMOND_DEFAULT_VAULT_DIR` environment variable, or add more vaults from the in-app vault manager. Your data lives in your home directory; the repo is the program.
+
+Production deployment guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
+Release verification lives in [docs/release-checklist.md](./docs/release-checklist.md).
+Vault-local plugin authoring notes live in [docs/plugins.md](./docs/plugins.md).
+Desktop wrapper notes live in [docs/desktop.md](./docs/desktop.md).
 
 ## Concepts
 
 - **Vault** — a folder of markdown files. Every vault is its own git repository (auto-initialized on first save).
 - **Note** — a `.md` file inside a vault. The file's path within the vault is its identity.
-- **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading. Broken links render visibly so you can create missing notes.
+- **Wikilink** — `[[Note Title]]` resolves to another note in the same vault. `[[Note#Heading]]` deep-links to a heading, and `[[Note#^block-id]]` deep-links to an Obsidian block ID. Broken links render visibly so you can create missing notes.
 - **Note embed** — `![[Note]]` renders the target note inline (cycle-safe).
-- **Image embed** — `![[image.png]]` for images stored in the vault.
+- **Attachment embed** — `![[image.png]]`, `![[audio.mp3]]`, `![[video.mp4]]`, `![[packet.pdf]]`, and other vault files render from local vault assets.
+- **Callout** — Obsidian-style callouts such as `> [!NOTE]`, `> [!WARNING]-`, and `> [!TIP]+` render in read mode and static publish.
 - **Backlink** — automatically computed index of every note that wikilinks *to* the note you're viewing.
+- **Unlinked mention** — a note that mentions the current note's title, filename stem, or alias in plain text without making it a wikilink yet.
 - **Tag** — `#hashtag` in body text or `tags:` in frontmatter. Tag index lists every tag and the notes that use it.
-- **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized.
+- **Frontmatter** — YAML block at the top of a note (`--- ... ---`). `title`, `aliases`, `tags`, `created`, `updated`, `public` are recognized, including Obsidian block-list `tags` and `aliases`.
 
 ## Features
 
@@ -59,6 +74,14 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 - CodeMirror 6 with markdown syntax highlighting
 - **Live preview** — Obsidian-style: markdown markers hide off-line, wikilinks render as atomic pills inline, headings render with their sizing
 - Source / Live / Read mode toggle per note
+- Imported Obsidian vaults can reuse safe `.obsidian/app.json`
+  `defaultViewMode` / `livePreview`, `showLineNumber`, `showInlineTitle`,
+  `spellcheck`, `tabSize` / `readableLineLength`, and `foldHeading` /
+  `foldIndent` editor preferences, `autoPairBrackets` bracket/quote pairing,
+  `autoPairMarkdown` emphasis/highlight/strikethrough/backtick pairing,
+  `propertiesInDocument: "hidden"` / `"source"` frontmatter display,
+  `strictLineBreaks` reading/publish behavior, `promptDelete` file-delete
+  confirmation behavior, and `showUnsupportedFiles` raw-asset tree visibility
 - Editor toolbar (bold, italic, headings, lists, code, etc.)
 - Word count + reading time in status bar
 
@@ -67,7 +90,9 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 - Right-click any wikilink for a context menu (Open / Open in new tab / Open in new pane / Copy path)
 - Hover preview — mouseover a wikilink for a floating card with the target's first ~800 chars rendered through the same pipeline
 - Heading anchors — every heading gets a stable id so `[[Note#Heading]]` deep-links work
+- Obsidian block anchors — paragraph/list block IDs such as `^install-steps` become stable anchors for `[[Note#^install-steps]]` in Live Preview, Read mode, and static publish
 - Backlinks panel — every note linking to the open note
+- Unlinked mentions panel — notes that mention the open note title, filename stem, or alias without a wikilink
 - Outgoing links panel
 - Outline panel — headings of the active note, click to scroll
 
@@ -76,25 +101,34 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 - Code highlighting (highlight.js, server-rendered, language auto-detect)
 - Mermaid diagrams (lazy-loaded client-side)
 - Footnotes — standard `[^1]` references with back-links
-- Note embeds (`![[Note]]`), image embeds (`![[image.png]]`)
+- Obsidian block IDs — trailing paragraph/list markers such as `^block-id` render as linkable anchors without showing the marker text
+- Obsidian highlights — paired `==highlight==` spans render in Live Preview, Read mode, and static publish, including nested inline markdown
+- Obsidian comments — paired `%% hidden %%` comments are hidden from Live Preview, Read mode, static publish, search/link/tag indexing, and Canvas text-card previews while remaining in source
+- Note embeds (`![[Note]]`), image embeds (`![[image.png]]`, `![[image.png|300]]`, `![[image.png|300x200]]`)
 
 ### Workspace
 - Tabs + split panes (recursive layout tree)
+- Touch swipes switch adjacent tabs first, then adjacent panes at tab boundaries
 - Polymorphic tabs: notes, graph, tags, search, settings
-- File tree with folders, rename / move / delete, drag-drop
-- Bookmarks panel (per-vault, ⌘⇧B to toggle)
+- File tree with folders, markdown notes, Canvas files, and optional Obsidian-style unsupported raw-asset visibility; rename / move / delete, drag-drop stay scoped to notes, Canvas files, and folders
+- Attachment workflow: drop/paste uploads, existing-asset picker, multi-select insert, delete, and reference-safe rename/move organization
+- Obsidian import support that preserves `.obsidian`, surfaces plugin, appearance, graph, core-plugin, and hotkey settings as migration guidance with known Diamond command mappings, imports note-level Obsidian bookmarks plus search bookmarks, and honors safe attachment/new-note/daily-note/link-style/new-link-format/editor-display/inline-title/readable-line-length/frontmatter-display settings plus unsupported-file visibility, link-update, delete-confirmation, and local-trash preferences
+- Obsidian export package from Settings that preserves vault files and `.obsidian` config while excluding Diamond metadata, generated publish output, and Git internals
+- Obsidian Canvas previews for `.canvas` boards, with markdown-aware text-card previews including H1-H6 headings, thematic breaks, hidden Obsidian comments, callouts, highlights, strikethrough, backslash-escaped inline punctuation, aligned simple tables with escaped pipes and padded missing body cells, resolved note/title/alias inline wikilinks, source-relative and vault-root Markdown note/Canvas links and asset embeds including parenthesized filenames, note embed chips, explicit Canvas links and embed chips, file-card heading/block subpaths, Markdown note-card previews, vault-asset file-card previews, zoom controls, SVG export, group rendering/label editing/creation, git-backed text-card editing, node duplication/positioning/resizing, node/edge color edits, and edge routing controls
+- Bookmarks panel (per-vault, git-backed, ⌘⇧B to toggle)
 - Recent notes panel
 - Light / Dark / Auto theme (⌘⇧L to cycle)
 
 ### Search
 - Fuzzy quick-switcher
-- Full-text search across the vault
+- Ranked, index-backed full-text search across the vault with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, highlighted literal result matches, folder-grouped results, folder facets, git-backed saved searches, paged loading, and virtualized results
 - Command palette (⌘P)
 
 ### Graph view
 - Force-directed graph of notes + links
 - App-style tab — opens beside notes, doesn't replace them
 - Drag nodes to pin, click to open in new tab, alt-click for new pane
+- Shift-click or shift-drag to select multiple graph nodes
 - Tunable forces panel: node size, repel, link force, link distance, center force (per-vault persisted)
 - Filters: hide orphans, search by name/path
 
@@ -104,35 +138,74 @@ On first run, Diamond Markdown copies the bundled `sample-vault/` to `~/Document
 
 ### Versioning
 - Git auto-commit on save (debounced, per-vault repo)
-- Per-note history viewer with diff
+- Per-note history viewer with diff, snapshot copy, and git-backed restore
+- Vault-local bookmarks and saved searches are stored under `.diamondmd/` so
+  they follow ordinary GitHub sync with the vault
+- GitHub sync panel in Settings — configure a GitHub remote, run safe one-click sync, check reachability, fetch status, pull fast-forward updates, push local commits, and copy explicit recovery commands when manual git resolution is needed
 
 ### Daily notes
-- ⌘⇧D opens today's `Daily Notes/YYYY-MM-DD.md`
-- Optional `Daily Notes/Template.md` with `{{date}}` / `{{time}}` substitutions
+- ⌘⇧D opens today's daily note, defaulting to `Daily Notes/YYYY-MM-DD.md`
+- Safe Obsidian Daily Notes settings in `.obsidian/daily-notes.json` are reused
+  for folder, template, and date-format paths
+- Optional templates support `{{date}}`, `{{time}}`, `{{title}}`, and
+  `{{cursor}}` substitutions
 
 ### Templates
-- General templates from `Templates/` folder, ⌘⇧T to insert
-- Variables: `{{date}}`, `{{time}}`, `{{title}}`
+- General templates from `Templates/` or a safe Obsidian-configured Templates
+  folder, ⌘⇧T to insert
+- Safe `.obsidian/templates.json` folder plus default date/time formats are
+  reused for the insert-template picker
+- Variables: `{{date}}`, `{{time}}`, `{{title}}`, `{{cursor}}`
 
 ### Excluded folders
 - Per-vault folder ignore list (right-click a folder → Exclude from index)
 
 ### Publishing
 - `public: true` frontmatter opts a note in
-- One-shot static-site export to `<vault>/.diamond-publish/` — deploy-ready HTML + CSS, public-to-public wikilinks rewritten, private-target links broken intentionally
+- One-shot static-site export to `<vault>/.diamond-publish/` — deploy-ready HTML + CSS, public-to-public wikilinks rewritten, private-target links broken intentionally, local images copied to `images/`, and non-image attachments copied to `assets/`
 
 ### PWA
 - Installable on mobile / desktop, offline manifest, theme-color, custom icons
+- Service worker caches the app shell and immutable static assets. Vault APIs
+  stay network/server-backed so note and git state do not go stale silently.
+
+### Self-hosting
+- Optional `DIAMOND_READ_ONLY=true` mode for browse-only demos: read APIs stay
+  available while write APIs return `403`
+- Designed for localhost, Tailscale/private networks, or authenticated reverse
+  proxy deployment
+- Optional `DIAMOND_BASIC_AUTH=user:password` guard for simple single-user
+  self-hosted installs; no multi-user auth or per-vault authorization yet
+
+### Desktop
+- Tauri v2 shell in `src-tauri/`
+- Starts the existing built SvelteKit/Node backend on loopback, waits for it,
+  then opens a native desktop webview to the local app
+- Supports attaching to an already-running backend with `DIAMOND_SERVER_URL`
+- Supports current-platform self-contained builds via
+  `npm run desktop:build:self-contained`, which prepares a Node sidecar and
+  bundles it through Tauri
+- `npm run verify:desktop-release` checks current-host bundle inputs before
+  building; the release verifier uses a cross-platform preview launcher, and
+  the GitHub Actions desktop workflow builds unsigned bundle artifacts plus
+  per-platform SHA-256 artifact manifests across the configured matrix. The
+  signed release plan is in
+  [docs/desktop-release.md](./docs/desktop-release.md)
+
+### Plugins
+- Vault-local ESM plugins from `.diamondmd/plugins/<plugin-id>/`
+- Manifest discovery in Settings
+- Boot-time command registration for command-palette actions
 
 ## Roadmap
 
 See [ROADMAP.md](./ROADMAP.md) — summary:
 
 - **v0.1** ✓ MVP shipped 2026-04-22
-- **v0.2** ✓ Obsidian-core parity shipped 2026-04-25
-- **v0.3** — Polish, service worker, mobile gestures
-- **v0.4** — Refinements + perf (large vaults)
-- **v0.5** — Plugin API, Tauri desktop wrapper
+- **v0.2** ✓ Obsidian-style core notes workflow shipped 2026-04-25
+- **v0.3** ✓ Polish, service worker, mobile gestures
+- **v0.4** ✓ Git sync and large-vault scale work
+- **v0.5** Partial — plugin API, Tauri desktop wrapper, current-host sidecar-ready desktop runtime, and unsigned desktop artifact CI are present; signed cross-platform release publishing remains open
 
 The open-source replacement track is broken out in
 [OPEN_SOURCE_OBSIDIAN_PLAN.md](./OPEN_SOURCE_OBSIDIAN_PLAN.md).
@@ -142,8 +215,12 @@ The open-source replacement track is broken out in
 Single SvelteKit app:
 
 - Server (`src/lib/server/`) handles filesystem, git, indexing — never exposes raw paths, only vault-relative paths
+- Desktop (`src-tauri/`) wraps the same server app in Tauri and launches it on
+  loopback for local desktop use
+- Sync (`src/lib/server/git-sync.ts`) wraps remote Git operations with remote health checks, safe one-click sync, clean-worktree guidance, fast-forward pulls, divergence guards, and write blocking when the last fetched remote is behind or diverged
 - Client (`src/lib/components/`, `src/routes/`) is pure Svelte 5 runes, vanilla CSS, no external UI framework
 - Command registry (`src/lib/commands/`) — every user action registers with `{id, title, icon, shortcut, exec, when}`
+- Plugin runtime (`src/lib/plugins/`) — vault-local manifests and ESM modules register scoped commands at vault boot
 - Typed event bus (`src/lib/events.ts`) — `note:saved`, `note:renamed`, etc. Decouples panes / panels / index.
 - No database — all state derives from the filesystem; the backlink/tag index is rebuilt on file-watcher events
 - [DESIGN.md](./DESIGN.md) has the details
@@ -157,6 +234,7 @@ MIT. See [LICENSE](./LICENSE).
 Open an issue if you've got an idea or run into a bug. See [CONTRIBUTING.md](./CONTRIBUTING.md). Style: vanilla CSS (no Tailwind), TypeScript strict, Svelte 5 runes.
 
 Security model and reporting guidance live in [SECURITY.md](./SECURITY.md).
+Self-hosting hardening guidance lives in [docs/self-hosting.md](./docs/self-hosting.md).
 
 ## Acknowledgments
 

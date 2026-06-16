@@ -1,93 +1,110 @@
 /**
- * Per-vault bookmark store. Persisted to localStorage so it survives
- * reloads but stays local to each device. (Cloud sync is the user's
- * problem — git the vault if you want bookmarks shared.)
+ * Per-vault bookmark store. Bookmarks live in `.diamondmd/bookmarks.json`
+ * inside the vault so they follow the same git/GitHub sync path as notes.
  */
 
-import { browser } from '$app/environment';
+import { api } from '$lib/vault-api';
+import type { Bookmark } from '$lib/types';
 
-export interface Bookmark { path: string; title: string; }
+interface State {
+	byVault: Record<string, Bookmark[]>;
+	loaded: Record<string, boolean>;
+	loading: Record<string, boolean>;
+	errors: Record<string, string | null>;
+}
 
-interface State { byVault: Record<string, Bookmark[]>; }
+const state = $state<State>({
+	byVault: {},
+	loaded: {},
+	loading: {},
+	errors: {}
+});
 
-const state = $state<State>({ byVault: {} });
-
-function key(vaultId: string): string { return `diamond.bookmarks.${vaultId}`; }
-
-export function hydrate(vaultId: string): void {
-	if (!browser) return;
-	if (state.byVault[vaultId]) return;
+export async function hydrate(vaultId: string, force = false): Promise<void> {
+	if (!force && (state.loaded[vaultId] || state.loading[vaultId])) return;
+	state.loading[vaultId] = true;
+	state.errors[vaultId] = null;
 	try {
-		const raw = localStorage.getItem(key(vaultId));
-		state.byVault[vaultId] = raw ? (JSON.parse(raw) as Bookmark[]) : [];
-	} catch {
+		state.byVault[vaultId] = await api.bookmarks(vaultId);
+		state.loaded[vaultId] = true;
+	} catch (e) {
 		state.byVault[vaultId] = [];
+		state.errors[vaultId] = (e as Error).message;
+	} finally {
+		state.loading[vaultId] = false;
 	}
 }
 
-function persist(vaultId: string): void {
-	if (!browser) return;
-	try { localStorage.setItem(key(vaultId), JSON.stringify(state.byVault[vaultId] ?? [])); } catch { /* quota / disabled */ }
+function ensureHydrating(vaultId: string): void {
+	if (!state.loaded[vaultId] && !state.loading[vaultId]) void hydrate(vaultId);
 }
 
 export function list(vaultId: string): Bookmark[] {
-	hydrate(vaultId);
+	ensureHydrating(vaultId);
 	return state.byVault[vaultId] ?? [];
 }
 
 export function isStarred(vaultId: string, path: string): boolean {
-	hydrate(vaultId);
+	ensureHydrating(vaultId);
 	return (state.byVault[vaultId] ?? []).some((b) => b.path === path);
 }
 
-export function add(vaultId: string, path: string, title: string): void {
-	hydrate(vaultId);
+function setBookmarks(vaultId: string, bookmarks: Bookmark[]): void {
+	state.byVault[vaultId] = bookmarks;
+	state.loaded[vaultId] = true;
+	state.errors[vaultId] = null;
+}
+
+export async function add(vaultId: string, path: string, title: string): Promise<void> {
+	await hydrate(vaultId);
 	const cur = state.byVault[vaultId] ?? [];
 	if (cur.some((b) => b.path === path)) return;
-	state.byVault[vaultId] = [{ path, title }, ...cur];
-	persist(vaultId);
+	const response = await api.saveBookmark(vaultId, { path, title });
+	setBookmarks(vaultId, response.bookmarks);
 }
 
-export function remove(vaultId: string, path: string): void {
-	hydrate(vaultId);
+export async function remove(vaultId: string, path: string): Promise<void> {
+	await hydrate(vaultId);
 	const cur = state.byVault[vaultId] ?? [];
-	state.byVault[vaultId] = cur.filter((b) => b.path !== path);
-	persist(vaultId);
+	if (!cur.some((b) => b.path === path)) return;
+	const response = await api.deleteBookmark(vaultId, path);
+	setBookmarks(vaultId, response.bookmarks);
 }
 
-export function toggle(vaultId: string, path: string, title: string): void {
-	if (isStarred(vaultId, path)) remove(vaultId, path);
-	else add(vaultId, path, title);
+export async function toggle(vaultId: string, path: string, title: string): Promise<void> {
+	await hydrate(vaultId);
+	if (isStarred(vaultId, path)) await remove(vaultId, path);
+	else await add(vaultId, path, title);
 }
 
 export function rename(vaultId: string, oldPath: string, newPath: string, newTitle?: string): void {
-	hydrate(vaultId);
+	ensureHydrating(vaultId);
 	const cur = state.byVault[vaultId] ?? [];
 	let changed = false;
 	state.byVault[vaultId] = cur.map((b) => {
-		if (b.path === oldPath) { changed = true; return { path: newPath, title: newTitle ?? b.title }; }
+		if (b.path === oldPath) { changed = true; return { ...b, path: newPath, title: newTitle ?? b.title }; }
 		if (b.path.startsWith(oldPath + '/')) {
 			changed = true;
-			return { path: newPath + b.path.slice(oldPath.length), title: b.title };
+			return { ...b, path: newPath + b.path.slice(oldPath.length) };
 		}
 		return b;
 	});
-	if (changed) persist(vaultId);
+	if (changed) state.loaded[vaultId] = true;
 }
 
 export function deleted(vaultId: string, path: string): void {
-	hydrate(vaultId);
+	ensureHydrating(vaultId);
 	const cur = state.byVault[vaultId] ?? [];
 	const next = cur.filter((b) => b.path !== path && !b.path.startsWith(path + '/'));
 	if (next.length !== cur.length) {
 		state.byVault[vaultId] = next;
-		persist(vaultId);
+		state.loaded[vaultId] = true;
 	}
 }
 
 /** Reactive snapshot — components can $derive on this. */
 export function snapshot(vaultId: string): Bookmark[] {
-	hydrate(vaultId);
+	ensureHydrating(vaultId);
 	return state.byVault[vaultId] ?? [];
 }
 

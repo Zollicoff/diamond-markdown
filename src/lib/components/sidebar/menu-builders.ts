@@ -9,6 +9,7 @@ import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 import type { TreeNode } from '$lib/types';
 import { exec } from '$lib/commands';
 import { isStarred } from '$lib/bookmarks.svelte';
+import { treeFileHref } from '$lib/tree/view';
 
 export interface MenuBuilderDeps {
 	vaultId: string;
@@ -29,6 +30,35 @@ export function fileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
 		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) },
 		{ separator: true, label: '' },
 		{ label: 'Delete', icon: '🗑', danger: true, action: () => exec('note.delete', ctx) }
+	];
+}
+
+export function canvasFileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
+	const ctx = { vaultId: deps.vaultId, node };
+	return [
+		{ label: 'Open Canvas', icon: '□', action: () => exec('tabs.open', ctx) },
+		{ label: 'Open in new tab', icon: '⎚', shortcut: '⌘click', action: () => exec('tabs.open-in-new-tab', ctx) },
+		{ label: 'Open in new pane', icon: '⊞', action: () => exec('tabs.open-in-new-pane', ctx) },
+		{ separator: true, label: '' },
+		{ label: 'Rename', icon: '✎', shortcut: 'F2', action: () => deps.beginRename(node) },
+		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) },
+		{ separator: true, label: '' },
+		{ label: 'Delete Canvas', icon: '🗑', danger: true, action: () => exec('canvas.delete', ctx) }
+	];
+}
+
+export function unsupportedFileMenu(node: TreeNode, deps: MenuBuilderDeps): MenuItem[] {
+	const ctx = { vaultId: deps.vaultId, node };
+	return [
+		{
+			label: 'Open asset',
+			icon: '◇',
+			action: () => {
+				if (typeof window === 'undefined') return;
+				window.open(treeFileHref(deps.vaultId, node), '_blank', 'noopener,noreferrer');
+			}
+		},
+		{ label: 'Copy path', icon: '⎘', action: () => exec('path.copy', ctx) }
 	];
 }
 

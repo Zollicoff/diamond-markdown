@@ -1,0 +1,12 @@
+import { escAttr } from '$lib/util/strings';
+import { blockReferenceId } from '$lib/markdown/wikilinks';
+
+export function addObsidianBlockIds(html: string): string {
+	return html.replace(
+		/<(p|li)([^>]*)>([\s\S]*?)(?:\s|&nbsp;)\^([A-Za-z0-9_-]+)\s*<\/\1>/g,
+		(_whole, tag: string, attrs: string, inner: string, blockId: string) => {
+			const idAttr = /\sid\s*=/.test(attrs) ? '' : ` id="${escAttr(blockReferenceId(blockId))}"`;
+			return `<${tag}${attrs}${idAttr}>${inner}</${tag}>`;
+		}
+	);
+}

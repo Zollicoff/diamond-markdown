@@ -2,6 +2,8 @@
 	import { snapshot, remove } from '$lib/bookmarks.svelte';
 	import { openNote } from '$lib/workspace/actions';
 	import { bookmarks } from '$lib/bookmarks.svelte';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { alertDialog } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -12,14 +14,16 @@
 	// Reactivity: read the underlying state directly so we re-render when it mutates.
 	const items = $derived(bookmarks.byVault[vaultId] ?? []);
 
-	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
-		if (e.metaKey || e.ctrlKey || e.button === 1) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
+	function open(e: MouseEvent, path: string, title: string): void {
+		openNote(vaultId, path, title, openModeForPointer(e));
 	}
 
-	function open(e: MouseEvent, path: string, title: string): void {
-		openNote(vaultId, path, title, modeFor(e));
+	async function removeBookmark(path: string): Promise<void> {
+		try {
+			await remove(vaultId, path);
+		} catch (e) {
+			await alertDialog({ title: 'Could not remove bookmark', message: (e as Error).message, tone: 'danger' });
+		}
 	}
 
 	// Make sure the snapshot has populated.
@@ -50,7 +54,7 @@
 					<button
 						class="x"
 						title="Remove bookmark"
-						onclick={(e) => { e.stopPropagation(); remove(vaultId, b.path); }}
+						onclick={(e) => { e.stopPropagation(); void removeBookmark(b.path); }}
 					>×</button>
 				</li>
 			{/each}

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 
 // Fixture is built once by playwright.config.ts before the webServer starts.
 
@@ -15,6 +15,80 @@ async function openFirstNote(page: Page): Promise<void> {
 	await fileLink.click();
 	// Editor mounts when a note tab activates.
 	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+}
+
+async function swipe(locator: Locator, direction: 'left' | 'right'): Promise<void> {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error('Cannot swipe an invisible target');
+	const y = box.y + box.height / 2;
+	const startX = direction === 'left' ? box.x + box.width * 0.78 : box.x + box.width * 0.22;
+	const endX = direction === 'left' ? box.x + box.width * 0.22 : box.x + box.width * 0.78;
+	await locator.evaluate((el, gesture) => {
+		const common: PointerEventInit = {
+			pointerId: 99,
+			pointerType: 'touch',
+			isPrimary: true,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		};
+		el.dispatchEvent(new PointerEvent('pointerdown', {
+			...common,
+			clientX: gesture.startX,
+			clientY: gesture.y,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointermove', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.y,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointerup', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.y,
+			buttons: 0
+		}));
+	}, { startX, endX, y });
+}
+
+async function shiftDragSelect(locator: Locator): Promise<void> {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error('Cannot drag-select an invisible target');
+	const startX = box.x + 8;
+	const startY = box.y + 8;
+	const endX = box.x + box.width - 8;
+	const endY = box.y + box.height - 8;
+	await locator.evaluate((el, gesture) => {
+		const common: PointerEventInit = {
+			pointerId: 101,
+			pointerType: 'mouse',
+			isPrimary: true,
+			shiftKey: true,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		};
+		el.dispatchEvent(new PointerEvent('pointerdown', {
+			...common,
+			clientX: gesture.startX,
+			clientY: gesture.startY,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointermove', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.endY,
+			buttons: 1
+		}));
+		el.dispatchEvent(new PointerEvent('pointerup', {
+			...common,
+			clientX: gesture.endX,
+			clientY: gesture.endY,
+			buttons: 0
+		}));
+	}, { startX, startY, endX, endY });
 }
 
 test('app boots and lists vaults on the picker', async ({ page }) => {
@@ -47,12 +121,81 @@ test('graph tab opens beside the active note (does not replace)', async ({ page 
 	expect(tabsAfter).toBeGreaterThan(tabsBefore);
 });
 
+test('graph supports shift-drag selection', async ({ page }) => {
+	await openFirstVault(page);
+	await openFirstNote(page);
+	await page.getByLabel('Graph').click();
+	await expect(page.locator('text=/\\d+ nodes? · \\d+ edges?/').first()).toBeVisible({ timeout: 5_000 });
+
+	await shiftDragSelect(page.locator('.canvas'));
+	await expect.poll(() => page.locator('.node.selected').count()).toBeGreaterThan(1);
+	await expect(page.locator('.selected-count')).toContainText(/selected/);
+
+	await page.getByRole('button', { name: 'Clear' }).click();
+	await expect(page.locator('.selected-count')).toBeHidden();
+});
+
+test('touch swipes switch workspace tabs and panes', async ({ page }) => {
+	await page.goto('/');
+	await page.evaluate(() => {
+		localStorage.setItem('diamond.workspace.default', JSON.stringify({
+			panes: {
+				p1: {
+					id: 'p1',
+					tabs: [
+						{ id: 'note:Getting Started.md', kind: 'note', path: 'Getting Started.md', title: 'Getting Started' },
+						{ id: 'graph', kind: 'graph', title: 'Graph' }
+					],
+					activeTabId: 'note:Getting Started.md'
+				},
+				p2: {
+					id: 'p2',
+					tabs: [
+						{ id: 'note:Wikilinks.md', kind: 'note', path: 'Wikilinks.md', title: 'Wikilinks' }
+					],
+					activeTabId: 'note:Wikilinks.md'
+				}
+			},
+			layout: {
+				kind: 'split',
+				direction: 'row',
+				children: [{ kind: 'pane', paneId: 'p1' }, { kind: 'pane', paneId: 'p2' }],
+				sizes: [1, 1]
+			},
+			activePaneId: 'p1',
+			leftSidebarCollapsed: true,
+			rightSidebarCollapsed: true,
+			leftPanelId: 'files',
+			rightPanelId: 'backlinks'
+		}));
+	});
+	await page.goto('/vault/default');
+
+	const activeTabTitle = page.locator('.pane.active .tab.active .tab-title');
+	await expect(activeTabTitle).toHaveText('Getting Started');
+
+	await swipe(page.locator('.pane.active'), 'left');
+	await expect(activeTabTitle).toHaveText('Graph');
+
+	await swipe(page.locator('.pane.active'), 'left');
+	await expect(activeTabTitle).toHaveText('Wikilinks');
+
+	await swipe(page.locator('.pane.active'), 'right');
+	await expect(activeTabTitle).toHaveText('Graph');
+
+	await swipe(page.locator('.pane.active'), 'right');
+	await expect(activeTabTitle).toHaveText('Getting Started');
+});
+
 test('settings tab opens with theme + vault info', async ({ page }) => {
 	await openFirstVault(page);
 	await page.getByLabel('Settings').click();
+	await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 	await expect(page.getByText('Theme', { exact: true })).toBeVisible();
 	await expect(page.getByText('Excluded folders')).toBeVisible();
+	await page.getByRole('button', { name: 'Sync', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'GitHub sync' })).toBeVisible();
 });
 
 test('left sidebar collapses and re-expands via the topbar chevron', async ({ page }) => {
@@ -81,9 +224,41 @@ test('mode buttons (Live / Source / Read) are inline in the note topbar', async 
 	await expect(sourceBtn).toHaveClass(/active/);
 });
 
+test('outline jumps scroll the live editor to headings', async ({ page }) => {
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await expect(page.getByRole('tab', { name: 'Live' })).toHaveClass(/active/);
+
+	await page.locator('.outline .h-btn[title="Shortcuts"]').click();
+	await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('#shortcuts');
+	await expect(page.locator('.cm-activeLine')).toContainText('Shortcuts');
+	await expect.poll(() => page.locator('.cm-scroller').first().evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
+test('light theme applies readable highlight.js token colors', async ({ page }) => {
+	await page.goto('/');
+	await page.evaluate(() => localStorage.setItem('diamond.theme', 'light'));
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await page.getByRole('tab', { name: 'Read' }).click();
+
+	const codeBlock = page.locator('.preview pre').first();
+	const builtin = page.locator('.preview code.hljs .hljs-built_in').first();
+	await expect(codeBlock).toBeVisible();
+	await expect(builtin).toHaveText('clone');
+
+	const colors = await builtin.evaluate((el) => {
+		const token = getComputedStyle(el);
+		const pre = getComputedStyle(el.closest('pre')!);
+		return { token: token.color, background: pre.backgroundColor };
+	});
+	expect(colors.background).toBe('rgb(246, 248, 250)');
+	expect(colors.token).toBe('rgb(5, 80, 174)');
+});
+
 test('wikilink toolbar button inserts double-bracket [[]] syntax', async ({ page }) => {
-	await openFirstVault(page);
-	await openFirstNote(page);
+	await page.goto('/vault/default/note/Getting%20Started.md');
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
 	// Switch to Source mode for deterministic raw-markdown reads.
 	await page.getByRole('tab', { name: 'Source' }).click();
 	const editor = page.locator('.cm-content').first();

@@ -1,77 +1,243 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { emit } from '$lib/events';
 	import { api } from '$lib/vault-api';
+	import {
+		isActiveSavedSearch,
+		savedSearchName,
+		searchModeFromFullText
+	} from '$lib/search/saved';
+	import {
+		canLoadMoreSearch,
+		canSaveCurrentSearch,
+		isSearchAbortError,
+		mergeSearchResults,
+		savedSearchDraftAfterExternalQuery,
+		savedSearchDraftAfterQueryInput,
+		saveSearchTitle as searchSaveTitle,
+		searchRequestOptions,
+		SEARCH_DEBOUNCE_MS
+	} from '$lib/search/session';
+	import {
+		buildSearchResultRows,
+		searchFolderFacets,
+		visibleSearchRows,
+		type SearchResultDisplayRow,
+		type SearchGroupMode
+	} from '$lib/search/view';
+	import { confirmDialog } from '$lib/dialogs';
 	import { openNote } from '$lib/workspace/actions';
-	import type { SearchHit } from '$lib/types';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import type { SavedSearch, SavedSearchMode, SearchHit, SearchResponse } from '$lib/types';
+	import SearchHeader from './search/SearchHeader.svelte';
+	import SearchResultsList from './search/SearchResultsList.svelte';
 
 	interface Props {
 		vaultId: string;
 		query: string;
+		initialFullText?: boolean;
 		onQueryChange?: (q: string) => void;
+		onFullTextChange?: (fullText: boolean) => void;
 	}
 
-	let { vaultId, query, onQueryChange }: Props = $props();
+	let { vaultId, query, initialFullText = false, onQueryChange, onFullTextChange }: Props = $props();
 
-	let inputEl: HTMLInputElement | null = $state(null);
 	// svelte-ignore state_referenced_locally
 	let q = $state(query);
-	let fullText = $state(false);
+	// svelte-ignore state_referenced_locally
+	let fullText = $state(initialFullText);
+	// svelte-ignore state_referenced_locally
+	let appliedInitialFullText = $state(initialFullText);
+	let groupMode = $state<SearchGroupMode>('none');
 	let results = $state<SearchHit[]>([]);
+	let savedSearches = $state<SavedSearch[]>([]);
+	let savedName = $state('Saved search');
+	let savedNameTouched = $state(false);
+	let scrollTop = $state(0);
+	let viewportHeight = $state(0);
+	let meta = $state<SearchResponse | null>(null);
 	let loading = $state(false);
+	let loadingMore = $state(false);
+	let savedLoading = $state(false);
+	let savingSearch = $state(false);
+	let deletingSearchId = $state<string | null>(null);
 	let err = $state<string | null>(null);
+	let savedErr = $state<string | null>(null);
 	let controller: AbortController | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-	onMount(() => {
-		setTimeout(() => inputEl?.focus(), 0);
-		if (q.trim()) void runSearch(q);
-	});
+	let requestId = 0;
+	let resultResetKey = $state(0);
+	let resultRows = $derived(buildSearchResultRows(results, groupMode));
+	let resultWindow = $derived(visibleSearchRows(resultRows, scrollTop, viewportHeight));
+	let folderFacets = $derived(searchFolderFacets(results, q));
+	let currentMode = $derived<SavedSearchMode>(searchModeFromFullText(fullText));
+	let searchAlreadySaved = $derived(savedSearches.some((search) => isActiveSavedSearch(search, q, currentMode)));
+	let canSaveSearch = $derived(
+		canSaveCurrentSearch(q, savingSearch, searchAlreadySaved)
+	);
+	let saveSearchTitle = $derived(searchSaveTitle(q, searchAlreadySaved));
 
 	function runSearchDebounced(): void {
 		if (debounceTimer) clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => void runSearch(q), 120);
+		debounceTimer = setTimeout(() => void runSearch(q), SEARCH_DEBOUNCE_MS);
 	}
 
-	async function runSearch(query: string): Promise<void> {
+	async function runSearch(query: string, append = false): Promise<void> {
 		const trimmed = query.trim();
+		const id = ++requestId;
 		// Tell the parent so the tab title updates.
 		onQueryChange?.(trimmed);
 		if (!trimmed) {
 			results = [];
+			meta = null;
+			resetResultWindow();
 			loading = false;
+			loadingMore = false;
 			err = null;
 			return;
 		}
+		if (append && !meta?.nextOffset) return;
 		controller?.abort();
 		controller = new AbortController();
-		loading = true;
+		if (append) loadingMore = true;
+		else {
+			loading = true;
+			loadingMore = false;
+		}
 		err = null;
 		try {
-			const hits = await api.search(vaultId, trimmed, { full: fullText });
-			results = hits;
+			const requestOptions = searchRequestOptions(fullText, append, meta, results.length);
+			const response = await api.searchWithMeta(vaultId, trimmed, {
+				...requestOptions,
+				signal: controller.signal
+			});
+			if (id !== requestId) return;
+			results = mergeSearchResults(results, response, append);
+			meta = response;
+			if (!append) resetResultWindow();
 		} catch (e) {
+			if (id !== requestId || isSearchAbortError(e)) return;
 			err = e instanceof Error ? e.message : String(e);
 			results = [];
+			meta = null;
+			resetResultWindow();
 		} finally {
-			loading = false;
+			if (id === requestId) {
+				if (append) loadingMore = false;
+				else loading = false;
+			}
 		}
 	}
 
-	function onInput(e: Event): void {
-		q = (e.target as HTMLInputElement).value;
+	function onQueryInput(value: string): void {
+		q = value;
+		const draft = savedSearchDraftAfterQueryInput(q, savedName, savedNameTouched);
+		savedName = draft.savedName;
+		savedNameTouched = draft.savedNameTouched;
 		runSearchDebounced();
+	}
+
+	function onSavedNameInput(value: string): void {
+		savedName = value;
+		savedNameTouched = true;
+	}
+
+	function resetResultWindow(): void {
+		scrollTop = 0;
+		resultResetKey += 1;
+	}
+
+	function loadMore(): void {
+		if (!canLoadMoreSearch(loading, loadingMore, meta)) return;
+		void runSearch(q, true);
 	}
 
 	function toggleFullText(): void {
 		fullText = !fullText;
+		onFullTextChange?.(fullText);
 		void runSearch(q);
 	}
 
+	function setGroupMode(mode: SearchGroupMode): void {
+		if (groupMode === mode) return;
+		groupMode = mode;
+		resetResultWindow();
+	}
+
+	function narrowToFolder(query: string): void {
+		if (!fullText || query === q) return;
+		q = query;
+		if (!savedNameTouched) savedName = savedSearchName(q);
+		void runSearch(q);
+	}
+
+	async function loadSavedSearches(): Promise<void> {
+		savedLoading = true;
+		savedErr = null;
+		try {
+			savedSearches = await api.savedSearches(vaultId);
+		} catch (e) {
+			savedErr = e instanceof Error ? e.message : String(e);
+		} finally {
+			savedLoading = false;
+		}
+	}
+
+	async function saveCurrentSearch(): Promise<void> {
+		const query = q.trim();
+		if (!query || savingSearch) return;
+		savingSearch = true;
+		savedErr = null;
+		try {
+			const response = await api.saveSavedSearch(vaultId, {
+				name: savedName.trim() || savedSearchName(query),
+				query,
+				mode: currentMode
+			});
+			savedSearches = response.searches;
+			if (response.search) savedName = response.search.name;
+			savedNameTouched = false;
+			emit('toast:show', { title: 'Saved search saved', tone: 'success' });
+		} catch (e) {
+			savedErr = e instanceof Error ? e.message : String(e);
+		} finally {
+			savingSearch = false;
+		}
+	}
+
+	function runSavedSearch(search: SavedSearch): void {
+		q = search.query;
+		fullText = search.mode === 'full';
+		onFullTextChange?.(fullText);
+		savedName = search.name;
+		savedNameTouched = false;
+		void runSearch(q);
+	}
+
+	async function deleteSavedSearch(search: SavedSearch): Promise<void> {
+		if (deletingSearchId) return;
+		const confirmed = await confirmDialog({
+			title: 'Delete saved search',
+			message: `Delete saved search "${search.name}"?`,
+			confirmLabel: 'Delete',
+			tone: 'danger'
+		});
+		if (!confirmed) return;
+		deletingSearchId = search.id;
+		savedErr = null;
+		try {
+			const response = await api.deleteSavedSearch(vaultId, search.id);
+			savedSearches = response.searches;
+			emit('toast:show', { title: 'Saved search removed' });
+		} catch (e) {
+			savedErr = e instanceof Error ? e.message : String(e);
+		} finally {
+			deletingSearchId = null;
+		}
+	}
+
 	function open(hit: SearchHit, evt: MouseEvent | KeyboardEvent): void {
-		const mod = ('metaKey' in evt && (evt.metaKey || evt.ctrlKey)) || ('button' in evt && evt.button === 1);
-		const alt = 'altKey' in evt && evt.altKey;
-		const mode = alt ? 'new-pane' : mod ? 'new-tab' : 'replace';
-		openNote(vaultId, hit.path, hit.title, mode);
+		openNote(vaultId, hit.path, hit.title, openModeForPointer(evt));
 	}
 
 	function onResultKey(e: KeyboardEvent, hit: SearchHit): void {
@@ -81,6 +247,21 @@
 		}
 	}
 
+	function openResultRow(row: SearchResultDisplayRow, evt: MouseEvent): void {
+		if (row.kind !== 'result') return;
+		open(row.hit, evt);
+	}
+
+	function onResultRowKey(e: KeyboardEvent, row: SearchResultDisplayRow): void {
+		if (row.kind !== 'result') return;
+		onResultKey(e, row.hit);
+	}
+
+	onMount(() => {
+		savedName = savedSearchName(q);
+		if (q.trim()) void runSearch(q);
+	});
+
 	// If the bound query prop changes externally (e.g., the search command
 	// is invoked again with a different seed query), reflect it. untrack
 	// avoids loops with our own writes.
@@ -89,63 +270,77 @@
 		untrack(() => {
 			if (incoming !== q) {
 				q = incoming;
+				const draft = savedSearchDraftAfterExternalQuery(incoming);
+				savedName = draft.savedName;
+				savedNameTouched = draft.savedNameTouched;
 				void runSearch(q);
 			}
+		});
+	});
+
+	$effect(() => {
+		const incoming = initialFullText;
+		untrack(() => {
+			if (incoming !== appliedInitialFullText) {
+				fullText = incoming;
+				appliedInitialFullText = incoming;
+				void runSearch(q);
+			}
+		});
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			void id;
+			void loadSavedSearches();
 		});
 	});
 </script>
 
 <div class="search-view">
-	<header class="search-header">
-		<div class="input-row">
-			<svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-				<circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4" />
-				<line x1="10.4" y1="10.4" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-			</svg>
-			<input
-				bind:this={inputEl}
-				type="text"
-				placeholder={fullText ? 'Search in note contents…' : 'Search note titles…'}
-				value={q}
-				oninput={onInput}
-				autocomplete="off"
-				spellcheck="false"
-			/>
-			<button
-				class="mode-toggle"
-				class:active={fullText}
-				onclick={toggleFullText}
-				title={fullText ? 'Full-text (body) — click to switch to titles' : 'Title — click to switch to full-text'}
-			>
-				{fullText ? 'Body' : 'Title'}
-			</button>
-		</div>
-		<p class="hint">
-			{#if loading}Searching…
-			{:else if err}<span class="err">Error: {err}</span>
-			{:else if !q.trim()}Type to search.
-			{:else if results.length === 0}No matches.
-			{:else}{results.length} result{results.length === 1 ? '' : 's'}
-			{/if}
-		</p>
-	</header>
+	<SearchHeader
+		{q}
+		{fullText}
+		{groupMode}
+		{folderFacets}
+		{savedName}
+		{savedSearches}
+		{currentMode}
+		{canSaveSearch}
+		{saveSearchTitle}
+		{savingSearch}
+		{savedErr}
+		{savedLoading}
+		{deletingSearchId}
+		{loading}
+		{err}
+		resultsCount={results.length}
+		{meta}
+		onQueryInput={onQueryInput}
+		onSavedNameInput={onSavedNameInput}
+		onToggleFullText={toggleFullText}
+		onSetGroupMode={setGroupMode}
+		onNarrowToFolder={narrowToFolder}
+		onSaveCurrentSearch={saveCurrentSearch}
+		onRunSavedSearch={runSavedSearch}
+		onDeleteSavedSearch={deleteSavedSearch}
+	/>
 
-	<div class="results">
-		{#each results as hit (hit.path)}
-			<button
-				type="button"
-				class="result"
-				onclick={(e) => open(hit, e)}
-				onkeydown={(e) => onResultKey(e, hit)}
-			>
-				<div class="title">{hit.title || hit.path}</div>
-				<div class="path">{hit.path}</div>
-				{#if hit.snippet}
-					<div class="snippet">{hit.snippet}</div>
-				{/if}
-			</button>
-		{/each}
-	</div>
+	<SearchResultsList
+		query={q}
+		{resultWindow}
+		{meta}
+		resultsCount={results.length}
+		{loading}
+		{loadingMore}
+		resetKey={resultResetKey}
+		onScrollTopChange={(value) => (scrollTop = value)}
+		onViewportHeightChange={(value) => (viewportHeight = value)}
+		onLoadMore={loadMore}
+		onOpenResultRow={openResultRow}
+		onResultRowKey={onResultRowKey}
+	/>
 </div>
 
 <style>
@@ -154,98 +349,5 @@
 		flex-direction: column;
 		height: 100%;
 		min-height: 0;
-	}
-	.search-header {
-		padding: 18px 22px 10px;
-		border-bottom: 1px solid var(--border);
-	}
-	.input-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 8px 12px;
-	}
-	.icon {
-		width: 16px;
-		height: 16px;
-		color: var(--fg-dim);
-		flex: 0 0 16px;
-	}
-	.input-row input {
-		flex: 1;
-		background: transparent;
-		border: 0;
-		outline: none;
-		color: var(--fg);
-		font: inherit;
-		font-size: 0.95rem;
-	}
-	.mode-toggle {
-		background: transparent;
-		border: 1px solid var(--border);
-		color: var(--fg-muted);
-		padding: 4px 10px;
-		border-radius: 4px;
-		font-size: 0.78rem;
-		cursor: pointer;
-	}
-	.mode-toggle:hover { color: var(--fg); }
-	.mode-toggle.active {
-		color: var(--accent);
-		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 12%, transparent);
-	}
-	.hint {
-		margin: 8px 2px 0;
-		color: var(--fg-dim);
-		font-size: 0.8rem;
-	}
-	.hint .err { color: var(--danger, #f87171); }
-
-	.results {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		padding: 6px 12px 18px;
-	}
-	.result {
-		display: block;
-		width: 100%;
-		text-align: left;
-		background: transparent;
-		border: 0;
-		border-radius: 6px;
-		padding: 10px 12px;
-		margin: 2px 0;
-		cursor: pointer;
-		color: inherit;
-		font: inherit;
-	}
-	.result:hover { background: var(--bg-hover); }
-	.result:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
-	}
-	.title {
-		color: var(--fg);
-		font-weight: 600;
-		font-size: 0.95rem;
-		font-family: 'Bricolage Grotesque', var(--sans);
-	}
-	.path {
-		color: var(--fg-dim);
-		font-size: 0.78rem;
-		margin-top: 2px;
-	}
-	.snippet {
-		color: var(--fg-muted);
-		font-size: 0.82rem;
-		margin-top: 6px;
-		line-height: 1.45;
-		white-space: pre-wrap;
-		word-break: break-word;
 	}
 </style>

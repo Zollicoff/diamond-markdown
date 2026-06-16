@@ -3,6 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Wordmark from '$lib/components/Wordmark.svelte';
+	import VaultImportChecklist from '$lib/components/VaultImportChecklist.svelte';
+	import { api } from '$lib/vault-api';
+	import type { VaultImportAnalysis } from '$lib/types';
 
 	let { data }: { data: PageData } = $props();
 
@@ -10,7 +13,10 @@
 	let newName = $state('');
 	let newPath = $state('');
 	let adding = $state(false);
+	let checkingImport = $state(false);
 	let err = $state<string | null>(null);
+	let importCheck = $state<VaultImportAnalysis | null>(null);
+	let checkedPath = $state('');
 
 	// Recent notes across all vaults — read the tab stores for each vault
 	// directly from localStorage. No server trip.
@@ -35,26 +41,49 @@
 		recent = out;
 	});
 
+	function toggleAddVault(): void {
+		if (data.readOnly) {
+			addOpen = false;
+			return;
+		}
+		addOpen = !addOpen;
+	}
+
 	async function addVault(): Promise<void> {
+		if (data.readOnly) return;
 		if (!newName.trim() || !newPath.trim()) return;
 		adding = true; err = null;
 		try {
-			const res = await fetch('/api/vaults', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: newName.trim(), path: newPath.trim() })
-			});
-			if (!res.ok) {
-				const d = await res.json().catch(() => ({}));
-				err = d?.message ?? `HTTP ${res.status}`;
-				return;
-			}
-			const { vault } = await res.json();
+			const { vault } = await api.addVault(newName.trim(), newPath.trim());
 			goto(`/vault/${vault.id}`);
 		} catch (e) {
 			err = (e as Error).message;
 		} finally {
 			adding = false;
+		}
+	}
+
+	function pathEdited(): void {
+		if (importCheck && newPath.trim() !== checkedPath) importCheck = null;
+	}
+
+	async function inspectImport(): Promise<void> {
+		if (data.readOnly) return;
+		const path = newPath.trim();
+		if (!path) {
+			err = 'path required';
+			return;
+		}
+		checkingImport = true;
+		err = null;
+		try {
+			importCheck = await api.inspectVaultImport(path);
+			checkedPath = path;
+		} catch (e) {
+			importCheck = null;
+			err = (e as Error).message;
+		} finally {
+			checkingImport = false;
 		}
 	}
 
@@ -81,10 +110,14 @@
 		<Wordmark size="md" />
 	</header>
 
+	{#if data.readOnly}
+		<div class="read-only-banner">Read-only mode: browsing is enabled; changes are disabled.</div>
+	{/if}
+
 	<section class="col">
 		<div class="col-head">
 			<h2>Vaults</h2>
-			<button class="mini-btn" onclick={() => (addOpen = !addOpen)}>
+			<button class="mini-btn" disabled={data.readOnly} onclick={toggleAddVault}>
 				{addOpen ? '× Cancel' : '＋ Add vault'}
 			</button>
 		</div>
@@ -115,14 +148,22 @@
 				</label>
 				<label>
 					<span>Absolute path</span>
-					<input type="text" bind:value={newPath} placeholder="/Users/me/Documents/vault" />
+					<input type="text" bind:value={newPath} oninput={pathEdited} placeholder="/Users/me/Documents/vault" />
 				</label>
 				<div class="actions">
+					<button class="btn" disabled={checkingImport || adding || !newPath.trim()} onclick={inspectImport}>
+						{checkingImport ? 'Inspecting…' : 'Inspect import'}
+					</button>
 					<button class="btn primary" disabled={adding} onclick={addVault}>
 						{adding ? 'Adding…' : 'Add vault'}
 					</button>
 				</div>
 				{#if err}<p class="err">{err}</p>{/if}
+				{#if importCheck}
+					<div aria-live="polite">
+						<VaultImportChecklist analysis={importCheck} />
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</section>
@@ -178,6 +219,14 @@
 		align-items: baseline;
 		justify-content: space-between;
 		margin-bottom: 0.6rem;
+	}
+	.read-only-banner {
+		padding: 10px 14px;
+		border: 1px solid color-mix(in srgb, var(--brand-cyan), var(--border) 65%);
+		background: color-mix(in srgb, var(--brand-cyan), var(--bg-elev) 88%);
+		border-radius: 8px;
+		color: var(--fg);
+		font-size: 0.9rem;
 	}
 	h2 {
 		font-family: 'Bricolage Grotesque', var(--sans);
@@ -276,6 +325,9 @@
 	}
 	.add-form input:focus { outline: 2px solid var(--brand-cyan); outline-offset: 1px; border-color: transparent; }
 	.actions { display: flex; gap: 8px; }
+	.actions .btn {
+		white-space: nowrap;
+	}
 
 	.btn {
 		padding: 7px 14px;
@@ -308,6 +360,14 @@
 		font-family: inherit;
 	}
 	.mini-btn:hover { color: var(--accent); background: var(--bg-hover); }
+	.mini-btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+	.mini-btn:disabled:hover {
+		color: var(--fg-muted);
+		background: transparent;
+	}
 
 	/* Footer */
 	.foot {

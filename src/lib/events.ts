@@ -14,14 +14,51 @@ export interface VaultEventMap {
 	'note:created':  { vaultId: string; path: string; };
 	'note:deleted':  { vaultId: string; path: string; };
 	'note:renamed':  { vaultId: string; from: string; to: string; linksUpdated: number; };
+	'canvas:saved': { vaultId: string; path: string; sha: string | null; };
+	'canvas:deleted': { vaultId: string; path: string; };
+	'canvas:renamed': { vaultId: string; from: string; to: string; };
 	'folder:renamed': { vaultId: string; from: string; to: string; };
 	'folder:deleted': { vaultId: string; path: string; };
 	'tree:invalidate': { vaultId: string; };
 	'palette:open':  { vaultId: string; };
+	'switcher:open': { vaultId: string; fullText?: boolean; };
 	'palette:template-pick': { vaultId: string; activeNoteTitle?: string; };
+	'plugins:reload': { vaultId: string; };
 	'history:open':  { vaultId: string; path: string; };
+	'outline:jump':  { vaultId: string; path: string; headingId: string; };
 	'template:insert': { vaultId: string; content: string; };
+	'searches:changed': { vaultId: string; };
+	'bookmarks:changed': { vaultId: string; };
 	'note:rename-request': { vaultId: string; path: string; };
+	'dialog:prompt': {
+		title: string;
+		label: string;
+		value?: string;
+		placeholder?: string;
+		confirmLabel?: string;
+		resolve: (value: string | null) => void;
+	};
+	'dialog:confirm': {
+		title: string;
+		message: string;
+		confirmLabel?: string;
+		cancelLabel?: string;
+		tone?: 'default' | 'danger';
+		resolve: (confirmed: boolean) => void;
+	};
+	'dialog:alert': {
+		title: string;
+		message: string;
+		confirmLabel?: string;
+		tone?: 'default' | 'danger' | 'success';
+		resolve: () => void;
+	};
+	'toast:show': {
+		title: string;
+		message?: string;
+		tone?: 'default' | 'danger' | 'success';
+		timeoutMs?: number;
+	};
 }
 
 type Handler<K extends keyof VaultEventMap> = (payload: VaultEventMap[K]) => void;

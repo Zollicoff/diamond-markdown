@@ -3,14 +3,33 @@
 	import { api } from '$lib/vault-api';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { buildGraphSimulationData } from '$lib/graph/data';
 	import {
-		simulateStep,
-		nodeRadius,
-		SIM_DEFAULTS,
 		type GNode,
 		type GEdge
 	} from '$lib/graph/sim';
-	import GraphSettingsPanel from './GraphSettingsPanel.svelte';
+	import { createGraphSimulationRunner } from '$lib/graph/simulation-runner';
+	import {
+		buildGraphProjection,
+		selectNodesInBox,
+		selectionBoxFromPoints
+	} from '$lib/graph/view';
+	import {
+		centeredGraphTransform,
+		graphDragMoved,
+		graphNodePinnedPosition,
+		graphNodeOpenTitle,
+		graphViewportPoint,
+		panGraphTransform,
+		toggleGraphPathSelection,
+		zoomGraphTransform
+	} from '$lib/graph/interaction';
+	import {
+		createGraphSettingsState
+	} from '$lib/graph/settings-state.svelte';
+	import GraphStage from './GraphStage.svelte';
+	import GraphToolbar from './GraphToolbar.svelte';
 
 	interface Props {
 		vaultId: string;
@@ -33,76 +52,48 @@
 	let panStartY = 0;
 	let panOrigX = 0;
 	let panOrigY = 0;
+	let selecting = $state(false);
+	let selectStart = $state<{ x: number; y: number } | null>(null);
+	let selectEnd = $state<{ x: number; y: number } | null>(null);
 
 	// --- Drag state ----------------------------------------------------
 	let draggingNode: GNode | null = null;
-	let dragStartX = 0;
-	let dragStartY = 0;
+	let dragStart: { x: number; y: number } | null = null;
 	let dragMoved = false;
-	const DRAG_THRESHOLD = 4; // px before a press counts as a drag, not a click
+	let suppressNextNodeClick = false;
 	let hoverPath = $state<string | null>(null);
+	let selectedPaths = $state<string[]>([]);
 
 	// --- Tunable params (per-vault, persisted) -------------------------
-	let nodeScale = $state(SIM_DEFAULTS.nodeScale);
-	let repulse = $state(SIM_DEFAULTS.repulse);
-	let linkForce = $state(SIM_DEFAULTS.linkForce);
-	let linkDist = $state(SIM_DEFAULTS.linkDist);
-	let centerForce = $state(SIM_DEFAULTS.centerForce);
-	let hideOrphans = $state(false);
-	let searchQuery = $state('');
+	const graphSettings = createGraphSettingsState(() => vaultId);
+	const settings = graphSettings.settings;
 	let panelOpen = $state(false);
-	let settingsHydrated = false;
-
-	const settingsKey = (): string => `diamondmd:graph-settings:${vaultId}`;
-
-	function hydrateSettings(): void {
-		if (typeof localStorage === 'undefined') return;
-		try {
-			const raw = localStorage.getItem(settingsKey());
-			if (!raw) return;
-			const v = JSON.parse(raw) as Partial<typeof SIM_DEFAULTS> & { hideOrphans?: boolean; searchQuery?: string };
-			if (typeof v.nodeScale === 'number') nodeScale = v.nodeScale;
-			if (typeof v.repulse === 'number') repulse = v.repulse;
-			if (typeof v.linkForce === 'number') linkForce = v.linkForce;
-			if (typeof v.linkDist === 'number') linkDist = v.linkDist;
-			if (typeof v.centerForce === 'number') centerForce = v.centerForce;
-			if (typeof v.hideOrphans === 'boolean') hideOrphans = v.hideOrphans;
-			if (typeof v.searchQuery === 'string') searchQuery = v.searchQuery;
-		} catch { /* corrupt JSON — stick with defaults */ }
-	}
+	const simulationRunner = createGraphSimulationRunner();
 
 	function resetForces(): void {
-		nodeScale = SIM_DEFAULTS.nodeScale;
-		repulse = SIM_DEFAULTS.repulse;
-		linkForce = SIM_DEFAULTS.linkForce;
-		linkDist = SIM_DEFAULTS.linkDist;
-		centerForce = SIM_DEFAULTS.centerForce;
+		graphSettings.resetForces();
 	}
 	function resetFilters(): void {
-		hideOrphans = false;
-		searchQuery = '';
+		graphSettings.resetFilters();
 	}
 
 	$effect(() => {
-		const snapshot = { nodeScale, repulse, linkForce, linkDist, centerForce, hideOrphans, searchQuery };
-		if (!settingsHydrated || typeof localStorage === 'undefined') return;
-		try { localStorage.setItem(settingsKey(), JSON.stringify(snapshot)); } catch { /* quota / private mode */ }
+		graphSettings.persist();
 	});
 
 	// --- Filter projection ---------------------------------------------
-	const visiblePaths = $derived.by<Set<string>>(() => {
-		const q = searchQuery.trim().toLowerCase();
-		const set = new Set<string>();
-		for (const n of nodes) {
-			if (hideOrphans && n.degree === 0) continue;
-			if (q && !n.title.toLowerCase().includes(q) && !n.path.toLowerCase().includes(q)) continue;
-			set.add(n.path);
-		}
-		return set;
-	});
-	const visibleNodes = $derived<GNode[]>(nodes.filter((n) => visiblePaths.has(n.path)));
-	const visibleEdges = $derived<GEdge[]>(edges.filter((e) => visiblePaths.has(e.from) && visiblePaths.has(e.to)));
-	const filtersActive = $derived<boolean>(hideOrphans || searchQuery.trim().length > 0);
+	const graphProjection = $derived.by(() => buildGraphProjection(
+		nodes,
+		edges,
+		{ hideOrphans: settings.hideOrphans, searchQuery: settings.searchQuery },
+		selectedPaths
+	));
+	const visiblePaths = $derived(graphProjection.visiblePaths);
+	const visibleNodes = $derived(graphProjection.visibleNodes);
+	const visibleEdges = $derived(graphProjection.visibleEdges);
+	const filtersActive = $derived(graphProjection.filtersActive);
+	const selectedCount = $derived(graphProjection.selectedCount);
+	const selectionBox = $derived.by(() => selectionBoxFromPoints(selecting, selectStart, selectEnd));
 
 	// --- Load + sim loop -----------------------------------------------
 	let initialCenterDone = false;
@@ -111,22 +102,9 @@
 		err = null;
 		try {
 			const data = await api.graph(vaultId);
-			const byPath = new Map<string, GNode>();
-			for (const n of data.nodes) {
-				byPath.set(n.path, {
-					path: n.path,
-					title: n.title,
-					degree: n.degree,
-					x: (Math.random() - 0.5) * 400,
-					y: (Math.random() - 0.5) * 400,
-					vx: 0,
-					vy: 0,
-					fx: null,
-					fy: null
-				});
-			}
-			nodes = [...byPath.values()];
-			edges = data.edges.filter((e) => byPath.has(e.from) && byPath.has(e.to));
+			const graph = buildGraphSimulationData(data);
+			nodes = graph.nodes;
+			edges = graph.edges;
 			startSim();
 			loading = false;
 			if (!initialCenterDone) {
@@ -140,113 +118,213 @@
 		}
 	}
 
-	let rafId = 0;
-	let lastTick = 0;
 	function startSim(): void {
-		cancelAnimationFrame(rafId);
-		lastTick = performance.now();
-		const tick = (now: number): void => {
-			const dt = Math.min(32, now - lastTick) / 16; // normalize to ~60fps
-			lastTick = now;
-			simulateStep(nodes, edges, dt, { repulse, linkForce, linkDist, centerForce });
-			nodes = nodes; // nudge reactivity — sim mutates in place
-			rafId = requestAnimationFrame(tick);
-		};
-		rafId = requestAnimationFrame(tick);
+		simulationRunner.start(
+			nodes,
+			edges,
+			() => ({
+				repulse: settings.repulse,
+				linkForce: settings.linkForce,
+				linkDist: settings.linkDist,
+				centerForce: settings.centerForce
+			}),
+			() => {
+				nodes = nodes; // nudge reactivity — sim mutates in place
+			}
+		);
 	}
 
 	// --- Pointer + view handlers ---------------------------------------
 	function onWheel(e: WheelEvent): void {
 		e.preventDefault();
-		const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
-		const cx = e.clientX - rect.left;
-		const cy = e.clientY - rect.top;
-		const wx = (cx - viewX) / viewScale;
-		const wy = (cy - viewY) / viewScale;
-		viewScale = Math.max(0.2, Math.min(4, viewScale * factor));
-		viewX = cx - wx * viewScale;
-		viewY = cy - wy * viewScale;
+		const next = zoomGraphTransform({
+			screenPoint: graphViewportPoint({ x: e.clientX, y: e.clientY }, rect),
+			deltaY: e.deltaY,
+			transform: { viewX, viewY, viewScale }
+		});
+		viewX = next.viewX;
+		viewY = next.viewY;
+		viewScale = next.viewScale;
+	}
+
+	function capturePointer(el: Element, pointerId: number): void {
+		try { el.setPointerCapture?.(pointerId); } catch { /* synthetic or already-captured pointer */ }
+	}
+
+	function releasePointer(el: Element, pointerId: number): void {
+		try { el.releasePointerCapture?.(pointerId); } catch { /* synthetic or already-released pointer */ }
+	}
+
+	function screenPoint(e: PointerEvent): { x: number; y: number } | null {
+		const rect = svgEl?.getBoundingClientRect();
+		if (!rect) return null;
+		return graphViewportPoint({ x: e.clientX, y: e.clientY }, rect);
+	}
+
+	function clearSelection(): void {
+		selectedPaths = [];
+	}
+
+	function toggleSelection(path: string): void {
+		selectedPaths = toggleGraphPathSelection(selectedPaths, path);
+	}
+
+	function finishSelection(additive: boolean): void {
+		if (selectionBox) {
+			selectedPaths = selectNodesInBox(
+				visibleNodes,
+				selectionBox,
+				{ viewX, viewY, viewScale },
+				selectedPaths,
+				additive
+			);
+		}
+		selecting = false;
+		selectStart = null;
+		selectEnd = null;
 	}
 
 	function onPointerDownBG(e: PointerEvent): void {
+		if (e.shiftKey) {
+			const point = screenPoint(e);
+			if (!point) return;
+			selecting = true;
+			selectStart = point;
+			selectEnd = point;
+			isPanning = false;
+			capturePointer(e.currentTarget as Element, e.pointerId);
+			return;
+		}
 		isPanning = true;
 		panStartX = e.clientX;
 		panStartY = e.clientY;
 		panOrigX = viewX;
 		panOrigY = viewY;
-		(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		capturePointer(e.currentTarget as Element, e.pointerId);
 	}
 
 	function onPointerMoveBG(e: PointerEvent): void {
+		if (selecting) {
+			const point = screenPoint(e);
+			if (point) selectEnd = point;
+			return;
+		}
 		if (draggingNode) {
 			if (!dragMoved) {
-				const dx = e.clientX - dragStartX;
-				const dy = e.clientY - dragStartY;
-				if (dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) dragMoved = true;
+				dragMoved = graphDragMoved(
+					dragStart ?? { x: e.clientX, y: e.clientY },
+					{ x: e.clientX, y: e.clientY }
+				);
 			}
 			const rect = svgEl?.getBoundingClientRect();
 			if (!rect) return;
-			draggingNode.fx = (e.clientX - rect.left - viewX) / viewScale;
-			draggingNode.fy = (e.clientY - rect.top - viewY) / viewScale;
+			const pinned = graphNodePinnedPosition(
+				{ x: e.clientX, y: e.clientY },
+				{ x: rect.left, y: rect.top },
+				{ viewX, viewY, viewScale }
+			);
+			draggingNode.fx = pinned.x;
+			draggingNode.fy = pinned.y;
 			return;
 		}
 		if (!isPanning) return;
-		viewX = panOrigX + (e.clientX - panStartX);
-		viewY = panOrigY + (e.clientY - panStartY);
+		const next = panGraphTransform(
+			{ x: panOrigX, y: panOrigY },
+			{ x: panStartX, y: panStartY },
+			{ x: e.clientX, y: e.clientY }
+		);
+		viewX = next.viewX;
+		viewY = next.viewY;
 	}
 
 	function onPointerUpBG(e: PointerEvent): void {
+		if (selecting) {
+			if (e.type === 'pointercancel') {
+				selecting = false;
+				selectStart = null;
+				selectEnd = null;
+			} else {
+				finishSelection(e.metaKey || e.ctrlKey);
+			}
+			releasePointer(e.currentTarget as Element, e.pointerId);
+			return;
+		}
 		if (draggingNode) {
 			draggingNode.fx = null;
 			draggingNode.fy = null;
 			draggingNode = null;
+			dragStart = null;
 		}
 		isPanning = false;
-		(e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
+		releasePointer(e.currentTarget as Element, e.pointerId);
 	}
 
 	function onNodePointerDown(e: PointerEvent, n: GNode): void {
 		e.stopPropagation();
 		draggingNode = n;
-		dragStartX = e.clientX;
-		dragStartY = e.clientY;
+		dragStart = { x: e.clientX, y: e.clientY };
 		dragMoved = false;
 		const rect = svgEl?.getBoundingClientRect();
 		if (!rect) return;
 		n.fx = n.x;
 		n.fy = n.y;
-		(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		capturePointer(e.currentTarget as Element, e.pointerId);
+	}
+
+	function onNodePointerMove(e: PointerEvent): void {
+		e.stopPropagation();
+		onPointerMoveBG(e);
+	}
+
+	function onNodePointerUp(e: PointerEvent, n: GNode): void {
+		e.stopPropagation();
+		const shouldToggleSelection = e.type !== 'pointercancel' && e.shiftKey && !dragMoved;
+		onPointerUpBG(e);
+		if (shouldToggleSelection) {
+			toggleSelection(n.path);
+			suppressNextNodeClick = true;
+		}
 	}
 
 	function onNodeClick(e: MouseEvent, n: GNode): void {
 		e.stopPropagation();
+		if (suppressNextNodeClick) {
+			suppressNextNodeClick = false;
+			return;
+		}
 		// Suppress the click the browser fires after a drag-release.
 		if (dragMoved) {
 			dragMoved = false;
 			return;
 		}
-		if (e.shiftKey) return; // reserved for multiselect later
-		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
-		const mode = e.altKey ? 'new-pane' : 'new-tab';
-		openNote(vaultId, n.path, title, mode);
+		if (e.shiftKey) {
+			toggleSelection(n.path);
+			return;
+		}
+		const title = graphNodeOpenTitle(n);
+		openNote(vaultId, n.path, title, openModeForPointer(e, 'new-tab'));
 	}
 
 	function onNodeKeydown(e: KeyboardEvent, n: GNode): void {
 		if (e.key !== 'Enter' && e.key !== ' ') return;
 		e.preventDefault();
 		e.stopPropagation();
-		const title = n.title || n.path.split('/').pop()!.replace(/\.md$/, '');
+		if (e.shiftKey) {
+			toggleSelection(n.path);
+			return;
+		}
+		const title = graphNodeOpenTitle(n);
 		openNote(vaultId, n.path, title, 'new-tab');
 	}
 
 	function center(): void {
 		if (!svgEl) return;
-		const rect = svgEl.getBoundingClientRect();
-		viewX = rect.width / 2;
-		viewY = rect.height / 2;
-		viewScale = 1;
+		const next = centeredGraphTransform(svgEl.getBoundingClientRect());
+		viewX = next.viewX;
+		viewY = next.viewY;
+		viewScale = next.viewScale;
 	}
 
 	/** Restore force tunings + filters to factory defaults, then re-center
@@ -260,8 +338,7 @@
 	}
 
 	onMount(() => {
-		hydrateSettings();
-		settingsHydrated = true;
+		graphSettings.hydrate();
 		void loadGraph();
 		const offs = [
 			onBus('note:created', (e) => { if (e.vaultId === vaultId) void loadGraph(); }),
@@ -273,103 +350,68 @@
 	});
 
 	onDestroy(() => {
-		cancelAnimationFrame(rafId);
+		simulationRunner.stop();
 	});
 </script>
 
 <div class="graph-view">
-	<header class="bar">
-		<h2>Graph</h2>
-		<span class="count mono">
-			{#if filtersActive}
-				{visibleNodes.length} of {nodes.length} nodes · {visibleEdges.length} edges
-			{:else}
-				{nodes.length} nodes · {edges.length} edges
-			{/if}
-		</span>
-		<span class="spacer"></span>
-		<button class="mini" class:active={panelOpen} onclick={() => (panelOpen = !panelOpen)} title="Forces, filters, display">⚙ Settings</button>
-		<button class="mini" onclick={resetAll} title="Restore force defaults, clear filters, re-center">Reset</button>
-		<button class="mini" onclick={center} title="Re-center the current view">Center</button>
-	</header>
+	<GraphToolbar
+		{filtersActive}
+		visibleNodeCount={visibleNodes.length}
+		totalNodeCount={nodes.length}
+		visibleEdgeCount={visibleEdges.length}
+		totalEdgeCount={edges.length}
+		{selectedCount}
+		{panelOpen}
+		onClearSelection={clearSelection}
+		onToggleSettings={() => (panelOpen = !panelOpen)}
+		onReset={resetAll}
+		onCenter={center}
+	/>
 
-	{#if loading && nodes.length === 0}
-		<p class="status">Building graph…</p>
-	{:else if err}
-		<p class="err">{err}</p>
-	{:else if nodes.length === 0}
-		<p class="status">No notes yet — add some and come back.</p>
-	{:else}
-		<svg
-			bind:this={svgEl}
-			class="canvas"
-			role="img"
-			aria-label="Vault graph"
-			onwheel={onWheel}
-			onpointerdown={onPointerDownBG}
-			onpointermove={onPointerMoveBG}
-			onpointerup={onPointerUpBG}
-			onpointercancel={onPointerUpBG}
-		>
-			<g transform={`translate(${viewX}, ${viewY}) scale(${viewScale})`}>
-				{#each visibleEdges as e, i (i)}
-					{@const a = nodes.find((n) => n.path === e.from)}
-					{@const b = nodes.find((n) => n.path === e.to)}
-					{#if a && b}
-						<line
-							x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-							class="edge"
-							class:hl={hoverPath === e.from || hoverPath === e.to}
-						/>
-					{/if}
-				{/each}
-				{#each visibleNodes as n (n.path)}
-					<g
-						class="node"
-						class:hl={hoverPath === n.path}
-						transform={`translate(${n.x}, ${n.y})`}
-						onpointerdown={(e) => onNodePointerDown(e, n)}
-						onclick={(e) => onNodeClick(e, n)}
-						onkeydown={(e) => onNodeKeydown(e, n)}
-						onmouseenter={() => (hoverPath = n.path)}
-						onmouseleave={() => (hoverPath = null)}
-						role="button"
-						tabindex="0"
-					>
-						<circle r={nodeRadius(n, nodeScale)} />
-						<text dy="-8">{n.title}</text>
-					</g>
-				{/each}
-			</g>
-		</svg>
-	{/if}
-
-	{#if panelOpen}
-		<GraphSettingsPanel
-			{nodeScale}
-			{repulse}
-			{linkForce}
-			{linkDist}
-			{centerForce}
-			{hideOrphans}
-			{searchQuery}
-			{filtersActive}
-			onSetNodeScale={(v) => (nodeScale = v)}
-			onSetRepulse={(v) => (repulse = v)}
-			onSetLinkForce={(v) => (linkForce = v)}
-			onSetLinkDist={(v) => (linkDist = v)}
-			onSetCenterForce={(v) => (centerForce = v)}
-			onSetHideOrphans={(v) => (hideOrphans = v)}
-			onSetSearchQuery={(v) => (searchQuery = v)}
-			onResetForces={resetForces}
-			onResetFilters={resetFilters}
-			onClose={() => (panelOpen = false)}
-		/>
-	{/if}
-
-	<footer class="legend">
-		<span>Drag a node to pin · drag background to pan · scroll to zoom · click to open in new tab · alt+click for new pane</span>
-	</footer>
+	<GraphStage
+		{loading}
+		error={err}
+		{nodes}
+		{visibleNodes}
+		{visibleEdges}
+		{viewX}
+		{viewY}
+		{viewScale}
+		nodeScale={settings.nodeScale}
+		{hoverPath}
+		{selectedPaths}
+		{selectionBox}
+		{panelOpen}
+		{filtersActive}
+		repulse={settings.repulse}
+		linkForce={settings.linkForce}
+		linkDist={settings.linkDist}
+		centerForce={settings.centerForce}
+		hideOrphans={settings.hideOrphans}
+		searchQuery={settings.searchQuery}
+		onSvgMount={(element) => (svgEl = element)}
+		onWheelGraph={onWheel}
+		onPointerDownBackground={onPointerDownBG}
+		onPointerMoveGraph={onPointerMoveBG}
+		onPointerUpGraph={onPointerUpBG}
+		{onNodePointerDown}
+		{onNodePointerMove}
+		{onNodePointerUp}
+		{onNodeClick}
+		{onNodeKeydown}
+		onHoverPath={(path) => (hoverPath = path)}
+		onSetNodeScale={(value) => (settings.nodeScale = value)}
+		onSetRepulse={(value) => (settings.repulse = value)}
+		onSetLinkForce={(value) => (settings.linkForce = value)}
+		onSetLinkDist={(value) => (settings.linkDist = value)}
+		onSetCenterForce={(value) => (settings.centerForce = value)}
+		onSetHideOrphans={(value) => (settings.hideOrphans = value)}
+		onSetSearchQuery={(value) => (settings.searchQuery = value)}
+		onResetForces={resetForces}
+		onResetFilters={resetFilters}
+		onCloseSettings={() => (panelOpen = false)}
+	/>
 </div>
 
 <style>
@@ -381,89 +423,4 @@
 		min-height: 0;
 		background: var(--bg);
 	}
-	.bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 8px 14px;
-		border-bottom: 1px solid var(--border);
-	}
-	h2 {
-		font-family: 'Bricolage Grotesque', var(--sans);
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 600;
-	}
-	.count { font-size: 0.72rem; color: var(--fg-dim); }
-	.spacer { flex: 1; }
-	.mini {
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 3px 9px;
-		color: var(--fg-muted);
-		cursor: pointer;
-		font: inherit;
-		font-size: 0.76rem;
-	}
-	.mini:hover { color: var(--accent); border-color: var(--accent); }
-	.mini.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-
-	.canvas {
-		flex: 1;
-		min-height: 0;
-		display: block;
-		background: var(--bg);
-		cursor: grab;
-		user-select: none;
-		touch-action: none;
-	}
-	.canvas:active { cursor: grabbing; }
-
-	.edge {
-		stroke: var(--border-strong);
-		stroke-width: 1;
-		opacity: 0.55;
-		pointer-events: none;
-	}
-	.edge.hl { stroke: var(--brand-cyan); opacity: 1; stroke-width: 1.4; }
-
-	.node circle {
-		fill: var(--fg-muted);
-		stroke: var(--bg);
-		stroke-width: 1.5;
-		transition: fill 0.15s;
-	}
-	.node text {
-		font-family: var(--sans);
-		font-size: 11px;
-		fill: var(--fg-dim);
-		text-anchor: middle;
-		pointer-events: none;
-		paint-order: stroke;
-		stroke: var(--bg);
-		stroke-width: 3px;
-		stroke-linejoin: round;
-	}
-	.node:hover circle, .node.hl circle {
-		fill: var(--brand-cyan);
-		cursor: pointer;
-	}
-	.node:hover text, .node.hl text { fill: var(--fg); }
-
-	.status, .err {
-		padding: 2rem;
-		text-align: center;
-		color: var(--fg-dim);
-		font-size: 0.9rem;
-	}
-	.err { color: var(--danger); }
-
-	.legend {
-		border-top: 1px solid var(--border);
-		padding: 6px 14px;
-		font-size: 0.74rem;
-		color: var(--fg-dim);
-	}
-	.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 </style>

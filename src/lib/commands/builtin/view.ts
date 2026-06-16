@@ -7,6 +7,7 @@ import { toggleLeftSidebar, toggleRightSidebar, openTab, openNote } from '$lib/w
 import { emit } from '$lib/events';
 import { api } from '$lib/vault-api';
 import { cycle as cycleTheme, setMode as setThemeMode } from '$lib/theme.svelte';
+import { alertDialog } from '$lib/dialogs';
 
 export function registerViewCommands(): void {
 	register({
@@ -32,6 +33,30 @@ export function registerViewCommands(): void {
 		category: 'view',
 		exec(ctx: CommandContext) {
 			emit('palette:open', { vaultId: ctx.vaultId! });
+		}
+	});
+
+	register({
+		id: 'switcher.open',
+		title: 'Quick switcher',
+		shortcut: '⌘K',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			emit('switcher:open', { vaultId: ctx.vaultId!, fullText: false });
+		}
+	});
+
+	register({
+		id: 'search.quick-open',
+		title: 'Full-text search',
+		shortcut: '⌘⇧F',
+		category: 'view',
+		exec(ctx: CommandContext) {
+			openTab(
+				ctx.vaultId!,
+				{ id: 'search', kind: 'search', title: 'Search', query: '', fullText: true },
+				'new-tab'
+			);
 		}
 	});
 
@@ -105,7 +130,7 @@ export function registerViewCommands(): void {
 				const title = res.path.split('/').pop()!.replace(/\.md$/, '');
 				openNote(ctx.vaultId!, res.path, title, 'replace');
 			} catch (e) {
-				alert((e as Error).message);
+				await alertDialog({ title: 'Could not open daily note', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});
@@ -118,10 +143,10 @@ export function registerViewCommands(): void {
 		async exec(ctx: CommandContext) {
 			try {
 				const res = await api.publish(ctx.vaultId!);
-				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
-				alert(msg);
+				const msg = `Published ${res.publicNotes} of ${res.totalNotes} notes to\n${res.outDir}\n\n${res.imagesCopied} image(s) copied.\n${res.attachmentsCopied} attachment(s) copied.${res.skipped.length ? `\n${res.skipped.length} skipped.` : ''}\n\nDeploy this folder to any static host.`;
+				await alertDialog({ title: 'Publish complete', message: msg, tone: 'success' });
 			} catch (e) {
-				alert('Publish failed: ' + (e as Error).message);
+				await alertDialog({ title: 'Publish failed', message: (e as Error).message, tone: 'danger' });
 			}
 		}
 	});

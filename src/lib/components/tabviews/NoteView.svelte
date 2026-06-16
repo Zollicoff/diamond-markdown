@@ -1,22 +1,45 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
-	import Editor from '$lib/components/editor/Editor.svelte';
-	import Preview from '$lib/components/editor/Preview.svelte';
-	import EditorToolbar from '$lib/components/editor/EditorToolbar.svelte';
 	import type { EditorApi } from '$lib/editor/commands';
+	import type { LinkInsertionContext } from '$lib/editor/link-insertion';
 	import type { LinkResolver } from '$lib/editor/live-preview';
-	import type { NoteDoc } from '$lib/types';
+	import type { EditorLinkStyle, EditorPropertiesInDocumentMode, NoteDoc, NoteLinkTarget, NoteViewMode } from '$lib/types';
 	import { api } from '$lib/vault-api';
 	import { on as onBus, emit as emitBus } from '$lib/events';
+	import { attachmentEmbedMarkdown } from '$lib/note/attachments';
 	import { openNote } from '$lib/workspace/actions';
+	import { currentLocationHashId, replaceLocationHash } from '$lib/workspace/hash';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { registerActivePluginEditor } from '$lib/plugins/editor-commands.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
-	import { READING_SPEED_WPM } from '$lib/util/constants';
+	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
+	import { confirmDialog } from '$lib/dialogs';
+	import NoteTopBar from './note/NoteTopBar.svelte';
+	import {
+		loadNoteEditor,
+		loadNotePreview,
+		loadNoteToolbar,
+		type NoteViewComponent
+	} from '$lib/note/lazy-components';
+	import {
+		ensureMarkdownPath,
+		isStaleRevisionError,
+		markdownWordCount,
+		noteTargetFromVaultHref,
+		noteTitleFromPath,
+		readingTimeLabel,
+		resolveNoteLink,
+		type NoteHrefTarget
+	} from '$lib/note/view';
+	import NoteBody from './note/NoteBody.svelte';
 
 	interface Props {
 		vaultId: string;
+		paneId: string;
+		tabId: string;
 		path: string;
-		mode: 'live' | 'source' | 'read';
+		mode: NoteViewMode;
 		isFocused: boolean;
 		/** Called when this view emits an update the parent cares about
 		 *  (e.g. backlinks refreshed, title from frontmatter). */
@@ -24,10 +47,10 @@
 		/** Called when the user picks a new view mode in the topbar. The
 		 *  pane owns the mode state so it survives note switches inside
 		 *  the same tab. */
-		onModeChange?: (m: 'live' | 'source' | 'read') => void;
+		onModeChange?: (m: NoteViewMode) => void;
 	}
 
-	let { vaultId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
+	let { vaultId, paneId, tabId, path, mode, isFocused, onDocLoaded, onModeChange }: Props = $props();
 
 	let doc = $state<NoteDoc | null>(null);
 	let content = $state('');
@@ -36,6 +59,24 @@
 	let savedAt = $state<number | null>(null);
 	let err = $state<string | null>(null);
 	let editorApi = $state<EditorApi | null>(null);
+	let uploadingAttachments = $state(0);
+	let attachmentPickerOpen = $state(false);
+	let EditorView = $state<NoteViewComponent | null>(null);
+	let PreviewView = $state<NoteViewComponent | null>(null);
+	let ToolbarView = $state<NoteViewComponent | null>(null);
+	let viewLoadError = $state<string | null>(null);
+	let linkStyle = $state<EditorLinkStyle>('wikilink');
+	let newLinkFormat = $state<string | null>(null);
+	let linkTargets = $state<NoteLinkTarget[]>([]);
+	let showLineNumbers = $state(true);
+	let spellcheck = $state(false);
+	let tabSize = $state(4);
+	let readableLineLength = $state(false);
+	let autoPairBrackets = $state(true);
+	let autoPairMarkdown = $state(true);
+	let folding = $state(false);
+	let propertiesInDocument = $state<EditorPropertiesInDocumentMode>('source');
+	let showInlineTitle = $state(false);
 
 	let loadedPath: string | null = null;
 	let loadedVault: string | null = null;
@@ -55,6 +96,15 @@
 		}
 	}
 
+	async function refreshLinkTargets(id = vaultId): Promise<void> {
+		try {
+			const targets = await api.linkTargets(id);
+			if (id === vaultId) linkTargets = targets;
+		} catch {
+			if (id === vaultId) linkTargets = [];
+		}
+	}
+
 	$effect(() => {
 		// Reload whenever the note we're showing changes.
 		if (path !== loadedPath || vaultId !== loadedVault) {
@@ -63,6 +113,77 @@
 				void load();
 			});
 		}
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			linkStyle = 'wikilink';
+			newLinkFormat = null;
+			api.linkStyle(id)
+				.then((preference) => {
+					if (id === vaultId) {
+						linkStyle = preference.style;
+						newLinkFormat = preference.newLinkFormat;
+					}
+				})
+				.catch(() => {
+					if (id === vaultId) {
+						linkStyle = 'wikilink';
+						newLinkFormat = null;
+					}
+				});
+		});
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			linkTargets = [];
+			void refreshLinkTargets(id);
+		});
+	});
+
+	$effect(() => {
+		const id = vaultId;
+		untrack(() => {
+			showLineNumbers = true;
+			showInlineTitle = false;
+			spellcheck = false;
+			tabSize = 4;
+			readableLineLength = false;
+			autoPairBrackets = true;
+			autoPairMarkdown = true;
+			folding = false;
+			propertiesInDocument = 'source';
+			api.editorPreferences(id)
+				.then((preference) => {
+					if (id === vaultId) {
+						showLineNumbers = preference.lineNumbers;
+						showInlineTitle = preference.showInlineTitle;
+						spellcheck = preference.spellcheck;
+						tabSize = preference.tabSize;
+						readableLineLength = preference.readableLineLength;
+						autoPairBrackets = preference.autoPairBrackets;
+						autoPairMarkdown = preference.autoPairMarkdown;
+						folding = preference.folding;
+						propertiesInDocument = preference.propertiesInDocument;
+					}
+				})
+				.catch(() => {
+					if (id === vaultId) {
+						showLineNumbers = true;
+						showInlineTitle = false;
+						spellcheck = false;
+						tabSize = 4;
+						readableLineLength = false;
+						autoPairBrackets = true;
+						autoPairMarkdown = true;
+						folding = false;
+						propertiesInDocument = 'source';
+					}
+				});
+		});
 	});
 
 	// Refresh when a sibling saves the same note, or this note is renamed.
@@ -78,10 +199,17 @@
 					setTimeout(() => void load(), 0);
 				}
 			}),
+			onBus('tree:invalidate', (e) => {
+				if (e.vaultId === vaultId) void refreshLinkTargets(e.vaultId);
+			}),
 			onBus('template:insert', (e) => {
 				// Only the focused note view should consume the template insert.
 				if (e.vaultId !== vaultId || !isFocused) return;
 				editorApi?.insertTemplate(e.content);
+			}),
+			onBus('outline:jump', (e) => {
+				if (e.vaultId !== vaultId || e.path !== path || !isFocused) return;
+				jumpToHeading(e.headingId);
 			})
 		];
 		return () => offs.forEach((off) => off());
@@ -92,7 +220,7 @@
 		saving = true;
 		err = null;
 		try {
-			await api.saveNote(vaultId, path, content);
+			await api.saveNote(vaultId, path, content, doc.revision);
 			dirty = false;
 			savedAt = Date.now();
 			// Refresh for fresh html + backlinks.
@@ -101,6 +229,39 @@
 			err = (e as Error).message;
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function reloadFromDisk(): Promise<void> {
+		if (dirty && !(await confirmDialog({
+			title: 'Reload from disk',
+			message: 'Reload this note from disk and discard unsaved edits?',
+			confirmLabel: 'Reload',
+			tone: 'danger'
+		}))) return;
+		void load();
+	}
+
+	function scrollReadHeading(id: string): boolean {
+		const root = document.querySelector('.pane.active .preview') as HTMLElement | null;
+		const el = root?.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+		if (!el) return false;
+		el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		return true;
+	}
+
+	function jumpToHeading(id: string): boolean {
+		if (mode === 'read') {
+			return scrollReadHeading(id);
+		}
+		return editorApi?.scrollToHeading(id) ?? false;
+	}
+
+	function openLinkedNote(target: NoteHrefTarget, openMode: ReturnType<typeof openModeForPointer>): void {
+		replaceLocationHash(target.hash);
+		openNote(vaultId, target.path, noteTitleFromPath(target.path), openMode);
+		if (target.hash && target.path === path) {
+			setTimeout(() => jumpToHeading(target.hash!), 0);
 		}
 	}
 
@@ -118,38 +279,48 @@
 		dirty = true;
 	}
 
+	async function handleAttachmentFiles(files: File[]): Promise<void> {
+		if (!files.length || !editorApi) return;
+		uploadingAttachments = files.length;
+		err = null;
+		try {
+			const uploaded = [];
+			for (const file of files) {
+				uploaded.push(await api.uploadAttachment(vaultId, file));
+			}
+			editorApi.insert(attachmentEmbedMarkdown(uploaded.map((file) => file.path)));
+		} catch (e) {
+			err = (e as Error).message;
+		} finally {
+			uploadingAttachments = 0;
+		}
+	}
+
+	function insertExistingAttachments(paths: string[]): void {
+		editorApi?.insert(attachmentEmbedMarkdown(paths));
+	}
+
 	const resolveLink: LinkResolver = (target: string) => {
-		if (!doc) return { resolved: false };
-		const t = target.trim().toLowerCase();
-		for (const link of doc.outgoingLinks) {
-			if (link.resolved && (link.target.toLowerCase() === t || link.resolved.toLowerCase() === t)) {
-				return { resolved: true, href: `/vault/${vaultId}/note/${encodeURI(link.resolved)}` };
-			}
-		}
-		for (const b of doc.backlinks) {
-			if (b.path.toLowerCase() === t || b.title.toLowerCase() === t) {
-				return { resolved: true, href: `/vault/${vaultId}/note/${encodeURI(b.path)}` };
-			}
-		}
-		return { resolved: false };
+		return resolveNoteLink(doc, vaultId, target);
 	};
 
 	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
-		if (e.button === 1) return 'new-tab';
-		if (e.metaKey || e.ctrlKey) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
+		return openModeForPointer(e);
 	}
 
-	function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
+	async function handleWikilinkClick(target: string, href: string | null, resolved: boolean, e: MouseEvent): Promise<void> {
 		if (resolved && href) {
-			const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
-			const notePath = href.replace(`/vault/${vaultId}/note/`, '');
-			openNote(vaultId, decodeURIComponent(notePath), noteTitle, modeFor(e));
+			const noteTarget = noteTargetFromVaultHref(vaultId, href);
+			if (!noteTarget) return;
+			openLinkedNote(noteTarget, modeFor(e));
 			return;
 		}
-		const createPath = confirm(`Create note "${target}"?`)
-			? (target.endsWith('.md') ? target : `${target}.md`)
+		const createPath = await confirmDialog({
+			title: 'Create note',
+			message: `Create note "${target}"?`,
+			confirmLabel: 'Create note'
+		})
+			? ensureMarkdownPath(target)
 			: null;
 		if (!createPath) return;
 		goto(`/vault/${vaultId}/note/${encodeURI(createPath)}`);
@@ -161,137 +332,145 @@
 
 	function handleWikilinkContext(target: string, href: string | null, resolved: boolean, e: MouseEvent): void {
 		if (!resolved || !href) return;
-		const noteTitle = target.split('/').pop()!.replace(/\.md$/, '');
-		const notePath = decodeURIComponent(href.replace(`/vault/${vaultId}/note/`, ''));
+		const noteTarget = noteTargetFromVaultHref(vaultId, href);
+		if (!noteTarget) return;
 		menuPos = { x: e.clientX, y: e.clientY };
 		menuItems = [
-			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, notePath, noteTitle, 'replace') },
-			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, notePath, noteTitle, 'new-tab') },
-			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, notePath, noteTitle, 'new-pane') },
+			{ label: 'Open',             icon: '→', action: () => openLinkedNote(noteTarget, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openLinkedNote(noteTarget, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openLinkedNote(noteTarget, 'new-pane') },
 			{ separator: true, label: '' },
-			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(notePath).catch(() => {}); } }
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(noteTarget.path).catch(() => {}); } }
 		];
 		menuOpen = true;
 	}
 
-	const wordCount = $derived.by<number>(() => {
-		// Strip frontmatter, then count word-shaped tokens.
-		const stripped = content.replace(/^---[\s\S]*?\n---\s*\n/, '').replace(/`[^`]*`/g, ' ').replace(/```[\s\S]*?```/g, ' ');
-		const m = stripped.match(/[\p{L}\p{N}'-]+/gu);
-		return m ? m.length : 0;
+	const wordCount = $derived(markdownWordCount(content));
+	const readingTime = $derived(readingTimeLabel(wordCount));
+	const isConflict = $derived(isStaleRevisionError(err));
+	const waitingForEditor = $derived(mode !== 'read' && (!EditorView || !ToolbarView));
+	const waitingForPreview = $derived(mode === 'read' && !PreviewView);
+	const linkContext = $derived<LinkInsertionContext>({
+		sourcePath: path,
+		newLinkFormat,
+		targets: linkTargets
 	});
 
-	const readingTime = $derived<string>(
-		wordCount === 0 ? '' : `${Math.max(1, Math.round(wordCount / READING_SPEED_WPM))} min`
-	);
-
-	function fmtSaved(ms: number | null): string {
-		if (!ms) return '';
-		const d = Date.now() - ms;
-		if (d < 2000) return 'just saved';
-		return `saved ${Math.round(d / 1000)}s ago`;
+	function openHistory(): void {
+		emitBus('history:open', { vaultId, path });
 	}
+
+	$effect(() => {
+		let alive = true;
+		viewLoadError = null;
+		if (mode === 'read') {
+			editorApi = null;
+			loadNotePreview()
+				.then((component) => { if (alive) PreviewView = component; })
+				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
+		} else {
+			Promise.all([loadNoteEditor(), loadNoteToolbar()])
+				.then(([editor, toolbar]) => {
+					if (!alive) return;
+					EditorView = editor;
+					ToolbarView = toolbar;
+				})
+				.catch((e) => { if (alive) viewLoadError = e instanceof Error ? e.message : String(e); });
+		}
+		return () => { alive = false; };
+	});
+
+	$effect(() => {
+		if (!doc || !editorApi || mode === 'read') return;
+		return registerActivePluginEditor({
+			vaultId,
+			paneId,
+			tabId,
+			notePath: path,
+			doc,
+			editor: editorApi
+		});
+	});
+
+	let lastAnchorJumpKey = $state('');
+	$effect(() => {
+		if (!doc) return;
+		const hash = currentLocationHashId();
+		if (!hash) return;
+		if (mode !== 'read' && !editorApi) return;
+		const key = `${vaultId}:${path}:${mode}:${hash}:${editorApi ? 'editor' : 'preview'}`;
+		if (key === lastAnchorJumpKey) return;
+		setTimeout(() => {
+			if (jumpToHeading(hash)) lastAnchorJumpKey = key;
+		}, 0);
+	});
+
 </script>
 
 <div class="note-view">
-	<header class="topbar">
-		<div class="crumbs mono">{path}</div>
-		<div class="save-status">
-			{#if wordCount > 0}
-				<span class="meta mono" title="Word count · estimated reading time">{wordCount} words · {readingTime}</span>
-			{/if}
-			<div class="mode-group" role="tablist" aria-label="View mode">
-				<button class:active={mode === 'live'}   onclick={() => onModeChange?.('live')}   role="tab" aria-selected={mode === 'live'}>Live</button>
-				<button class:active={mode === 'source'} onclick={() => onModeChange?.('source')} role="tab" aria-selected={mode === 'source'}>Source</button>
-				<button class:active={mode === 'read'}   onclick={() => onModeChange?.('read')}   role="tab" aria-selected={mode === 'read'}>Read</button>
-			</div>
-			{#if saving}<span class="status saving">saving…</span>
-			{:else if err}<span class="status err" title={err}>error</span>
-			{:else if dirty}<span class="status dirty">●</span>
-			{:else if savedAt}<span class="status saved">{fmtSaved(savedAt)}</span>{/if}
-			<button
-				class="btn"
-				onclick={() => emitBus('history:open', { vaultId, path })}
-				title="Show version history"
-				aria-label="Show version history"
-			>⏱</button>
-			<button class="btn" onclick={save} disabled={!dirty || saving}>Save</button>
-		</div>
-	</header>
+	<NoteTopBar
+		{path}
+		{wordCount}
+		{readingTime}
+		{mode}
+		{saving}
+		{dirty}
+		{savedAt}
+		{err}
+		{isConflict}
+		{onModeChange}
+		onReload={reloadFromDisk}
+		onHistory={openHistory}
+		onSave={save}
+	/>
 
-	{#if mode !== 'read'}
-		<EditorToolbar api={editorApi} />
-	{/if}
-
-	<div class="body">
-		{#if !doc}
-			<div class="loading">Loading…</div>
-		{:else if mode === 'read'}
-			<Preview html={doc.html} {vaultId} />
-		{:else}
-			<Editor
-				value={content}
-				mode={mode as 'live' | 'source'}
-				{resolveLink}
-				onChange={onContentChange}
-				onSave={save}
-				onWikilinkClick={handleWikilinkClick}
-				onWikilinkContext={handleWikilinkContext}
-				onReady={(a) => (editorApi = a)}
-			/>
-		{/if}
-	</div>
+	<NoteBody
+		{vaultId}
+		{doc}
+		{mode}
+		{linkStyle}
+		{linkContext}
+		{showLineNumbers}
+		{showInlineTitle}
+		{spellcheck}
+		{tabSize}
+		{readableLineLength}
+		{autoPairBrackets}
+		{autoPairMarkdown}
+		{folding}
+		{propertiesInDocument}
+		{content}
+		{editorApi}
+		{uploadingAttachments}
+		{EditorView}
+		{PreviewView}
+		{ToolbarView}
+		{viewLoadError}
+		{waitingForEditor}
+		{waitingForPreview}
+		{resolveLink}
+		onContentChange={onContentChange}
+		onSave={save}
+		onWikilinkClick={handleWikilinkClick}
+		onWikilinkContext={handleWikilinkContext}
+		onFilesInsert={handleAttachmentFiles}
+		onEditorReady={(api: EditorApi) => (editorApi = api)}
+		onAttachExisting={() => (attachmentPickerOpen = true)}
+	/>
 </div>
 
 {#if menuOpen}
 	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
 {/if}
 
+{#if attachmentPickerOpen}
+	<AttachmentPicker
+		{vaultId}
+		onInsert={insertExistingAttachments}
+		onClose={() => (attachmentPickerOpen = false)}
+	/>
+{/if}
+
 <style>
 	.note-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-	.topbar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 6px 14px;
-		border-bottom: 1px solid var(--border);
-		gap: 16px;
-		background: var(--bg);
-	}
-	.crumbs { color: var(--fg-muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-	.save-status { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--fg-dim); }
-	.meta { font-size: 0.74rem; color: var(--fg-muted); white-space: nowrap; }
-
-	.mode-group { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); padding: 2px; border-radius: 6px; }
-	.mode-group button {
-		background: transparent;
-		border: 0;
-		color: var(--fg-muted);
-		padding: 2px 9px;
-		border-radius: 4px;
-		font-size: 0.74rem;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.mode-group button:hover { color: var(--fg); }
-	.mode-group button.active { background: var(--bg-elev); color: var(--accent); }
-	.status.saving { color: var(--fg-muted); }
-	.status.dirty  { color: var(--accent); font-size: 1.2em; line-height: 1; }
-	.status.saved  { color: var(--success); }
-	.status.err    { color: var(--danger); }
-	.btn {
-		padding: 3px 12px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		color: var(--fg);
-		font-size: 0.78rem;
-		cursor: pointer;
-	}
-	.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-	.btn:disabled { opacity: 0.4; cursor: default; }
-
-	.body { flex: 1; min-height: 0; overflow: hidden; }
-	.loading { padding: 2rem; color: var(--fg-dim); }
-	.mono { font-family: var(--mono); }
 </style>

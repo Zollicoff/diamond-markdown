@@ -66,6 +66,10 @@ function configDir(): string {
 const CONFIG_DIR = configDir();
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
+export function getConfigDir(): string {
+	return CONFIG_DIR;
+}
+
 // Repo-relative sample vault — works in dev (src/) and prod (build/) alike,
 // since import.meta.url resolves to the built file's location.
 function sampleVaultPath(): string {

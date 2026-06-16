@@ -29,6 +29,19 @@
 	--warn:          #d29922;
 	--danger:        #f85149;
 
+	--hljs-bg:       #161b22;
+	--hljs-fg:       #e6edf3;
+	--hljs-comment:  #8b949e;
+	--hljs-keyword:  #ff7b72;
+	--hljs-title:    #d2a8ff;
+	--hljs-string:   #a5d6ff;
+	--hljs-symbol:   #79c0ff;
+	--hljs-attr:     #ffa657;
+	--hljs-section:  #1f6feb;
+	--hljs-meta:     #ffa657;
+	--hljs-addition: #aff5b4;
+	--hljs-deletion: #ffdcd7;
+
 	--mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 	--sans: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', system-ui, sans-serif;
 }
@@ -50,18 +63,90 @@
 	--success:       #1a7f37;
 	--warn:          #9a6700;
 	--danger:        #cf222e;
+	--hljs-bg:       #f6f8fa;
+	--hljs-fg:       #24292f;
+	--hljs-comment:  #6e7781;
+	--hljs-keyword:  #cf222e;
+	--hljs-title:    #8250df;
+	--hljs-string:   #0a3069;
+	--hljs-symbol:   #0550ae;
+	--hljs-attr:     #953800;
+	--hljs-section:  #0969da;
+	--hljs-meta:     #953800;
+	--hljs-addition: #116329;
+	--hljs-deletion: #82071e;
 	/* Brand stays the same in light mode. */
 	--brand-cyan:    #0ea5e9;
 	--brand-indigo:  #6366f1;
 }
 
-/* highlight.js — github-dark works visually on a light background only with
-   a dark inset for the code block itself. Don't try to recolor every token;
-   keep the dark code surface and let it sit in a card. */
-:root[data-theme='light'] pre code.hljs,
-:root[data-theme='light'] pre .hljs {
-	background: #161b22;
-	color: #e6edf3;
+/* highlight.js — imported theme supplies the class map; Diamond owns colors. */
+pre code.hljs,
+pre .hljs {
+	background: var(--hljs-bg);
+	color: var(--hljs-fg);
+}
+.hljs-comment,
+.hljs-quote {
+	color: var(--hljs-comment);
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+	color: var(--hljs-keyword);
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+	color: var(--hljs-title);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-variable {
+	color: var(--hljs-attr);
+}
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+	color: var(--hljs-string);
+}
+.hljs-built_in,
+.hljs-symbol {
+	color: var(--hljs-symbol);
+}
+.hljs-code,
+.hljs-formula,
+.hljs-section {
+	color: var(--hljs-section);
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-pseudo,
+.hljs-selector-tag {
+	color: var(--hljs-meta);
+}
+.hljs-subst {
+	color: var(--hljs-fg);
+}
+.hljs-addition {
+	color: var(--hljs-addition);
+	background: color-mix(in srgb, var(--hljs-addition) 12%, transparent);
+}
+.hljs-deletion {
+	color: var(--hljs-deletion);
+	background: color-mix(in srgb, var(--hljs-deletion) 12%, transparent);
 }
 
 * {
@@ -74,6 +159,7 @@ html, body {
 	height: 100%;
 	background: var(--bg);
 	color: var(--fg);
+	font-size: var(--vault-base-font-size, 16px);
 	font-family: var(--sans);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
@@ -123,3 +209,76 @@ button {
 	margin: 0 1px;
 }
 .tag:hover { text-decoration: none; filter: brightness(1.1); }
+
+.callout {
+	--callout-accent: var(--link);
+	--callout-bg: color-mix(in srgb, var(--callout-accent), transparent 90%);
+	margin: 1em 0;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--callout-accent), var(--border) 55%);
+	border-left-width: 4px;
+	border-radius: 7px;
+	background: var(--callout-bg);
+}
+.callout-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--fg);
+	font-weight: 700;
+}
+.callout-title::before {
+	content: '!';
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	background: var(--callout-accent);
+	color: var(--bg);
+	font-family: var(--mono);
+	font-size: 0.72em;
+}
+summary.callout-title {
+	cursor: pointer;
+}
+summary.callout-title::marker,
+summary.callout-title::-webkit-details-marker {
+	color: var(--fg-dim);
+}
+.callout-body {
+	margin-top: 8px;
+	color: var(--fg-muted);
+}
+.callout-body > :last-child {
+	margin-bottom: 0;
+}
+.callout-note,
+.callout-info,
+.callout-todo {
+	--callout-accent: var(--link);
+}
+.callout-tip,
+.callout-hint,
+.callout-success {
+	--callout-accent: var(--success);
+}
+.callout-warning,
+.callout-caution,
+.callout-important {
+	--callout-accent: var(--warn);
+}
+.callout-danger,
+.callout-error,
+.callout-failure,
+.callout-bug {
+	--callout-accent: var(--danger);
+}
+.callout-example,
+.callout-question,
+.callout-abstract,
+.callout-summary,
+.callout-quote,
+.callout-cite {
+	--callout-accent: var(--brand-indigo);
+}

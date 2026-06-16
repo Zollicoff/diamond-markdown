@@ -6,12 +6,20 @@
  *   [[path/to/note]]
  *   [[Note Title|display text]]
  *   [[Note Title#Heading]]
+ *   [[Note Title#^block-id]]
  *   [[Note Title#Heading|display text]]
  *
  * Resolution lives in indexer.ts — this file is just the syntax parser.
  */
 
 import { WIKILINK_RE } from '$lib/util/strings';
+import { parseObsidianEmbedMeta, splitAssetReference } from './embed';
+import {
+	parseWikilinkSubpath,
+	wikilinkFragment
+} from '$lib/markdown/wikilinks';
+
+export { parseWikilinkSubpath, wikilinkFragment };
 
 export interface ParsedWikilink {
 	/** Exact substring from the source, including `[[` and `]]`. */
@@ -20,6 +28,8 @@ export interface ParsedWikilink {
 	target: string;
 	/** Heading anchor after `#`, or null. */
 	heading: string | null;
+	/** Obsidian block reference id after `#^`, or null. */
+	blockId: string | null;
 	/** Display text (after `|`), or null to fall back to target. */
 	display: string | null;
 }
@@ -32,10 +42,12 @@ export interface ParsedWikilink {
 export function parseWikilinks(body: string): ParsedWikilink[] {
 	const out: ParsedWikilink[] = [];
 	for (const match of body.matchAll(WIKILINK_RE)) {
+		const subpath = parseWikilinkSubpath(match[2]);
 		out.push({
 			raw: match[0],
 			target: match[1].trim(),
-			heading: match[2]?.trim() ?? null,
+			heading: subpath.heading,
+			blockId: subpath.blockId,
 			display: match[3]?.trim() ?? null
 		});
 	}
@@ -51,10 +63,12 @@ export function replaceWikilinks(
 	render: (link: ParsedWikilink) => string
 ): string {
 	return body.replace(WIKILINK_RE, (raw, target, heading, display) => {
+		const subpath = parseWikilinkSubpath(heading as string | undefined);
 		return render({
 			raw,
 			target: (target as string).trim(),
-			heading: (heading as string | undefined)?.trim() ?? null,
+			heading: subpath.heading,
+			blockId: subpath.blockId,
 			display: (display as string | undefined)?.trim() ?? null
 		});
 	});
@@ -75,23 +89,28 @@ export function parseInlineTags(body: string): string[] {
 }
 
 /**
- * Embed syntax: `![[path/to/image.png]]` or `![[image.png|alt text]]`.
+ * Embed syntax: `![[path/to/file.png]]`, `![[file.pdf|caption]]`,
+ * `![[image.png|300]]`, `![[image.png|300x200]]`, or
+ * `![[image.png|alt text|300x200]]`.
  * No heading anchors for embeds.
  */
 export interface ParsedEmbed {
 	raw: string;
 	target: string;
 	alt: string | null;
+	width: number | null;
+	height: number | null;
 }
 
 const EMBED_RE = /!\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
 
 export function replaceEmbeds(body: string, render: (e: ParsedEmbed) => string): string {
-	return body.replace(EMBED_RE, (raw, target, alt) => {
+	return body.replace(EMBED_RE, (raw, target, meta) => {
+		const parsed = parseObsidianEmbedMeta(meta as string | undefined);
 		return render({
 			raw,
 			target: (target as string).trim(),
-			alt: (alt as string | undefined)?.trim() ?? null
+			...parsed
 		});
 	});
 }
@@ -99,5 +118,5 @@ export function replaceEmbeds(body: string, render: (e: ParsedEmbed) => string):
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
 
 export function isImagePath(p: string): boolean {
-	return IMAGE_EXT_RE.test(p);
+	return IMAGE_EXT_RE.test(splitAssetReference(p).path);
 }

@@ -1,0 +1,400 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { commitChange, getVaultGit } from './git';
+import { getIndex, upsertNote } from './indexer';
+import { normalizeVaultPath, resolveInVault } from './paths';
+import type { Vault } from './vault';
+import { splitAssetReference } from './embed';
+import { replaceEmbeds } from './wikilink';
+import { resolveMarkdownImagePath } from './embed';
+import type { AttachmentKind, AttachmentRef } from '$lib/types';
+import { readObsidianAppConfig, safeVaultFolder } from './obsidian-config';
+import { moveToLocalTrash } from './trash';
+
+export interface AttachmentUploadResult {
+	ok: true;
+	path: string;
+	filename: string;
+	size: number;
+	sha: string | null;
+}
+
+export interface AttachmentDeleteResult {
+	ok: true;
+	path: string;
+	sha: string | null;
+}
+
+export interface AttachmentRenameResult {
+	ok: true;
+	from: string;
+	to: string;
+	linksUpdated: number;
+	touched: string[];
+	sha: string | null;
+}
+
+export interface AttachmentMoveItem {
+	from: string;
+	to: string;
+}
+
+export interface AttachmentMoveResult {
+	ok: true;
+	folder: string;
+	moved: AttachmentMoveItem[];
+	linksUpdated: number;
+	touched: string[];
+	sha: string | null;
+}
+
+const DEFAULT_ATTACHMENT_FOLDER = 'Attachments';
+const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+const MAX_LISTED_ATTACHMENTS = 1_000;
+const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|avif|svg|bmp|ico)$/i;
+const AUDIO_EXT_RE = /\.(?:mp3|wav|ogg|oga|m4a|flac|aac|opus)$/i;
+const VIDEO_EXT_RE = /\.(?:mp4|webm|ogv|mov|m4v)$/i;
+const PDF_EXT_RE = /\.pdf$/i;
+const EXCLUDED_DIRS = new Set(['.git', '.diamondmd', '.obsidian', '.diamond-publish', 'node_modules']);
+
+export function sanitizeAttachmentFilename(input: string): string {
+	const basename = path.basename((input || 'attachment').replace(/\\/g, '/'));
+	const cleaned = basename
+		.replace(/[\u0000-\u001f\u007f]/g, '')
+		.replace(/[/:]/g, '-')
+		.trim()
+		.replace(/^\.+/, '')
+		.trim();
+	return cleaned || 'attachment';
+}
+
+function candidateFilename(filename: string, index: number): string {
+	if (index === 1) return filename;
+	const parsed = path.parse(filename);
+	const stem = parsed.name || 'attachment';
+	return `${stem} ${index}${parsed.ext}`;
+}
+
+function obsidianAttachmentFolder(vault: Vault): string | null {
+	return readObsidianAppConfig(vault.path).attachmentFolderPath ?? null;
+}
+
+export function preferredAttachmentFolder(vault: Vault): string {
+	return obsidianAttachmentFolder(vault) ?? DEFAULT_ATTACHMENT_FOLDER;
+}
+
+function nextAvailableAttachmentPath(vault: Vault, filename: string): { rel: string; abs: string } {
+	const folder = preferredAttachmentFolder(vault);
+	for (let index = 1; index <= 999; index += 1) {
+		const rel = normalizeVaultPath(`${folder}/${candidateFilename(filename, index)}`);
+		const abs = resolveInVault(vault, rel);
+		if (!fs.existsSync(abs)) return { rel, abs };
+	}
+	throw new Error('could not find an available attachment filename');
+}
+
+function nextAvailableMovePath(
+	vault: Vault,
+	folder: string,
+	filename: string,
+	reserved: Set<string>
+): string {
+	for (let index = 1; index <= 999; index += 1) {
+		const rel = normalizeVaultPath(`${folder}/${candidateFilename(filename, index)}`);
+		const key = rel.toLowerCase();
+		if (reserved.has(key)) continue;
+		if (fs.existsSync(resolveInVault(vault, rel))) {
+			reserved.add(key);
+			continue;
+		}
+		reserved.add(key);
+		return rel;
+	}
+	throw new Error('could not find an available attachment filename');
+}
+
+function attachmentKind(relPath: string): AttachmentKind | null {
+	if (/\.(?:md|markdown|canvas)$/i.test(relPath)) return null;
+	if (IMAGE_EXT_RE.test(relPath)) return 'image';
+	if (AUDIO_EXT_RE.test(relPath)) return 'audio';
+	if (VIDEO_EXT_RE.test(relPath)) return 'video';
+	if (PDF_EXT_RE.test(relPath)) return 'pdf';
+	return path.posix.extname(relPath) ? 'file' : null;
+}
+
+function shouldSkipDir(name: string): boolean {
+	return name.startsWith('.') || EXCLUDED_DIRS.has(name);
+}
+
+function assertAttachmentPath(inputPath: string): string {
+	const rel = normalizeVaultPath(inputPath);
+	if (!attachmentKind(rel)) throw new Error('path is not an attachment');
+	return rel;
+}
+
+function sameAttachmentRef(target: string, oldPath: string): boolean {
+	return splitAssetReference(target).path.toLowerCase() === oldPath.toLowerCase();
+}
+
+function preserveSuffix(target: string, newPath: string): string {
+	return `${newPath}${splitAssetReference(target).suffix}`;
+}
+
+function relativeMarkdownHref(notePath: string, newPath: string, suffix: string): string {
+	const noteDir = path.posix.dirname(notePath);
+	const rel = path.posix.relative(noteDir === '.' ? '' : noteDir, newPath) || path.posix.basename(newPath);
+	const href = `${rel}${suffix}`;
+	return /\s/.test(href) ? `<${href}>` : href;
+}
+
+function splitMarkdownImageDestination(body: string): { href: string; rest: string; wrapped: boolean } | null {
+	const trimmed = body.trim();
+	if (!trimmed) return null;
+	if (trimmed.startsWith('<')) {
+		const close = trimmed.indexOf('>');
+		if (close < 0) return null;
+		return {
+			href: trimmed.slice(1, close),
+			rest: trimmed.slice(close + 1),
+			wrapped: true
+		};
+	}
+	const match = trimmed.match(/^(\S+)([\s\S]*)$/);
+	if (!match) return null;
+	return { href: match[1], rest: match[2], wrapped: false };
+}
+
+function rewriteMarkdownImagesInText(
+	text: string,
+	notePath: string,
+	oldPath: string,
+	newPath: string
+): { text: string; hits: number } {
+	let hits = 0;
+	const next = text.replace(/!\[([^\]\n]*)\]\(([^)\n]+)\)/g, (whole, alt: string, body: string) => {
+		const dest = splitMarkdownImageDestination(body);
+		if (!dest) return whole;
+		const resolved = resolveMarkdownImagePath(dest.href, notePath);
+		if (!resolved || resolved.toLowerCase() !== oldPath.toLowerCase()) return whole;
+
+		hits++;
+		const suffix = splitAssetReference(dest.href).suffix;
+		const href = relativeMarkdownHref(notePath, newPath, suffix);
+		return `![${alt}](${href}${dest.rest})`;
+	});
+	return { text: next, hits };
+}
+
+function rewriteAttachmentReferences(
+	vault: Vault,
+	oldPath: string,
+	newPath: string
+): { touched: string[]; linksUpdated: number } {
+	const idx = getIndex(vault);
+	const touched = new Set<string>();
+	let linksUpdated = 0;
+
+	for (const notePath of idx.notes.keys()) {
+		let abs: string;
+		try {
+			abs = resolveInVault(vault, notePath);
+		} catch {
+			continue;
+		}
+		if (!fs.existsSync(abs)) continue;
+		const content = fs.readFileSync(abs, 'utf-8');
+		let embedHits = 0;
+		const withEmbeds = replaceEmbeds(content, (embed) => {
+			if (!sameAttachmentRef(embed.target, oldPath)) return embed.raw;
+			embedHits++;
+			const meta = embed.raw.match(/!\[\[[^\[\]|\n]+?(\|[^\[\]\n]+?)?\]\]/)?.[1] ?? '';
+			return `![[${preserveSuffix(embed.target, newPath)}${meta}]]`;
+		});
+		const markdown = rewriteMarkdownImagesInText(withEmbeds, notePath, oldPath, newPath);
+		const next = markdown.text;
+		const hits = embedHits + markdown.hits;
+		if (hits > 0 && next !== content) {
+			fs.writeFileSync(abs, next);
+			upsertNote(vault, notePath, next);
+			touched.add(notePath);
+			linksUpdated += hits;
+		}
+	}
+
+	return { touched: [...touched], linksUpdated };
+}
+
+export function listAttachments(vault: Vault): AttachmentRef[] {
+	const root = fs.realpathSync.native(path.resolve(vault.path));
+	const results: AttachmentRef[] = [];
+
+	function walk(absDir: string, relDir: string): void {
+		if (results.length >= MAX_LISTED_ATTACHMENTS) return;
+		for (const entry of fs.readdirSync(absDir, { withFileTypes: true })) {
+			if (results.length >= MAX_LISTED_ATTACHMENTS) return;
+			if (entry.isDirectory()) {
+				if (shouldSkipDir(entry.name)) continue;
+				walk(path.join(absDir, entry.name), relDir ? `${relDir}/${entry.name}` : entry.name);
+				continue;
+			}
+			if (!entry.isFile()) continue;
+			const rel = normalizeVaultPath(relDir ? `${relDir}/${entry.name}` : entry.name);
+			const kind = attachmentKind(rel);
+			if (!kind) continue;
+			const abs = path.join(absDir, entry.name);
+			const stat = fs.statSync(abs);
+			results.push({
+				path: rel,
+				filename: entry.name,
+				size: stat.size,
+				mtime: stat.mtimeMs,
+				kind
+			});
+		}
+	}
+
+	walk(root, '');
+	return results.sort((a, b) => b.mtime - a.mtime || a.path.localeCompare(b.path));
+}
+
+export async function saveAttachment(vault: Vault, file: File): Promise<AttachmentUploadResult> {
+	const filename = sanitizeAttachmentFilename(file.name);
+	const { rel, abs } = nextAvailableAttachmentPath(vault, filename);
+	const buffer = Buffer.from(await file.arrayBuffer());
+	if (buffer.byteLength > MAX_ATTACHMENT_BYTES) {
+		throw new Error('attachment is larger than 100 MB');
+	}
+
+	fs.mkdirSync(path.dirname(abs), { recursive: true });
+	const tmp = `${abs}.${crypto.randomUUID()}.tmp`;
+	try {
+		fs.writeFileSync(tmp, buffer, { flag: 'wx' });
+		fs.renameSync(tmp, abs);
+	} finally {
+		if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true });
+	}
+
+	const res = await commitChange(vault, [rel], 'create', rel);
+	return {
+		ok: true,
+		path: rel,
+		filename: path.basename(rel),
+		size: buffer.byteLength,
+		sha: res?.sha ?? null
+	};
+}
+
+export async function deleteAttachment(vault: Vault, inputPath: string): Promise<AttachmentDeleteResult> {
+	const rel = assertAttachmentPath(inputPath);
+	const abs = resolveInVault(vault, rel);
+	if (!fs.existsSync(abs)) throw new Error('attachment not found');
+	const stat = fs.statSync(abs);
+	if (!stat.isFile()) throw new Error('path is not an attachment file');
+
+	await getVaultGit(vault);
+	const trashed = moveToLocalTrash(vault, rel);
+	if (!trashed) fs.rmSync(abs, { force: true });
+	const res = await commitChange(
+		vault,
+		trashed ? [rel, trashed.to] : [rel],
+		'delete',
+		trashed ? `${rel} -> ${trashed.to}` : rel
+	);
+	return {
+		ok: true,
+		path: rel,
+		sha: res?.sha ?? null
+	};
+}
+
+export async function renameAttachment(vault: Vault, fromInput: string, toInput: string): Promise<AttachmentRenameResult> {
+	const from = assertAttachmentPath(fromInput);
+	const to = assertAttachmentPath(toInput);
+	if (from.toLowerCase() === to.toLowerCase()) throw new Error('destination must be different');
+	const fromAbs = resolveInVault(vault, from);
+	const toAbs = resolveInVault(vault, to);
+	if (!fs.existsSync(fromAbs) || !fs.statSync(fromAbs).isFile()) throw new Error('attachment not found');
+	if (fs.existsSync(toAbs)) throw new Error('destination already exists');
+
+	const { touched, linksUpdated } = rewriteAttachmentReferences(vault, from, to);
+	fs.mkdirSync(path.dirname(toAbs), { recursive: true });
+
+	fs.renameSync(fromAbs, toAbs);
+	const summary = linksUpdated > 0
+		? `${from} → ${to} (+${linksUpdated} reference${linksUpdated === 1 ? '' : 's'} updated)`
+		: `${from} → ${to}`;
+	const res = await commitChange(vault, [from, to, ...touched], 'rename', summary);
+
+	return { ok: true, from, to, touched, linksUpdated, sha: res?.sha ?? null };
+}
+
+export async function moveAttachments(
+	vault: Vault,
+	inputPaths: unknown,
+	folderInput: unknown
+): Promise<AttachmentMoveResult> {
+	if (!Array.isArray(inputPaths) || inputPaths.length === 0) throw new Error('attachment paths required');
+	const folder = safeVaultFolder(folderInput);
+	if (!folder) throw new Error('destination folder required');
+
+	const sourceKeys = new Set<string>();
+	const sources: string[] = [];
+	for (const inputPath of inputPaths) {
+		if (typeof inputPath !== 'string') throw new Error('attachment path required');
+		const rel = assertAttachmentPath(inputPath);
+		const key = rel.toLowerCase();
+		if (sourceKeys.has(key)) continue;
+		const abs = resolveInVault(vault, rel);
+		if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new Error('attachment not found');
+		sourceKeys.add(key);
+		sources.push(rel);
+	}
+
+	const reserved = new Set<string>();
+	for (const attachment of listAttachments(vault)) {
+		const key = attachment.path.toLowerCase();
+		if (!sourceKeys.has(key)) reserved.add(key);
+	}
+
+	const moves: AttachmentMoveItem[] = [];
+	for (const from of sources) {
+		const currentFolder = path.posix.dirname(from);
+		if (currentFolder.toLowerCase() === folder.toLowerCase()) {
+			reserved.add(from.toLowerCase());
+			continue;
+		}
+		const to = nextAvailableMovePath(vault, folder, path.posix.basename(from), reserved);
+		moves.push({ from, to });
+	}
+
+	if (moves.length === 0) {
+		return { ok: true, folder, moved: [], touched: [], linksUpdated: 0, sha: null };
+	}
+
+	for (const move of moves) {
+		if (fs.existsSync(resolveInVault(vault, move.to))) throw new Error('destination already exists');
+	}
+
+	const touchedSet = new Set<string>();
+	let linksUpdated = 0;
+	for (const move of moves) {
+		const rewrite = rewriteAttachmentReferences(vault, move.from, move.to);
+		for (const touched of rewrite.touched) touchedSet.add(touched);
+		linksUpdated += rewrite.linksUpdated;
+
+		const fromAbs = resolveInVault(vault, move.from);
+		const toAbs = resolveInVault(vault, move.to);
+		fs.mkdirSync(path.dirname(toAbs), { recursive: true });
+		fs.renameSync(fromAbs, toAbs);
+	}
+
+	const touched = [...touchedSet];
+	const paths = [...new Set([...moves.flatMap((move) => [move.from, move.to]), ...touched])];
+	const summary = linksUpdated > 0
+		? `${moves.length} attachment${moves.length === 1 ? '' : 's'} to ${folder} (+${linksUpdated} reference${linksUpdated === 1 ? '' : 's'} updated)`
+		: `${moves.length} attachment${moves.length === 1 ? '' : 's'} to ${folder}`;
+	const res = await commitChange(vault, paths, 'move', summary);
+
+	return { ok: true, folder, moved: moves, touched, linksUpdated, sha: res?.sha ?? null };
+}

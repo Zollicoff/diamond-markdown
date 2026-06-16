@@ -15,55 +15,44 @@
  */
 
 import fs from 'node:fs';
-import { marked } from 'marked';
+import { marked, Renderer, type Tokens } from 'marked';
 import markedFootnote from 'marked-footnote';
 import katex from 'katex';
 import hljs from 'highlight.js';
-import { replaceWikilinks, replaceEmbeds, isImagePath } from './wikilink';
+import { replaceWikilinks, replaceEmbeds, isImagePath, wikilinkFragment } from './wikilink';
+import {
+	attachmentEmbedKind,
+	embedImageAttrs,
+	parseMarkdownImageText,
+	renderAttachmentEmbedHtml,
+	resolveMarkdownImageReference,
+	splitAssetReference
+} from './embed';
+import { markdownNoteHash, resolveMarkdownNoteReference } from './markdown-links';
 import type { VaultIndex } from './indexer';
 import { resolveTarget } from './indexer';
 import type { Vault } from './vault';
 import { resolveInVault } from './paths';
 import { splitFrontmatter } from './frontmatter';
 import { purify } from './sanitize';
+import { renderObsidianCallout } from './callouts';
+import { useObsidianMarkedExtensions } from './marked-obsidian';
+import { addObsidianBlockIds } from './block-ids';
+import { markdownRenderPreference } from './obsidian-config';
 import { slugifyHeading, escHtml, escAttr } from '$lib/util/strings';
+import { stripObsidianCommentsOutsideCode } from '$lib/markdown/obsidian-comments';
 
 marked.setOptions({ gfm: true, breaks: false });
 marked.use(markedFootnote());
+useObsidianMarkedExtensions(marked);
 
 // Custom renderer: highlight code blocks + flag mermaid blocks for client.
-marked.use({
-	renderer: {
-		code({ text, lang }: { text: string; lang?: string; escaped?: boolean }) {
-			const language = (lang ?? '').trim().toLowerCase();
-			if (language === 'mermaid') {
-				// Encode the source so the client can pull it back out and feed it to mermaid.
-				const encoded = Buffer.from(text, 'utf-8').toString('base64');
-				return `<div class="mermaid-block" data-mermaid-source="${encoded}"><pre class="mermaid-fallback">${escHtml(text)}</pre></div>\n`;
-			}
-			let highlighted = '';
-			if (language && hljs.getLanguage(language)) {
-				try {
-					highlighted = hljs.highlight(text, { language, ignoreIllegals: true }).value;
-				} catch {
-					highlighted = escHtml(text);
-				}
-			} else {
-				try {
-					highlighted = hljs.highlightAuto(text).value;
-				} catch {
-					highlighted = escHtml(text);
-				}
-			}
-			const cls = language ? `hljs language-${language}` : 'hljs';
-			return `<pre><code class="${cls}">${highlighted}</code></pre>\n`;
-		}
-	}
-});
+marked.use({ renderer: { code: renderCodeBlock } });
 
 const ALLOWED_ATTR = [
 	'href', 'class', 'data-target', 'data-mermaid-source', 'title', 'src', 'alt',
 	'id', 'target', 'rel', 'loading', 'width', 'height', 'role', 'aria-hidden',
+	'aria-label', 'controls', 'preload', 'download', 'open',
 	'style' // KaTeX emits a few inline styles; safe under DOMPurify's CSS sanitization
 ];
 
@@ -72,13 +61,36 @@ export interface RenderResult {
 	outgoingLinks: { target: string; resolved: string | null }[];
 }
 
+export interface RenderMarkdownOptions {
+	softLineBreaks?: boolean;
+}
+
 /**
  * Render `body` (markdown without frontmatter) to sanitized HTML.
  */
-export function renderMarkdown(vault: Vault, idx: VaultIndex, body: string): RenderResult {
+export function renderMarkdown(
+	vault: Vault,
+	idx: VaultIndex,
+	body: string,
+	sourcePath: string | null = null,
+	options: RenderMarkdownOptions = {}
+): RenderResult {
 	const outgoing: { target: string; resolved: string | null }[] = [];
-	const html = renderInner(vault, idx, body, outgoing, new Set());
-	return { html, outgoingLinks: outgoing };
+	const softLineBreaks = options.softLineBreaks ?? markdownRenderPreference(vault.path).softLineBreaks;
+	const html = renderInner(vault, idx, body, outgoing, new Set(), sourcePath, softLineBreaks);
+	return { html, outgoingLinks: dedupeOutgoingLinks(outgoing) };
+}
+
+function dedupeOutgoingLinks(links: RenderResult['outgoingLinks']): RenderResult['outgoingLinks'] {
+	const seen = new Set<string>();
+	const deduped: RenderResult['outgoingLinks'] = [];
+	for (const link of links) {
+		const key = `${link.target}\0${link.resolved ?? ''}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(link);
+	}
+	return deduped;
 }
 
 /** Inner recursive renderer — `visited` is the chain of paths currently being
@@ -88,19 +100,36 @@ function renderInner(
 	idx: VaultIndex,
 	body: string,
 	outgoing: { target: string; resolved: string | null }[],
-	visited: Set<string>
+	visited: Set<string>,
+	sourcePath: string | null,
+	softLineBreaks: boolean
 ): string {
+	const withoutComments = stripObsidianCommentsOutsideCode(body);
+
 	// 1. Math first — replace $...$ and $$...$$ with rendered HTML so marked
 	//    passes them through unchanged. Done outside code regions only.
-	const mathReplaced = processOutsideCode(body, (chunk) => renderMathInChunk(chunk));
+	const mathReplaced = processOutsideCode(withoutComments, (chunk) => renderMathInChunk(chunk));
 
 	// 2. Embeds + wikilinks + tags — also outside code regions.
 	const processed = processOutsideCode(mathReplaced, (chunk) => {
 		const withEmbeds = replaceEmbeds(chunk, (e) => {
 			if (isImagePath(e.target)) {
-				const src = `/api/vaults/${vault.id}/raw/${encodeURI(e.target)}`;
-				const alt = e.alt ?? e.target.split('/').pop() ?? '';
-				return `<img src="${src}" alt="${escAttr(alt)}" class="embed-image" loading="lazy">`;
+				const ref = splitAssetReference(e.target);
+				const src = `/api/vaults/${vault.id}/raw/${encodeURI(ref.path)}${ref.suffix}`;
+				return `<img src="${escAttr(src)}" ${embedImageAttrs({ ...e, target: ref.path })}>`;
+			}
+			const attachmentKind = attachmentEmbedKind(e.target);
+			if (attachmentKind) {
+				const ref = splitAssetReference(e.target);
+				try {
+					const abs = resolveInVault(vault, ref.path);
+					if (fs.statSync(abs).isFile()) {
+						const src = `/api/vaults/${vault.id}/raw/${encodeURI(ref.path)}${ref.suffix}`;
+						return renderAttachmentEmbedHtml({ ...e, target: ref.path }, src, attachmentKind);
+					}
+				} catch {
+					// Fall through to note resolution / broken embed display.
+				}
 			}
 			// Note embed — try to resolve to a markdown note + inline its body.
 			const resolved = resolveTarget(idx, e.target);
@@ -114,7 +143,7 @@ function renderInner(
 					const { body: childBody } = splitFrontmatter(raw);
 					const nextVisited = new Set(visited);
 					nextVisited.add(resolved);
-					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited);
+					const childHtml = renderInner(vault, idx, childBody, outgoing, nextVisited, resolved, softLineBreaks);
 					const title = e.alt ?? resolved.split('/').pop()!.replace(/\.md$/, '');
 					return `<div class="embed-note" data-target="${escAttr(resolved)}"><div class="embed-note-head"><a class="wikilink" href="/vault/${vault.id}/note/${encodeURI(resolved)}">${escHtml(title)}</a></div><div class="embed-note-body">${childHtml}</div></div>`;
 				} catch {
@@ -132,7 +161,7 @@ function renderInner(
 			if (!resolved) {
 				return `<a class="wikilink wikilink--broken" href="/vault/${vault.id}/create?title=${encodeURIComponent(link.target)}" data-target="${escAttr(link.target)}">${escHtml(display)}</a>`;
 			}
-			const hash = link.heading ? `#${slugifyHeading(link.heading)}` : '';
+			const hash = wikilinkFragment(link);
 			const href = `/vault/${vault.id}/note/${encodeURI(resolved)}${hash}`;
 			return `<a class="wikilink" href="${href}" data-target="${escAttr(resolved)}">${escHtml(display)}</a>`;
 		});
@@ -142,16 +171,86 @@ function renderInner(
 	});
 
 	// 3. Marked → HTML (with our custom code renderer + footnotes ext + GFM).
-	const raw = marked.parse(processed, { async: false }) as string;
+	const raw = marked.parse(processed, {
+		async: false,
+		breaks: softLineBreaks,
+		renderer: createMarkdownRenderer(vault, idx, outgoing, sourcePath, softLineBreaks)
+	}) as string;
 
 	// 4. Add id attributes to headings so `[[Note#Heading]]` deep-links work.
 	const withHeadingIds = addHeadingIds(raw);
+	const withBlockIds = addObsidianBlockIds(withHeadingIds);
 
 	// 5. Sanitize.
-	return purify.sanitize(withHeadingIds, {
+	return purify.sanitize(withBlockIds, {
 		ALLOWED_ATTR,
 		ADD_ATTR: ['target']
 	});
+}
+
+function renderCodeBlock({ text, lang }: Tokens.Code): string {
+	const language = (lang ?? '').trim().toLowerCase();
+	if (language === 'mermaid') {
+		// Encode the source so the client can pull it back out and feed it to mermaid.
+		const encoded = Buffer.from(text, 'utf-8').toString('base64');
+		return `<div class="mermaid-block" data-mermaid-source="${encoded}"><pre class="mermaid-fallback">${escHtml(text)}</pre></div>\n`;
+	}
+	let highlighted = '';
+	if (language && hljs.getLanguage(language)) {
+		try {
+			highlighted = hljs.highlight(text, { language, ignoreIllegals: true }).value;
+		} catch {
+			highlighted = escHtml(text);
+		}
+	} else {
+		try {
+			highlighted = hljs.highlightAuto(text).value;
+		} catch {
+			highlighted = escHtml(text);
+		}
+	}
+	const cls = language ? `hljs language-${language}` : 'hljs';
+	return `<pre><code class="${cls}">${highlighted}</code></pre>\n`;
+}
+
+function createMarkdownRenderer(
+	vault: Vault,
+	idx: VaultIndex,
+	outgoing: { target: string; resolved: string | null }[],
+	sourcePath: string | null,
+	softLineBreaks: boolean
+): Renderer<string, string> {
+	const renderer = new Renderer();
+	renderer.code = renderCodeBlock;
+	renderer.blockquote = (token) => {
+		return renderObsidianCallout(token, (markdown) => marked.parse(markdown, {
+			async: false,
+			breaks: softLineBreaks,
+			renderer
+		}) as string) ?? `<blockquote>\n${renderer.parser.parse(token.tokens)}</blockquote>\n`;
+	};
+	renderer.image = ({ href, title, text }: Tokens.Image) => {
+		const localRef = resolveMarkdownImageReference(href, sourcePath);
+		const src = localRef ? `/api/vaults/${vault.id}/raw/${encodeURI(localRef.path)}${localRef.suffix}` : href;
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		const meta = parseMarkdownImageText(text);
+		return `<img src="${escAttr(src)}" ${embedImageAttrs({ target: localRef?.path ?? href, ...meta })}${titleAttr}>`;
+	};
+	renderer.link = ({ href, title, tokens }: Tokens.Link) => {
+		const label = renderer.parser.parseInline(tokens);
+		const ref = resolveMarkdownNoteReference(href, sourcePath);
+		if (ref) {
+			const resolved = resolveTarget(idx, ref.target);
+			outgoing.push({ target: ref.target, resolved });
+			if (resolved) {
+				const hash = markdownNoteHash(ref.suffix);
+				return `<a class="wikilink" href="/vault/${vault.id}/note/${encodeURI(resolved)}${escAttr(hash)}" data-target="${escAttr(resolved)}">${label}</a>`;
+			}
+		}
+		const titleAttr = title ? ` title="${escAttr(title)}"` : '';
+		return `<a href="${escAttr(href)}"${titleAttr}>${label}</a>`;
+	};
+	return renderer;
 }
 
 /** Replace `$$...$$` (block) and `$...$` (inline) with KaTeX-rendered HTML.

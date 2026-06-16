@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	if (body.length > PREVIEW_CHARS) snippet += '\n\n_…_';
 
 	const idx = getIndex(vault);
-	const { html } = renderMarkdown(vault, idx, snippet);
+	const { html } = renderMarkdown(vault, idx, snippet, rel);
 	const title = (typeof frontmatter.title === 'string' && frontmatter.title) || rel.split('/').pop()!.replace(/\.md$/, '');
 	return json({ path: rel, title, html });
 };

@@ -1,4 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { FIXTURE_PATHS } from './setup-fixture';
+import { bindings, comboFromEvent, comboToDisplay } from '../src/lib/commands/keymap';
+import { diamondCommandForObsidian } from '../src/lib/shortcuts/obsidian';
+import { buildShortcutRows, groupShortcutRows } from '../src/lib/shortcuts/view';
+import type { CommandDef } from '../src/lib/commands/registry';
 
 /**
  * Hotkey spec — every shortcut in the global keymap fires its actual
@@ -8,16 +15,80 @@ import { test, expect, type Page } from '@playwright/test';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
+const commandFixtures: CommandDef[] = [
+	{ id: 'switcher.open', title: 'Quick switcher', shortcut: '⌘K', category: 'view', exec() {} },
+	{ id: 'search.quick-open', title: 'Full-text search', shortcut: '⌘⇧F', category: 'view', exec() {} },
+	{ id: 'palette.open', title: 'Open command palette', shortcut: '⌘P', category: 'view', exec() {} },
+	{ id: 'daily.open', title: "Open today's daily note", shortcut: '⌘⇧D', category: 'file', exec() {} },
+	{ id: 'tabs.close', title: 'Close tab', shortcut: '⌘W', category: 'tabs', exec() {} }
+];
+
+test('shortcut helpers expose global keymap rows and Obsidian command aliases', () => {
+	const rows = buildShortcutRows(commandFixtures, bindings).map((row) => ({
+		...row,
+		shortcut: row.source === 'global' ? comboToDisplay(row.shortcut) : row.shortcut
+	}));
+	const switcher = rows.find((row) => row.commandId === 'switcher.open');
+	expect(switcher).toMatchObject({
+		title: 'Quick switcher',
+		shortcut: '⌘K',
+		category: 'view',
+		source: 'global',
+		obsidianCommandIds: ['switcher:open']
+	});
+	expect(rows.find((row) => row.commandId === 'search.quick-open')).toMatchObject({
+		title: 'Full-text search',
+		shortcut: '⌘⇧F',
+		obsidianCommandIds: ['global-search:open']
+	});
+	expect(diamondCommandForObsidian('command-palette:open')).toMatchObject({
+		diamondCommandId: 'palette.open',
+		diamondTitle: 'Open command palette'
+	});
+	expect(groupShortcutRows(rows).get('view')?.map((row) => row.title)).toContain('Quick switcher');
+	expect(comboFromEvent({
+		altKey: false,
+		code: 'KeyK',
+		ctrlKey: true,
+		key: 'K',
+		metaKey: false,
+		shiftKey: false
+	})).toBe('mod+k');
+	expect(comboFromEvent({
+		altKey: false,
+		code: 'Backslash',
+		ctrlKey: false,
+		key: 'Dead',
+		metaKey: true,
+		shiftKey: false
+	})).toBe('mod+\\');
+});
+
 async function openVault(page: Page): Promise<void> {
 	await page.goto('/vault/default');
 	await expect(page.locator('.tree').first()).toBeVisible({ timeout: 10_000 });
+	await page.evaluate(() => new Promise<void>((resolve) => {
+		requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+	}));
 }
 
 async function openFirstNote(page: Page): Promise<void> {
-	const fileLink = page.locator('.tree .file-link').first();
-	await expect(fileLink).toBeVisible({ timeout: 5_000 });
-	await fileLink.click();
-	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 5_000 });
+	await page.goto(`/vault/default/note/${encodeURIComponent('Getting Started.md')}`);
+	await expect(page.locator('.cm-content').first()).toBeVisible({ timeout: 10_000 });
+}
+
+async function dispatchModKey(page: Page, key: string, options: { shift?: boolean } = {}): Promise<void> {
+	await page.evaluate(({ key, mod, shift }) => {
+		window.dispatchEvent(new KeyboardEvent('keydown', {
+			key,
+			code: `Key${key.toUpperCase()}`,
+			metaKey: mod === 'Meta',
+			ctrlKey: mod === 'Control',
+			shiftKey: shift,
+			bubbles: true,
+			cancelable: true
+		}));
+	}, { key, mod: MOD, shift: options.shift ?? false });
 }
 
 test('⌘\\ toggles the left sidebar', async ({ page }) => {
@@ -62,25 +133,32 @@ test('⌘P still opens the palette while the editor is focused', async ({ page }
 
 test('⌘K opens the quick switcher', async ({ page }) => {
 	await openVault(page);
-	await page.keyboard.press(`${MOD}+KeyK`);
-	await expect(page.locator('input[placeholder*="jump" i], input[placeholder*="title" i]').first()).toBeVisible({ timeout: 2_000 });
+	const switcher = page.locator('input[placeholder*="jump" i], input[placeholder*="title" i]');
+	await dispatchModKey(page, 'k');
+	await expect(switcher.first()).toBeVisible({ timeout: 2_000 });
 });
 
 test('⌘⇧F opens full-text search', async ({ page }) => {
 	await openVault(page);
-	await page.keyboard.press(`${MOD}+Shift+KeyF`);
-	await expect(page.locator('input[placeholder*="full-text" i], input[placeholder*="search" i]').first()).toBeVisible({ timeout: 2_000 });
+	const search = page.locator('.search-view');
+	await dispatchModKey(page, 'f', { shift: true });
+	await expect(search).toBeVisible({ timeout: 2_000 });
+	await expect(search.locator('.input-row input').first()).toHaveAttribute('placeholder', /contents/i);
+	await expect(search.getByRole('button', { name: 'Notes' })).toBeVisible();
 });
 
 test('⌘⇧D opens today\'s daily note', async ({ page }) => {
 	await openVault(page);
-	const tabsBefore = await page.locator('.tabs > .tab, [role="tab"][aria-selected]').count();
-	await page.keyboard.press(`${MOD}+Shift+KeyD`);
-	// Daily note becomes a new tab; either a new tab appears or the
-	// active tab title changes to a YYYY-MM-DD pattern.
-	await page.waitForTimeout(500);
-	const url = page.url();
-	expect(url).toMatch(/Daily Notes\/\d{4}-\d{2}-\d{2}|note\/Daily/);
+	// Chrome/Linux reserves Ctrl+Shift+D for browser bookmarks, so dispatch
+	// the same app-level keydown shape directly to Diamond's keymap listener.
+	await dispatchModKey(page, 'd', { shift: true });
+	const activeDailyTab = page.locator('.tabs .tab.active').filter({ hasText: /\d{4}-\d{2}-\d{2}/ });
+	await expect(activeDailyTab).toBeVisible({ timeout: 5_000 });
+	await expect.poll(() => {
+		const dailyDir = path.join(FIXTURE_PATHS.VAULT_DIR, 'Daily Notes');
+		if (!fs.existsSync(dailyDir)) return '';
+		return fs.readdirSync(dailyDir).find((name) => /^\d{4}-\d{2}-\d{2}\.md$/.test(name)) ?? '';
+	}, { timeout: 5_000 }).toMatch(/^\d{4}-\d{2}-\d{2}\.md$/);
 });
 
 test('⌘⇧L cycles theme', async ({ page }) => {
@@ -95,36 +173,15 @@ test('⌘⇧L cycles theme', async ({ page }) => {
 test('⌘⇧B toggles bookmark on the active note', async ({ page }) => {
 	await openVault(page);
 	await openFirstNote(page);
-	const path = page.url().split('/note/')[1];
-	const before = await page.evaluate(
-		(args: { vaultId: string; path: string }) => {
-			const raw = localStorage.getItem(`diamond.bookmarks.${args.vaultId}`);
-			if (!raw) return false;
-			try {
-				const list = JSON.parse(raw) as { path: string }[];
-				return list.some((b) => b.path === decodeURIComponent(args.path));
-			} catch {
-				return false;
-			}
-		},
-		{ vaultId: 'default', path }
-	);
+	const notePath = decodeURIComponent(page.url().split('/note/')[1] ?? '');
+	const bookmarksFile = path.join(FIXTURE_PATHS.VAULT_DIR, '.diamondmd', 'bookmarks.json');
 	await page.keyboard.press(`${MOD}+Shift+KeyB`);
-	await page.waitForTimeout(200);
-	const after = await page.evaluate(
-		(args: { vaultId: string; path: string }) => {
-			const raw = localStorage.getItem(`diamond.bookmarks.${args.vaultId}`);
-			if (!raw) return false;
-			try {
-				const list = JSON.parse(raw) as { path: string }[];
-				return list.some((b) => b.path === decodeURIComponent(args.path));
-			} catch {
-				return false;
-			}
-		},
-		{ vaultId: 'default', path }
-	);
-	expect(after).not.toBe(before);
+	await expect.poll(() => fs.existsSync(bookmarksFile), { timeout: 5_000 }).toBe(true);
+	await expect.poll(() => {
+		const body = JSON.parse(fs.readFileSync(bookmarksFile, 'utf-8')) as { bookmarks: { path: string }[] };
+		return body.bookmarks.some((b) => b.path === notePath);
+	}).toBe(true);
+	await expect(page.locator('.bookmarks')).toContainText(notePath.replace(/\.md$/i, '').split('/').pop() ?? notePath);
 });
 
 test('⌘W closes the active tab', async ({ page }) => {

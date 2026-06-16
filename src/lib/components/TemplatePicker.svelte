@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { on as onBus, emit } from '$lib/events';
+	import { alertDialog } from '$lib/dialogs';
 
 	interface Props {
 		vaultId: string;
@@ -13,6 +14,7 @@
 	let open = $state(false);
 	let query = $state('');
 	let all = $state<Template[]>([]);
+	let templateFolder = $state('Templates');
 	let selectedIdx = $state(0);
 	let inputEl: HTMLInputElement | null = $state(null);
 	let activeNoteTitle: string = '';
@@ -20,7 +22,7 @@
 	const filtered = $derived.by<Template[]>(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return all;
-		return all.filter((t) => t.name.toLowerCase().includes(q));
+		return all.filter((t) => t.name.toLowerCase().includes(q) || t.path.toLowerCase().includes(q));
 	});
 
 	onMount(() => {
@@ -41,10 +43,12 @@
 	async function openPicker(): Promise<void> {
 		try {
 			const res = await fetch(`/api/vaults/${vaultId}/templates`);
-			const data = await res.json() as { templates: Template[] };
+			const data = await res.json() as { templates: Template[]; folder?: string };
 			all = data.templates ?? [];
+			templateFolder = data.folder || 'Templates';
 		} catch {
 			all = [];
+			templateFolder = 'Templates';
 		}
 		query = '';
 		selectedIdx = 0;
@@ -75,16 +79,16 @@
 		if (!t) return;
 		open = false;
 		try {
-			const url = `/api/vaults/${vaultId}/templates?name=${encodeURIComponent(t.name)}&title=${encodeURIComponent(activeNoteTitle)}`;
+			const url = `/api/vaults/${vaultId}/templates?path=${encodeURIComponent(t.path)}&title=${encodeURIComponent(activeNoteTitle)}`;
 			const res = await fetch(url);
 			if (!res.ok) {
-				alert(`Couldn't load template: ${res.statusText}`);
+				await alertDialog({ title: 'Could not load template', message: res.statusText, tone: 'danger' });
 				return;
 			}
 			const data = await res.json() as { content: string };
 			emit('template:insert', { vaultId, content: data.content });
 		} catch (e) {
-			alert(`Template load failed: ${(e as Error).message}`);
+			await alertDialog({ title: 'Template load failed', message: (e as Error).message, tone: 'danger' });
 		}
 	}
 </script>
@@ -105,7 +109,7 @@
 				<input
 					bind:this={inputEl}
 					bind:value={query}
-					placeholder={all.length === 0 ? 'No templates in Templates/ folder' : 'Filter templates…'}
+					placeholder={all.length === 0 ? `No templates in ${templateFolder}/ folder` : 'Filter templates…'}
 					spellcheck="false"
 					autocomplete="off"
 				/>
@@ -127,7 +131,7 @@
 				{#if filtered.length === 0}
 					<li class="empty">
 						{#if all.length === 0}
-							Create <code>.md</code> files in a <code>Templates/</code> folder
+							Create <code>.md</code> files in a <code>{templateFolder}/</code> folder
 							to use them here. Tokens supported: {'{{date}}'}, {'{{date:FORMAT}}'},
 							{'{{time}}'}, {'{{title}}'}, {'{{cursor}}'}.
 						{:else}

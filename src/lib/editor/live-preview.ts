@@ -22,28 +22,74 @@ import {
 import { syntaxTree } from '@codemirror/language';
 import { type Range } from '@codemirror/state';
 import { WIKILINK_RE } from '$lib/util/strings';
+import { parseWikilinkSubpath, wikilinkFragment } from '$lib/markdown/wikilinks';
+import type { EditorPropertiesInDocumentMode } from '$lib/types';
 
 /** Called for every [[target]] to tell us whether that note exists. */
 export type LinkResolver = (target: string) => { resolved: boolean; href?: string };
+
+export interface LivePreviewOptions {
+	propertiesInDocument?: EditorPropertiesInDocumentMode;
+}
+
+interface PreviewSpan {
+	from: number;
+	to: number;
+}
+
+interface HighlightSpan extends PreviewSpan {
+	contentFrom: number;
+	contentTo: number;
+}
 
 class WikilinkWidget extends WidgetType {
 	constructor(
 		readonly target: string,
 		readonly display: string,
 		readonly resolved: boolean,
-		readonly href: string | null
+		readonly href: string | null,
+		readonly highlighted = false
 	) {
 		super();
 	}
 
 	toDOM(): HTMLElement {
 		const a = document.createElement('a');
-		a.className = this.resolved ? 'cm-wikilink' : 'cm-wikilink cm-wikilink--broken';
+		a.className = [
+			'cm-wikilink',
+			this.resolved ? '' : 'cm-wikilink--broken',
+			this.highlighted ? 'cm-obsidian-highlight' : ''
+		].filter(Boolean).join(' ');
 		a.textContent = this.display;
 		if (this.href) a.href = this.href;
 		a.dataset.target = this.target;
-		// Let CodeMirror ignore the mouse so the link click propagates.
+		a.contentEditable = 'false';
 		a.setAttribute('data-diamond-wikilink', '1');
+		const dispatch = (event: MouseEvent, name: 'diamond-wikilink-click' | 'diamond-wikilink-context') => {
+			event.preventDefault();
+			event.stopPropagation();
+			a.dispatchEvent(new CustomEvent(name, {
+				bubbles: true,
+				composed: true,
+				detail: {
+					target: this.target,
+					href: this.href,
+					resolved: this.resolved,
+					mouseEvent: event
+				}
+			}));
+		};
+		a.addEventListener('mousedown', (event) => {
+			if (event.button === 0) dispatch(event, 'diamond-wikilink-click');
+		});
+		a.addEventListener('click', (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+		});
+		a.addEventListener('auxclick', (event) => {
+			if (event.button === 1) dispatch(event, 'diamond-wikilink-click');
+		});
+		a.addEventListener('contextmenu', (event) => dispatch(event, 'diamond-wikilink-context'));
 		return a;
 	}
 
@@ -52,17 +98,98 @@ class WikilinkWidget extends WidgetType {
 			other instanceof WikilinkWidget &&
 			other.target === this.target &&
 			other.display === this.display &&
-			other.resolved === this.resolved
+			other.resolved === this.resolved &&
+			other.href === this.href &&
+			other.highlighted === this.highlighted
 		);
 	}
 
 	ignoreEvent(): boolean {
-		// false = CodeMirror does NOT eat the event; the click reaches the <a>.
-		return false;
+		// Keep CodeMirror from moving the caret into the raw wikilink before
+		// the delegated link handler can route the click.
+		return true;
 	}
 }
 
-function buildDecorations(view: EditorView, resolveLink: LinkResolver): DecorationSet {
+function spansOverlap(left: PreviewSpan, right: PreviewSpan): boolean {
+	return left.from < right.to && right.from < left.to;
+}
+
+function containsSpan(spans: PreviewSpan[], from: number, to: number): boolean {
+	for (const span of spans) {
+		if (from >= span.from && to <= span.to) return true;
+	}
+	return false;
+}
+
+function overlapsSpan(spans: PreviewSpan[], from: number, to: number): boolean {
+	const candidate = { from, to };
+	for (const span of spans) {
+		if (spansOverlap(candidate, span)) return true;
+	}
+	return false;
+}
+
+function frontmatterSpan(view: EditorView): PreviewSpan | null {
+	const text = view.state.doc.toString();
+	const match = /^---(?:\r?\n[\s\S]*?\r?\n---)(?:\r?\n|$)/.exec(text);
+	return match ? { from: 0, to: match[0].length } : null;
+}
+
+function collectCodeSpans(view: EditorView): PreviewSpan[] {
+	const spans: PreviewSpan[] = [];
+	syntaxTree(view.state).iterate({
+		from: 0,
+		to: view.state.doc.length,
+		enter(node) {
+			const name = node.type.name;
+			if (name === 'FencedCode' || name === 'CodeBlock' || name === 'InlineCode') {
+				spans.push({ from: node.from, to: node.to });
+				return false;
+			}
+		}
+	});
+	return spans;
+}
+
+function collectObsidianCommentSpans(
+	view: EditorView,
+	codeSpans: PreviewSpan[],
+	ignoredSpans: PreviewSpan[] = []
+): PreviewSpan[] {
+	const spans: PreviewSpan[] = [];
+	const text = view.state.doc.toString();
+	const commentRe = /%%[\s\S]*?%%/g;
+	let match: RegExpExecArray | null;
+	while ((match = commentRe.exec(text))) {
+		const from = match.index;
+		const to = from + match[0].length;
+		if (overlapsSpan(codeSpans, from, to) || overlapsSpan(ignoredSpans, from, to)) continue;
+		spans.push({ from, to });
+	}
+	return spans;
+}
+
+function collectObsidianHighlightSpans(
+	view: EditorView,
+	codeSpans: PreviewSpan[],
+	commentSpans: PreviewSpan[],
+	ignoredSpans: PreviewSpan[] = []
+): HighlightSpan[] {
+	const spans: HighlightSpan[] = [];
+	const text = view.state.doc.toString();
+	const highlightRe = /==(?!=)(?=\S)([^\n]*?\S)==(?![=])/g;
+	let match: RegExpExecArray | null;
+	while ((match = highlightRe.exec(text))) {
+		const from = match.index;
+		const to = from + match[0].length;
+		if (overlapsSpan(codeSpans, from, to) || overlapsSpan(commentSpans, from, to) || overlapsSpan(ignoredSpans, from, to)) continue;
+		spans.push({ from, to, contentFrom: from + 2, contentTo: to - 2 });
+	}
+	return spans;
+}
+
+function buildDecorations(view: EditorView, resolveLink: LinkResolver, options: LivePreviewOptions = {}): DecorationSet {
 	const ranges: Range<Decoration>[] = [];
 	const cursor = view.state.selection.main.head;
 	const { state } = view;
@@ -70,13 +197,29 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 
 	// Does the caret sit somewhere inside [from..to]?
 	const cursorInside = (from: number, to: number): boolean => cursor >= from && cursor <= to;
+	const hiddenFrontmatter = options.propertiesInDocument === 'hidden' ? frontmatterSpan(view) : null;
+	const hiddenFrontmatterSpans = hiddenFrontmatter
+		? [hiddenFrontmatter]
+		: [];
+	const codeSpans = collectCodeSpans(view);
+	const commentSpans = collectObsidianCommentSpans(view, codeSpans, hiddenFrontmatterSpans);
+	const highlightSpans = collectObsidianHighlightSpans(view, codeSpans, commentSpans, hiddenFrontmatterSpans);
+	const activeHighlightSpans = highlightSpans.filter((span) => cursorInside(span.from, span.to));
+	const inactiveHighlightSpans = highlightSpans.filter((span) => !cursorInside(span.from, span.to));
 
 	// Pre-pass: collect [[wikilink]] spans across the visible viewport.
 	// lezer-markdown parses `[[Note]]` as a literal `[` + standard Link `[Note]`
 	// + literal `]`, so the LinkMark/URL handlers below would hide the inner
 	// brackets — leaving the outer pair visible as `[Note]`. We need to know
 	// the wikilink spans first so those passes can skip anything inside them.
-	const wikilinkSpans: Array<{ from: number; to: number; target: string; display: string }> = [];
+	const wikilinkSpans: Array<{
+		from: number;
+		to: number;
+		target: string;
+		display: string;
+		fragment: string;
+		highlighted: boolean;
+	}> = [];
 	for (const { from: vFrom, to: vTo } of view.visibleRanges) {
 		const text = doc.sliceString(vFrom, vTo);
 		let m: RegExpExecArray | null;
@@ -85,8 +228,16 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 			const start = vFrom + m.index;
 			const end = start + m[0].length;
 			const target = m[1].trim();
+			const subpath = parseWikilinkSubpath(m[2]);
 			const display = (m[3]?.trim() || target);
-			wikilinkSpans.push({ from: start, to: end, target, display });
+			const fragment = wikilinkFragment(subpath);
+			if (overlapsSpan(hiddenFrontmatterSpans, start, end)) continue;
+			if (overlapsSpan(commentSpans, start, end)) continue;
+			if (overlapsSpan(activeHighlightSpans, start, end)) continue;
+			const highlighted = inactiveHighlightSpans.some(
+				(span) => start >= span.contentFrom && end <= span.contentTo
+			);
+			wikilinkSpans.push({ from: start, to: end, target, display, fragment, highlighted });
 		}
 	}
 	const insideWikilink = (from: number, to: number): boolean => {
@@ -109,12 +260,14 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 					return false;
 				}
 
+				if (overlapsSpan(hiddenFrontmatterSpans, node.from, node.to)) return false;
 				// Skip anything that lezer parsed inside a [[wikilink]] — the
 				// wikilink widget will own that whole range below. Returning
 				// false prevents descent into children (the inner LinkMarks
 				// that would otherwise hide the inner brackets, leaving the
 				// outer pair visible as `[Note]`).
 				if (insideWikilink(node.from, node.to)) return false;
+				if (containsSpan(commentSpans, node.from, node.to)) return false;
 
 				if (name === 'HeaderMark') {
 					// `# ` prefix of an ATX heading. Hide when caret is not on the line.
@@ -169,14 +322,37 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 		});
 	}
 
+	// Hide YAML frontmatter for imported vaults that use Obsidian's hidden
+	// Properties-in-document setting. Source mode still exposes the raw file.
+	for (const frontmatter of hiddenFrontmatterSpans) {
+		ranges.push(Decoration.mark({ class: 'cm-hidden-frontmatter' }).range(frontmatter.from, frontmatter.to));
+	}
+
+	// Hide paired Obsidian `%%...%%` comments unless the caret is inside the
+	// span, which keeps the raw text reachable for edits in Live mode.
+	for (const comment of commentSpans) {
+		if (cursorInside(comment.from, comment.to)) continue;
+		ranges.push(Decoration.replace({}).range(comment.from, comment.to));
+	}
+
+	// Obsidian `==highlight==` marks — hide only the paired `==` markers when
+	// the caret is outside the span, and style the content as highlighted text.
+	for (const highlight of highlightSpans) {
+		if (cursorInside(highlight.from, highlight.to)) continue;
+		ranges.push(Decoration.replace({}).range(highlight.from, highlight.contentFrom));
+		ranges.push(Decoration.mark({ class: 'cm-obsidian-highlight' }).range(highlight.contentFrom, highlight.contentTo));
+		ranges.push(Decoration.replace({}).range(highlight.contentTo, highlight.to));
+	}
+
 	// Wikilink pills — replace each pre-collected span with a widget unless
 	// the caret is inside it (then leave the raw `[[…]]` text for editing).
 	for (const w of wikilinkSpans) {
 		if (cursor >= w.from && cursor <= w.to) continue;
 		const { resolved, href } = resolveLink(w.target);
+		const hrefWithFragment = href ? `${href}${w.fragment}` : null;
 		ranges.push(
 			Decoration.replace({
-				widget: new WikilinkWidget(w.target, w.display, resolved, href ?? null)
+				widget: new WikilinkWidget(w.target, w.display, resolved, hrefWithFragment, w.highlighted)
 			}).range(w.from, w.to)
 		);
 	}
@@ -185,12 +361,12 @@ function buildDecorations(view: EditorView, resolveLink: LinkResolver): Decorati
 	return Decoration.set(ranges, true);
 }
 
-export function livePreview(resolveLink: LinkResolver) {
+export function livePreview(resolveLink: LinkResolver, options: LivePreviewOptions = {}) {
 	return ViewPlugin.fromClass(
 		class {
 			decorations: DecorationSet;
 			constructor(view: EditorView) {
-				this.decorations = buildDecorations(view, resolveLink);
+				this.decorations = buildDecorations(view, resolveLink, options);
 			}
 			update(update: ViewUpdate): void {
 				if (
@@ -198,7 +374,7 @@ export function livePreview(resolveLink: LinkResolver) {
 					update.selectionSet ||
 					update.viewportChanged
 				) {
-					this.decorations = buildDecorations(update.view, resolveLink);
+					this.decorations = buildDecorations(update.view, resolveLink, options);
 				}
 			}
 		},

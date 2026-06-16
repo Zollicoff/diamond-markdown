@@ -2,15 +2,25 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { openNote, openTab } from '$lib/workspace/actions';
+	import { openModeForPointer } from '$lib/workspace/open-mode';
+	import { replaceLocationHash } from '$lib/workspace/hash';
+	import { noteTargetFromVaultHref, noteTitleFromPath, type NoteHrefTarget } from '$lib/note/view';
+	import { listMarkdownPostprocessors } from '$lib/plugins/extensions.svelte';
 	import ContextMenu, { type MenuItem, type Position } from '$lib/components/ContextMenu.svelte';
+	import type { NoteDoc } from '$lib/types';
+	import MarkdownSurface from './MarkdownSurface.svelte';
+	import PreviewHoverCard from './PreviewHoverCard.svelte';
 
 	interface Props {
 		html: string;
 		vaultId?: string;
+		doc?: NoteDoc;
+		readableLineLength?: boolean;
 	}
 
-	let { html, vaultId }: Props = $props();
-	let host: HTMLElement;
+	let { html, vaultId, doc, readableLineLength = false }: Props = $props();
+	let host = $state<HTMLElement | null>(null);
+	const markdownPostprocessors = $derived(vaultId ? listMarkdownPostprocessors(vaultId) : []);
 
 	// Hover-preview state — popped when the user lingers on a wikilink.
 	let hoverCard = $state<{ x: number; y: number; html: string } | null>(null);
@@ -22,16 +32,22 @@
 	let menuPos = $state<Position>({ x: 0, y: 0 });
 	let menuItems = $state<MenuItem[]>([]);
 
-	function pathFromHref(href: string): string | null {
-		const m = /^\/vault\/[^/]+\/note\/(.+)$/.exec(href);
-		return m ? decodeURIComponent(m[1]) : null;
+	function setHost(element: HTMLElement | null): void {
+		host = element;
 	}
 
-	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
-		if (e.button === 1) return 'new-tab';
-		if (e.metaKey || e.ctrlKey) return 'new-tab';
-		if (e.altKey) return 'new-pane';
-		return 'replace';
+	function scrollToHashTarget(hash: string | null): void {
+		if (!hash || !host) return;
+		const el = host.querySelector(`#${CSS.escape(hash)}`) as HTMLElement | null;
+		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	function openLinkedNote(target: NoteHrefTarget, mode: ReturnType<typeof openModeForPointer>): void {
+		replaceLocationHash(target.hash);
+		openNote(vaultId!, target.path, noteTitleFromPath(target.path), mode);
+		if (target.hash && doc?.path === target.path) {
+			queueMicrotask(() => scrollToHashTarget(target.hash));
+		}
 	}
 
 	function onClick(e: MouseEvent): void {
@@ -54,11 +70,10 @@
 
 		// Wikilink → modifier-aware open through the workspace store.
 		if (a.classList.contains('wikilink') && vaultId) {
-			const path = pathFromHref(href);
-			if (path) {
+			const target = noteTargetFromVaultHref(vaultId, href);
+			if (target) {
 				e.preventDefault();
-				const title = path.split('/').pop()!.replace(/\.md$/, '');
-				openNote(vaultId, path, title, modeFor(e));
+				openLinkedNote(target, openModeForPointer(e));
 				return;
 			}
 		}
@@ -83,11 +98,10 @@
 		if (!a || !vaultId) return;
 		const href = a.getAttribute('href');
 		if (!href || !a.classList.contains('wikilink')) return;
-		const path = pathFromHref(href);
-		if (!path) return;
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return;
 		e.preventDefault();
-		const title = path.split('/').pop()!.replace(/\.md$/, '');
-		openNote(vaultId, path, title, 'new-tab');
+		openLinkedNote(target, 'new-tab');
 	}
 
 	function onContext(e: MouseEvent): void {
@@ -95,17 +109,16 @@
 		if (!a || !vaultId) return;
 		const href = a.getAttribute('href');
 		if (!href || !a.classList.contains('wikilink')) return;
-		const path = pathFromHref(href);
-		if (!path) return;
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return;
 		e.preventDefault();
-		const title = path.split('/').pop()!.replace(/\.md$/, '');
 		menuPos = { x: e.clientX, y: e.clientY };
 		menuItems = [
-			{ label: 'Open',             icon: '→', action: () => openNote(vaultId, path, title, 'replace') },
-			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openNote(vaultId, path, title, 'new-tab') },
-			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openNote(vaultId, path, title, 'new-pane') },
+			{ label: 'Open',             icon: '→', action: () => openLinkedNote(target, 'replace') },
+			{ label: 'Open in new tab',  icon: '⎚', shortcut: '⌘click',   action: () => openLinkedNote(target, 'new-tab') },
+			{ label: 'Open in new pane', icon: '⊞', shortcut: 'alt+click', action: () => openLinkedNote(target, 'new-pane') },
 			{ separator: true, label: '' },
-			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(path).catch(() => {}); } }
+			{ label: 'Copy path',        icon: '⎘', action: async () => { await navigator.clipboard?.writeText(target.path).catch(() => {}); } }
 		];
 		menuOpen = true;
 	}
@@ -123,8 +136,8 @@
 		if (!a || !a.classList.contains('wikilink')) { clearHover(); return; }
 		const href = a.getAttribute('href');
 		if (!href) return;
-		const path = pathFromHref(href);
-		if (!path) return; // broken wikilink — no preview to show
+		const target = noteTargetFromVaultHref(vaultId, href);
+		if (!target) return; // broken wikilink — no preview to show
 		// Position card just above the link so it doesn't cover what you're reading.
 		const rect = a.getBoundingClientRect();
 		const x = rect.left;
@@ -132,7 +145,7 @@
 
 		if (hoverTimer) clearTimeout(hoverTimer);
 		hoverTimer = setTimeout(async () => {
-			const cached = previewCache.get(path);
+			const cached = previewCache.get(target.path);
 			if (cached) {
 				hoverCard = { x, y, html: cached };
 				return;
@@ -140,10 +153,10 @@
 			hoverFetchAbort?.abort();
 			hoverFetchAbort = new AbortController();
 			try {
-				const res = await fetch(`/api/vaults/${vaultId}/preview?path=${encodeURIComponent(path)}`, { signal: hoverFetchAbort.signal });
+				const res = await fetch(`/api/vaults/${vaultId}/preview?path=${encodeURIComponent(target.path)}`, { signal: hoverFetchAbort.signal });
 				if (!res.ok) return;
 				const data = await res.json() as { html: string };
-				previewCache.set(path, data.html);
+				previewCache.set(target.path, data.html);
 				hoverCard = { x, y, html: data.html };
 			} catch { /* ignore aborts */ }
 		}, 280);
@@ -189,212 +202,80 @@
 		}
 	}
 
-	// After HTML changes: scroll to hash if URL has one, render mermaid blocks.
+	function applyCleanup(fn: (() => void) | void, cleanups: (() => void)[], disposed: boolean): void {
+		if (typeof fn !== 'function') return;
+		if (disposed) {
+			try { fn(); } catch (e) { console.error('[plugins] markdown cleanup failed:', e); }
+			return;
+		}
+		cleanups.push(fn);
+	}
+
+	// After HTML changes: render mermaid blocks, run plugin postprocessors, then scroll to hash.
 	$effect(() => {
 		void html; // dep
-		if (!host) return;
+		const currentHost = host;
+		const processors = markdownPostprocessors;
+		if (!currentHost) return;
+		let disposed = false;
+		const cleanups: (() => void)[] = [];
 		queueMicrotask(() => {
-			void renderMermaidIn(host);
-			const hash = window.location.hash;
-			if (hash && hash.length > 1) {
-				const id = decodeURIComponent(hash.slice(1));
-				const target = host.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
-				target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			}
+			void (async () => {
+				if (disposed) return;
+				await renderMermaidIn(currentHost);
+				if (disposed) return;
+				if (vaultId && doc) {
+					for (const processor of processors) {
+						try {
+							const result = await processor.process(currentHost, {
+								vaultId,
+								pluginId: processor.pluginId,
+								extensionId: processor.localId,
+								processorId: processor.localId,
+								doc,
+								root: currentHost
+							});
+							applyCleanup(result as void | (() => void), cleanups, disposed);
+						} catch (e) {
+							console.error(`[plugin:${processor.pluginId}] markdown postprocessor failed:`, e);
+						}
+					}
+				}
+				if (disposed) return;
+				const hash = window.location.hash;
+				if (hash && hash.length > 1) {
+					const id = decodeURIComponent(hash.slice(1));
+					const el = currentHost.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
+					el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			})();
 		});
+		return () => {
+			disposed = true;
+			for (const cleanup of cleanups.splice(0)) {
+				try { cleanup(); } catch (e) { console.error('[plugins] markdown cleanup failed:', e); }
+			}
+		};
 	});
 
 	onMount(() => () => clearHover());
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions - preview delegates clicks/context/hover to rendered markdown links. -->
-<div
-	bind:this={host}
-	class="preview"
-	onclick={onClick}
-	onauxclick={onAuxClick}
-	oncontextmenu={onContext}
-	onkeydown={() => {}}
-	onpointerover={onPointerOver}
-	onpointerout={onPointerOut}
-	role="document"
-	tabindex="-1"
->
-	{@html html}
-</div>
+<MarkdownSurface
+	{html}
+	{readableLineLength}
+	onHostMount={setHost}
+	onClickPreview={onClick}
+	onAuxClickPreview={onAuxClick}
+	onContextPreview={onContext}
+	onPointerOverPreview={onPointerOver}
+	onPointerOutPreview={onPointerOut}
+/>
 
 {#if hoverCard}
-	<div
-		class="hover-card"
-		style="left:{hoverCard.x}px;top:{hoverCard.y}px"
-		onpointerleave={clearHover}
-		role="tooltip"
-	>
-		<div class="hover-card-body">{@html hoverCard.html}</div>
-	</div>
+	<PreviewHoverCard x={hoverCard.x} y={hoverCard.y} html={hoverCard.html} onLeave={clearHover} />
 {/if}
 
 {#if menuOpen}
 	<ContextMenu items={menuItems} pos={menuPos} onClose={() => (menuOpen = false)} />
 {/if}
-
-<style>
-	.preview {
-		padding: 40px 48px;
-		overflow-y: auto;
-		height: 100%;
-		color: var(--fg);
-		font-family: var(--sans);
-		font-size: 17px;
-		line-height: 1.7;
-	}
-	.preview :global(h1) { font-family: var(--sans); font-size: 2.2em; margin: 0 0 0.6em; line-height: 1.1; letter-spacing: -0.01em; }
-	.preview :global(h2) { font-family: var(--sans); font-size: 1.6em; margin: 1.8em 0 0.5em; line-height: 1.15; }
-	.preview :global(h3) { font-family: var(--sans); font-size: 1.3em; margin: 1.5em 0 0.4em; }
-	.preview :global(h4) { font-size: 1.1em; margin: 1.3em 0 0.3em; font-family: var(--sans); font-weight: 700; }
-	.preview :global(p) { margin: 0 0 1em; }
-	.preview :global(ul), .preview :global(ol) { margin: 0 0 1em; padding-left: 1.4em; }
-	.preview :global(li) { margin: 0.25em 0; }
-	.preview :global(blockquote) {
-		margin: 1em 0; padding: 0.4em 1em;
-		border-left: 3px solid var(--border-strong);
-		color: var(--fg-muted); font-style: italic;
-	}
-	.preview :global(code) {
-		font-family: var(--mono);
-		font-size: 0.9em;
-		background: var(--bg-elev-2);
-		padding: 1px 6px;
-		border-radius: 4px;
-	}
-	.preview :global(pre) {
-		background: var(--bg-elev);
-		padding: 14px 16px;
-		border-radius: 8px;
-		overflow-x: auto;
-		border: 1px solid var(--border);
-	}
-	.preview :global(pre code) {
-		background: transparent;
-		padding: 0;
-		font-size: 0.88em;
-	}
-	.preview :global(table) {
-		border-collapse: collapse;
-		margin: 1em 0;
-		font-family: var(--sans);
-		font-size: 0.92em;
-	}
-	.preview :global(th), .preview :global(td) {
-		border: 1px solid var(--border);
-		padding: 6px 10px;
-		text-align: left;
-	}
-	.preview :global(th) { background: var(--bg-elev); font-weight: 600; }
-	.preview :global(hr) {
-		border: 0;
-		border-top: 1px solid var(--border);
-		margin: 2em 0;
-	}
-	.preview :global(img) { max-width: 100%; border-radius: 6px; }
-
-	/* ── Note embeds ─────────────────────────────────────── */
-	.preview :global(.embed-note) {
-		border: 1px solid var(--border);
-		border-left: 3px solid var(--accent);
-		border-radius: 6px;
-		margin: 1em 0;
-		background: var(--bg-elev);
-		overflow: hidden;
-	}
-	.preview :global(.embed-note-head) {
-		padding: 6px 14px;
-		font-size: 0.78rem;
-		font-family: var(--mono);
-		color: var(--fg-dim);
-		background: var(--bg-elev-2);
-		border-bottom: 1px solid var(--border);
-	}
-	.preview :global(.embed-note-body) { padding: 12px 16px; }
-	.preview :global(.embed-note-body > :first-child) { margin-top: 0; }
-	.preview :global(.embed-note-body > :last-child) { margin-bottom: 0; }
-	.preview :global(.embed-note.embed-cycle) {
-		padding: 8px 14px;
-		font-size: 0.85rem;
-		color: var(--fg-dim);
-		font-style: italic;
-	}
-	.preview :global(.embed-note.embed-cycle .hint) { font-size: 0.74rem; color: var(--fg-muted); margin-left: 6px; }
-	.preview :global(.embed-broken) {
-		color: var(--link-broken);
-		font-style: italic;
-		border-bottom: 1px dotted var(--link-broken);
-	}
-
-	/* ── Mermaid ─────────────────────────────────────────── */
-	.preview :global(.mermaid-block) {
-		margin: 1em 0;
-		padding: 14px 16px;
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		text-align: center;
-		overflow-x: auto;
-	}
-	.preview :global(.mermaid-block svg) { max-width: 100%; height: auto; }
-	.preview :global(.mermaid-fallback) {
-		color: var(--fg-muted);
-		font-size: 0.85em;
-		text-align: left;
-		margin: 0;
-	}
-
-	/* ── Math (KaTeX overrides if any) ──────────────────── */
-	.preview :global(.math-error) {
-		color: var(--link-broken);
-		font-family: var(--mono);
-		font-size: 0.92em;
-	}
-	.preview :global(.katex-display) { margin: 1em 0; }
-
-	/* ── Footnotes (marked-footnote output) ─────────────── */
-	.preview :global(.footnotes) {
-		margin-top: 3em;
-		padding-top: 1.4em;
-		border-top: 1px solid var(--border);
-		font-size: 0.92em;
-		color: var(--fg-muted);
-	}
-	.preview :global(.footnote-ref) {
-		font-size: 0.78em;
-		vertical-align: super;
-		margin-left: 1px;
-	}
-	.preview :global(.footnote-backref) { margin-left: 4px; opacity: 0.6; }
-	.preview :global(.footnote-backref:hover) { opacity: 1; }
-
-	/* ── Hover preview card (wikilinks) ─────────────────── */
-	.hover-card {
-		position: fixed;
-		z-index: 900;
-		max-width: 420px;
-		max-height: 320px;
-		overflow-y: auto;
-		background: var(--bg-elev);
-		border: 1px solid var(--border-strong);
-		border-radius: 8px;
-		box-shadow: 0 10px 40px rgba(0,0,0,0.45);
-		padding: 12px 16px;
-		font-family: var(--sans);
-		font-size: 14px;
-		line-height: 1.55;
-		color: var(--fg);
-		transform: translate(0, -100%);
-		pointer-events: auto;
-	}
-	.hover-card-body :global(h1),
-	.hover-card-body :global(h2),
-	.hover-card-body :global(h3) { font-size: 1em; margin: 0 0 0.4em; }
-	.hover-card-body :global(p) { margin: 0 0 0.5em; }
-	.hover-card-body :global(p:last-child) { margin-bottom: 0; }
-</style>

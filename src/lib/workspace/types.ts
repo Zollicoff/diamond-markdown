@@ -6,7 +6,7 @@
  * to change the renderer, not the store.
  */
 
-export type TabKind = 'note' | 'graph' | 'tags' | 'search' | 'settings' | 'shortcuts';
+export type TabKind = 'note' | 'canvas' | 'graph' | 'tags' | 'search' | 'settings' | 'shortcuts';
 
 interface TabBase {
 	id: string;
@@ -17,6 +17,11 @@ interface TabBase {
 export interface NoteTab extends TabBase {
 	kind: 'note';
 	path: string; // vault-relative with .md
+}
+
+export interface CanvasTab extends TabBase {
+	kind: 'canvas';
+	path: string; // vault-relative with .canvas
 }
 
 export interface GraphTab extends TabBase {
@@ -31,6 +36,7 @@ export interface TagsTab extends TabBase {
 export interface SearchTab extends TabBase {
 	kind: 'search';
 	query: string;
+	fullText?: boolean;
 }
 
 export interface SettingsTab extends TabBase {
@@ -41,7 +47,7 @@ export interface ShortcutsTab extends TabBase {
 	kind: 'shortcuts';
 }
 
-export type Tab = NoteTab | GraphTab | TagsTab | SearchTab | SettingsTab | ShortcutsTab;
+export type Tab = NoteTab | CanvasTab | GraphTab | TagsTab | SearchTab | SettingsTab | ShortcutsTab;
 
 export interface Pane {
 	id: string;
