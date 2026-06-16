@@ -26,12 +26,12 @@ Diamond Markdown already has the right foundation:
 - Release verification that covers audit, type checking, build, auth smoke,
   read-only smoke, and batched full-suite Playwright e2e.
 
-The app is past prototype status. The remaining work is about making the
-architecture honest, boring, and durable while filling daily-driver gaps.
-The product-level gap matrix lives in
-[docs/obsidian-parity-audit.md](./obsidian-parity-audit.md); use it to pick
-work that moves Diamond toward the Obsidian-style daily-driver goal, not merely
-the next convenient subsystem slice.
+The app is past prototype status. Current work is in completion mode: make v1
+finite, verify the release-shaped product, and fix only blockers. The v1 gate
+lives in [docs/v1-acceptance.md](./v1-acceptance.md). The product-level gap
+matrix remains in [docs/obsidian-parity-audit.md](./obsidian-parity-audit.md),
+but parity gaps that do not block v1 should be documented as limitations rather
+than turned into more open-ended implementation slices.
 
 ## Main Risks
 
