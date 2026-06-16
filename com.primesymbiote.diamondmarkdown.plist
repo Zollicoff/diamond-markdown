@@ -19,11 +19,11 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/node</string>
-		<string>/Users/primesymbiote/Github/diamondmarkdown/build/index.js</string>
+		<string>/Volumes/zas-hot-22/Github/diamondmarkdown/build/index.js</string>
 	</array>
 
 	<key>WorkingDirectory</key>
-	<string>/Users/primesymbiote/Github/diamondmarkdown</string>
+	<string>/Volumes/zas-hot-22/Github/diamondmarkdown</string>
 
 	<key>EnvironmentVariables</key>
 	<dict>
