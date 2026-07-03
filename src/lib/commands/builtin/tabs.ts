@@ -4,18 +4,7 @@
  */
 
 import { register, type CommandContext } from '../registry';
-import { openCanvas, openNote, closeTab as closeTabAction, closePane as closePaneAction } from '$lib/workspace/actions';
-
-function titleFor(path: string): string {
-	return path.split('/').pop()!.replace(/\.(md|markdown|canvas)$/i, '');
-}
-
-function openFile(ctx: CommandContext, mode: 'replace' | 'new-tab' | 'new-pane'): void {
-	if (!ctx.node || ctx.node.type !== 'file') return;
-	const title = titleFor(ctx.node.path);
-	if (ctx.node.fileKind === 'canvas') openCanvas(ctx.vaultId!, ctx.node.path, title, mode);
-	else openNote(ctx.vaultId!, ctx.node.path, title, mode);
-}
+import { openNote, closeTab as closeTabAction, closePane as closePaneAction } from '$lib/workspace/actions';
 
 export function registerTabCommands(): void {
 	register({
@@ -24,7 +13,8 @@ export function registerTabCommands(): void {
 		icon: '→',
 		category: 'tabs',
 		exec(ctx: CommandContext) {
-			openFile(ctx, 'replace');
+			if (!ctx.node || ctx.node.type !== 'file') return;
+			openNote(ctx.vaultId!, ctx.node.path, ctx.node.name.replace(/\.md$/, ''), 'replace');
 		}
 	});
 
@@ -35,7 +25,8 @@ export function registerTabCommands(): void {
 		shortcut: '⌘click',
 		category: 'tabs',
 		exec(ctx: CommandContext) {
-			openFile(ctx, 'new-tab');
+			if (!ctx.node || ctx.node.type !== 'file') return;
+			openNote(ctx.vaultId!, ctx.node.path, ctx.node.name.replace(/\.md$/, ''), 'new-tab');
 		}
 	});
 
@@ -45,7 +36,8 @@ export function registerTabCommands(): void {
 		icon: '⊞',
 		category: 'tabs',
 		exec(ctx: CommandContext) {
-			openFile(ctx, 'new-pane');
+			if (!ctx.node || ctx.node.type !== 'file') return;
+			openNote(ctx.vaultId!, ctx.node.path, ctx.node.name.replace(/\.md$/, ''), 'new-pane');
 		}
 	});
 

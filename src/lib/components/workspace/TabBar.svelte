@@ -23,10 +23,7 @@
 	let dropActive = $state(false);
 
 	function titleOf(t: Tab): string {
-		if (t.title) return t.title;
-		if (t.kind === 'note') return t.path.split('/').pop()!.replace(/\.md$/, '');
-		if (t.kind === 'canvas') return t.path.split('/').pop()!.replace(/\.canvas$/, '');
-		return t.kind;
+		return t.title || (t.kind === 'note' ? t.path.split('/').pop()!.replace(/\.md$/, '') : t.kind);
 	}
 
 	function click(t: Tab): void {
@@ -103,7 +100,7 @@
 			class="tab"
 			class:active={t.id === pane.activeTabId}
 			class:drag-over={dragOverIdx === i && dragIdx !== i}
-			title={t.kind === 'note' || t.kind === 'canvas' ? t.path : t.kind}
+			title={t.kind === 'note' ? t.path : t.kind}
 			draggable="true"
 			onclick={() => click(t)}
 			onauxclick={(e) => onAuxClick(e, t)}
@@ -130,7 +127,6 @@
 	function kindGlyph(k: Tab['kind']): string {
 		switch (k) {
 			case 'note':     return '◇';
-			case 'canvas':   return '□';
 			case 'graph':    return '◎';
 			case 'tags':     return '#';
 			case 'search':   return '⌕';

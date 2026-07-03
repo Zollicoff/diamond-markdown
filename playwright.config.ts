@@ -1,14 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
+import { buildFixture, FIXTURE_PATHS } from './e2e/setup-fixture';
 
-const configuredPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '4173', 10);
-const PORT = Number.isFinite(configuredPort) ? configuredPort : 4173;
-const FIXTURE_ROOT = path.resolve(process.env.DIAMOND_E2E_FIXTURE_ROOT ?? 'e2e/.fixture-root');
-const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const PORT = 4173;
+const FIXTURE_ROOT = FIXTURE_PATHS.FIXTURE_ROOT;
+
+// Build a clean test vault before the webServer boots.
+buildFixture();
 
 /**
- * Isolated test runtime. The `webServer` boots the production adapter-node
- * build through a static-safe test preview server with `DIAMOND_CONFIG_DIR` and
+ * Isolated test runtime. The `webServer` boots `npm run preview` (the
+ * production-ish adapter-node build) with `DIAMOND_CONFIG_DIR` and
  * `DIAMOND_DEFAULT_VAULT_DIR` pointed at e2e-only paths, so smoke runs
  * never touch the user's real config or vault.
  */
@@ -22,20 +24,13 @@ export default defineConfig({
 	use: {
 		baseURL: `http://127.0.0.1:${PORT}`,
 		trace: 'on-first-retry',
-		screenshot: 'only-on-failure',
-		// Production builds auto-register the SvelteKit service worker. Block it
-		// in e2e so repeated release runs never serve stale immutable chunks from
-		// a previous build on the same localhost origin.
-		serviceWorkers: 'block',
-		launchOptions: CHROMIUM_EXECUTABLE_PATH
-			? { executablePath: CHROMIUM_EXECUTABLE_PATH }
-			: undefined
+		screenshot: 'only-on-failure'
 	},
 	projects: [
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }
 	],
 	webServer: {
-		command: 'node scripts/playwright-webserver.mjs',
+		command: `node build`,
 		url: `http://127.0.0.1:${PORT}/`,
 		reuseExistingServer: false,
 		timeout: 60_000,
@@ -47,7 +42,6 @@ export default defineConfig({
 			...process.env,
 			PORT: String(PORT),
 			HOST: '127.0.0.1',
-			ORIGIN: `http://127.0.0.1:${PORT}`,
 			DIAMOND_CONFIG_DIR: path.join(FIXTURE_ROOT, 'config'),
 			DIAMOND_DEFAULT_VAULT_DIR: path.join(FIXTURE_ROOT, 'vault')
 		} as Record<string, string>

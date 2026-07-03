@@ -1,16 +1,11 @@
 <script lang="ts">
 	import type { EditorApi } from '$lib/editor/commands';
-	import { linkToolbarButton, type LinkInsertionContext } from '$lib/editor/link-insertion';
-	import type { EditorLinkStyle } from '$lib/types';
 
 	interface Props {
 		api: EditorApi | null;
-		linkStyle?: EditorLinkStyle;
-		linkContext?: LinkInsertionContext;
-		onAttachExisting?: () => void;
 	}
 
-	let { api, linkStyle = 'wikilink', linkContext, onAttachExisting }: Props = $props();
+	let { api }: Props = $props();
 
 	function act(fn: (api: EditorApi) => void): void {
 		if (!api) return;
@@ -19,8 +14,7 @@
 
 	interface Btn { icon: string; title: string; action: (a: EditorApi) => void; }
 
-	const linkButton = $derived(linkToolbarButton(linkStyle));
-	const groups = $derived<Btn[][]>([
+	const groups: Btn[][] = [
 		[
 			{ icon: 'B',     title: 'Bold (⌘B)',        action: (a) => a.wrap('**') },
 			{ icon: 'I',     title: 'Italic (⌘I)',      action: (a) => a.wrap('*') },
@@ -39,10 +33,10 @@
 			{ icon: '❝',     title: 'Quote',            action: (a) => a.prependLines('> ') }
 		],
 		[
-			{ icon: linkButton.icon, title: linkButton.title, action: (a) => a.insertNoteLink(linkStyle, linkContext) },
+			{ icon: '[[ ]]', title: 'Wikilink',         action: (a) => a.insertWikilink() },
 			{ icon: '{ }',   title: 'Code block',       action: (a) => a.insertCodeBlock() }
 		]
-	]);
+	];
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Formatting">
@@ -60,18 +54,6 @@
 		</div>
 		{#if gi < groups.length - 1}<div class="sep"></div>{/if}
 	{/each}
-	{#if onAttachExisting}
-		<div class="sep"></div>
-		<div class="group">
-			<button
-				class="t-btn"
-				title="Insert attachment"
-				aria-label="Insert attachment"
-				disabled={!api}
-				onclick={onAttachExisting}
-			>📎</button>
-		</div>
-	{/if}
 </div>
 
 <style>

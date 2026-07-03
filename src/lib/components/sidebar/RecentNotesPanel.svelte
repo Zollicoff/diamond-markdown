@@ -3,7 +3,6 @@
 	import { browser } from '$app/environment';
 	import { on as onBus } from '$lib/events';
 	import { openNote } from '$lib/workspace/actions';
-	import { openModeForPointer } from '$lib/workspace/open-mode';
 
 	interface Props {
 		vaultId: string;
@@ -37,8 +36,14 @@
 		}
 	}
 
+	function modeFor(e: MouseEvent): 'replace' | 'new-tab' | 'new-pane' {
+		if (e.metaKey || e.ctrlKey || e.button === 1) return 'new-tab';
+		if (e.altKey) return 'new-pane';
+		return 'replace';
+	}
+
 	function open(e: MouseEvent, path: string, title: string): void {
-		openNote(vaultId, path, title, openModeForPointer(e));
+		openNote(vaultId, path, title, modeFor(e));
 	}
 
 	onMount(() => {

@@ -1,14 +1,9 @@
 # Open-Source Obsidian Replacement Plan
 
 Diamond Markdown is already past a basic notes app: vaults, wikilinks,
-backlinks, graph, live preview, git history, templates, daily notes, ranked
-indexed search, tags, embeds, publishing, PWA app-shell caching, conservative
-GitHub sync, attachment organization, Obsidian import guidance with safe
-attachment/new-note/daily-note settings reuse and link-update preference
-handling, plugin scaffolding, and broad Canvas
-compatibility exist. This plan now tracks the
-remaining work needed to keep it trustworthy as an open-source daily driver
-without overstating full Obsidian ecosystem parity.
+backlinks, graph, live preview, git history, templates, daily notes, search,
+tags, embeds, publishing, and PWA plumbing exist. The next work should make it
+trustworthy as an open-source daily driver.
 
 ## Current Assessment
 
@@ -18,117 +13,93 @@ Strengths:
 - User-owned markdown and git history are the right differentiators against
   proprietary sync.
 - The feature surface covers most core Obsidian workflows.
-- Release verification covers dependency audit, Svelte diagnostics, clean
-  production build, Basic Auth smoke, read-only smoke, and the full Playwright
-  suite.
+- E2E coverage exists for boot, workspace shell, graph/search/settings,
+  shortcuts, wikilinks, and editor toolbar behavior.
 
 Risks:
 - Server APIs are single-user and powerful by design. Any public deployment
-  needs Basic Auth, read-only mode, Tailscale, or an authenticated reverse proxy
-  before it is safe.
-- Large-vault work has improved through index caching, virtualized file/search
-  views, vault-local saved searches, and graph scale paths, but grouped search
-  polish is still basic.
+  needs an auth/reverse-proxy story before it is safe.
+- Large-vault performance is still mostly in-memory scans and recursive trees.
 - File/path safety must remain centralized; any new disk-touching route should
   go through `src/lib/server/paths.ts`.
-- The plugin system is intentionally small. Expanding it toward full Obsidian
-  API compatibility would lock in maintenance burden and is not a core goal.
-- Desktop has a Tauri shell, current-host self-contained preflight, unsigned
-  cross-platform artifact CI, and draft unsigned release publishing. Signing,
-  notarization, and public installer policy remain open.
+- The plugin system is still a major design risk. A too-large API would lock in
+  maintenance burden before the core is stable.
 
 ## Next Moves
 
-### 1. Finish The v1 Gate
+### 1. Stabilize The Core
 
-- Use `docs/v1-acceptance.md` as the finite definition of done.
-- Freeze non-blocking parity work until the v1 smoke, documentation audit, and
-  release packet are complete.
-- Fix only issues that block the v1 acceptance criteria or make public claims
-  inaccurate.
+- Finish reducing `svelte-check` warnings, especially remaining accessibility
+  warnings in workspace tabs, graph, preview, and pane focus handling.
+- Add route-level tests for path traversal, symlink escape prevention, raw asset
+  headers, note create/read/update/delete, rename, duplicate, and folder moves.
+- Add indexer tests for backlinks, aliases, tags, embeds, rename rewrites, and
+  deleted notes.
+- Add a release checklist: `npm run check`, `npm run build`, `npm run test:e2e`,
+  `npm audit --audit-level=moderate`.
 
-### 2. Keep The Core Verified
+### 2. Make It Safe To Self-Host
 
-- Preserve zero-error `npm run check` as a release gate.
-- Keep route-level tests around path traversal, symlink escape prevention, raw
-  asset headers, note/folder mutations, Canvas mutations, and sync guards.
-- Keep indexer coverage around backlinks, aliases, tags, embeds, rename
-  rewrites, deleted notes, and unlinked mentions.
-- Use `npm run verify:release` as the canonical local gate for dependency
-  audit, type checking, production build, auth/read-only smoke, and browser
-  coverage.
-
-### 3. Make It Safe To Self-Host
-
-- Keep documenting localhost/Tailscale/reverse-proxy deployment as the safe
-  default; there is no built-in multi-user authorization model yet.
-- Basic Auth is available via `DIAMOND_BASIC_AUTH`; trusted-header auth remains
-  a possible later proxy integration.
-- Server-enforced `DIAMOND_READ_ONLY` mode is available for browse-only demos;
-  future work can hide more write controls in the UI.
+- Document the security model in README: localhost/Tailscale/reverse proxy by
+  default, no built-in multi-user auth yet.
+- Add optional basic auth or trusted-header auth for simple self-hosted installs.
+- Add read-only mode for public demos and sample vaults.
 - Keep raw asset serving sandboxed and non-executable.
 
-### 4. Make Sync Real
+### 3. Make Sync Real
 
-- Maintain the explicit git status/sync/fetch/pull/push UI per vault.
-- Keep write APIs blocked after fetch when the remote is behind, diverged, or
-  merge-conflicted.
-- Keep remote setup instructions, health checks, incoming-file review, safe
-  one-click sync, and divergence recovery visible.
-- Treat background sync and automatic conflict resolution as future work only
-  if they can preserve git transparency.
+- Add explicit git status/pull/push UI per vault.
+- Add conflict detection before save when the working tree diverges.
+- Add a conflict-resolution workflow for remote pulls and local edits.
+- Support per-vault remote setup instructions and health checks.
 
-### 5. Improve Daily-Driver UX
+### 4. Improve Daily-Driver UX
 
-- Continue mobile polish around touch-friendly dense controls and context menus.
-- Keep service-worker behavior limited to the app shell and immutable assets;
-  vault APIs stay server-backed so note/git state does not go stale silently.
-- Consider bulk file operations when they can reuse existing path-safety and
-  git-backed mutation helpers.
-- Continue import helpers for remaining Obsidian configuration edges without
-  executing Obsidian plugins or silently rewriting vault files.
+- Finish mobile ergonomics: sidebar gestures, tab switching, editor controls,
+  and touch-friendly context menus.
+- Add service worker/offline behavior with clear conflict rules.
+- Add bulk file operations: multi-select, move, delete, rename, and command
+  palette actions over selections.
+- Add import helpers for existing Obsidian vaults, including attachment folders,
+  `.obsidian` ignore defaults, and common frontmatter patterns.
 
-### 6. Scale Large Vaults
+### 5. Scale Large Vaults
 
-- Keep the persisted vault index cache warm across restarts.
-- File tree and search result virtualization are present; preserve coverage as
-  rendering changes.
-- Keep improving advanced search ergonomics, especially grouping, and consider
-  a token/inverted index only if real-world vaults
-  outgrow the current ranked indexed body corpus.
-- Graph scale paths exist; keep cosmetic graph parity secondary to correctness
-  and responsiveness.
+- Add persisted index cache keyed by file mtimes and content hashes.
+- Virtualize the file tree and search results.
+- Replace full-text substring scans with an indexed search backend when vaults
+  exceed a configurable threshold.
+- Replace graph O(n^2)-style interactions with spatial indexing for large
+  graphs.
 
-### 7. Plugin System, Small And Late
+### 6. Plugin System, Small And Late
 
-- Keep the plugin surface intentionally small: commands, markdown
-  postprocessors, editor commands, settings panels, and right-panel views.
+- Start with three extension points only: markdown render extension, command
+  registration, and side-panel view.
 - Run plugin logic in workers/iframes, not the app's privileged server context.
-- Require explicit per-vault plugin enablement and capability-mediated file or
-  editor access.
-- Do not chase full Obsidian plugin API parity.
+- Require explicit per-vault plugin enablement.
+- Treat plugin persistence and filesystem access as separate capabilities.
 
-### 8. Open-Source Readiness
+### 7. Open-Source Readiness
 
-- Keep `SECURITY.md`, self-hosting guidance, release checklist, and parity audit
-  current as product claims change.
-- Add issue templates and `CHANGELOG.md` before the next tagged public release.
+- Add issue templates for bug reports, feature requests, and security reports.
+- Add `SECURITY.md` with supported versions and private disclosure process.
+- Add `CHANGELOG.md` before the next tagged release.
 - Add screenshots/GIFs generated from the actual app, not the marketing site.
-- Keep contributor architecture guidance focused on safe file APIs, command
-  registration, workspace state, sync boundaries, and plugin capability limits.
+- Add a contributor architecture guide focused on safe file APIs, command
+  registration, and workspace state.
 
 ## Near-Term Release Target
 
 For the next public milestone, aim for:
 - zero type-check errors
 - zero moderate/high audit findings
-- green full release verifier
-- exact claim boundary in README, ROADMAP, and parity audit
-- current-host desktop release rehearsal passing
-- no claim of full Obsidian plugin, Canvas, sync, offline, or desktop parity
-  beyond verified behavior
+- green e2e suite
+- explicit self-hosting/security documentation
+- git sync status UI
+- path/indexer route tests
+- mobile polish pass
 
-That combination keeps Diamond Markdown credible as an open-source Obsidian
-alternative without pretending the plugin ecosystem, full visual Canvas parity,
-automatic conflict-free sync, or cross-platform desktop release story is
+That combination makes Diamond Markdown credible as an open-source Obsidian
+alternative without pretending the plugin ecosystem or large-vault story is
 finished.

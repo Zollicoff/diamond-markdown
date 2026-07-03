@@ -20,8 +20,6 @@ export const bindings: KeyBinding[] = [
 	{ combo: 'mod+shift+\\', commandId: 'view.toggle-right-sidebar' },
 	{ combo: 'mod+w', commandId: 'tabs.close' },
 	{ combo: 'mod+p', commandId: 'palette.open' },
-	{ combo: 'mod+k', commandId: 'switcher.open' },
-	{ combo: 'mod+shift+f', commandId: 'search.quick-open' },
 	{ combo: 'mod+shift+d', commandId: 'daily.open' },
 	{ combo: 'mod+shift+b', commandId: 'note.toggle-star' },
 	{ combo: 'mod+shift+l', commandId: 'theme.cycle' },
@@ -46,7 +44,7 @@ export function comboToDisplay(combo: string): string {
 
 export function installGlobalKeymap(getCtx: () => CommandContext): () => void {
 	const handler = (e: KeyboardEvent): void => {
-		const combo = comboFromEvent(e);
+		const combo = comboFrom(e);
 		for (const b of bindings) {
 			if (b.combo !== combo) continue;
 			// Bare-key bindings (e.g. f2) must NOT hijack typing inside an
@@ -74,28 +72,11 @@ function isTextInput(el: HTMLElement): boolean {
 	return false;
 }
 
-export function comboFromEvent(e: Pick<KeyboardEvent, 'altKey' | 'code' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'>): string {
+function comboFrom(e: KeyboardEvent): string {
 	const parts: string[] = [];
 	if (e.metaKey || e.ctrlKey) parts.push('mod');
 	if (e.shiftKey) parts.push('shift');
 	if (e.altKey) parts.push('alt');
-	parts.push(keyToken(e));
+	parts.push(e.key.toLowerCase());
 	return parts.join('+');
-}
-
-function keyToken(e: Pick<KeyboardEvent, 'code' | 'key'>): string {
-	if (/^Key[A-Z]$/i.test(e.code)) return e.code.slice(3).toLowerCase();
-	if (/^Digit[0-9]$/i.test(e.code)) return e.code.slice(5);
-	if (e.code === 'Backslash') return '\\';
-	if (e.code === 'Slash') return '/';
-	if (e.code === 'Minus') return '-';
-	if (e.code === 'Equal') return '=';
-	if (e.code === 'BracketLeft') return '[';
-	if (e.code === 'BracketRight') return ']';
-	if (e.code === 'Semicolon') return ';';
-	if (e.code === 'Quote') return "'";
-	if (e.code === 'Comma') return ',';
-	if (e.code === 'Period') return '.';
-	if (e.code === 'Backquote') return '`';
-	return e.key.toLowerCase();
 }

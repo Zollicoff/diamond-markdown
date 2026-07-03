@@ -1,12 +1,6 @@
 # Diamond Markdown — Roadmap
 
-Version numbers signal feature areas, not SemVer stability. We're pre-1.0.
-The current claim boundary lives in
-[docs/obsidian-parity-audit.md](./docs/obsidian-parity-audit.md): Diamond can
-claim an Obsidian-style core notes workflow, conservative GitHub sync, and broad
-Canvas compatibility, but not full Obsidian plugin parity, full Canvas
-whiteboard parity, automatic proprietary-sync replacement, or signed
-cross-platform desktop release publishing.
+Version numbers signal feature parity, not stability. We're pre-1.0.
 
 ## v0.1 — MVP ✓ (shipped 2026-04-22)
 
@@ -25,16 +19,15 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Broken link styling + click-to-create
 - [x] Frontmatter parser (title, tags, aliases, created, updated, public)
 - [x] Backlinks panel
-- [x] Unlinked mentions panel
 - [x] Outgoing links panel
 - [x] Tag index page
 - [x] Fuzzy quick-switcher
-- [x] Ranked index-backed full-text search with quoted phrases, field filters, exclusions, boolean `OR`, safe `/regex/` terms, highlighted literal result matches, folder grouping/facets, paged loading, and virtualized results
+- [x] Full-text search
 - [x] Git auto-commit on save (debounced)
 - [x] Per-note history viewer (git log + diff)
 - [x] Daily notes (auto-create from `Daily Notes/Template.md`, ⌘⇧D)
 
-## v0.2 — Obsidian-style core notes workflow ✓ (shipped 2026-04-25)
+## v0.2 — Obsidian-core parity ✓ (shipped 2026-04-25)
 
 - [x] Command palette (⌘P)
 - [x] Tag index page
@@ -50,7 +43,7 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 - [x] Code highlighting (highlight.js)
 - [x] Footnotes
 - [x] General templates (`Templates/` folder + ⌘⇧T)
-- [x] Git-backed bookmarks (⌘⇧B, sidebar panel)
+- [x] Bookmarks (⌘⇧B, sidebar panel)
 - [x] Recent notes panel
 - [x] Light / Dark / Auto theme (⌘⇧L)
 - [x] PWA manifest + theme-color + icons (home-screen install)
@@ -62,75 +55,44 @@ The non-negotiable minimum to replace a basic Obsidian workflow:
 
 ## v0.3 — Polish & mobile
 
-- [x] Security/self-hosting docs and release checklist
-- [x] Route-level tests for path traversal, symlink escapes, raw asset headers, and note/folder mutations
-- [x] Template picker upgrade (modal palette instead of `prompt()`)
-- [x] App-level dialogs/toasts for command confirmations, errors, and plugin notifications
-- [x] Service worker for offline app shell/static assets
-- [x] Mobile touch gestures (swipe to switch tabs / panes)
-- [x] Light-mode highlight.js per-token theming
-- [x] Outline scroll inside Live mode
-- [x] Settings page consolidation
-- [x] Multi-select / drag-select in graph
+- [ ] Security/self-hosting docs and release checklist
+- [ ] Route-level tests for path traversal, symlink escapes, raw asset headers, and note/folder mutations
+- [ ] Service worker for full offline use
+- [ ] Mobile touch gestures (swipe to switch tabs / panes)
+- [ ] Template picker upgrade (modal palette instead of `prompt()`)
+- [ ] Light-mode highlight.js per-token theming
+- [ ] Outline scroll inside Live mode (currently Read mode only)
+- [ ] Settings page consolidation
+- [ ] Multi-select / drag-select in graph
 
 ## v0.4 — Performance & scale
 
-- [x] Git sync status / safe one-click sync / pull / push UI with divergence warnings
-- [x] Indexer warm-cache on disk for fast startup
-- [x] Diverged-history resolution UI with local/remote/overlap file lists
-- [x] Virtualized file tree for very large vaults
-- [x] Quadtree-backed graph sim (drop O(n²) for very large vaults)
+- [ ] Git sync status / pull / push UI with divergence warnings
+- [ ] Virtualized file tree for very large vaults
+- [ ] Indexer warm-cache on disk for fast startup
+- [ ] Quadtree-backed graph sim (drop O(n²) for very large vaults)
+- [ ] Conflict resolution UI when pulling a remote that diverged
 
-## v0.5 — Plugins & desktop (partial)
+## v0.5 — Plugins & desktop
 
-- [x] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
-- [x] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
-  - [x] Settings panel renderer
-  - [x] Markdown postprocessor hook
-  - [x] Editor-specific command hook
-  - [x] Right-panel view hook
-- [x] Sandboxed execution (iframes for UI; Worker for logic)
-  - [x] Worker execution for command-only plugin logic
-  - [x] Iframe-hosted settings/right-panel renderers
-  - [x] Capability proxy for note file read/write APIs
-  - [x] Capability proxy for active-editor mutation APIs
-- [x] Plugin install UI (load plugins from manifest URL, not just disk)
-- [x] Curated plugin registry/catalog
-- [x] **Tauri v2 desktop wrapper** — native desktop shell that launches the existing built SvelteKit/Node backend on loopback and opens a Tauri webview, reusing 100% of current app behavior.
-- [x] **Current-platform self-contained desktop runtime** — optional Tauri sidecar config plus `desktop:prepare-node-sidecar` / `desktop:build:self-contained` scripts bundle the current host's Node runtime instead of requiring system Node.
-- [x] **Current-host desktop release preflight** — `verify:desktop-release` checks production backend resources, Tauri bundle inputs, host sidecar executable, version alignment, and generated-binary ignore rules before self-contained packaging.
-- [x] **Unsigned desktop artifact CI** — `.github/workflows/desktop-release.yml` runs the web release gate, desktop preflight, self-contained Tauri build, SHA-256 artifact manifest generation, and unsigned bundle artifact upload on macOS / Windows / Linux.
-- [x] **Draft unsigned release publishing** — `v*` tag pushes create or update a draft GitHub Release with zipped unsigned platform artifact directories attached after the full desktop artifact matrix passes.
-- [ ] **Signed cross-platform release publishing** — configure signing/notarization secrets, release notes, and GitHub Release attachment policy for every published macOS / Windows / Linux target.
+- [ ] Minimal plugin API (ES modules loaded at boot from `<vault>/.diamondmd/plugins/`)
+- [ ] Plugin extension points: markdown extension, editor command, right-panel view, settings panel
+- [ ] Sandboxed execution (iframes for UI; Worker for logic)
+- [ ] Plugin registry page (load plugins from URL, not just disk)
+- [ ] **Tauri v2 desktop wrapper** — wrap the existing web app for offline-first desktop, reuses 100% of current code; small Rust shim for filesystem + git. Lands on macOS / Windows / Linux without a rewrite.
 
-Deliberately smaller plugin surface than Obsidian's — too much API = too much
-rewriting. Diamond has useful plugin extension points, but full Obsidian plugin
-runtime compatibility is a non-goal.
+Deliberately smaller plugin surface than Obsidian's — too much API = too much rewriting. Three or four extension points max.
 
 ## Open ideas (maybe, maybe not)
 
-- **Deeper Canvas parity.** Canvas previews, zoom controls, markdown-aware text
-  cards with H1-H6 headings, thematic breaks, callouts, highlights,
-  strikethrough, backslash-escaped inline punctuation, aligned simple tables
-  with escaped pipes and padded missing body cells, resolved note/title/alias inline wikilinks and
-  source-relative/vault-root Markdown note/Canvas links and asset embeds,
-  including parenthesized filenames, note embed chips, explicit Canvas links
-  and embed chips, Markdown file-card note previews, file-card subpaths, SVG
-  export, git-backed editing, and node duplication exist; full visual
-  whiteboard parity would need its own focused track.
 - **Branches-for-drafts.** "Start a draft" creates a git branch; "publish draft" merges to main. Could be magical for long-form writing.
 - **Real-time multi-user** via CRDT. Probably a fork, not core.
 - **LLM integration** — summarize this note, find related notes semantically, generate a daily review. Opt-in, offline-first via Ollama.
-- **Export to Obsidian** — Settings can download an Obsidian-ready vault ZIP;
-  deeper ecosystem conversion remains outside the core claim.
-- **Search dashboards.** Search now has ranked indexed results, operators,
-  regex, highlighted literal result matches, folder grouping/facets,
-  pagination, virtualization, and git-backed saved searches; richer dashboards
-  can stay incremental.
+- **Export to Obsidian** — already true (we use the same wikilink syntax + flat markdown), but a one-click export package would be nice.
 
 ## Non-goals
 
-- **Full Canvas parity as core.** Diamond opens and edits `.canvas` boards for core node/edge workflows; full visual whiteboarding remains out of core unless the project explicitly takes on that track.
+- **Canvas.** Obsidian's visual whiteboarding. Not shipping. Folks who need it have Obsidian.
 - **Hosted publish service.** We provide the static-site exporter; you bring the host (gh-pages, Cloudflare Pages, Vercel, Netlify, your own box). No proprietary hosting.
 - **Native mobile apps.** Responsive web is the target. PWA install, yes. App Store listings, no.
 - **Plugin runtime parity with Obsidian.** Their plugin API is huge. We keep ours small on purpose.

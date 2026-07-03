@@ -11,17 +11,13 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import TemplatePicker from '$lib/components/TemplatePicker.svelte';
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
-	import AppDialogs from '$lib/components/AppDialogs.svelte';
 	import { hydrate as hydrateWorkspace, workspace } from '$lib/workspace/store.svelte';
 	import { bindVaultEvents, toggleLeftSidebar, toggleRightSidebar, activePane, activeTab } from '$lib/workspace/actions';
 	import { registerBuiltinCommands } from '$lib/commands';
 	import { installGlobalKeymap } from '$lib/commands/keymap';
 	import { on as onBus } from '$lib/events';
 	import { hydrate as hydrateBookmarks, rename as renameBookmark, deleted as deleteBookmark } from '$lib/bookmarks.svelte';
-	import { loadVaultPlugins } from '$lib/plugins/runtime';
-	import { applyVaultAppearance, vaultAppearanceStyle } from '$lib/appearance';
-	import { api } from '$lib/vault-api';
-	import type { NoteDoc, VaultAppearancePreference } from '$lib/types';
+	import type { NoteDoc } from '$lib/types';
 	import type { TreeNode } from '$lib/types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
@@ -30,51 +26,17 @@
 
 	let tree = $state<TreeNode[]>([]);
 	let activeDoc = $state<NoteDoc | null>(null);
-	let appearancePreference = $state<VaultAppearancePreference | null>(null);
-	const appearanceStyle = $derived(vaultAppearanceStyle(appearancePreference));
-
-	// Register before child controls can fire click/key handlers. The registry
-	// is idempotent, so this remains safe across client navigations.
-	registerBuiltinCommands();
 
 	$effect(() => {
 		// Keep the tree prop synced when data reloads.
 		tree = data.tree;
 	});
 
-	$effect(() => {
-		const id = vaultId;
-		appearancePreference = null;
-		api.appearancePreferences(id)
-			.then((preference) => {
-				if (id === vaultId) appearancePreference = preference;
-			})
-			.catch(() => {
-				if (id === vaultId) appearancePreference = null;
-			});
-	});
-
-	$effect(() => applyVaultAppearance(appearancePreference));
-
 	onMount(() => {
-		// Boot: hydrate workspace and wire event listeners.
+		// Boot: hydrate workspace, wire event listeners, register commands.
 		hydrateWorkspace(vaultId);
-		void hydrateBookmarks(vaultId);
-		let disposePlugins: (() => void) | null = null;
-		let pluginReloadSeq = 0;
-		async function reloadPlugins(): Promise<void> {
-			const seq = ++pluginReloadSeq;
-			disposePlugins?.();
-			disposePlugins = null;
-			try {
-				const runtime = await loadVaultPlugins(vaultId);
-				if (seq === pluginReloadSeq) disposePlugins = runtime.dispose;
-				else runtime.dispose();
-			} catch (e) {
-				console.error('[plugins] boot failed:', e);
-			}
-		}
-		void reloadPlugins();
+		hydrateBookmarks(vaultId);
+		registerBuiltinCommands();
 
 		const offs = [
 			bindVaultEvents(vaultId),
@@ -101,10 +63,6 @@
 				if (e.vaultId !== vaultId) return;
 				deleteBookmark(vaultId, e.path);
 			}),
-			onBus('plugins:reload', (e) => {
-				if (e.vaultId !== vaultId) return;
-				void reloadPlugins();
-			}),
 			installGlobalKeymap(() => {
 				const pane = activePane();
 				const tab = activeTab();
@@ -116,10 +74,7 @@
 				};
 			})
 		];
-		return () => {
-			disposePlugins?.();
-			offs.forEach((off) => off?.());
-		};
+		return () => offs.forEach((off) => off?.());
 	});
 
 	function onDocLoaded(doc: NoteDoc): void {
@@ -138,7 +93,6 @@
 		if (!tab) return;
 		let desired: string | null = null;
 		if (tab.kind === 'note') desired = `/vault/${vaultId}/note/${encodeURI(tab.path)}`;
-		if (tab.kind === 'canvas') desired = `/vault/${vaultId}/canvas/${encodeURI(tab.path)}`;
 		if (!desired) return;
 		const current = window.location.pathname;
 		if (current === desired) return;
@@ -152,7 +106,6 @@
 	class="shell"
 	class:left-collapsed={workspace.leftSidebarCollapsed}
 	class:right-collapsed={workspace.rightSidebarCollapsed}
-	style={appearanceStyle}
 >
 	<!-- Top bar spans the full width via subgrid; columns mirror the
 	     layout below: rail | left-sidebar | editor | right-sidebar.
@@ -176,9 +129,6 @@
 	</div>
 
 	<main class="center">
-		{#if data.readOnly}
-			<div class="read-only-banner">Read-only mode: browsing is enabled; changes are disabled.</div>
-		{/if}
 		<Workspace {vaultId} {onDocLoaded} />
 		{@render children()}
 	</main>
@@ -192,7 +142,6 @@
 <CommandPalette {vaultId} />
 <TemplatePicker {vaultId} />
 <HistoryViewer {vaultId} />
-<AppDialogs />
 
 <style>
 	.shell {
@@ -222,14 +171,6 @@
 		min-width: 0;
 		min-height: 0;
 		overflow: hidden;
-	}
-	.read-only-banner {
-		flex: 0 0 auto;
-		padding: 8px 12px;
-		border-bottom: 1px solid color-mix(in srgb, var(--brand-cyan), var(--border) 65%);
-		background: color-mix(in srgb, var(--brand-cyan), var(--bg-elev) 90%);
-		color: var(--fg);
-		font-size: 0.82rem;
 	}
 	.center > :global(.workspace) { flex: 1; min-height: 0; }
 

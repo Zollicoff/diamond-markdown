@@ -8,33 +8,22 @@
 
 import { api } from '$lib/vault-api';
 import { register, type CommandContext } from '../registry';
-import type { TreeNode } from '$lib/types';
 import * as bookmarks from '$lib/bookmarks.svelte';
 import { emit } from '$lib/events';
-import { alertDialog, confirmDialog, notify, promptText } from '$lib/dialogs';
-import { buildNewNotePath, newNotePromptLabel } from '$lib/note/new-note';
-import { isCanvasTreeFile } from '$lib/tree/view';
 
-async function promptPath(title: string, label: string, confirmLabel: string, placeholder = ''): Promise<string | null> {
-	return promptText({ title, label, placeholder, confirmLabel });
+async function promptPath(msg: string, placeholder = ''): Promise<string | null> {
+	if (typeof window === 'undefined') return null;
+	const v = window.prompt(msg, placeholder);
+	return v?.trim() || null;
 }
 
-async function confirmVaultDelete(vaultId: string | undefined, options: Parameters<typeof confirmDialog>[0]): Promise<boolean> {
-	if (!vaultId) return false;
-	const preference = await api.deletePreferences(vaultId).catch(() => ({ confirmDeletes: true }));
-	return preference.confirmDeletes ? confirmDialog(options) : true;
+async function confirmAction(msg: string): Promise<boolean> {
+	if (typeof window === 'undefined') return false;
+	return window.confirm(msg);
 }
 
-function markdownNode(ctx: CommandContext): TreeNode | null {
-	const node = ctx.node;
-	if (!node || node.type !== 'file') return null;
-	return !node.fileKind || node.fileKind === 'markdown' ? node : null;
-}
-
-function canvasNode(ctx: CommandContext): TreeNode | null {
-	const node = ctx.node;
-	if (!node || !isCanvasTreeFile(node)) return null;
-	return node;
+function ensureMd(s: string): string {
+	return /\.[a-z0-9]+$/i.test(s) ? s : s + '.md';
 }
 
 export function registerFsCommands(): void {
@@ -45,23 +34,15 @@ export function registerFsCommands(): void {
 		category: 'file',
 		async exec(ctx: CommandContext) {
 			const vaultId = ctx.vaultId!;
-			const explicitParent = ctx.node?.type === 'directory' ? ctx.node.path : null;
-			const configured = explicitParent
-				? null
-				: await api.newNoteLocation(vaultId).catch(() => null);
-			const parent = explicitParent ?? configured?.folder ?? '';
-			const raw = await promptPath(
-				'New note',
-				newNotePromptLabel(parent),
-				'Create note'
-			);
+			const parent = ctx.node?.type === 'directory' ? ctx.node.path : '';
+			const raw = await promptPath(`New note in "${parent || '(root)'}"`);
 			if (!raw) return;
-			const note = buildNewNotePath(raw, parent);
-			if (!note) return;
+			const rel = (parent ? `${parent}/` : '') + ensureMd(raw);
+			const title = raw.split('/').pop()!.replace(/\.md$/, '');
 			try {
-				await api.createNote(vaultId, note.path, `---\ntitle: ${note.title}\n---\n\n`);
+				await api.createNote(vaultId, rel, `---\ntitle: ${title}\n---\n\n`);
 			} catch (e) {
-				await alertDialog({ title: 'Could not create note', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});
@@ -74,17 +55,13 @@ export function registerFsCommands(): void {
 		async exec(ctx: CommandContext) {
 			const vaultId = ctx.vaultId!;
 			const parent = ctx.node?.type === 'directory' ? ctx.node.path : '';
-			const raw = await promptPath(
-				'New folder',
-				`Name in ${parent || 'vault root'}`,
-				'Create folder'
-			);
+			const raw = await promptPath(`New folder in "${parent || '(root)'}"`);
 			if (!raw) return;
 			const rel = (parent ? `${parent}/` : '') + raw.replace(/^\/+|\/+$/g, '');
 			try {
 				await api.createFolder(vaultId, rel);
 			} catch (e) {
-				await alertDialog({ title: 'Could not create folder', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});
@@ -95,19 +72,13 @@ export function registerFsCommands(): void {
 		icon: '🗑',
 		category: 'file',
 		async exec(ctx: CommandContext) {
-			const node = markdownNode(ctx);
-			if (!node) return;
+			if (!ctx.node || ctx.node.type !== 'file') return;
 			const { vaultId } = ctx;
-			if (!(await confirmVaultDelete(vaultId, {
-				title: 'Delete note',
-				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
-				confirmLabel: 'Delete',
-				tone: 'danger'
-			}))) return;
+			if (!(await confirmAction(`Delete "${ctx.node.name}"? Reversible via git log.`))) return;
 			try {
-				await api.deleteNote(vaultId!, node.path);
+				await api.deleteNote(vaultId!, ctx.node.path);
 			} catch (e) {
-				await alertDialog({ title: 'Could not delete note', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});
@@ -118,34 +89,11 @@ export function registerFsCommands(): void {
 		icon: '❏',
 		category: 'file',
 		async exec(ctx: CommandContext) {
-			const node = markdownNode(ctx);
-			if (!node) return;
+			if (!ctx.node || ctx.node.type !== 'file') return;
 			try {
-				await api.duplicateNote(ctx.vaultId!, node.path);
+				await api.duplicateNote(ctx.vaultId!, ctx.node.path);
 			} catch (e) {
-				await alertDialog({ title: 'Could not duplicate note', message: (e as Error).message, tone: 'danger' });
-			}
-		}
-	});
-
-	register({
-		id: 'canvas.delete',
-		title: 'Delete Canvas',
-		icon: '🗑',
-		category: 'file',
-		async exec(ctx: CommandContext) {
-			const node = canvasNode(ctx);
-			if (!node) return;
-			if (!(await confirmVaultDelete(ctx.vaultId, {
-				title: 'Delete Canvas',
-				message: `Delete "${node.name}"?\n\nThis is reversible through git history.`,
-				confirmLabel: 'Delete',
-				tone: 'danger'
-			}))) return;
-			try {
-				await api.deleteCanvas(ctx.vaultId!, node.path);
-			} catch (e) {
-				await alertDialog({ title: 'Could not delete Canvas', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});
@@ -162,16 +110,11 @@ export function registerFsCommands(): void {
 			const msg = force
 				? `Delete folder "${ctx.node.path}" and everything inside it?`
 				: `Delete empty folder "${ctx.node.path}"?`;
-			if (!(await confirmVaultDelete(ctx.vaultId, {
-				title: force ? 'Delete folder and contents' : 'Delete folder',
-				message: msg,
-				confirmLabel: 'Delete',
-				tone: 'danger'
-			}))) return;
+			if (!(await confirmAction(msg))) return;
 			try {
 				await api.deleteFolder(ctx.vaultId!, ctx.node.path, force);
 			} catch (e) {
-				await alertDialog({ title: 'Could not delete folder', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});
@@ -183,11 +126,7 @@ export function registerFsCommands(): void {
 		category: 'file',
 		async exec(ctx: CommandContext) {
 			if (!ctx.node) return;
-			await navigator.clipboard?.writeText(ctx.node.path).then(() => {
-				notify({ title: 'Path copied', message: ctx.node?.path, tone: 'success' });
-			}).catch(() => {
-				notify({ title: 'Could not copy path', tone: 'danger' });
-			});
+			await navigator.clipboard?.writeText(ctx.node.path).catch(() => {});
 		}
 	});
 
@@ -197,7 +136,7 @@ export function registerFsCommands(): void {
 		icon: '✎',
 		shortcut: 'F2',
 		category: 'file',
-		when: (ctx) => Boolean(markdownNode(ctx)?.path || ctx.notePath),
+		when: (ctx) => Boolean(ctx.node?.path || ctx.notePath),
 		exec(ctx: CommandContext) {
 			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
 			if (!path || !ctx.vaultId) return;
@@ -213,16 +152,11 @@ export function registerFsCommands(): void {
 		title: 'Toggle bookmark',
 		icon: '★',
 		category: 'file',
-		async exec(ctx: CommandContext) {
-			if (ctx.node && !markdownNode(ctx)) return;
+		exec(ctx: CommandContext) {
 			const path = ctx.node?.path ?? (ctx.notePath as string | undefined);
 			if (!path || !ctx.vaultId) return;
 			const title = (ctx.node?.name ?? path.split('/').pop() ?? path).replace(/\.md$/, '');
-			try {
-				await bookmarks.toggle(ctx.vaultId, path, title);
-			} catch (e) {
-				await alertDialog({ title: 'Could not update bookmark', message: (e as Error).message, tone: 'danger' });
-			}
+			bookmarks.toggle(ctx.vaultId, path, title);
 		}
 	});
 
@@ -237,7 +171,7 @@ export function registerFsCommands(): void {
 			try {
 				await api.toggleExcluded(ctx.vaultId, ctx.node.path);
 			} catch (e) {
-				await alertDialog({ title: 'Could not update excluded folders', message: (e as Error).message, tone: 'danger' });
+				alert((e as Error).message);
 			}
 		}
 	});

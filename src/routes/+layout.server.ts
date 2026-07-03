@@ -2,7 +2,6 @@ import type { LayoutServerLoad } from './$types';
 import fs from 'node:fs';
 import path from 'node:path';
 import { listVaults, getActiveVault } from '$lib/server/vault';
-import { isReadOnlyMode } from '$lib/server/read-only';
 
 interface VaultStats {
 	noteCount: number;
@@ -38,7 +37,6 @@ export const load: LayoutServerLoad = async () => {
 	const vaults = listVaults();
 	return {
 		vaults: vaults.map((v) => ({ ...v, stats: statsFor(v.path) })),
-		activeVaultId: getActiveVault()?.id ?? null,
-		readOnly: isReadOnlyMode()
+		activeVaultId: getActiveVault()?.id ?? null
 	};
 };
