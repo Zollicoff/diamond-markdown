@@ -9,6 +9,18 @@ use std::path::Path;
 use diamond_index::{BuildReport, LinkTarget, VaultIndex};
 use diamond_vault::{EntryKind, Vault, VaultError, VaultPath, VaultWatcher};
 
+/// The address prefix the reading view gives links to notes. The rest of the
+/// address is the percent-encoded link target as written in the note.
+pub const NOTE_SCHEME: &str = "diamond://note/";
+
+fn is_image(path: &VaultPath) -> bool {
+    path.extension().is_some_and(|extension| {
+        ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]
+            .iter()
+            .any(|known| extension.eq_ignore_ascii_case(known))
+    })
+}
+
 /// A file or folder in the sidebar tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeNode {
@@ -182,33 +194,41 @@ impl Session {
     }
 
     /// Finds the link under `offset` in `text`, the open note's current
-    /// text, and reports where it leads.
+    /// text, and reports where it leads. See [`Session::follow_target`].
+    pub fn follow(&mut self, text: &str, offset: usize) -> Result<Follow, VaultError> {
+        let meta = diamond_parse::parse(text);
+        match meta
+            .links
+            .iter()
+            .find(|link| link.range.start <= offset && offset <= link.range.end)
+        {
+            Some(link) => self.follow_target(&link.target),
+            None => Ok(Follow::NoLink),
+        }
+    }
+
+    /// Reports where a link target written in the open note leads. Anything
+    /// after a `#` (a heading or block) is ignored for now.
     ///
     /// A link to a note that does not exist creates that note, empty, at the
     /// path the link names from the vault root, which is what makes
     /// "write the link first, fill the note in later" work.
-    pub fn follow(&mut self, text: &str, offset: usize) -> Result<Follow, VaultError> {
+    pub fn follow_target(&mut self, target: &str) -> Result<Follow, VaultError> {
+        let target = target.split('#').next().unwrap_or(target).trim();
         let Some(from) = self.current().cloned() else {
             return Ok(Follow::NoLink);
         };
-        let meta = diamond_parse::parse(text);
-        let Some(link) = meta
-            .links
-            .iter()
-            .find(|link| link.range.start <= offset && offset <= link.range.end)
-            .filter(|link| !link.target.is_empty())
-        else {
+        if target.is_empty() {
             return Ok(Follow::NoLink);
-        };
+        }
 
-        match self.index.resolve(&from, &link.target) {
+        match self.index.resolve(&from, target) {
             LinkTarget::Note(path) => Ok(Follow::Note {
                 path: path.clone(),
                 created: false,
             }),
             LinkTarget::File(path) => Ok(Follow::Attachment(path.clone())),
-            LinkTarget::Unresolved(target) => {
-                let name = target.trim();
+            LinkTarget::Unresolved(name) => {
                 let name = name
                     .strip_suffix(".md")
                     .or_else(|| name.strip_suffix(".MD"))
@@ -222,6 +242,64 @@ impl Session {
                 Ok(Follow::Note { path, created })
             }
         }
+    }
+
+    /// Rewrites a note's text into plain Markdown for the reading view.
+    ///
+    /// The properties block is dropped. Wikilinks become ordinary links with
+    /// a `diamond://note/` address the window recognizes, image embeds become
+    /// Markdown images pointing at the file, and other embeds become links.
+    /// Everything else, including code that merely looks like a link, is
+    /// passed through untouched.
+    pub fn reading_markdown(&self, text: &str) -> String {
+        let meta = diamond_parse::parse(text);
+        let mut output = String::with_capacity(text.len() + 64);
+        let mut position = meta
+            .frontmatter
+            .as_ref()
+            .map_or(0, |frontmatter| frontmatter.range.end.min(text.len()));
+
+        for link in &meta.links {
+            if link.syntax != diamond_parse::LinkSyntax::Wiki || link.range.start < position {
+                continue;
+            }
+            output.push_str(&text[position..link.range.start]);
+            position = link.range.end;
+
+            let mut written = link.target.clone();
+            match &link.subpath {
+                Some(diamond_parse::Subpath::Heading(heading)) => {
+                    written.push('#');
+                    written.push_str(heading);
+                }
+                Some(diamond_parse::Subpath::Block(block)) => {
+                    written.push_str("#^");
+                    written.push_str(block);
+                }
+                None => {}
+            }
+            let label = link.display.as_deref().unwrap_or(&written);
+            let label = label.replace('[', "\\[").replace(']', "\\]");
+            let address = format!("{NOTE_SCHEME}{}", diamond_parse::percent_encode(&written));
+
+            if !link.embed {
+                output.push_str(&format!("[{label}]({address})"));
+                continue;
+            }
+            let image =
+                self.current()
+                    .and_then(|from| match self.index.resolve(from, &link.target) {
+                        LinkTarget::File(file) if is_image(file) => self.vault.resolve(file).ok(),
+                        _ => None,
+                    });
+            match image {
+                // Angle brackets let the path contain spaces.
+                Some(absolute) => output.push_str(&format!("![{label}](<{}>)", absolute.display())),
+                None => output.push_str(&format!("[↪ {label}]({address})")),
+            }
+        }
+        output.push_str(&text[position..]);
+        output
     }
 
     /// Watches the vault folder; see [`Vault::watch`].
@@ -544,6 +622,41 @@ mod tests {
                 created: false
             }
         );
+    }
+
+    #[test]
+    fn reading_markdown_turns_wikilinks_into_ordinary_links() {
+        let text = "---\ntitle: T\n---\n# Head\n\nSee [[Plan]], [[Work/Plan#Budget|the budget]] and [[A (b) c]].\n\n![[pic one.png]]\n\n![[Plan]]\n\n`[[code]]` and [web](https://example.com).\n";
+        let (dir, mut session) = session(&[
+            ("Home.md", text),
+            ("Work/Plan.md", ""),
+            ("img/pic one.png", ""),
+        ]);
+        session.open_note(&path("Home.md")).unwrap();
+        let image = dir.path().canonicalize().unwrap().join("img/pic one.png");
+        assert_eq!(
+            session.reading_markdown(text),
+            format!(
+                "\n# Head\n\nSee [Plan](diamond://note/Plan), [the budget](diamond://note/Work/Plan%23Budget) and [A (b) c](diamond://note/A%20%28b%29%20c).\n\n![pic one.png](<{}>)\n\n[↪ Plan](diamond://note/Plan)\n\n`[[code]]` and [web](https://example.com).\n",
+                image.display()
+            )
+        );
+        // Text without links or properties passes through unchanged.
+        assert_eq!(session.reading_markdown("plain *text*\n"), "plain *text*\n");
+    }
+
+    #[test]
+    fn follow_target_ignores_the_heading_part() {
+        let (_dir, mut session) = session(&[("Home.md", ""), ("Plan.md", "")]);
+        session.open_note(&path("Home.md")).unwrap();
+        assert_eq!(
+            session.follow_target("Plan#Budget").unwrap(),
+            Follow::Note {
+                path: path("Plan.md"),
+                created: false
+            }
+        );
+        assert_eq!(session.follow_target("#Top").unwrap(), Follow::NoLink);
     }
 
     #[test]

@@ -14,15 +14,19 @@ use gpui_kit::component::{
     menu::PopupMenuItem,
     resizable::{h_resizable, resizable_panel},
     scroll::ScrollableElement as _,
+    text::TextView,
     tree::{TreeEvent, TreeItem, TreeState, tree},
     v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::session::{Follow, OpenChange, Session, TreeNode};
+use crate::session::{Follow, NOTE_SCHEME, OpenChange, Session, TreeNode};
 
-actions!(diamond, [SaveNote, FollowLink, NewNote, QuickSwitch]);
+actions!(
+    diamond,
+    [SaveNote, FollowLink, NewNote, QuickSwitch, ToggleReading]
+);
 
 const CONTEXT: &str = "Workspace";
 
@@ -57,6 +61,11 @@ pub fn init(cx: &mut App) {
         KeyBinding::new(primary!("s"), SaveNote, Some(CONTEXT)),
         KeyBinding::new(primary!("n"), NewNote, Some(CONTEXT)),
         KeyBinding::new(primary!("o"), QuickSwitch, Some(CONTEXT)),
+        KeyBinding::new(primary!("e"), ToggleReading, Some(CONTEXT)),
+        // Off macOS the text input claims Ctrl-E for "move to end of line".
+        // This more specific binding, registered after it, takes it back.
+        #[cfg(not(target_os = "macos"))]
+        KeyBinding::new("ctrl-e", ToggleReading, Some("Workspace > Input")),
         KeyBinding::new("alt-enter", FollowLink, Some(CONTEXT)),
     ]);
 }
@@ -76,6 +85,9 @@ pub struct Workspace {
     session: Session,
     tree: Entity<TreeState>,
     editor: Entity<EditorState>,
+    /// Keeps keyboard focus inside the window when the editor is not shown,
+    /// so shortcuts keep working in the reading view.
+    focus: FocusHandle,
     /// Folders the user has opened in the sidebar, by vault path, so the
     /// tree can be rebuilt after a file change without collapsing.
     expanded: HashSet<SharedString>,
@@ -86,6 +98,10 @@ pub struct Workspace {
     /// saves, so neither version is lost without a decision.
     conflict: Option<SharedString>,
     autosave: Option<Task<()>>,
+    /// When set, the note is shown rendered and read-only. Holds the
+    /// editor text the rendering was made from and the Markdown handed to
+    /// the renderer, so the conversion runs only when the text changes.
+    reading: Option<(SharedString, SharedString)>,
     switcher: Option<Switcher>,
     watcher: Option<(VaultWatcher, Task<()>)>,
     _subscriptions: Vec<Subscription>,
@@ -132,10 +148,12 @@ impl Workspace {
             session,
             tree,
             editor,
+            focus: cx.focus_handle(),
             expanded,
             error,
             conflict: None,
             autosave: None,
+            reading: None,
             switcher: None,
             watcher: None,
             _subscriptions: subscriptions,
@@ -237,6 +255,9 @@ impl Workspace {
                 self.error = None;
                 self.editor
                     .update(cx, |editor, cx| editor.set_value(text, window, cx));
+                if self.reading.is_some() {
+                    self.focus.focus(window, cx);
+                }
             }
             Err(failure) => self.error = Some(failure.to_string().into()),
         }
@@ -282,7 +303,33 @@ impl Workspace {
             let editor = self.editor.read(cx);
             (editor.value(), editor.cursor())
         };
-        match self.session.follow(&text, cursor) {
+        let followed = self.session.follow(&text, cursor);
+        self.go(followed, window, cx);
+    }
+
+    /// Handles a click on a link in the reading view.
+    pub fn open_link(&mut self, address: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let target = match address.strip_prefix(NOTE_SCHEME) {
+            Some(encoded) => diamond_parse::percent_decode(encoded),
+            None if diamond_parse::is_external(address) => {
+                cx.open_url(address);
+                return;
+            }
+            // An ordinary Markdown link to a file in the vault.
+            None => diamond_parse::percent_decode(address),
+        };
+        let followed = self.session.follow_target(&target);
+        self.go(followed, window, cx);
+    }
+
+    /// Acts on where a link leads.
+    fn go(
+        &mut self,
+        followed: Result<Follow, diamond_vault::VaultError>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match followed {
             Ok(Follow::NoLink) => {}
             Ok(Follow::Note { path, created }) => {
                 if created {
@@ -296,6 +343,31 @@ impl Workspace {
             Err(failure) => self.error = Some(failure.to_string().into()),
         }
         cx.notify();
+    }
+
+    /// Switches between editing the note and reading it rendered.
+    pub fn toggle_reading(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.reading.take().is_some() {
+            self.editor
+                .update(cx, |editor, cx| editor.focus(window, cx));
+        } else {
+            self.reading = Some(Default::default());
+            self.refresh_reading(cx);
+            self.focus.focus(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// Re-renders the reading view's Markdown if the note's text changed.
+    fn refresh_reading(&mut self, cx: &mut Context<Self>) {
+        let Some((source, _)) = &self.reading else {
+            return;
+        };
+        let text = self.editor.read(cx).value();
+        if *source != text || text.is_empty() {
+            let rendered = self.session.reading_markdown(&text);
+            self.reading = Some((text, rendered.into()));
+        }
     }
 
     /// Creates an empty note and opens it.
@@ -573,12 +645,36 @@ impl Workspace {
                     ),
             )
             .child(
-                div().flex_1().min_h_0().child(
-                    Editor::new(&self.editor)
+                div().flex_1().min_h_0().child(match &self.reading {
+                    None => Editor::new(&self.editor)
                         .appearance(false)
                         .bordered(false)
-                        .h(relative(1.)),
-                ),
+                        .h(relative(1.))
+                        .into_any_element(),
+                    Some((_, rendered)) => {
+                        let view = cx.entity();
+                        // A fresh id per note, so each note starts at its top.
+                        let id = self
+                            .session
+                            .current()
+                            .map(|path| format!("reading:{path}"))
+                            .unwrap_or_default();
+                        panel(
+                            "reading-view",
+                            div().size_full().px_8().py_4().child(
+                                TextView::markdown(SharedString::from(id), rendered.clone())
+                                    .selectable(true)
+                                    .scrollable(true)
+                                    .on_link_click(move |address, _, window, cx| {
+                                        view.update(cx, |this, cx| {
+                                            this.open_link(address, window, cx);
+                                        });
+                                    }),
+                            ),
+                        )
+                        .into_any_element()
+                    }
+                }),
             )
     }
 
@@ -643,8 +739,10 @@ impl Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.refresh_reading(cx);
         div()
             .id("workspace")
+            .track_focus(&self.focus)
             .key_context(CONTEXT)
             .on_action(cx.listener(|this, _: &SaveNote, _, cx| this.save(cx)))
             .on_action(cx.listener(|this, _: &FollowLink, window, cx| {
@@ -655,6 +753,9 @@ impl Render for Workspace {
             }))
             .on_action(cx.listener(|this, _: &QuickSwitch, window, cx| {
                 this.open_switcher(window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &ToggleReading, window, cx| {
+                this.toggle_reading(window, cx);
             }))
             .relative()
             .size_full()
@@ -1232,5 +1333,71 @@ mod tests {
         });
         cx.simulate_keystrokes("z");
         assert_eq!(editor_text(&workspace, cx), "zhome\n");
+    }
+
+    #[gpui_kit::test]
+    fn reading_view_shows_the_note_and_follows_its_links(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(
+            &[
+                ("Home.md", "# Home\n\nGo to [[Plan]] or [[Brand New]].\n"),
+                ("Plan.md", "# Plan\n"),
+            ],
+            cx,
+        );
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("x");
+
+        cx.simulate_keystrokes(super::primary!("e"));
+        workspace.read_with(cx, |workspace, _| {
+            let (source, rendered) = workspace.reading.as_ref().expect("reading view on");
+            assert_eq!(source.as_ref(), "x# Home\n\nGo to [[Plan]] or [[Brand New]].\n");
+            assert_eq!(
+                rendered.as_ref(),
+                "x# Home\n\nGo to [Plan](diamond://note/Plan) or [Brand New](diamond://note/Brand%20New).\n"
+            );
+        });
+        cx.update(|window, cx| {
+            window.render_frame(cx);
+            let reading = window.find("reading-view").bounds();
+            assert!(
+                reading.size.width > px(100.) && reading.size.height > px(100.),
+                "{reading:?}"
+            );
+        });
+
+        // Clicking a link opens that note, still in the reading view, and
+        // saves what was typed in the note being left.
+        let click = |address: &str, cx: &mut VisualTestContext| {
+            cx.update(|window, cx| {
+                workspace.update(cx, |workspace, cx| workspace.open_link(address, window, cx));
+            });
+        };
+        click("diamond://note/Plan", cx);
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(workspace.session.current(), Some(&path("Plan.md")));
+            assert!(workspace.reading.is_some());
+        });
+        assert!(
+            fs::read_to_string(dir.path().join("Home.md"))
+                .unwrap()
+                .starts_with("x# Home")
+        );
+        cx.update(|window, cx| window.render_frame(cx));
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(workspace.reading.as_ref().unwrap().1.as_ref(), "# Plan\n");
+        });
+
+        // A link to a note that does not exist creates it.
+        click("diamond://note/Brand%20New", cx);
+        assert!(dir.path().join("Brand New.md").exists());
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(workspace.session.current(), Some(&path("Brand New.md")));
+        });
+
+        // Back to editing: typing reaches the editor again.
+        cx.simulate_keystrokes(super::primary!("e"));
+        workspace.read_with(cx, |workspace, _| assert!(workspace.reading.is_none()));
+        cx.simulate_keystrokes("h i");
+        assert_eq!(editor_text(&workspace, cx), "hi");
     }
 }
