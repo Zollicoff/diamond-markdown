@@ -253,3 +253,62 @@ fn build_reads_a_vault_from_disk_and_resolves_attachments() {
     assert_eq!(strings(index.backlinks(&home)), vec!["Projects/Plan.md"]);
     assert_eq!(strings(index.notes_with_tag("home")), vec!["Home.md"]);
 }
+
+#[test]
+fn refresh_follows_changes_on_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |relative: &str, contents: &str| {
+        let absolute = dir.path().join(relative);
+        std::fs::create_dir_all(absolute.parent().unwrap()).unwrap();
+        std::fs::write(absolute, contents).unwrap();
+    };
+    write("Home.md", "[[Plan]] [[Later]]");
+    write("Projects/Plan.md", "");
+    let vault = Vault::open(dir.path()).unwrap();
+    let (mut index, _) = VaultIndex::build(&vault).unwrap();
+    assert_eq!(resolved(&index, "Home.md", "Later"), "unresolved:Later");
+
+    // Editing a known note changes links, not the file listing.
+    write("Projects/Plan.md", "back to [[Home]] #plan");
+    let refresh = index.refresh(&vault, &[path("Projects/Plan.md")]).unwrap();
+    assert!(!refresh.structure_changed);
+    assert_eq!(
+        strings(index.backlinks(&path("Home.md"))),
+        vec!["Projects/Plan.md"]
+    );
+    assert_eq!(
+        strings(index.notes_with_tag("plan")),
+        vec!["Projects/Plan.md"]
+    );
+
+    // New files appear; a batch re-resolves once.
+    write("Later.md", "");
+    write("pic.png", "png");
+    let refresh = index
+        .refresh(&vault, &[path("Later.md"), path("pic.png")])
+        .unwrap();
+    assert!(refresh.structure_changed);
+    assert_eq!(resolved(&index, "Home.md", "Later"), "Later.md");
+    assert_eq!(resolved(&index, "Home.md", "pic.png"), "file:pic.png");
+
+    // A deleted file goes, and links to it become unresolved again.
+    std::fs::remove_file(dir.path().join("Later.md")).unwrap();
+    let refresh = index.refresh(&vault, &[path("Later.md")]).unwrap();
+    assert!(refresh.structure_changed);
+    assert_eq!(resolved(&index, "Home.md", "Later"), "unresolved:Later");
+
+    // A path that never existed and is not indexed changes nothing.
+    let refresh = index.refresh(&vault, &[path("Never.md")]).unwrap();
+    assert!(!refresh.structure_changed);
+
+    // A folder renamed outside the app is reported as the old path gone and
+    // the new path present.
+    std::fs::rename(dir.path().join("Projects"), dir.path().join("Work")).unwrap();
+    let refresh = index
+        .refresh(&vault, &[path("Projects"), path("Work")])
+        .unwrap();
+    assert!(refresh.structure_changed);
+    assert!(index.note(&path("Projects/Plan.md")).is_none());
+    assert_eq!(resolved(&index, "Home.md", "Plan"), "Work/Plan.md");
+    assert_eq!(index.len(), 2);
+}

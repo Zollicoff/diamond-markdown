@@ -98,6 +98,14 @@ impl BuildReport {
     }
 }
 
+/// What [`VaultIndex::refresh`] found.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Refresh {
+    /// Files or folders appeared or disappeared, so file listings are stale.
+    /// `false` when only the contents of known notes changed.
+    pub structure_changed: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Resolved {
     Note(NoteId),
@@ -258,6 +266,96 @@ impl VaultIndex {
         self.notes.remove(position);
         self.rebuild_graph();
         true
+    }
+
+    /// Brings the index up to date with the files at `paths`, which are paths
+    /// a file watcher reported as changed.
+    ///
+    /// Each path is looked at on disk: a note that exists is re-read, a path
+    /// that no longer exists is dropped along with anything that was under
+    /// it. Links are re-resolved once at the end, however many paths there
+    /// are. A change to a folder rebuilds the whole index, since everything
+    /// under it may have moved.
+    pub fn refresh(&mut self, vault: &Vault, paths: &[VaultPath]) -> Result<Refresh, VaultError> {
+        let mut refresh = Refresh::default();
+        let mut touched = false;
+
+        for path in paths {
+            let absolute = match vault.resolve(path) {
+                Ok(absolute) => absolute,
+                // A symlink that now points outside the vault: treat as gone.
+                Err(_) => continue,
+            };
+            let metadata = std::fs::metadata(&absolute).ok();
+
+            if metadata.as_ref().is_some_and(std::fs::Metadata::is_dir) {
+                let (rebuilt, _) = Self::build(vault)?;
+                *self = rebuilt;
+                return Ok(Refresh {
+                    structure_changed: true,
+                });
+            }
+
+            let is_note = path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"));
+            let note_position = self.notes.binary_search_by(|probe| probe.path.cmp(path));
+            let file_position = self.files.binary_search(path);
+
+            if metadata.is_some() {
+                if is_note {
+                    // A note that cannot be read (not UTF-8, say) stays out
+                    // of the index, as it does in a full build.
+                    match vault.read(path) {
+                        Ok(source) => {
+                            let note = Note {
+                                meta: diamond_parse::parse(&source),
+                                path: path.clone(),
+                            };
+                            match note_position {
+                                Ok(existing) => self.notes[existing] = note,
+                                Err(insert_at) => {
+                                    self.notes.insert(insert_at, note);
+                                    refresh.structure_changed = true;
+                                }
+                            }
+                            touched = true;
+                        }
+                        Err(_) => {
+                            if let Ok(existing) = note_position {
+                                self.notes.remove(existing);
+                                refresh.structure_changed = true;
+                                touched = true;
+                            }
+                        }
+                    }
+                } else if let Err(insert_at) = file_position {
+                    self.files.insert(insert_at, path.clone());
+                    refresh.structure_changed = true;
+                    touched = true;
+                }
+                continue;
+            }
+
+            // Nothing is at the path any more: a removed file, or a removed
+            // or renamed folder, whose contents go with it.
+            let under = format!("{}/", path.as_str());
+            let gone =
+                |candidate: &VaultPath| candidate == path || candidate.as_str().starts_with(&under);
+            let notes_before = self.notes.len();
+            let files_before = self.files.len();
+            self.notes.retain(|note| !gone(&note.path));
+            self.files.retain(|file| !gone(file));
+            if self.notes.len() != notes_before || self.files.len() != files_before {
+                refresh.structure_changed = true;
+                touched = true;
+            }
+        }
+
+        if touched {
+            self.rebuild_graph();
+        }
+        Ok(refresh)
     }
 
     /// Where the link `target`, written in the note `from`, leads.
