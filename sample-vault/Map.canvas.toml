@@ -1,0 +1,35 @@
+[[card]]
+id = 1
+x = 40.0
+y = 40.0
+text = "Spring launch"
+
+[[card]]
+id = 2
+x = 320.0
+y = 150.0
+note = "Launch"
+
+[[card]]
+id = 3
+x = 60.0
+y = 290.0
+note = "Budget"
+
+[[card]]
+id = 4
+x = 360.0
+y = 330.0
+text = "Ask Sam about the venue"
+
+[[link]]
+from = 1
+to = 2
+
+[[link]]
+from = 3
+to = 2
+
+[[link]]
+from = 4
+to = 2

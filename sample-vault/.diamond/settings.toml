@@ -1,0 +1,12 @@
+# This vault's settings. Every line here is the default, so deleting this
+# file changes nothing. After editing it, run "Reload vault settings".
+
+[daily]
+folder = "Daily"        # daily notes are Daily/2026-11-11.md
+template = "Daily"      # a note in the templates folder, or a path with a /
+
+[templates]
+folder = "Templates"
+
+[calendar]
+week_starts = "monday"  # or "sunday"

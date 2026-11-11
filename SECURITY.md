@@ -1,38 +1,29 @@
-# Security Policy
+# Security policy
 
-Diamond Markdown is designed as a single-user, self-hosted knowledge base. It
-has filesystem and git access to every registered vault, so treat the server as
-trusted software with access to private notes.
+Diamond is a desktop app for one person on their own computer. It is
+pre-release; fixes go to the development branch.
 
-## Supported Versions
+## What the app can touch
 
-Diamond Markdown is pre-1.0. Security fixes target the current `main` branch
-until versioned releases begin.
+- **The vault folder.** Diamond reads and writes files only inside the vault
+  you open. Paths are checked so that neither `..` nor a symlink can lead
+  outside it (`crates/diamond-vault`). Deleted files are moved to
+  `.diamond/trash` inside the vault, not removed.
+- **Its settings folder**, for the list of vaults you have opened and how the
+  app looks.
+- **Other programs.** The git commands run the `git` that is installed, with
+  your own identity, credentials and remotes, and only when you run them.
+  Clicking a web link, or a file Diamond cannot show itself, hands it to the
+  system's default app.
 
-## Deployment Guidance
+The app makes no network connections of its own and has no account, server
+or telemetry.
 
-- Run on localhost, behind Tailscale, or behind a trusted reverse proxy.
-- Do not expose the server directly to the public internet without an
-  authentication layer in front of it.
-- Register only vault directories you trust.
-- Keep dependencies current and run `npm audit --audit-level=moderate` before
-  releases.
+## Reporting a vulnerability
 
-## Reporting A Vulnerability
+Please do not open a public issue for anything that could expose or destroy
+notes: a path that escapes the vault, a file overwritten or lost, or code
+run from the contents of a note.
 
-Please do not open a public issue for a private-note exposure, path traversal,
-authentication bypass, XSS, or remote code execution concern.
-
-Email the maintainer or use a private channel with:
-- affected version or commit
-- reproduction steps
-- impact
-- any proof-of-concept files or requests
-
-## Security Model
-
-The app currently assumes one trusted user. It does not provide built-in
-multi-user authentication or authorization. The server rejects vault path
-escapes and symlink escapes through `src/lib/server/paths.ts`; new filesystem
-routes must use that resolver rather than reading client-supplied paths
-directly.
+Contact the maintainer privately with the commit, the steps to reproduce,
+the impact, and any files that show it.

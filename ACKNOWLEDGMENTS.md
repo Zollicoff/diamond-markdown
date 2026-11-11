@@ -1,49 +1,35 @@
 # Acknowledgments
 
-DiamondMD is an original implementation, licensed MIT. It builds on other people's work and owes its conceptual model to earlier software. This file names the debts.
+Diamond is an original implementation, licensed MIT. It is built on other
+people's libraries, named here with the license each is used under.
 
-## Conceptual model
+## Interface
 
-- **[Obsidian](https://obsidian.md)** — the UX vocabulary DiamondMD adopts (vaults, wikilinks, backlinks panel, graph view, live preview, daily notes) was popularized by Obsidian. DiamondMD contains no Obsidian code; it is a clean-room re-implementation of the *pattern*, not of the software.
+- **[GPUI](https://www.gpui.rs)** (Zed Industries), Apache-2.0: the
+  GPU-rendered UI framework.
+- **[GPUI Kit](https://gpui-kit.com)** (Longbridge), Apache-2.0: the
+  component library, including the text editor and Markdown renderer, and
+  the icons it bundles from Lucide.
+- **Tree-sitter** and its Markdown grammar, MIT: syntax highlighting in the
+  editor.
 
-If Obsidian is a good fit for your workflow, you should use Obsidian.
+Zed's own editor crates are GPL-3.0 and are not used.
 
-## Runtime dependencies
+## Notes and files
 
-Every library we ship with runs under the license noted. License texts are bundled under `node_modules/<lib>/LICENSE*` when installed; this file is a human-readable index.
+- **pulldown-cmark**, MIT: Markdown structure.
+- **yaml-rust2**, MIT or Apache-2.0: note properties.
+- **notify**, CC0-1.0: watching the vault folder for changes.
+- **walkdir**, Unlicense or MIT: listing the vault.
+- **rayon**, MIT or Apache-2.0, and **memchr**, Unlicense or MIT: indexing
+  and search.
 
-### Framework
+## Everything else
 
-- **[Svelte](https://svelte.dev)** — MIT — reactive UI framework.
-- **[SvelteKit](https://kit.svelte.dev)** — MIT — full-stack meta-framework + adapter-node for the production server.
+- **serde** and **toml**, MIT or Apache-2.0: settings files.
+- **chrono**, MIT or Apache-2.0: dates.
+- **thiserror**, MIT or Apache-2.0, and **async-channel**, Apache-2.0 or
+  MIT.
+- **tempfile**, MIT or Apache-2.0: tests only.
 
-### Editor
-
-- **[CodeMirror 6](https://codemirror.net)** — MIT — editor engine. Specifically:
-  - `@codemirror/commands`, `@codemirror/lang-markdown`, `@codemirror/language`, `@codemirror/search`, `@codemirror/state`, `@codemirror/view`, `codemirror`
-- **[Lezer](https://lezer.codemirror.net)** — MIT — incremental parsers, including the markdown grammar behind `@codemirror/lang-markdown`.
-  - `@lezer/highlight` and the transitive grammar packages.
-
-### Markdown pipeline
-
-- **[marked](https://marked.js.org)** — MIT — markdown → HTML.
-- **[DOMPurify](https://github.com/cure53/DOMPurify)** — dual-licensed MPL-2.0 / Apache-2.0 — HTML sanitization applied server-side before the client receives rendered HTML.
-- **[jsdom](https://github.com/jsdom/jsdom)** — MIT — DOM implementation the server-side DOMPurify call runs against.
-
-### Storage / search
-
-- **[simple-git](https://github.com/steveukx/git-js)** — MIT — wraps `git` for auto-commits on save, rename commits, and the per-file history viewer.
-- **[Fuse.js](https://fusejs.io)** — Apache-2.0 — fuzzy match scoring for the quick switcher and command palette.
-
-### Build tooling
-
-- **[Vite](https://vitejs.dev)** — MIT — dev server + bundler (via SvelteKit).
-- **[TypeScript](https://www.typescriptlang.org)** — Apache-2.0.
-
-## Fonts
-
-- **[Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque)** — SIL Open Font License 1.1 — used for the Wordmark and headings. Loaded from Google Fonts at runtime; not redistributed.
-
-## How to add attribution when extending DiamondMD
-
-If you add a new runtime dependency, copy the format above: library, license, one-line description of what it does for us. If a dependency's license requires in-product notice (Apache-2.0 has NOTICE requirements, for example), mirror that notice here.
+`Cargo.lock` lists every package the build uses, with its exact version.

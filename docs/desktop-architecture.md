@@ -224,8 +224,9 @@ Columns are `title`, `name`, `path`, `folder`, `tags` or any property.
 The editor highlights Markdown syntax (Tree-sitter) but does not render it
 in place yet. The reading view renders the note with clickable wikilinks.
 
-Run it with `cargo run -p diamond-app`. It reopens the last vault, or asks
-for a folder the first time. A folder given as an argument (or in
+Run it with `cargo run -p diamond-app -- sample-vault` to open the vault in
+this repository. Without a folder it reopens the last vault, or asks for one
+the first time. A folder given as an argument (or in
 `DIAMOND_VAULT`) takes precedence.
 
 Not built yet: Markdown rendered in place in the editor, dragging tabs
@@ -424,7 +425,7 @@ Linux, and anything under load.
 
 ## Open decisions
 
-- Sync model: git, as in v1, or something else.
-- What public `main` shows while the rewrite is in progress.
-- Whether the old web app's files are deleted on this branch now. They are
-  still present; the last web version is preserved at tag `v1.0.0-rc.4`.
+- Sync model: git is built; whether anything else is offered beside it.
+- What public `main` shows while the rewrite is in progress. `main` still
+  holds the earlier web app, whose last version is also at tag
+  `v1.0.0-rc.4`. This branch no longer contains it.
