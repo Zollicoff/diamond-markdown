@@ -40,9 +40,12 @@ jobs:
 
       - name: Install Linux libraries
         if: runner.os == 'Linux'
+        # Nothing may stop to ask a question: there is nobody to answer.
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
+          sudo --preserve-env=DEBIAN_FRONTEND apt-get install --no-install-recommends -y \
             build-essential clang cmake pkg-config \
             libasound2-dev libfontconfig-dev libfreetype-dev libssl-dev \
             libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev \
