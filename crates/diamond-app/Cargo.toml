@@ -1,0 +1,25 @@
+[package]
+name = "diamond-app"
+description = "Diamond Markdown desktop application."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "diamond"
+path = "src/main.rs"
+
+[dependencies]
+diamond-index.workspace = true
+diamond-parse.workspace = true
+diamond-vault.workspace = true
+# Pinned exactly: GPUI has no stable release line, so upgrades are deliberate.
+gpui-kit = { version = "=0.8.1", features = ["tree-sitter-markdown"] }
+
+[dev-dependencies]
+gpui-kit = { version = "=0.8.1", features = ["test-support", "tree-sitter-markdown"] }
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
