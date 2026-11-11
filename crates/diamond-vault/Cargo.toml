@@ -1,0 +1,17 @@
+[package]
+name = "diamond-vault"
+description = "Vault file access for Diamond Markdown: safe paths, listing, atomic writes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+thiserror = "2.0.21"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

@@ -1,0 +1,35 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/Zollicoff/diamond-markdown"
+rust-version = "1.99"
+
+[workspace.dependencies]
+diamond-vault = { path = "crates/diamond-vault" }
+diamond-parse = { path = "crates/diamond-parse" }
+diamond-index = { path = "crates/diamond-index" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.dev]
+# Keep our own crates debuggable but make the UI stack fast enough to judge.
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+# Dependencies are not stepped through; skipping their debug info keeps the
+# build folder several gigabytes smaller.
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
