@@ -6,6 +6,7 @@
 
 mod ops;
 mod path;
+mod reader;
 mod watch;
 
 use std::fs;
@@ -17,6 +18,7 @@ use std::time::SystemTime;
 use walkdir::WalkDir;
 
 pub use path::VaultPath;
+pub use reader::VaultReader;
 pub use watch::VaultWatcher;
 
 /// Errors from vault operations.
