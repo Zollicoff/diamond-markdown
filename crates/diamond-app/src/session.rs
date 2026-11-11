@@ -650,6 +650,22 @@ impl Session {
         Ok(notes::fill_template(&text, self.title(into), moment))
     }
 
+    /// A note's properties as of its last save, in the order they are
+    /// written, each value on one line.
+    pub fn properties(&self, path: &VaultPath) -> Vec<(String, String)> {
+        self.index
+            .note(path)
+            .and_then(|note| note.meta.frontmatter.as_ref())
+            .map(|frontmatter| {
+                frontmatter
+                    .properties
+                    .iter()
+                    .map(|(key, value)| (key.clone(), crate::plugins::properties::display(value)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Every task in the vault, as of each note's last save, in order of
     /// note path and then line.
     pub fn tasks(&self) -> Vec<TaskItem> {

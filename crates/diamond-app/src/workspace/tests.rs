@@ -808,9 +808,9 @@ fn a_command_that_opens_the_rename_field_leaves_it_open(cx: &mut TestAppContext)
     assert_eq!(matched(&workspace, cx), 1);
     cx.simulate_keystrokes("enter");
     workspace.read_with(cx, |workspace, cx| match &workspace.overlay {
-        Some(Overlay::Rename(rename)) => {
-            assert_eq!(rename.path, path("Home.md"));
-            assert_eq!(rename.input.read(cx).value().as_ref(), "Home");
+        Some(Overlay::Prompt(prompt)) => {
+            assert_eq!(prompt.title.as_ref(), "Rename or move Home.md");
+            assert_eq!(prompt.input.read(cx).value().as_ref(), "Home");
         }
         _ => panic!("the rename field should be open"),
     });
@@ -1708,6 +1708,7 @@ fn unsaved_edits_are_written_when_the_window_goes_away(cx: &mut TestAppContext) 
 
 #[gpui_kit::test]
 fn a_plugin_adds_a_command_a_shortcut_and_a_panel_section(cx: &mut TestAppContext) {
+    use crate::plugin::Plugin as _;
     use crate::plugins::bookmarks::Bookmarks;
 
     let (dir, workspace, cx) = open(
@@ -1720,7 +1721,10 @@ fn a_plugin_adds_a_command_a_shortcut_and_a_panel_section(cx: &mut TestAppContex
     let stored = dir.path().join(".diamond/bookmarks.toml");
     let bookmarked = |cx: &mut VisualTestContext| {
         workspace.read_with(cx, |workspace, _| {
-            workspace.plugins[0].sections(&workspace.session, None)[0]
+            workspace
+                .plugin::<Bookmarks>()
+                .unwrap()
+                .sections(&workspace.session, None)[0]
                 .rows
                 .iter()
                 .map(|row| row.label.clone())
@@ -1912,6 +1916,124 @@ fn the_calendar_opens_the_daily_note_of_a_chosen_day(cx: &mut TestAppContext) {
     open_day(10, cx);
     assert_eq!(editor_text(&workspace, cx), "earlier\n");
     workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+    });
+}
+
+#[gpui_kit::test]
+fn table_commands_work_on_the_table_under_the_cursor(cx: &mut TestAppContext) {
+    let text = "Costs\n\n|Item|Cost|\n|--|--:|\n|Rent|1000|\n";
+    let (dir, workspace, cx) = open(&[("Home.md", text)], cx);
+    open_note(&workspace, "Home.md", cx);
+
+    // Outside a table the command says what it needs.
+    run_command("line up table", &workspace, cx);
+    workspace.read_with(cx, |workspace, _| assert!(workspace.error.is_some()));
+    assert_eq!(editor_text(&workspace, cx), text);
+
+    set_cursor(&workspace, text.find("Rent").unwrap(), cx);
+    run_command("line up table", &workspace, cx);
+    let lined_up = "Costs\n\n| Item | Cost |\n| ---- | ---: |\n| Rent | 1000 |\n";
+    assert_eq!(editor_text(&workspace, cx), lined_up);
+
+    run_command("add table row", &workspace, cx);
+    run_command("add table column", &workspace, cx);
+    let grown = "Costs\n\n| Item | Cost |     |\n| ---- | ---: | --- |\n| Rent | 1000 |     |\n|      |      |     |\n";
+    assert_eq!(editor_text(&workspace, cx), grown);
+
+    // The change is an ordinary edit: it is saved, and it can be undone.
+    cx.executor()
+        .advance_clock(AUTOSAVE_DELAY + Duration::from_millis(50));
+    cx.run_until_parked();
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Home.md")).unwrap(),
+        grown
+    );
+    cx.simulate_keystrokes(primary!("z"));
+    assert_ne!(editor_text(&workspace, cx), grown);
+
+    // A new table goes in at the cursor.
+    let end = editor_text(&workspace, cx).len();
+    set_cursor(&workspace, end, cx);
+    run_command("insert table", &workspace, cx);
+    assert!(
+        editor_text(&workspace, cx).ends_with("\n\n|     |     |\n| --- | --- |\n|     |     |\n")
+    );
+}
+
+#[gpui_kit::test]
+fn properties_are_listed_and_changed_from_the_context_panel(cx: &mut TestAppContext) {
+    use crate::plugin::{Plugin as _, RowAction};
+    use crate::plugins::properties::Properties;
+
+    let (dir, workspace, cx) = open(
+        &[("Home.md", "---\nstatus: open\ntags: [a, b]\n---\nbody\n")],
+        cx,
+    );
+    let read = || fs::read_to_string(dir.path().join("Home.md")).unwrap();
+    open_note(&workspace, "Home.md", cx);
+    let rows = |cx: &mut VisualTestContext| {
+        workspace.read_with(cx, |workspace, _| {
+            Properties.sections(&workspace.session, workspace.current())[0]
+                .rows
+                .iter()
+                .map(|row| row.label.clone())
+                .collect::<Vec<_>>()
+        })
+    };
+    assert_eq!(
+        rows(cx),
+        vec!["status: open", "tags: [a, b]", "+ Add a property"]
+    );
+    // Clicking a row asks for the new value, with the old one selected.
+    let click = |row: usize, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                let section = &Properties.sections(&workspace.session, workspace.current())[0];
+                if let RowAction::Run(run) = section.rows[row].action.clone() {
+                    run(workspace, window, cx);
+                }
+            });
+        });
+    };
+    let save = |cx: &mut VisualTestContext| {
+        cx.executor()
+            .advance_clock(AUTOSAVE_DELAY + Duration::from_millis(50));
+        cx.run_until_parked();
+    };
+
+    click(0, cx);
+    workspace.read_with(cx, |workspace, cx| match &workspace.overlay {
+        Some(Overlay::Prompt(prompt)) => {
+            assert_eq!(prompt.title.as_ref(), "Set status");
+            assert_eq!(prompt.input.read(cx).value().as_ref(), "open");
+        }
+        _ => panic!("the prompt should be open"),
+    });
+    cx.simulate_keystrokes("d o n e enter");
+    save(cx);
+    assert_eq!(read(), "---\nstatus: done\ntags: [a, b]\n---\nbody\n");
+    assert_eq!(rows(cx)[0], "status: done");
+
+    // Adding one, then removing one by clearing its value.
+    click(2, cx);
+    cx.simulate_keystrokes("d u e : space 2 0 2 6 enter");
+    save(cx);
+    assert_eq!(
+        read(),
+        "---\nstatus: done\ntags: [a, b]\ndue: 2026\n---\nbody\n"
+    );
+    click(1, cx);
+    cx.simulate_keystrokes("backspace enter");
+    save(cx);
+    assert_eq!(read(), "---\nstatus: done\ndue: 2026\n---\nbody\n");
+    assert_eq!(
+        rows(cx),
+        vec!["status: done", "due: 2026", "+ Add a property"]
+    );
+    // Typing goes back to the note afterwards.
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.overlay.is_none());
         assert!(workspace.error.is_none(), "{:?}", workspace.error);
     });
 }

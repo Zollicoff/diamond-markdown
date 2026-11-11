@@ -3,6 +3,8 @@
 
 pub mod bookmarks;
 pub mod calendar;
+pub mod properties;
+pub mod tables;
 pub mod tasks;
 
 use crate::plugin::Plugin;
@@ -10,8 +12,10 @@ use crate::plugin::Plugin;
 /// Every core plugin, in the order their commands and panel sections appear.
 pub fn core() -> Vec<Box<dyn Plugin>> {
     vec![
+        Box::new(properties::Properties),
         Box::new(bookmarks::Bookmarks::default()),
         Box::new(tasks::Tasks),
         Box::new(calendar::Calendar),
+        Box::new(tables::Tables),
     ]
 }

@@ -39,11 +39,16 @@ const AUTOSAVE_DELAY: Duration = Duration::from_millis(800);
 /// One save by another program arrives as several reports.
 const WATCH_SETTLE: Duration = Duration::from_millis(150);
 
-/// The field for typing an entry's new name.
-struct RenameBox {
-    /// The file or folder being renamed.
-    path: VaultPath,
+/// What to do with the text typed into a prompt.
+type Answer = Box<dyn FnOnce(&mut Workspace, String, &mut Window, &mut Context<Workspace>)>;
+
+/// A one-line question: a title, a field and what to do with the answer.
+struct Prompt {
+    title: SharedString,
+    /// A line under the field saying what Enter does.
+    hint: SharedString,
     input: Entity<InputState>,
+    answer: Answer,
     _subscription: Subscription,
 }
 
@@ -51,7 +56,7 @@ struct RenameBox {
 /// confirmed or dismissed. Only one is open at a time.
 enum Overlay {
     Palette(Palette),
-    Rename(RenameBox),
+    Prompt(Prompt),
 }
 
 /// The main window's root view.
@@ -1162,38 +1167,97 @@ impl Workspace {
         self.refresh_tree(cx);
     }
 
-    /// Opens the field for typing a new name for a file or folder.
-    pub fn start_rename(&mut self, path: &VaultPath, window: &mut Window, cx: &mut Context<Self>) {
-        let name = self.session.display_name(path).to_owned();
+    /// Asks a one-line question over the window. `answer` gets what was
+    /// typed when Enter is pressed; Escape dismisses the question.
+    pub fn prompt(
+        &mut self,
+        title: impl Into<SharedString>,
+        hint: impl Into<SharedString>,
+        initial: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        answer: impl FnOnce(&mut Self, String, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        let initial = initial.to_owned();
         let input = cx.new(|cx| {
             let mut input = InputState::new(window, cx);
-            input.set_value(name, window, cx);
+            input.set_value(initial, window, cx);
+            // Selected, so typing replaces it.
             input.select_all(window, cx);
             input
         });
         let subscription =
             cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
                 if matches!(event, InputEvent::PressEnter { .. }) {
-                    this.confirm_rename(window, cx);
+                    this.confirm_prompt(window, cx);
                 }
             });
         input.update(cx, |input, cx| input.focus(window, cx));
-        self.overlay = Some(Overlay::Rename(RenameBox {
-            path: path.clone(),
+        self.overlay = Some(Overlay::Prompt(Prompt {
+            title: title.into(),
+            hint: hint.into(),
             input,
+            answer: Box::new(answer),
             _subscription: subscription,
         }));
         cx.notify();
     }
 
-    /// Renames the entry to what was typed in the rename field.
-    fn confirm_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(Overlay::Rename(rename)) = self.overlay.take() else {
+    /// Hands what was typed in the prompt to whoever asked.
+    fn confirm_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(Overlay::Prompt(prompt)) = self.overlay.take() else {
             return;
         };
-        let name = rename.input.read(cx).value();
+        let typed = prompt.input.read(cx).value().to_string();
         self.focus_content(window, cx);
-        self.rename_entry(&rename.path, &name, window, cx);
+        (prompt.answer)(self, typed, window, cx);
+        cx.notify();
+    }
+
+    /// Asks for a new name for a file or folder.
+    pub fn start_rename(&mut self, path: &VaultPath, window: &mut Window, cx: &mut Context<Self>) {
+        let name = self.session.display_name(path).to_owned();
+        let from = path.clone();
+        self.prompt(
+            format!("Rename or move {path}"),
+            "Enter to rename. A name with a / in it is a path from the vault root.",
+            &name,
+            window,
+            cx,
+            move |this, name, window, cx| this.rename_entry(&from, &name, window, cx),
+        );
+    }
+
+    /// Changes the text of the note in front the way typing would: the
+    /// change can be undone and is saved like anything typed. `change` gets
+    /// the note's text and the cursor, and returns the range to replace and
+    /// what to put there, or `None` to leave the note alone. Returns whether
+    /// anything was changed.
+    pub fn edit_note(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        change: impl FnOnce(&str, usize) -> Option<(std::ops::Range<usize>, String)>,
+    ) -> bool {
+        if self.current().is_none() {
+            self.report("Open a note first", cx);
+            return false;
+        }
+        self.start_editing(window, cx);
+        let editor = self.tab().editor.clone();
+        let (text, cursor) = {
+            let editor = editor.read(cx);
+            (editor.value(), editor.cursor())
+        };
+        let Some((range, replacement)) = change(&text, cursor) else {
+            return false;
+        };
+        editor.update(cx, |editor, cx| {
+            editor.set_selected_range(range, cx);
+            editor.replace(replacement, window, cx);
+        });
+        cx.notify();
+        true
     }
 
     /// Renames or moves a file or folder to `name`, as typed, and rewrites

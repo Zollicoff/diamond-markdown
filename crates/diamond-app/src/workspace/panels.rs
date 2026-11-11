@@ -21,7 +21,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::palette::PaletteMode;
-use super::{Overlay, RenameBox, SIDE_PANEL_WIDTH, Workspace};
+use super::{Overlay, Prompt, SIDE_PANEL_WIDTH, Workspace};
 use crate::actions::{
     CloseTab, CommandPalette, DeleteNote, FollowLink, GoBack, GoForward, InsertTemplate, NewNote,
     NewTab, NextPane, NextTab, OpenDailyNote, PreviousPane, PreviousTab, QuickSwitch,
@@ -536,14 +536,10 @@ impl Workspace {
             })
     }
 
-    fn render_rename(
-        &self,
-        rename: &RenameBox,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement + use<> {
+    fn render_prompt(&self, prompt: &Prompt, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_flex()
-            .id("rename-box")
+            .id("prompt")
             .gap_2()
             .p_3()
             .rounded(theme.radius)
@@ -558,14 +554,14 @@ impl Workspace {
                 div()
                     .text_sm()
                     .text_color(theme.muted_foreground)
-                    .child(format!("Rename or move {}", rename.path)),
+                    .child(prompt.title.clone()),
             )
-            .child(Input::new(&rename.input))
+            .child(Input::new(&prompt.input))
             .child(
                 div()
                     .text_xs()
                     .text_color(theme.muted_foreground)
-                    .child("Enter to rename. A name with a / in it is a path from the vault root."),
+                    .child(prompt.hint.clone()),
             )
     }
 }
@@ -577,8 +573,8 @@ impl Render for Workspace {
             Some(Overlay::Palette(palette)) => {
                 Some(self.render_palette(palette, cx).into_any_element())
             }
-            Some(Overlay::Rename(rename)) => {
-                Some(self.render_rename(rename, cx).into_any_element())
+            Some(Overlay::Prompt(prompt)) => {
+                Some(self.render_prompt(prompt, cx).into_any_element())
             }
             None => None,
         };
