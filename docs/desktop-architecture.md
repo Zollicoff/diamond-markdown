@@ -106,38 +106,64 @@ large vaults.
 
 ### diamond-app
 
-The window. `session.rs` holds the state that is not pixels (the vault, the
-index, the open note) and has no UI types, so it is tested without a window.
-`workspace.rs` is the view: file tree, editor, and a panel with the open
-note's backlinks, outline and tags.
+The window. Its code is split by what it knows about:
+
+- `session.rs` holds the state that is not pixels (the vault, the index,
+  the open note, the vault's settings) and has no UI types, so it is tested
+  without a window. `history.rs`, `notes.rs` and `settings.rs` are the same
+  kind of code: back and forward, daily notes and templates, settings files.
+- `actions.rs` lists every command: its action, its default shortcut and
+  its name in the command palette.
+- `workspace/` is the view. `mod.rs` is what the window does, `panels.rs`
+  how it is drawn, and `palette.rs` the palette that finds notes, text,
+  commands and templates.
+- `app.rs` is the state every window shares: the app's settings and whether
+  it is drawn light or dark.
+
+The window has three panels: the file tree, the note, and a context panel
+with the note's backlinks, outline and tags. The outline and tags follow the
+editor as it is typed in. Clicking a heading puts the cursor on it; clicking
+a tag lists the notes that carry it. A status line under the note shows what
+just happened or went wrong, the word and character counts, and the
+switches for reading view and light or dark.
 
 | Shortcut (Cmd on macOS, Ctrl on Linux) | Does |
 | --- | --- |
-| Cmd-S | Save now. Notes also save 800 ms after typing stops and when switching notes |
-| Cmd-N | New note |
-| Cmd-O | Quick switcher: jump to a note by name |
+| Cmd-Shift-P | Command palette: every command, with its shortcut |
+| Cmd-O | Go to a note by name |
 | Cmd-Shift-F | Search all notes; Enter opens the note at the matching line |
-| Cmd-E | Switch between editing and the rendered reading view |
+| Cmd-N | New note |
+| Cmd-Shift-D | Open today's daily note, creating it from its template |
+| Cmd-Shift-T | Insert a template at the cursor |
+| F2 | Rename or move the open note; links to it are rewritten |
+| Cmd-Alt-Left / Right (Alt-Left / Right on Linux) | Back and forward |
 | Alt-Enter | Follow the link under the cursor, creating the note if it is missing |
+| Cmd-E | Switch between editing and the rendered reading view |
+| Cmd-S | Save now. Notes also save 800 ms after typing stops and when switching notes |
 | Cmd-Shift-O | Open another vault in a new window |
 
-Right-click a file or folder in the sidebar to delete it.
+Right-click a file or folder in the sidebar for a new note there, rename or
+move, and delete. A new name with a `/` in it is a path from the vault
+root, which moves the entry. Renaming a folder moves every note in it.
 
 Changes made by other programs show up live. If the open note changes on
 disk while the editor has unsaved edits, the editor keeps them, autosave
 stops, and leaving the note writes the edits to a "(conflict)" copy, so
 neither version is lost.
 
+Templates are the notes in the templates folder. `{{title}}`, `{{date}}`
+and `{{time}}` in a template are filled in when it is inserted or when a
+daily note is made from it.
+
 The editor highlights Markdown syntax (Tree-sitter) but does not render it
 in place yet. The reading view renders the note with clickable wikilinks.
 
 Run it with `cargo run -p diamond-app`. It reopens the last vault, or asks
 for a folder the first time. A folder given as an argument (or in
-`DIAMOND_VAULT`) takes precedence. Opened vaults are remembered in a plain
-text file in the platform's settings folder.
+`DIAMOND_VAULT`) takes precedence.
 
-Not built yet: rename in the app (the link-rewriting logic exists in the
-index), tabs and splits, settings.
+Not built yet: tabs and splits, a settings screen, scrolling the reading
+view to a heading (the outline switches to the editor for now).
 
 ### Settings
 
@@ -257,16 +283,18 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-101 tests so far; `cargo test --workspace` runs them all.
+143 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (72): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (15): `session.rs` and the remembered-vaults list, tested
-  without a window.
-- App UI (14): headless window tests drive the real views. They open, type,
-  save and autosave; follow and create links; reload after outside edits
-  and keep both versions in a conflict; use the quick switcher, the search
-  palette and the reading view; and measure where the panels are laid out.
+- App logic (41): the session, history, daily notes and templates, settings
+  files and the remembered-vaults list, tested without a window.
+- App UI (30): headless window tests drive the real views with real
+  keystrokes. They open, type, save and autosave; follow and create links;
+  reload after outside edits and keep both versions in a conflict; use the
+  palette for notes, search, commands and templates; rename with links
+  rewritten; go back and forward; switch light and dark; and measure where
+  the panels are laid out.
 
 Dependencies: `scripts/release-age.py` lists locked dependencies published
 in the last 14 days, and `--pin` moves them back to older releases. As of
@@ -274,15 +302,17 @@ in the last 14 days, and `--pin` moves them back to older releases. As of
 seven are the `wasm-bindgen` family, which is only compiled for the browser
 target and is not part of the macOS or Linux build.
 
-Not verified: how the app looks. It builds, starts and stays up on the development Mac, and
-the headless tests confirm the panel layout and behaviour, but nobody has
-looked at the rendered window yet.
+The rendered window has been looked at on the development Mac (dark
+appearance): the three panels, a note in the editor and in the reading view,
+and the command palette. Not checked by eye yet: the light appearance,
+Linux, and anything under load.
 
 ## Milestones
 
 0. **Foundation** (nearly done). Done: workspace, core crates, app shell,
-   file watching, create and delete, quick switcher, search, reading view,
-   vault picker, benchmark. Left: rename in the app, CI for macOS and Linux.
+   file watching, create, rename and delete, quick switcher, search, reading
+   view, vault picker, settings, command palette, back and forward, daily
+   notes, templates, benchmark. Left: CI for macOS and Linux.
 1. **Core notes.** Markdown-aware editor with Live Preview and Reading view,
    clickable links, tabs and splits, command palette, quick switcher,
    full-text search, properties, settings, hotkeys, themes.

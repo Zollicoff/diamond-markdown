@@ -37,17 +37,6 @@ pub struct TreeNode {
     pub children: Vec<TreeNode>,
 }
 
-/// A heading in the open note's outline.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OutlineItem {
-    /// 1 through 6.
-    pub level: u8,
-    /// The heading text.
-    pub text: String,
-    /// Zero-based line in the note.
-    pub line: usize,
-}
-
 /// What following a link at the cursor leads to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Follow {
@@ -77,6 +66,18 @@ pub enum OpenChange {
     Removed,
 }
 
+/// What [`Session::rename`] did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Renamed {
+    /// Where the entry is now.
+    pub to: VaultPath,
+    /// How many notes had links rewritten so they keep leading to it.
+    pub notes_updated: usize,
+    /// The open note's new text, when its own links were rewritten. The
+    /// editor must show it, or the next save would undo the rewrite.
+    pub open_text: Option<String>,
+}
+
 /// The result of [`Session::apply_changes`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Applied {
@@ -97,10 +98,8 @@ pub struct Session {
     vault: Vault,
     index: VaultIndex,
     open: Option<OpenNote>,
-    #[cfg_attr(not(test), allow(dead_code))]
     settings: VaultSettings,
     /// What is wrong with the vault's settings file, when it cannot be used.
-    #[cfg_attr(not(test), allow(dead_code))]
     settings_problem: Option<String>,
 }
 
@@ -123,20 +122,17 @@ impl Session {
     }
 
     /// The vault's settings.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn settings(&self) -> &VaultSettings {
         &self.settings
     }
 
     /// What is wrong with the vault's settings file, if it exists but cannot
     /// be used. The settings are all defaults while this is set.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn settings_problem(&self) -> Option<&str> {
         self.settings_problem.as_deref()
     }
 
     /// Reads the vault's settings file again, after it was edited.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn reload_settings(&mut self) {
         let loaded = VaultSettings::load(&self.vault);
         self.settings = loaded.settings;
@@ -395,10 +391,10 @@ impl Session {
         Ok(copy)
     }
 
-    /// Creates an empty `Untitled` note at the vault root and returns its
-    /// path. The caller opens it.
-    pub fn new_note(&mut self) -> Result<VaultPath, VaultError> {
-        let path = self.vault.unused_path(None, "Untitled", "md")?;
+    /// Creates an empty `Untitled` note in `folder`, or at the vault root,
+    /// and returns its path. The caller opens it.
+    pub fn new_note(&mut self, folder: Option<&str>) -> Result<VaultPath, VaultError> {
+        let path = self.vault.unused_path(folder, "Untitled", "md")?;
         self.vault.create(&path, "")?;
         self.index.upsert(path.clone(), "");
         Ok(path)
@@ -419,6 +415,127 @@ impl Session {
             self.open = None;
         }
         Ok(closes_open)
+    }
+
+    /// The name to show and edit for an entry: a note's name without `.md`,
+    /// any other file's or folder's name in full.
+    pub fn display_name<'a>(&self, path: &'a VaultPath) -> &'a str {
+        if self.is_note(path) {
+            path.stem()
+        } else {
+            path.file_name()
+        }
+    }
+
+    /// The path `from` would have once renamed to `name`, as typed.
+    ///
+    /// A plain name renames the entry where it is. A name with a `/` in it
+    /// is a path from the vault root, which moves the entry there. A note
+    /// keeps its `.md` whether or not it is typed; other files and folders
+    /// are named exactly as typed.
+    pub fn renamed_path(&self, from: &VaultPath, name: &str) -> Result<VaultPath, VaultError> {
+        let name = name.trim().trim_matches('/');
+        if name.is_empty() {
+            return Err(VaultError::InvalidPath("a name is needed".into()));
+        }
+        let mut target = match (name.contains('/'), from.parent()) {
+            (false, Some(folder)) => format!("{folder}/{name}"),
+            _ => name.to_owned(),
+        };
+        if self.is_note(from) && !target.to_lowercase().ends_with(".md") {
+            target.push_str(".md");
+        }
+        let path = VaultPath::new(&target)?;
+        if path.components().any(|part| part.starts_with('.')) {
+            return Err(VaultError::InvalidPath(
+                "a name cannot start with a dot".into(),
+            ));
+        }
+        Ok(path)
+    }
+
+    /// Renames or moves a file or folder, and rewrites the links in other
+    /// notes that would otherwise stop leading to it.
+    ///
+    /// Links are rewritten in each note's text as last saved, so the open
+    /// note must be saved before this is called.
+    pub fn rename(&mut self, from: &VaultPath, to: &VaultPath) -> Result<Renamed, VaultError> {
+        if from == to {
+            return Ok(Renamed {
+                to: to.clone(),
+                notes_updated: 0,
+                open_text: None,
+            });
+        }
+        // Where a path ends up: the entry itself, or something inside it
+        // when the entry is a folder.
+        let moved = |path: &VaultPath| -> Option<VaultPath> {
+            if path == from {
+                return Some(to.clone());
+            }
+            let rest = path
+                .as_str()
+                .strip_prefix(from.as_str())?
+                .strip_prefix('/')?;
+            to.join(rest).ok()
+        };
+        let moves: Vec<(VaultPath, VaultPath)> = self
+            .index
+            .notes()
+            .iter()
+            .filter_map(|note| Some((note.path.clone(), moved(&note.path)?)))
+            .collect();
+        let edits = self.index.rename_edits(&moves);
+
+        self.vault.rename(from, to)?;
+
+        // From here the rename has happened. A note that cannot be rewritten
+        // is reported, but the rest are still done and the index is brought
+        // up to date either way.
+        let mut touched = vec![from.clone(), to.clone()];
+        let mut failure = None;
+        let mut open_text = None;
+        for edit in &edits {
+            let target = moved(&edit.path).unwrap_or_else(|| edit.path.clone());
+            match self.vault.write(&target, &edit.text) {
+                Ok(()) => {
+                    if self
+                        .open
+                        .as_ref()
+                        .is_some_and(|open| open.path == edit.path)
+                    {
+                        open_text = Some(edit.text.clone());
+                    }
+                    touched.push(target);
+                }
+                Err(error) => failure = failure.or(Some(error)),
+            }
+        }
+        if let Some(open) = self.open.as_mut() {
+            if let Some(path) = moved(&open.path) {
+                open.path = path;
+            }
+            if let Some(text) = &open_text {
+                text.clone_into(&mut open.saved);
+            }
+        }
+
+        // On a filesystem that ignores case, the old spelling of a name
+        // still "exists" after a rename that only changes capitals, so the
+        // index cannot be patched path by path.
+        if from.as_str().to_lowercase() == to.as_str().to_lowercase() {
+            self.index = VaultIndex::build(&self.vault)?.0;
+        } else {
+            self.index.refresh(&self.vault, &touched)?;
+        }
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(Renamed {
+                to: to.clone(),
+                notes_updated: edits.len(),
+                open_text,
+            }),
+        }
     }
 
     /// The notes that best match `query`, best first, as `(path, label)`.
@@ -465,7 +582,6 @@ impl Session {
     /// Finds the daily note for `moment`, creating it from the daily-note
     /// template if it does not exist yet. Returns its path and whether it
     /// was created.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn daily_note(&mut self, moment: Moment) -> Result<(VaultPath, bool), VaultError> {
         let path = notes::daily_note_path(&self.settings, moment)?;
         if self.vault.exists(&path) {
@@ -483,7 +599,6 @@ impl Session {
     }
 
     /// The notes in the templates folder, as `(path, name)`, sorted by path.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn templates(&self) -> Vec<(VaultPath, String)> {
         let folder = notes::templates_prefix(&self.settings).to_lowercase();
         self.index
@@ -495,7 +610,6 @@ impl Session {
     }
 
     /// A template's text with its placeholders filled in for the open note.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn template_text(
         &self,
         template: &VaultPath,
@@ -527,38 +641,6 @@ impl Session {
                 (source.clone(), title.to_owned())
             })
             .collect()
-    }
-
-    /// The open note's headings, as of its last save.
-    pub fn outline(&self) -> Vec<OutlineItem> {
-        self.current()
-            .and_then(|path| self.index.note(path))
-            .map(|note| {
-                note.meta
-                    .headings
-                    .iter()
-                    .map(|heading| OutlineItem {
-                        level: heading.level,
-                        text: heading.text.clone(),
-                        line: heading.line,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// The open note's tags, as of its last save.
-    pub fn tags(&self) -> Vec<String> {
-        self.current()
-            .and_then(|path| self.index.note(path))
-            .map(|note| {
-                note.meta
-                    .all_tags()
-                    .into_iter()
-                    .map(str::to_owned)
-                    .collect()
-            })
-            .unwrap_or_default()
     }
 
     /// How many of the open note's links lead nowhere, as of its last save.
@@ -658,15 +740,10 @@ mod tests {
             edited
         );
         assert_eq!(session.current_title(), Some("Start Here"));
-        assert_eq!(session.tags(), vec!["inbox"]);
         assert_eq!(session.unresolved_link_count(), 1);
         assert_eq!(
-            session.outline(),
-            vec![OutlineItem {
-                level: 1,
-                text: "Home".into(),
-                line: 3
-            }]
+            session.search("tag:inbox", 10),
+            vec![(path("Home.md"), "Start Here".to_owned(), None)]
         );
 
         session.open_note(&path("Plan.md")).unwrap();
@@ -947,9 +1024,13 @@ mod tests {
     #[test]
     fn new_note_picks_an_unused_name() {
         let (dir, mut session) = session(&[("Untitled.md", "taken")]);
-        let created = session.new_note().unwrap();
+        let created = session.new_note(None).unwrap();
         assert_eq!(created, path("Untitled 1.md"));
         assert!(session.is_note(&created));
+        assert_eq!(
+            session.new_note(Some("Deep/Folder")).unwrap(),
+            path("Deep/Folder/Untitled.md")
+        );
         assert_eq!(
             std::fs::read_to_string(dir.path().join("Untitled.md")).unwrap(),
             "taken"
@@ -976,6 +1057,133 @@ mod tests {
             "x"
         );
         assert!(session.delete(&path("Folder")).is_err());
+    }
+
+    #[test]
+    fn renamed_path_keeps_the_folder_and_the_note_extension() {
+        let (_dir, session) =
+            session(&[("Top.md", ""), ("Work/Plan.md", ""), ("Work/pic.png", "")]);
+        let renamed = |from: &str, name: &str| {
+            session
+                .renamed_path(&path(from), name)
+                .map(|to| to.to_string())
+        };
+        assert_eq!(renamed("Top.md", " Summit ").unwrap(), "Summit.md");
+        assert_eq!(renamed("Work/Plan.md", "Budget").unwrap(), "Work/Budget.md");
+        assert_eq!(renamed("Work/Plan.md", "v1.2").unwrap(), "Work/v1.2.md");
+        assert_eq!(
+            renamed("Work/Plan.md", "Budget.md").unwrap(),
+            "Work/Budget.md"
+        );
+        // A name with a slash is a path from the vault root: a move.
+        assert_eq!(
+            renamed("Work/Plan.md", "Archive/2026/Plan").unwrap(),
+            "Archive/2026/Plan.md"
+        );
+        // Other files and folders are named exactly as typed.
+        assert_eq!(
+            renamed("Work/pic.png", "photo.jpg").unwrap(),
+            "Work/photo.jpg"
+        );
+        assert_eq!(renamed("Work", "Projects").unwrap(), "Projects");
+        assert_eq!(session.display_name(&path("Work/Plan.md")), "Plan");
+        assert_eq!(session.display_name(&path("Work/pic.png")), "pic.png");
+
+        assert!(renamed("Top.md", "  ").is_err());
+        assert!(renamed("Top.md", ".hidden").is_err());
+        assert!(renamed("Top.md", "../../outside").is_err());
+        assert!(renamed("Top.md", "a\\b").is_err());
+    }
+
+    #[test]
+    fn rename_rewrites_links_and_follows_the_open_note() {
+        let (dir, mut session) = session(&[
+            ("Home.md", "See [[Plan]] and [[Work/Plan|the plan]].\n"),
+            (
+                "Work/Plan.md",
+                "Back to [[Home]] and on to [[Work/Notes]].\n",
+            ),
+            ("Work/Notes.md", "n\n"),
+        ]);
+        let read = |name: &str| std::fs::read_to_string(dir.path().join(name)).unwrap();
+        session.open_note(&path("Home.md")).unwrap();
+
+        // A note: links that name it are rewritten, including in the open
+        // note, whose new text is handed back for the editor.
+        let renamed = session
+            .rename(&path("Work/Plan.md"), &path("Work/Budget.md"))
+            .unwrap();
+        assert_eq!(renamed.to, path("Work/Budget.md"));
+        assert_eq!(renamed.notes_updated, 1);
+        let home = "See [[Budget]] and [[Work/Budget|the plan]].\n";
+        assert_eq!(renamed.open_text.as_deref(), Some(home));
+        assert_eq!(read("Home.md"), home);
+        assert!(!session.is_dirty(home));
+        assert!(!dir.path().join("Work/Plan.md").exists());
+        assert!(session.is_note(&path("Work/Budget.md")));
+        assert!(!session.is_note(&path("Work/Plan.md")));
+        assert_eq!(session.unresolved_link_count(), 0);
+
+        // The open note itself: it stays open under its new name.
+        let renamed = session.rename(&path("Home.md"), &path("Start.md")).unwrap();
+        assert_eq!(renamed.open_text, None);
+        assert_eq!(session.current(), Some(&path("Start.md")));
+        assert_eq!(
+            read("Work/Budget.md"),
+            "Back to [[Start]] and on to [[Work/Notes]].\n"
+        );
+        assert!(session.save(&format!("{home}more\n")).unwrap());
+        assert_eq!(read("Start.md"), format!("{home}more\n"));
+
+        // A folder: every note in it moves, and links that spelled out the
+        // folder follow.
+        session.open_note(&path("Work/Budget.md")).unwrap();
+        let renamed = session.rename(&path("Work"), &path("Projects")).unwrap();
+        assert_eq!(session.current(), Some(&path("Projects/Budget.md")));
+        let budget = "Back to [[Start]] and on to [[Projects/Notes]].\n";
+        assert_eq!(renamed.open_text.as_deref(), Some(budget));
+        assert_eq!(read("Projects/Budget.md"), budget);
+        assert!(read("Start.md").contains("[[Projects/Budget|the plan]]"));
+        assert!(session.is_note(&path("Projects/Notes.md")));
+        assert!(!dir.path().join("Work").exists());
+    }
+
+    #[test]
+    fn rename_refuses_to_replace_another_file() {
+        let (dir, mut session) = session(&[("A.md", "a [[B]]"), ("B.md", "b")]);
+        assert!(matches!(
+            session.rename(&path("A.md"), &path("B.md")),
+            Err(VaultError::AlreadyExists(_))
+        ));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("B.md")).unwrap(),
+            "b"
+        );
+        assert!(session.is_note(&path("A.md")));
+        // Renaming to the same name is nothing at all.
+        assert_eq!(
+            session
+                .rename(&path("A.md"), &path("A.md"))
+                .unwrap()
+                .notes_updated,
+            0
+        );
+    }
+
+    #[test]
+    fn rename_can_change_only_the_capitals() {
+        let (dir, mut session) = session(&[("note.md", "n"), ("Other.md", "[[note]]")]);
+        session.open_note(&path("note.md")).unwrap();
+        session.rename(&path("note.md"), &path("Note.md")).unwrap();
+        assert_eq!(session.current(), Some(&path("Note.md")));
+        assert!(session.is_note(&path("Note.md")));
+        assert!(!session.is_note(&path("note.md")));
+        let names: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.to_lowercase() == "note.md")
+            .collect();
+        assert_eq!(names, vec!["Note.md".to_owned()]);
     }
 
     #[test]

@@ -1,5 +1,8 @@
 //! Diamond Markdown desktop application.
 
+mod actions;
+mod app;
+mod history;
 mod notes;
 mod recent;
 mod session;
@@ -10,10 +13,9 @@ use std::path::{Path, PathBuf};
 
 use gpui_kit::*;
 
+use crate::actions::{OpenVault, Quit};
 use crate::session::Session;
 use crate::workspace::Workspace;
-
-actions!(diamond, [Quit, OpenVault]);
 
 /// A vault named on the command line or in `DIAMOND_VAULT`, which takes
 /// precedence over the remembered ones.
@@ -103,13 +105,13 @@ fn choose_vault(quit_if_cancelled: bool, cx: &mut App) {
 fn main() {
     let requested = requested_vault();
 
-    gpui_kit::application().run(move |cx| {
+    let app = gpui_kit::application().with_assets(gpui_kit::assets::Assets);
+    app.run(move |cx| {
         gpui_kit::init(cx);
-        workspace::init(cx);
-        cx.bind_keys([
-            KeyBinding::new(workspace::primary!("q"), Quit, None),
-            KeyBinding::new(workspace::primary!("shift-o"), OpenVault, None),
-        ]);
+        actions::bind_keys(cx);
+        if let Some(problem) = app::init(recent::config_dir(), cx) {
+            eprintln!("diamond: settings are not in use: {problem}");
+        }
         cx.on_action(|_: &Quit, cx| cx.quit());
         cx.on_action(|_: &OpenVault, cx| choose_vault(false, cx));
 

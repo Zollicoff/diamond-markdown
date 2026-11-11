@@ -12,10 +12,6 @@
 //! kept when the app writes the file. A file that cannot be parsed is
 //! reported and left alone: every setting takes its default until it is fixed.
 
-// The window does not use this module yet; the workspace wiring that follows
-// does, and this goes away with it.
-#![allow(dead_code)]
-
 use std::fs;
 use std::io::Write as _;
 use std::path::Path;

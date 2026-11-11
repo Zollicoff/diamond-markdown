@@ -3,10 +3,6 @@
 //! Where daily notes go and where templates are kept comes from the vault's
 //! own settings; see [`crate::settings`].
 
-// The window does not use this module yet; the workspace wiring that follows
-// does, and this goes away with it.
-#![allow(dead_code)]
-
 use diamond_vault::{VaultError, VaultPath};
 
 use crate::settings::VaultSettings;
@@ -123,12 +119,20 @@ pub fn fill_template(template: &str, title: &str, moment: Moment) -> String {
 }
 
 /// Words and characters in a note, not counting the properties block.
-pub fn counts(text: &str) -> (usize, usize) {
-    let body = match diamond_parse::parse(text).frontmatter {
+/// `meta` is what the parser reported for `text`.
+///
+/// A word is a run of non-space characters with a letter or digit in it, so
+/// Markdown markers standing alone (`#`, `-`, `>`) are not counted.
+pub fn counts(text: &str, meta: &diamond_parse::NoteMeta) -> (usize, usize) {
+    let body = match &meta.frontmatter {
         Some(frontmatter) => &text[frontmatter.range.end.min(text.len())..],
         None => text,
     };
-    (body.split_whitespace().count(), body.trim().chars().count())
+    let words = body
+        .split_whitespace()
+        .filter(|word| word.chars().any(char::is_alphanumeric))
+        .count();
+    (words, body.trim().chars().count())
 }
 
 #[cfg(test)]
@@ -226,11 +230,13 @@ mod tests {
 
     #[test]
     fn counts_skip_the_properties_block() {
+        let counted = |text: &str| counts(text, &diamond_parse::parse(text));
         assert_eq!(
-            counts("---\ntitle: Many words here\n---\nfour words in body\n"),
+            counted("---\ntitle: Many words here\n---\nfour words in body\n"),
             (4, 18)
         );
-        assert_eq!(counts(""), (0, 0));
-        assert_eq!(counts("日本語 text"), (2, 8));
+        assert_eq!(counted(""), (0, 0));
+        assert_eq!(counted("日本語 text"), (2, 8));
+        assert_eq!(counted("# Title\n\n- one\n- [ ] two #tag\n> ---\n").0, 4);
     }
 }
