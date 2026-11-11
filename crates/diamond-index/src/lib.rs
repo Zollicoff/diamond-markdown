@@ -22,6 +22,7 @@
 //! shortest path, then alphabetical order.
 
 pub mod fuzzy;
+mod rename;
 pub mod search;
 
 use std::collections::{BTreeMap, HashMap};
@@ -30,6 +31,8 @@ use std::time::{Duration, Instant};
 use diamond_parse::NoteMeta;
 use diamond_vault::{EntryKind, Vault, VaultError, VaultPath};
 use rayon::prelude::*;
+
+pub use rename::NoteEdit;
 
 /// Identifies a note within one [`VaultIndex`]. Ids change when the index is
 /// rebuilt or notes are added and removed; do not store them.
