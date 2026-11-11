@@ -16,6 +16,7 @@ use std::ops::Range;
 use pulldown_cmark::{Event, LinkType, MetadataBlockKind, Options, Parser, Tag, TagEnd};
 
 pub use frontmatter::{Frontmatter, PropertyValue};
+pub use scan::{is_external, percent_decode, percent_encode};
 
 /// Everything extracted from one note.
 #[derive(Clone, Debug, Default, PartialEq)]

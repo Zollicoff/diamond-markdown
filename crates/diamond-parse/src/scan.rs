@@ -101,8 +101,9 @@ pub(crate) fn block_id(source: &str, run: Range<usize>) -> Option<(String, Range
     Some((id.to_owned(), absolute..absolute + 1 + id.len()))
 }
 
-/// Whether a Markdown link destination points outside the vault.
-pub(crate) fn is_external(destination: &str) -> bool {
+/// Whether a link destination is a URL with a scheme (`https:`, `mailto:`)
+/// and so points outside the vault.
+pub fn is_external(destination: &str) -> bool {
     let scheme_end = destination
         .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
         .unwrap_or(destination.len());
@@ -110,9 +111,24 @@ pub(crate) fn is_external(destination: &str) -> bool {
     scheme_end >= 2 && destination[scheme_end..].starts_with(':')
 }
 
+/// Encodes text for use in a Markdown link destination: everything except
+/// letters, digits and `-._~/` becomes a `%XX` escape, so spaces and brackets
+/// cannot end the link early.
+pub fn percent_encode(input: &str) -> String {
+    let mut encoded = String::with_capacity(input.len());
+    for byte in input.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
 /// Decodes `%20` style escapes, which Markdown links need for spaces.
 /// Malformed escapes are left as written.
-pub(crate) fn percent_decode(input: &str) -> String {
+pub fn percent_decode(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut index = 0;

@@ -224,3 +224,23 @@ fn multibyte_text_keeps_ranges_on_character_boundaries() {
     assert_eq!(&source[meta.tags[0].range.clone()], "#日本語");
     assert_eq!(meta.blocks[0].id, "blk");
 }
+
+#[test]
+fn percent_encoding_round_trips() {
+    for text in [
+        "Plain",
+        "My Note (v2)#Heading",
+        "Zürich/東京 notes",
+        "100% & [brackets]",
+    ] {
+        let encoded = percent_encode(text);
+        assert!(
+            encoded
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-._~/%".contains(&b))
+        );
+        assert_eq!(percent_decode(&encoded), text);
+    }
+    assert_eq!(percent_encode("a b/c.md"), "a%20b/c.md");
+    assert_eq!(percent_decode("bad%zzescape%2"), "bad%zzescape%2");
+}
