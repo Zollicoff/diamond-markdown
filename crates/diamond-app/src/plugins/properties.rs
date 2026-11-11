@@ -8,35 +8,10 @@
 use std::ops::Range;
 use std::rc::Rc;
 
-use diamond_parse::PropertyValue;
 use diamond_vault::VaultPath;
 
 use crate::plugin::{Plugin, Row, RowAction, Section};
 use crate::session::Session;
-
-/// A property value as one line of text.
-pub fn display(value: &PropertyValue) -> String {
-    match value {
-        PropertyValue::Null => String::new(),
-        PropertyValue::Bool(value) => value.to_string(),
-        PropertyValue::Number(number) if number.fract() == 0.0 && number.abs() < 1e15 => {
-            format!("{number:.0}")
-        }
-        PropertyValue::Number(number) => number.to_string(),
-        PropertyValue::Text(text) => text.clone(),
-        PropertyValue::List(items) => {
-            let items: Vec<String> = items.iter().map(display).collect();
-            format!("[{}]", items.join(", "))
-        }
-        PropertyValue::Map(entries) => {
-            let entries: Vec<String> = entries
-                .iter()
-                .map(|(key, value)| format!("{key}: {}", display(value)))
-                .collect();
-            format!("{{{}}}", entries.join(", "))
-        }
-    }
-}
 
 /// The properties block of a note: the range of the lines between its two
 /// `---` lines, or `None` if the note does not start with one.
@@ -243,23 +218,5 @@ mod tests {
         for (key, value) in [("", "x"), ("a:b", "x"), ("a", "one\ntwo"), ("# a", "x")] {
             assert_eq!(apply(NOTE, key, value), None, "{key:?}: {value:?}");
         }
-    }
-
-    #[test]
-    fn values_are_shown_on_one_line() {
-        use PropertyValue::{Bool, List, Map, Null, Number, Text};
-        assert_eq!(display(&Text("open".into())), "open");
-        assert_eq!(display(&Number(3.0)), "3");
-        assert_eq!(display(&Number(2.5)), "2.5");
-        assert_eq!(display(&Bool(true)), "true");
-        assert_eq!(display(&Null), "");
-        assert_eq!(
-            display(&List(vec![Text("a".into()), Number(1.0)])),
-            "[a, 1]"
-        );
-        assert_eq!(
-            display(&Map(vec![("k".into(), Text("v".into()))])),
-            "{k: v}"
-        );
     }
 }

@@ -245,3 +245,21 @@ fn percent_encoding_round_trips() {
     assert_eq!(percent_encode("a b/c.md"), "a%20b/c.md");
     assert_eq!(percent_decode("bad%zzescape%2"), "bad%zzescape%2");
 }
+
+#[test]
+fn property_values_are_written_on_one_line() {
+    use PropertyValue::{Bool, List, Map, Null, Number, Text};
+    assert_eq!(Text("open".into()).to_string(), "open");
+    assert_eq!(Number(3.0).to_string(), "3");
+    assert_eq!(Number(2.5).to_string(), "2.5");
+    assert_eq!(Bool(true).to_string(), "true");
+    assert_eq!(Null.to_string(), "");
+    assert_eq!(
+        List(vec![Text("a".into()), Number(1.0), List(vec![Bool(false)])]).to_string(),
+        "[a, 1, [false]]"
+    );
+    assert_eq!(
+        Map(vec![("k".into(), Text("v".into())), ("n".into(), Null)]).to_string(),
+        "{k: v, n: }"
+    );
+}

@@ -22,6 +22,7 @@
 //! shortest path, then alphabetical order.
 
 pub mod fuzzy;
+pub mod query;
 mod rename;
 pub mod search;
 

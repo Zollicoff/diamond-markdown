@@ -34,6 +34,39 @@ impl PropertyValue {
     }
 }
 
+/// A value on one line, as it would be written in a list of properties:
+/// `open`, `3`, `true`, `[a, b]`, `{k: v}`. An empty value is nothing.
+impl std::fmt::Display for PropertyValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PropertyValue::Null => Ok(()),
+            PropertyValue::Bool(value) => write!(f, "{value}"),
+            PropertyValue::Number(number) => f.write_str(&format_number(*number)),
+            PropertyValue::Text(text) => f.write_str(text),
+            PropertyValue::List(items) => {
+                f.write_str("[")?;
+                for (index, item) in items.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{item}")?;
+                }
+                f.write_str("]")
+            }
+            PropertyValue::Map(entries) => {
+                f.write_str("{")?;
+                for (index, (key, value)) in entries.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{key}: {value}")?;
+                }
+                f.write_str("}")
+            }
+        }
+    }
+}
+
 /// The parsed properties block.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Frontmatter {

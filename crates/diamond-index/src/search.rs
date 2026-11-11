@@ -16,7 +16,7 @@
 use diamond_vault::VaultPath;
 use rayon::prelude::*;
 
-use crate::VaultIndex;
+use crate::{Note, VaultIndex};
 
 /// How many matching lines are kept per note.
 const LINES_PER_NOTE: usize = 3;
@@ -108,6 +108,37 @@ fn strip_prefix_ignore_case<'a>(text: &'a str, prefix: &str) -> Option<&'a str> 
     let head = text.get(..prefix.len())?;
     head.eq_ignore_ascii_case(prefix)
         .then(|| &text[prefix.len()..])
+}
+
+/// The notes a query selects, in path order, for uses that want every match
+/// rather than the best few: an empty query selects every note, and a query
+/// of exclusions alone selects every note they leave.
+pub fn select<'a>(index: &'a VaultIndex, query: &str) -> Vec<&'a Note> {
+    let terms = parse(query);
+    index
+        .notes()
+        .iter()
+        .filter(|note| {
+            let mut lowered = None;
+            terms.iter().all(|term| {
+                let matched = match &term.test {
+                    Test::Tag(tag) => {
+                        let nested = format!("{tag}/");
+                        note.meta.all_tags().iter().any(|have| {
+                            let have = have.to_lowercase();
+                            have == *tag || have.starts_with(&nested)
+                        })
+                    }
+                    Test::Path(part) => note.path.as_str().to_lowercase().contains(part),
+                    Test::Text(word) => {
+                        note.path.stem().to_lowercase().contains(word.as_str())
+                            || count_ignoring_case(&note.text, word, &mut lowered) > 0
+                    }
+                };
+                matched != term.exclude
+            })
+        })
+        .collect()
 }
 
 /// Searches every note in the index. Returns at most `limit` hits, best

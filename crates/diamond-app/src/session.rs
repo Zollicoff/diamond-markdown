@@ -404,6 +404,75 @@ impl Session {
             }
         }
         output.push_str(&text[position..]);
+        self.render_queries(&output)
+    }
+
+    /// Replaces each fenced `query` block with the table it computes; see
+    /// [`diamond_index::query`] for what a query says.
+    fn render_queries(&self, markdown: &str) -> String {
+        if !markdown.contains("```query") {
+            return markdown.to_owned();
+        }
+        let mut output = String::with_capacity(markdown.len());
+        let mut block: Option<String> = None;
+        for line in markdown.split_inclusive('\n') {
+            match &mut block {
+                None if line.trim() == "```query" => block = Some(String::new()),
+                None => output.push_str(line),
+                Some(source) if line.trim() == "```" => {
+                    output.push_str(&self.query_table(source));
+                    block = None;
+                }
+                Some(source) => source.push_str(line),
+            }
+        }
+        // A block that is never closed is shown as it was written.
+        if let Some(source) = block {
+            output.push_str("```query\n");
+            output.push_str(&source);
+        }
+        output
+    }
+
+    /// A query's result as a Markdown table whose first column links to
+    /// each note.
+    fn query_table(&self, source: &str) -> String {
+        let query = diamond_index::query::parse(source);
+        let table = diamond_index::query::run(&self.index, &query);
+        if table.rows.is_empty() {
+            return "*No notes match this query.*\n".to_owned();
+        }
+        let escape = |cell: &str| cell.replace('|', "\\|").replace('\n', " ");
+        let mut output = String::new();
+        for column in &table.columns {
+            output.push_str(&format!("| {} ", escape(column)));
+        }
+        output.push_str("|\n");
+        output.push_str(&"| --- ".repeat(table.columns.len()));
+        output.push_str("|\n");
+        for row in &table.rows {
+            for (column, cell) in row.cells.iter().enumerate() {
+                if column > 0 {
+                    output.push_str(&format!("| {} ", escape(cell)));
+                    continue;
+                }
+                // The first cell is the way to the note, so it is never
+                // left empty.
+                let label = if cell.is_empty() {
+                    self.title(&row.path)
+                } else {
+                    cell
+                };
+                let label = escape(label).replace('[', "\\[").replace(']', "\\]");
+                let target = row.path.as_str();
+                let target = target.strip_suffix(".md").unwrap_or(target);
+                output.push_str(&format!(
+                    "| [{label}]({NOTE_SCHEME}{}) ",
+                    diamond_parse::percent_encode(target)
+                ));
+            }
+            output.push_str("|\n");
+        }
         output
     }
 
@@ -660,7 +729,7 @@ impl Session {
                 frontmatter
                     .properties
                     .iter()
-                    .map(|(key, value)| (key.clone(), crate::plugins::properties::display(value)))
+                    .map(|(key, value)| (key.clone(), value.to_string()))
                     .collect()
             })
             .unwrap_or_default()
@@ -931,6 +1000,49 @@ mod tests {
         assert_eq!(
             session.reading_markdown(&home, "plain *text*\n"),
             "plain *text*\n"
+        );
+    }
+
+    #[test]
+    fn a_query_block_becomes_a_table_in_the_reading_view() {
+        let text = "Projects:\n\n```query\ntag:project\nshow: title, status\nsort: status\n```\n\nAnd in code:\n\n```\nnot a query\n```\n";
+        let (_dir, mut session) = session(&[
+            ("Home.md", text),
+            (
+                "Work/Big Plan.md",
+                "---\nstatus: open\ntags: [project]\n---\n",
+            ),
+            (
+                "Launch.md",
+                "---\ntitle: Launch | Day\nstatus: done\n---\n#project\n",
+            ),
+        ]);
+        let home = path("Home.md");
+        assert_eq!(
+            session.reading_markdown(&home, text),
+            "Projects:\n\n\
+             | title | status |\n\
+             | --- | --- |\n\
+             | [Launch \\| Day](diamond://note/Launch) | done |\n\
+             | [Big Plan](diamond://note/Work/Big%20Plan) | open |\n\
+             \nAnd in code:\n\n```\nnot a query\n```\n"
+        );
+        assert_eq!(
+            session.reading_markdown(&home, "```query\ntag:nothing\n```\n"),
+            "*No notes match this query.*\n"
+        );
+        // Never closed: left as written.
+        assert_eq!(
+            session.reading_markdown(&home, "```query\ntag:project\n"),
+            "```query\ntag:project\n"
+        );
+        // The links in the table lead to the notes.
+        assert_eq!(
+            session.follow_target(&home, "Work/Big Plan").unwrap(),
+            Follow::Note {
+                path: path("Work/Big Plan.md"),
+                created: false
+            }
         );
     }
 
