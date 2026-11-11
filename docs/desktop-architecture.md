@@ -19,16 +19,24 @@ Decided on 2026-11-10:
   most-used ones are rebuilt as core plugins.
 - Windows is out of scope for now.
 
-Assumed, not yet confirmed: the vault format stays compatible with Obsidian
-(the same Markdown files, wikilinks, properties, `.canvas` boards), so a vault
-opens in either app.
+Decided on 2026-11-11: **no crossover with Obsidian.** Diamond is a
+competitor with the same kind of features, built independently.
+
+- It does not read or write Obsidian's settings, its `.obsidian` folder or
+  any other file that belongs to that app.
+- It does not run, load or imitate Obsidian's plugins or themes.
+- It has its own settings, its own conventions and its own plugin system.
+
+Notes are plain Markdown files in a folder, linked with `[[wikilinks]]`.
+Those are general conventions, not anything taken from another app.
 
 ## Clean-room rule
 
-We work from public material only: Obsidian's public documentation and help
-site, the JSON Canvas spec, and behaviour anyone can observe by using the
-app. We never copy, decompile or reverse-engineer Obsidian's code or styles,
-and we take no code from other reimplementations.
+Everything here is written from scratch. We never copy, decompile or
+reverse-engineer another app's code or styles, and we take no code from
+other note-taking apps or reimplementations. Knowing what features people
+expect from this kind of app comes from public documentation and ordinary
+use, nothing else.
 
 ## Layers
 
@@ -57,7 +65,7 @@ The only code that touches the vault folder.
 - A watcher reports paths changed by any program.
 - `VaultReader` does the symlink check once per folder for passes that read
   thousands of files.
-- Listing skips dot-folders (`.git`, `.obsidian`, `.trash`).
+- Listing skips dot-folders, such as `.git` and `.trash`.
 
 Not built yet: attachments, following symlinks inside the vault when
 listing.
@@ -129,6 +137,14 @@ text file in the platform's settings folder.
 
 Not built yet: rename in the app (the link-rewriting logic exists in the
 index), tabs and splits, settings.
+
+To remove: `crates/diamond-app/src/notes.rs` reads two of Obsidian's
+settings files (`.obsidian/daily-notes.json` and `.obsidian/templates.json`)
+to place daily notes and find templates. That was written before the
+no-crossover decision and contradicts it. It is not reachable from the
+window. It is to be replaced with Diamond's own defaults and settings, and
+the remaining mentions of Obsidian in code comments and test names are to be
+reworded.
 
 ## UI stack
 
