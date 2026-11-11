@@ -3,6 +3,7 @@
 mod notes;
 mod recent;
 mod session;
+mod settings;
 mod workspace;
 
 use std::path::{Path, PathBuf};

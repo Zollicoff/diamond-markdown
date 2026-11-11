@@ -1330,7 +1330,7 @@ mod tests {
 
         assert!(!dir.path().join("Home.md").exists());
         assert_eq!(
-            fs::read_to_string(dir.path().join(".trash/Home.md")).unwrap(),
+            fs::read_to_string(dir.path().join(".diamond/trash/Home.md")).unwrap(),
             "xhome\n"
         );
         assert_eq!(editor_text(&workspace, cx), "");

@@ -226,7 +226,7 @@ fn build_reads_a_vault_from_disk_and_resolves_attachments() {
     write("Assets/diagram.png", b"\x89PNG");
     write("Projects/board.canvas", b"{}");
     write("Broken.md", &[0xff, 0xfe, 0x00]);
-    write(".obsidian/app.json", b"{}");
+    write(".diamond/settings.toml", b"");
 
     let vault = Vault::open(dir.path()).unwrap();
     let (index, report) = VaultIndex::build(&vault).unwrap();

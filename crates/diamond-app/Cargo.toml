@@ -18,7 +18,8 @@ diamond-parse.workspace = true
 diamond-vault.workspace = true
 # Pinned exactly: GPUI has no stable release line, so upgrades are deliberate.
 gpui-kit = { version = "=0.8.1", features = ["tree-sitter-markdown"] }
-serde_json = "1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.8"
 
 [dev-dependencies]
 gpui-kit = { version = "=0.8.1", features = ["test-support", "tree-sitter-markdown"] }

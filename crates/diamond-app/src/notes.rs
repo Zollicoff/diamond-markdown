@@ -1,13 +1,15 @@
 //! Daily notes, templates and text statistics.
 //!
-//! Settings are read from the same files Obsidian's core plugins write
-//! (`.obsidian/daily-notes.json`, `.obsidian/templates.json`), so a vault set
-//! up there behaves the same here.
+//! Where daily notes go and where templates are kept comes from the vault's
+//! own settings; see [`crate::settings`].
 
-// The window does not call into this module yet; its tests do.
+// The window does not use this module yet; the workspace wiring that follows
+// does, and this goes away with it.
 #![allow(dead_code)]
 
-use diamond_vault::{Vault, VaultPath};
+use diamond_vault::{VaultError, VaultPath};
+
+use crate::settings::VaultSettings;
 
 /// The local date and time, passed in so the logic can be tested.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,45 +46,55 @@ impl Moment {
     }
 }
 
-/// Reads one string setting from a JSON file in the vault's `.obsidian`
-/// folder. Missing files, invalid JSON and empty values are all "not set".
-fn setting(vault: &Vault, file: &str, key: &str) -> Option<String> {
-    let path = VaultPath::new(&format!(".obsidian/{file}")).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&vault.read(&path).ok()?).ok()?;
-    let value = json.get(key)?.as_str()?.trim().trim_matches('/');
-    (!value.is_empty()).then(|| value.to_owned())
+/// A folder setting as the start of a vault path: `""` for the vault root,
+/// otherwise the folder with a trailing slash.
+fn folder_prefix(folder: &str) -> String {
+    match folder.trim().trim_matches('/') {
+        "" => String::new(),
+        folder => format!("{folder}/"),
+    }
 }
 
-/// Where today's daily note lives and the template to start it from.
+/// Where the daily note for `moment` lives: a note named after the date,
+/// `2026-11-11.md`, in the daily-notes folder.
+pub fn daily_note_path(settings: &VaultSettings, moment: Moment) -> Result<VaultPath, VaultError> {
+    VaultPath::new(&format!(
+        "{}{}.md",
+        folder_prefix(&settings.daily.folder),
+        moment.date()
+    ))
+}
+
+/// The template a new daily note starts from, if the settings name one.
 ///
-/// Obsidian's default is a note named `YYYY-MM-DD` at the vault root. The
-/// `folder` and `template` settings are honoured. A custom date `format` is
-/// not: such vaults get the default name.
-pub fn daily_note(vault: &Vault, moment: Moment) -> (Option<VaultPath>, Option<VaultPath>) {
-    let name = format!("{}.md", moment.date());
-    let path = match setting(vault, "daily-notes.json", "folder") {
-        Some(folder) => VaultPath::new(&format!("{folder}/{name}")),
-        None => VaultPath::new(&name),
-    };
-    let template =
-        setting(vault, "daily-notes.json", "template").and_then(|template| note_path(&template));
-    (path.ok(), template)
-}
-
-/// The folder templates are kept in: the `folder` setting of Obsidian's
-/// Templates plugin, or a folder named `Templates` when that is not set.
-pub fn templates_folder(vault: &Vault) -> String {
-    setting(vault, "templates.json", "folder").unwrap_or_else(|| "Templates".to_owned())
-}
-
-/// A setting that names a note, with or without `.md`, as a vault path.
-fn note_path(written: &str) -> Option<VaultPath> {
-    let with_extension = if written.to_lowercase().ends_with(".md") {
-        written.to_owned()
+/// A bare name is a note in the templates folder; a name with a `/` in it is
+/// a path from the vault root. `.md` may be left off either way.
+pub fn daily_template_path(settings: &VaultSettings) -> Option<VaultPath> {
+    let written = settings.daily.template.trim().trim_matches('/');
+    if written.is_empty() {
+        return None;
+    }
+    let extension = if written.to_lowercase().ends_with(".md") {
+        ""
     } else {
-        format!("{written}.md")
+        ".md"
     };
-    VaultPath::new(&with_extension).ok()
+    let folder = if written.contains('/') {
+        String::new()
+    } else {
+        templates_prefix(settings)
+    };
+    VaultPath::new(&format!("{folder}{written}{extension}")).ok()
+}
+
+/// The templates folder as the start of a vault path, with a trailing slash.
+/// A vault whose templates folder is set to nothing has no templates, which
+/// is reported as a prefix no path starts with.
+pub fn templates_prefix(settings: &VaultSettings) -> String {
+    match folder_prefix(&settings.templates.folder) {
+        prefix if prefix.is_empty() => "/".to_owned(),
+        prefix => prefix,
+    }
 }
 
 /// Fills in a template's placeholders: `{{title}}`, `{{date}}` and
@@ -131,15 +143,12 @@ mod tests {
         minute: 5,
     };
 
-    fn vault(files: &[(&str, &str)]) -> (tempfile::TempDir, Vault) {
-        let dir = tempfile::tempdir().unwrap();
-        for (path, contents) in files {
-            let absolute = dir.path().join(path);
-            std::fs::create_dir_all(absolute.parent().unwrap()).unwrap();
-            std::fs::write(absolute, contents).unwrap();
-        }
-        let vault = Vault::open(dir.path()).unwrap();
-        (dir, vault)
+    fn settings(daily_folder: &str, daily_template: &str, templates: &str) -> VaultSettings {
+        let mut settings = VaultSettings::default();
+        daily_folder.clone_into(&mut settings.daily.folder);
+        daily_template.clone_into(&mut settings.daily.template);
+        templates.clone_into(&mut settings.templates.folder);
+        settings
     }
 
     #[test]
@@ -149,43 +158,54 @@ mod tests {
     }
 
     #[test]
-    fn daily_note_defaults_to_the_vault_root() {
-        let (_dir, vault) = vault(&[]);
-        let (path, template) = daily_note(&vault, MOMENT);
-        assert_eq!(path.unwrap().as_str(), "2026-03-07.md");
-        assert_eq!(template, None);
-        assert_eq!(templates_folder(&vault), "Templates");
-    }
-
-    #[test]
-    fn daily_note_honours_obsidian_settings() {
-        let (_dir, vault) = vault(&[
-            (
-                ".obsidian/daily-notes.json",
-                r#"{"folder": "/Journal/Daily/", "template": "Meta/Day", "format": "YYYY-MM-DD"}"#,
-            ),
-            (
-                ".obsidian/templates.json",
-                r#"{"folder": "Meta/Templates"}"#,
-            ),
-        ]);
-        let (path, template) = daily_note(&vault, MOMENT);
-        assert_eq!(path.unwrap().as_str(), "Journal/Daily/2026-03-07.md");
-        assert_eq!(template.unwrap().as_str(), "Meta/Day.md");
-        assert_eq!(templates_folder(&vault), "Meta/Templates");
-    }
-
-    #[test]
-    fn broken_or_empty_settings_fall_back_to_defaults() {
-        let (_dir, vault) = vault(&[
-            (".obsidian/daily-notes.json", "{ not json"),
-            (".obsidian/templates.json", r#"{"folder": "  "}"#),
-        ]);
+    fn daily_notes_default_to_a_daily_folder_and_a_daily_template() {
+        let defaults = VaultSettings::default();
         assert_eq!(
-            daily_note(&vault, MOMENT).0.unwrap().as_str(),
+            daily_note_path(&defaults, MOMENT).unwrap().as_str(),
+            "Daily/2026-03-07.md"
+        );
+        assert_eq!(
+            daily_template_path(&defaults).unwrap().as_str(),
+            "Templates/Daily.md"
+        );
+        assert_eq!(templates_prefix(&defaults), "Templates/");
+    }
+
+    #[test]
+    fn daily_notes_follow_the_vault_settings() {
+        let custom = settings("/Journal/Days/", "Day.md", " Meta/Templates ");
+        assert_eq!(
+            daily_note_path(&custom, MOMENT).unwrap().as_str(),
+            "Journal/Days/2026-03-07.md"
+        );
+        assert_eq!(
+            daily_template_path(&custom).unwrap().as_str(),
+            "Meta/Templates/Day.md"
+        );
+        assert_eq!(templates_prefix(&custom), "Meta/Templates/");
+
+        // A template written with a folder is a path from the vault root.
+        let rooted = settings("", "Meta/Day", "Templates");
+        assert_eq!(
+            daily_note_path(&rooted, MOMENT).unwrap().as_str(),
             "2026-03-07.md"
         );
-        assert_eq!(templates_folder(&vault), "Templates");
+        assert_eq!(
+            daily_template_path(&rooted).unwrap().as_str(),
+            "Meta/Day.md"
+        );
+    }
+
+    #[test]
+    fn empty_and_escaping_settings_are_harmless() {
+        let none = settings("Daily", "  ", "");
+        assert_eq!(daily_template_path(&none), None);
+        // No path starts with a slash, so nothing is offered as a template.
+        assert_eq!(templates_prefix(&none), "/");
+
+        let escaping = settings("../outside", "../../secret", "Templates");
+        assert!(daily_note_path(&escaping, MOMENT).is_err());
+        assert_eq!(daily_template_path(&escaping), None);
     }
 
     #[test]

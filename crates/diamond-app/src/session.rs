@@ -9,6 +9,9 @@ use std::path::Path;
 use diamond_index::{BuildReport, LinkTarget, VaultIndex};
 use diamond_vault::{EntryKind, Vault, VaultError, VaultPath, VaultWatcher};
 
+use crate::notes::{self, Moment};
+use crate::settings::VaultSettings;
+
 /// The address prefix the reading view gives links to notes. The rest of the
 /// address is the percent-encoded link target as written in the note.
 pub const NOTE_SCHEME: &str = "diamond://note/";
@@ -94,6 +97,11 @@ pub struct Session {
     vault: Vault,
     index: VaultIndex,
     open: Option<OpenNote>,
+    #[cfg_attr(not(test), allow(dead_code))]
+    settings: VaultSettings,
+    /// What is wrong with the vault's settings file, when it cannot be used.
+    #[cfg_attr(not(test), allow(dead_code))]
+    settings_problem: Option<String>,
 }
 
 impl Session {
@@ -101,14 +109,38 @@ impl Session {
     pub fn open(root: impl AsRef<Path>) -> Result<(Self, BuildReport), VaultError> {
         let vault = Vault::open(root)?;
         let (index, report) = VaultIndex::build(&vault)?;
+        let loaded = VaultSettings::load(&vault);
         Ok((
             Self {
                 vault,
                 index,
                 open: None,
+                settings: loaded.settings,
+                settings_problem: loaded.problem,
             },
             report,
         ))
+    }
+
+    /// The vault's settings.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn settings(&self) -> &VaultSettings {
+        &self.settings
+    }
+
+    /// What is wrong with the vault's settings file, if it exists but cannot
+    /// be used. The settings are all defaults while this is set.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn settings_problem(&self) -> Option<&str> {
+        self.settings_problem.as_deref()
+    }
+
+    /// Reads the vault's settings file again, after it was edited.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn reload_settings(&mut self) {
+        let loaded = VaultSettings::load(&self.vault);
+        self.settings = loaded.settings;
+        self.settings_problem = loaded.problem;
     }
 
     /// The vault's folder on disk.
@@ -430,23 +462,20 @@ impl Session {
         rows
     }
 
-    /// Finds today's daily note, creating it from the daily-note template
-    /// if it does not exist yet. Returns its path and whether it was created.
+    /// Finds the daily note for `moment`, creating it from the daily-note
+    /// template if it does not exist yet. Returns its path and whether it
+    /// was created.
     #[cfg_attr(not(test), allow(dead_code))]
-    pub fn daily_note(
-        &mut self,
-        moment: crate::notes::Moment,
-    ) -> Result<(VaultPath, bool), VaultError> {
-        let (path, template) = crate::notes::daily_note(&self.vault, moment);
-        let path = path.ok_or_else(|| VaultError::InvalidPath("daily notes folder".into()))?;
+    pub fn daily_note(&mut self, moment: Moment) -> Result<(VaultPath, bool), VaultError> {
+        let path = notes::daily_note_path(&self.settings, moment)?;
         if self.vault.exists(&path) {
             return Ok((path, false));
         }
-        // A template that is set but missing is not an error: the note is
-        // created empty, as Obsidian does.
-        let text = template
+        // A template that is named but missing is not an error: the note
+        // starts empty.
+        let text = notes::daily_template_path(&self.settings)
             .and_then(|template| self.vault.read(&template).ok())
-            .map(|template| crate::notes::fill_template(&template, path.stem(), moment))
+            .map(|template| notes::fill_template(&template, path.stem(), moment))
             .unwrap_or_default();
         self.vault.create(&path, &text)?;
         self.index.upsert(path.clone(), &text);
@@ -456,10 +485,7 @@ impl Session {
     /// The notes in the templates folder, as `(path, name)`, sorted by path.
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn templates(&self) -> Vec<(VaultPath, String)> {
-        let folder = format!(
-            "{}/",
-            crate::notes::templates_folder(&self.vault).to_lowercase()
-        );
+        let folder = notes::templates_prefix(&self.settings).to_lowercase();
         self.index
             .notes()
             .iter()
@@ -473,11 +499,11 @@ impl Session {
     pub fn template_text(
         &self,
         template: &VaultPath,
-        moment: crate::notes::Moment,
+        moment: Moment,
     ) -> Result<String, VaultError> {
         let text = self.vault.read(template)?;
         let title = self.current_title().unwrap_or_default();
-        Ok(crate::notes::fill_template(&text, title, moment))
+        Ok(notes::fill_template(&text, title, moment))
     }
 
     /// Whether `path` is a note in the index.
@@ -747,33 +773,32 @@ mod tests {
         assert!(session.search("", 10).is_empty());
     }
 
+    const MOMENT: Moment = Moment {
+        year: 2026,
+        month: 11,
+        day: 11,
+        hour: 6,
+        minute: 30,
+    };
+
     #[test]
     fn daily_note_is_created_once_from_its_template() {
-        let moment = crate::notes::Moment {
-            year: 2026,
-            month: 11,
-            day: 11,
-            hour: 6,
-            minute: 30,
-        };
         let (dir, mut session) = session(&[
-            (
-                ".obsidian/daily-notes.json",
-                r#"{"folder": "Daily", "template": "Templates/Day"}"#,
-            ),
-            ("Templates/Day.md", "# {{title}}\n\nStarted {{time}}\n"),
+            ("Templates/Daily.md", "# {{title}}\n\nStarted {{time}}\n"),
             ("Templates/Meeting.md", "## {{title}} on {{date}}\n"),
             ("Home.md", ""),
         ]);
-        let (path, created) = session.daily_note(moment).unwrap();
-        assert_eq!((path.as_str(), created), ("Daily/2026-11-11.md", true));
+        assert_eq!(session.settings_problem(), None);
+        let (daily, created) = session.daily_note(MOMENT).unwrap();
+        assert_eq!((daily.as_str(), created), ("Daily/2026-11-11.md", true));
         assert_eq!(
             std::fs::read_to_string(dir.path().join("Daily/2026-11-11.md")).unwrap(),
             "# 2026-11-11\n\nStarted 06:30\n"
         );
+        assert!(session.is_note(&daily));
         // The second time it is found, not recreated or overwritten.
         std::fs::write(dir.path().join("Daily/2026-11-11.md"), "edited").unwrap();
-        assert_eq!(session.daily_note(moment).unwrap(), (path, false));
+        assert_eq!(session.daily_note(MOMENT).unwrap(), (daily, false));
         assert_eq!(
             std::fs::read_to_string(dir.path().join("Daily/2026-11-11.md")).unwrap(),
             "edited"
@@ -782,27 +807,57 @@ mod tests {
         assert_eq!(
             session.templates(),
             vec![
-                (
-                    super::VaultPath::new("Templates/Day.md").unwrap(),
-                    "Day".to_owned()
-                ),
-                (
-                    super::VaultPath::new("Templates/Meeting.md").unwrap(),
-                    "Meeting".to_owned()
-                ),
+                (path("Templates/Daily.md"), "Daily".to_owned()),
+                (path("Templates/Meeting.md"), "Meeting".to_owned()),
             ]
         );
-        session
-            .open_note(&super::VaultPath::new("Home.md").unwrap())
-            .unwrap();
+        session.open_note(&path("Home.md")).unwrap();
         assert_eq!(
             session
-                .template_text(
-                    &super::VaultPath::new("Templates/Meeting.md").unwrap(),
-                    moment
-                )
+                .template_text(&path("Templates/Meeting.md"), MOMENT)
                 .unwrap(),
             "## Home on 2026-11-11\n"
+        );
+    }
+
+    #[test]
+    fn daily_notes_and_templates_follow_the_vault_settings() {
+        let (dir, mut session) = session(&[
+            (
+                ".diamond/settings.toml",
+                "[daily]\nfolder = \"Journal\"\ntemplate = \"Day\"\n\n[templates]\nfolder = \"Meta/Templates\"\n",
+            ),
+            ("Meta/Templates/Day.md", "{{date}}\n"),
+            ("Templates/Daily.md", "not used\n"),
+        ]);
+        assert_eq!(session.settings().daily.folder, "Journal");
+        let (daily, created) = session.daily_note(MOMENT).unwrap();
+        assert_eq!((daily.as_str(), created), ("Journal/2026-11-11.md", true));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Journal/2026-11-11.md")).unwrap(),
+            "2026-11-11\n"
+        );
+        assert_eq!(
+            session.templates(),
+            vec![(path("Meta/Templates/Day.md"), "Day".to_owned())]
+        );
+
+        // Editing the file and reloading takes effect; a broken file is
+        // reported and the defaults apply until it is fixed.
+        std::fs::write(dir.path().join(".diamond/settings.toml"), "[daily").unwrap();
+        session.reload_settings();
+        assert!(session.settings_problem().is_some());
+        assert_eq!(session.settings().daily.folder, "Daily");
+    }
+
+    #[test]
+    fn a_daily_note_without_a_template_starts_empty() {
+        let (dir, mut session) = session(&[("Home.md", "")]);
+        let (daily, created) = session.daily_note(MOMENT).unwrap();
+        assert!(created);
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(daily.as_str())).unwrap(),
+            ""
         );
     }
 
@@ -917,7 +972,7 @@ mod tests {
         assert!(session.current().is_none());
         assert!(!session.is_note(&path("Folder/Gone.md")));
         assert_eq!(
-            std::fs::read_to_string(dir.path().join(".trash/Folder/Gone.md")).unwrap(),
+            std::fs::read_to_string(dir.path().join(".diamond/trash/Folder/Gone.md")).unwrap(),
             "x"
         );
         assert!(session.delete(&path("Folder")).is_err());

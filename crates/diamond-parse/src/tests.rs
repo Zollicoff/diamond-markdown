@@ -80,7 +80,7 @@ fn links_and_tags_inside_code_are_ignored() {
 }
 
 #[test]
-fn tags_follow_obsidian_rules() {
+fn tags_follow_the_tag_rules() {
     let source = "#start mid #project/active, #snake_case #kebab-case #café #2026 #1a \
                   word#notatag #trailing/ and a lone # mark";
     let meta = parse(source);
@@ -204,7 +204,8 @@ fn tasks_report_state_and_line() {
 
 #[test]
 fn links_in_tables_and_lists() {
-    // A bare `|` ends a table cell, so Obsidian has you write `\|` there.
+    // A bare `|` ends a table cell, so inside a table a link's `|` is
+    // written `\|`.
     let meta = parse("| a | b |\n|---|---|\n| [[One]] | [[Two\\|2]] |\n\n- [[Three]]\n");
     assert_eq!(link_targets(&meta), vec!["One", "Two", "Three"]);
     assert_eq!(meta.links[1].display.as_deref(), Some("2"));

@@ -185,7 +185,7 @@ impl VaultIndex {
         for entry in entries {
             match entry.kind {
                 EntryKind::Note => note_paths.push(entry.path),
-                EntryKind::Canvas | EntryKind::Attachment => files.push(entry.path),
+                EntryKind::Attachment => files.push(entry.path),
                 EntryKind::Folder => {}
             }
         }

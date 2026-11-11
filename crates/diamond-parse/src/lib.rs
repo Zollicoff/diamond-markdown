@@ -5,8 +5,9 @@
 //! (frontmatter), headings, links and embeds, tags, block identifiers and
 //! tasks. Positions are byte ranges into the source.
 //!
-//! The syntax follows what Obsidian documents for its Markdown flavour, so a
-//! vault written in Obsidian reads the same here.
+//! The syntax is CommonMark plus the conventions plain-text notes commonly
+//! use: `[[wikilinks]]`, `![[embeds]]`, `#tags`, `^block-ids`, a YAML
+//! properties block and task lists. The exact rules are written on each type.
 
 mod frontmatter;
 mod scan;

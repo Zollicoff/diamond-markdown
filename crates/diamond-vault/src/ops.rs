@@ -4,11 +4,10 @@ use std::fs;
 use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 
-use crate::{Result, Vault, VaultError, VaultPath, io_error};
+use crate::{APP_FOLDER, Result, Vault, VaultError, VaultPath, io_error};
 
-/// The folder deleted files are moved to, as in Obsidian's "vault trash"
-/// setting. It is hidden from listings like every dot-folder.
-const TRASH: &str = ".trash";
+/// The folder inside [`APP_FOLDER`] that deleted files are moved to.
+const TRASH: &str = "trash";
 
 impl Vault {
     /// Creates a new text file. Fails if anything already exists at `path`,
@@ -78,12 +77,13 @@ impl Vault {
         fs::rename(&source, &destination).map_err(|error| io_error(from, error))
     }
 
-    /// Moves a file or folder into the vault's `.trash` folder, where it can
-    /// be recovered by hand. A name already in the trash gets a number added.
+    /// Moves a file or folder into the vault's trash, `.diamond/trash`, where
+    /// it can be recovered by hand. A name already in the trash gets a number
+    /// added.
     pub fn trash(&self, path: &VaultPath) -> Result<()> {
         let source = self.resolve(path)?;
         fs::symlink_metadata(&source).map_err(|error| io_error(path, error))?;
-        let trash = self.root.join(TRASH);
+        let trash = self.root.join(APP_FOLDER).join(TRASH);
         fs::create_dir_all(&trash).map_err(|error| io_error(path, error))?;
 
         let (stem, extension) = match path.extension() {
@@ -194,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn trash_moves_into_dot_trash_and_numbers_duplicates() {
+    fn trash_moves_into_the_vault_trash_and_numbers_duplicates() {
         let (dir, vault) = vault_with(&[
             ("Note.md", "one"),
             ("Sub/Note.md", "two"),
@@ -204,15 +204,15 @@ mod tests {
         vault.trash(&path("Sub/Note.md")).unwrap();
         vault.trash(&path("Folder")).unwrap();
         assert_eq!(
-            fs::read_to_string(dir.path().join(".trash/Note.md")).unwrap(),
+            fs::read_to_string(dir.path().join(".diamond/trash/Note.md")).unwrap(),
             "one"
         );
         assert_eq!(
-            fs::read_to_string(dir.path().join(".trash/Note 1.md")).unwrap(),
+            fs::read_to_string(dir.path().join(".diamond/trash/Note 1.md")).unwrap(),
             "two"
         );
         assert_eq!(
-            fs::read_to_string(dir.path().join(".trash/Folder/In.md")).unwrap(),
+            fs::read_to_string(dir.path().join(".diamond/trash/Folder/In.md")).unwrap(),
             "x"
         );
         // Trashed files leave the listing; the emptied folder stays.

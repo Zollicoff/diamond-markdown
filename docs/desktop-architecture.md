@@ -5,8 +5,9 @@ Status: draft, 2026-11-11. It describes the code on the
 
 ## Goal
 
-A native desktop app for macOS and Linux that does what Obsidian does, is
-100% open source (MIT) and is fast.
+Diamond is a Markdown knowledge-base app for macOS and Linux: notes are
+plain files in a folder, linked to each other, with the tools to write,
+find and connect them. It is native, fast and 100% open source (MIT).
 
 Decided on 2026-11-10:
 
@@ -15,8 +16,7 @@ Decided on 2026-11-10:
 - Rust throughout, with a GPU-rendered UI on GPUI (the framework Zed is
   built on).
 - Written from scratch in this repository.
-- Its own plugin system. Obsidian's community plugins do not run here; the
-  most-used ones are rebuilt as core plugins.
+- Its own plugin system.
 - Windows is out of scope for now.
 
 Decided on 2026-11-11: **no crossover with Obsidian.** Diamond is a
@@ -61,11 +61,12 @@ The only code that touches the vault folder.
   symlink.
 - Writes are atomic: temporary file in the same folder, flush, rename.
 - Create never replaces an existing file; rename refuses to overwrite a
-  different file; delete moves to the vault's `.trash` folder.
+  different file; delete moves to the vault's trash, `.diamond/trash`.
 - A watcher reports paths changed by any program.
 - `VaultReader` does the symlink check once per folder for passes that read
   thousands of files.
-- Listing skips dot-folders, such as `.git` and `.trash`.
+- Listing skips dot-folders, such as `.git` and the vault's own `.diamond`
+  folder, which holds its settings and its trash.
 
 Not built yet: attachments, following symlinks inside the vault when
 listing.
@@ -138,13 +139,29 @@ text file in the platform's settings folder.
 Not built yet: rename in the app (the link-rewriting logic exists in the
 index), tabs and splits, settings.
 
-To remove: `crates/diamond-app/src/notes.rs` reads two of Obsidian's
-settings files (`.obsidian/daily-notes.json` and `.obsidian/templates.json`)
-to place daily notes and find templates. That was written before the
-no-crossover decision and contradicts it. It is not reachable from the
-window. It is to be replaced with Diamond's own defaults and settings, and
-the remaining mentions of Obsidian in code comments and test names are to be
-reworded.
+### Settings
+
+Diamond keeps its settings in two TOML files, written to be read and fixed
+by hand (`crates/diamond-app/src/settings.rs`):
+
+- A vault's settings are in `.diamond/settings.toml` inside the vault, so
+  they travel with it.
+- The app's settings (light or dark, for example) are in `settings.toml` in
+  the platform's settings folder, beside the list of remembered vaults.
+
+A missing key takes its default, so a file holds only what differs. A file
+that cannot be parsed is reported and never overwritten; the defaults apply
+until it is fixed.
+
+```toml
+# .diamond/settings.toml, showing the defaults
+[daily]
+folder = "Daily"       # daily notes are Daily/2026-11-11.md
+template = "Daily"     # a name in the templates folder, or a path with a /
+
+[templates]
+folder = "Templates"
+```
 
 ## UI stack
 
@@ -161,9 +178,9 @@ Zed's own editor, rope and Markdown crates are GPL-3.0 and are not used.
 
 ### The editor is the largest piece of work
 
-Today the app uses GPUI Kit's code editor as a plain text editor. Obsidian's
-Live Preview (Markdown that renders in place as you type) does not exist in
-any Rust library. We build it: a Markdown-aware display layer over the text
+Today the app uses GPUI Kit's code editor as a plain text editor. Live
+Preview (Markdown that renders in place as you type) does not exist in any
+Rust library. We build it: a Markdown-aware display layer over the text
 buffer that hides markers off the cursor line and draws headings, links,
 embeds, tables and checkboxes inline.
 
@@ -173,9 +190,10 @@ back the geometry needed for caret placement, hit-testing and input. That
 is the rendering half of Live Preview; the document model, editing rules and
 cursor movement are ours to write.
 
-### Features that lean on web libraries in Obsidian
+### Rendering that needs a native answer
 
-These need native replacements, in rough order of difficulty:
+With no web view to lean on, these each need a native implementation, in
+rough order of difficulty:
 
 - syntax highlighting in code blocks: Tree-sitter (straightforward)
 - LaTeX math: a Rust math layout engine
@@ -196,23 +214,20 @@ Zed uses for extensions. They are written in any language that compiles to
 WebAssembly, get only the capabilities the user grants, and draw UI through
 an API we define, since there is no DOM to hand them.
 
-### Obsidian plugins to rebuild as core plugins
+### Core feature areas
 
-Proposed from Obsidian's public download counts (November 2026):
+Beyond the basics, these are built into Diamond as its own features, each a
+core plugin on the interface above:
 
-| Obsidian plugin | Downloads | Core plugin here |
-| --- | --- | --- |
-| Templater | 6.2M | Templates with variables and date math |
-| Dataview | 5.3M | Queries over notes and properties |
-| Tasks | 4.6M | Task queries, due dates, recurring tasks |
-| Git | 3.4M | Git sync and history |
-| Advanced Tables | 3.4M | Table editing |
-| Calendar | 3.3M | Calendar view of daily notes |
-| Kanban | 2.8M | Boards stored as Markdown |
-
-Left out on purpose: Excalidraw (9.0M downloads) is a whole drawing
-application and would be a project of its own; Copilot is an AI chat client;
-Style Settings only makes sense for CSS themes.
+| Area | What it does |
+| --- | --- |
+| Templating | Templates with variables and date math |
+| Queries | Lists and tables computed from notes and their properties |
+| Tasks | Tasks across the vault, with due dates and recurrence |
+| Git sync | Version history and sync through git |
+| Tables | Editing Markdown tables as tables |
+| Calendar | A calendar of daily notes |
+| Kanban | Boards stored as Markdown |
 
 ## Performance
 
@@ -273,7 +288,7 @@ looked at the rendered window yet.
    full-text search, properties, settings, hotkeys, themes.
 2. **Plugin interface and core plugins.** The module interface, then graph,
    Canvas, daily notes, templates, bookmarks, outline, page preview.
-3. **Rebuilt Obsidian plugins.** The table above.
+3. **Core feature areas.** The table above.
 4. **Third-party plugins and release.** WebAssembly plugin host, signing and
    notarization, auto-update, Linux packages.
 

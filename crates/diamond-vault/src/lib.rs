@@ -21,6 +21,11 @@ pub use path::VaultPath;
 pub use reader::VaultReader;
 pub use watch::VaultWatcher;
 
+/// The hidden folder in a vault where Diamond keeps its own files: the
+/// vault's settings and its trash. Like every dot-folder it is left out of
+/// listings and of the index.
+pub const APP_FOLDER: &str = ".diamond";
+
 /// Errors from vault operations.
 #[derive(Debug, thiserror::Error)]
 pub enum VaultError {
@@ -60,8 +65,6 @@ pub enum EntryKind {
     Folder,
     /// A Markdown note (`.md`).
     Note,
-    /// A JSON Canvas board (`.canvas`).
-    Canvas,
     /// Any other file: images, PDFs, audio and so on.
     Attachment,
 }
@@ -176,8 +179,8 @@ impl Vault {
     /// Lists every visible file and folder in the vault, sorted by path.
     ///
     /// Entries whose name starts with a dot are skipped along with everything
-    /// under them. That covers `.git`, `.obsidian`, `.trash` and our own
-    /// temporary files. Symlinks are not followed and are not listed.
+    /// under them. That covers `.git`, the vault's own `.diamond` folder and
+    /// our temporary files. Symlinks are not followed and are not listed.
     pub fn entries(&self) -> Result<Vec<Entry>> {
         let mut entries = Vec::new();
         let walker = WalkDir::new(&self.root)
@@ -237,7 +240,6 @@ impl Vault {
 fn kind_for(path: &VaultPath) -> EntryKind {
     match path.extension().map(str::to_ascii_lowercase).as_deref() {
         Some("md") => EntryKind::Note,
-        Some("canvas") => EntryKind::Canvas,
         _ => EntryKind::Attachment,
     }
 }
@@ -297,7 +299,7 @@ mod tests {
             ("Projects/Plan.md", "plan"),
             ("Projects/board.canvas", "{}"),
             ("Assets/pic.PNG", "png"),
-            (".obsidian/app.json", "{}"),
+            (".diamond/settings.toml", ""),
             (".git/HEAD", "ref"),
             ("Projects/.hidden.md", "h"),
         ]);
@@ -314,7 +316,7 @@ mod tests {
                 ("Assets/pic.PNG".to_owned(), EntryKind::Attachment),
                 ("Projects".to_owned(), EntryKind::Folder),
                 ("Projects/Plan.md".to_owned(), EntryKind::Note),
-                ("Projects/board.canvas".to_owned(), EntryKind::Canvas),
+                ("Projects/board.canvas".to_owned(), EntryKind::Attachment),
                 ("Zeta.md".to_owned(), EntryKind::Note),
             ]
         );
