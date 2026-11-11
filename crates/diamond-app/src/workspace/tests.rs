@@ -2098,3 +2098,44 @@ fn a_note_opens_as_a_board_and_moving_a_card_rewrites_the_note(cx: &mut TestAppC
     cx.simulate_keystrokes(primary!("z"));
     assert_eq!(editor_text(&workspace, cx), text);
 }
+
+#[gpui_kit::test]
+fn the_graph_opens_in_a_tab_and_draws(cx: &mut TestAppContext) {
+    let (_dir, workspace, cx) = open(
+        &[
+            ("Home.md", "[[Plan]] [[Ideas]]\n"),
+            ("Plan.md", "[[Budget]]\n"),
+            ("Budget.md", "numbers\n"),
+            ("Ideas.md", "loose\n"),
+            ("Far.md", "[[Further]]\n"),
+            ("Further.md", "\n"),
+        ],
+        cx,
+    );
+    workspace.read_with(cx, |workspace, _| {
+        let graph = workspace.session.graph();
+        assert_eq!(graph.notes.len(), 6);
+        assert_eq!(graph.links.len(), 4);
+    });
+    open_note(&workspace, "Home.md", cx);
+    run_command("show graph", &workspace, cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["Home", "*Graph"]]);
+    // Drawing the view, lines and dots included, must not fail.
+    cx.update(|window, cx| {
+        window.render_frame(cx);
+        let view = window.find("graph-view").bounds();
+        assert!(
+            view.size.width > px(100.) && view.size.height > px(100.),
+            "{view:?}"
+        );
+    });
+    // Editing a note elsewhere redraws it without trouble.
+    cx.simulate_keystrokes("ctrl-tab");
+    cx.simulate_keystrokes("x");
+    cx.simulate_keystrokes(primary!("s"));
+    cx.simulate_keystrokes("ctrl-tab");
+    cx.update(|window, cx| window.render_frame(cx));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+    });
+}

@@ -356,3 +356,20 @@ fn quick_switch_ranks_names_aliases_and_paths() {
     assert_eq!(index.quick_switch("", 2).len(), 2);
     assert_eq!(paths("plan").len(), index.quick_switch("plan", 3).len() + 1);
 }
+
+#[test]
+fn links_between_notes_are_listed_once_and_the_revision_moves() {
+    let mut index = index(&[
+        ("A.md", "[[B]] and [[B]] again, [[A]] itself, [[Missing]]"),
+        ("B.md", "[[A]] back, [[C]]"),
+        ("C.md", "alone"),
+    ]);
+    // A-B once though it is written three times across both notes; no
+    // self-link; nothing for a note that does not exist.
+    assert_eq!(index.note_links(), vec![(0, 1), (1, 2)]);
+
+    let before = index.revision();
+    index.upsert(path("C.md"), "now [[A]]");
+    assert_ne!(index.revision(), before);
+    assert_eq!(index.note_links(), vec![(0, 1), (0, 2), (1, 2)]);
+}

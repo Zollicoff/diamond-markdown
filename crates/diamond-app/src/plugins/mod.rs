@@ -5,6 +5,7 @@ pub mod board;
 pub mod bookmarks;
 pub mod calendar;
 pub mod git;
+pub mod graph;
 pub mod properties;
 pub mod tables;
 pub mod tasks;
@@ -18,6 +19,7 @@ pub fn core() -> Vec<Box<dyn Plugin>> {
         Box::new(bookmarks::Bookmarks::default()),
         Box::new(tasks::Tasks),
         Box::new(calendar::Calendar),
+        Box::new(graph::Graph),
         Box::new(board::Boards),
         Box::new(tables::Tables),
         Box::new(git::Git),

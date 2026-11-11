@@ -166,6 +166,8 @@ pub struct VaultIndex {
     backlinks: Vec<Vec<NoteId>>,
     /// Lowercased tag to its first-seen spelling and the notes carrying it.
     tags: BTreeMap<String, (String, Vec<NoteId>)>,
+    /// Changes whenever the index does; see [`VaultIndex::revision`].
+    revision: u64,
 }
 
 impl VaultIndex {
@@ -247,6 +249,36 @@ impl VaultIndex {
     /// Number of notes in the index.
     pub fn len(&self) -> usize {
         self.notes.len()
+    }
+
+    /// A number that is different after every change to the index, so
+    /// something computed from it can tell cheaply whether to compute again.
+    /// It says nothing else: not how many changes, nor their order across
+    /// indexes.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Every link between two notes, as pairs of positions in
+    /// [`VaultIndex::notes`], each pair once whichever way the link points
+    /// and however many times it is written.
+    pub fn note_links(&self) -> Vec<(usize, usize)> {
+        let mut links: Vec<(usize, usize)> = self
+            .outgoing
+            .iter()
+            .enumerate()
+            .flat_map(|(from, targets)| {
+                targets.iter().filter_map(move |target| match target {
+                    Resolved::Note(to) if to.index() != from => {
+                        Some((from.min(to.index()), from.max(to.index())))
+                    }
+                    _ => None,
+                })
+            })
+            .collect();
+        links.sort_unstable();
+        links.dedup();
+        links
     }
 
     /// Whether the index holds no notes.
@@ -550,6 +582,8 @@ impl VaultIndex {
     }
 
     fn rebuild_graph(&mut self) {
+        static NEXT_REVISION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        self.revision = NEXT_REVISION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let count = self.notes.len();
         self.keys = self
             .notes

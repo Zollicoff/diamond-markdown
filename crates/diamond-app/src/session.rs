@@ -67,6 +67,17 @@ pub enum OpenChange {
     Removed,
 }
 
+/// The vault's notes and the links between them, as [`Session::graph`]
+/// reports them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NoteGraph {
+    /// Every note, in path order, with its title.
+    pub notes: Vec<(VaultPath, String)>,
+    /// Every link between two notes, as positions in `notes`, each pair
+    /// once whichever way the link points.
+    pub links: Vec<(usize, usize)>,
+}
+
 /// One task list item, as [`Session::tasks`] reports it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskItem {
@@ -781,6 +792,24 @@ impl Session {
         self.vault.write(path, &rewritten)?;
         self.index.upsert(path.clone(), &rewritten);
         Ok(true)
+    }
+
+    /// Every note and every link between two notes.
+    pub fn graph(&self) -> NoteGraph {
+        NoteGraph {
+            notes: self
+                .index
+                .notes()
+                .iter()
+                .map(|note| (note.path.clone(), note.title().to_owned()))
+                .collect(),
+            links: self.index.note_links(),
+        }
+    }
+
+    /// A number that changes whenever the notes or their links do.
+    pub fn revision(&self) -> u64 {
+        self.index.revision()
     }
 
     /// A note's text as of its last save.
