@@ -187,7 +187,7 @@ impl Workspace {
         let Some(line) = line else {
             return;
         };
-        self.editor.update(cx, |editor, cx| {
+        self.tab().editor.update(cx, |editor, cx| {
             let text = editor.value();
             let offset: usize = text.split_inclusive('\n').take(line).map(str::len).sum();
             editor.set_selected_range(offset..offset, cx);

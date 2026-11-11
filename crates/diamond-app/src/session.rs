@@ -1,8 +1,9 @@
-//! One open vault and the note being edited.
+//! One open vault and the notes open from it.
 //!
 //! [`Session`] is everything the window knows that is not pixels: the vault,
-//! its index and the open note's last saved text. It has no UI types in it, so
-//! it is tested without a window.
+//! its index and its settings. A [`Document`] is one open note: where it is
+//! and its text as last read or saved. Neither has UI types in it, so both
+//! are tested without a window.
 
 use std::path::Path;
 
@@ -54,7 +55,7 @@ pub enum Follow {
     Attachment(VaultPath),
 }
 
-/// What a change on disk means for the note that is open.
+/// What a change on disk means for a note that is open.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpenChange {
     /// The open note's file is as it was last read or saved.
@@ -69,35 +70,88 @@ pub enum OpenChange {
 /// What [`Session::rename`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Renamed {
+    /// The entry's path before.
+    pub from: VaultPath,
     /// Where the entry is now.
     pub to: VaultPath,
-    /// How many notes had links rewritten so they keep leading to it.
-    pub notes_updated: usize,
-    /// The open note's new text, when its own links were rewritten. The
-    /// editor must show it, or the next save would undo the rewrite.
-    pub open_text: Option<String>,
+    /// Every note whose links were rewritten, by its path after the rename,
+    /// with its new text. An open note among them must show the new text,
+    /// or its next save would undo the rewrite: see
+    /// [`Document::follow_rename`].
+    pub edits: Vec<(VaultPath, String)>,
+    /// Why some note's links could not be rewritten, if that happened. The
+    /// rename itself still took place.
+    pub failed: Option<String>,
 }
 
-/// The result of [`Session::apply_changes`].
+/// Where `path` is after `from` was renamed to `to`: the entry itself, or
+/// something inside it when the entry is a folder. `None` when the rename
+/// did not move it.
+pub fn moved_path(from: &VaultPath, to: &VaultPath, path: &VaultPath) -> Option<VaultPath> {
+    if path == from {
+        return Some(to.clone());
+    }
+    let rest = path
+        .as_str()
+        .strip_prefix(from.as_str())?
+        .strip_prefix('/')?;
+    to.join(rest).ok()
+}
+
+/// Whether `path` is `entry` or, when `entry` is a folder, inside it.
+pub fn is_at_or_under(entry: &VaultPath, path: &VaultPath) -> bool {
+    path == entry
+        || path
+            .as_str()
+            .strip_prefix(entry.as_str())
+            .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// A note that is open: where it is and its text as last read or saved.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Applied {
-    /// Files or folders appeared or disappeared, so the sidebar is stale.
-    pub structure_changed: bool,
-    /// What happened to the open note.
-    pub open: OpenChange,
+pub struct Document {
+    path: VaultPath,
+    /// The text as it is on disk, to tell whether an editor has changes.
+    saved: String,
 }
 
-struct OpenNote {
-    path: VaultPath,
-    /// The text as it is on disk, to tell whether the editor has changes.
-    saved: String,
+impl Document {
+    /// Where the note is in the vault.
+    pub fn path(&self) -> &VaultPath {
+        &self.path
+    }
+
+    /// The note's text as last read or saved.
+    pub fn saved(&self) -> &str {
+        &self.saved
+    }
+
+    /// Whether `text` differs from what was last read or saved.
+    pub fn is_dirty(&self, text: &str) -> bool {
+        self.saved != text
+    }
+
+    /// Records that the editor now shows `text` as read from disk.
+    pub fn accept_disk_text(&mut self, text: &str) {
+        text.clone_into(&mut self.saved);
+    }
+
+    /// Keeps up with a rename: takes the note's new path if it moved, and
+    /// returns its new text if its links were rewritten.
+    pub fn follow_rename(&mut self, renamed: &Renamed) -> Option<&str> {
+        if let Some(path) = moved_path(&renamed.from, &renamed.to, &self.path) {
+            self.path = path;
+        }
+        let (_, text) = renamed.edits.iter().find(|(path, _)| *path == self.path)?;
+        text.clone_into(&mut self.saved);
+        Some(&self.saved)
+    }
 }
 
 /// An open vault.
 pub struct Session {
     vault: Vault,
     index: VaultIndex,
-    open: Option<OpenNote>,
     settings: VaultSettings,
     /// What is wrong with the vault's settings file, when it cannot be used.
     settings_problem: Option<String>,
@@ -113,7 +167,6 @@ impl Session {
             Self {
                 vault,
                 index,
-                open: None,
                 settings: loaded.settings,
                 settings_problem: loaded.problem,
             },
@@ -181,81 +234,66 @@ impl Session {
         Ok(roots)
     }
 
-    /// Reads a note and makes it the open note. Returns its text.
-    pub fn open_note(&mut self, path: &VaultPath) -> Result<String, VaultError> {
-        let text = self.vault.read(path)?;
-        self.open = Some(OpenNote {
+    /// Reads a note for editing.
+    pub fn open_note(&self, path: &VaultPath) -> Result<Document, VaultError> {
+        Ok(Document {
+            saved: self.vault.read(path)?,
             path: path.clone(),
-            saved: text.clone(),
-        });
-        Ok(text)
+        })
     }
 
-    /// The open note's path.
-    pub fn current(&self) -> Option<&VaultPath> {
-        self.open.as_ref().map(|open| &open.path)
+    /// A note's display title: its `title` property, or its name.
+    pub fn title<'a>(&'a self, path: &'a VaultPath) -> &'a str {
+        self.index
+            .note(path)
+            .map_or(path.stem(), |note| note.title())
     }
 
-    /// The open note's display title.
-    pub fn current_title(&self) -> Option<&str> {
-        let path = self.current()?;
-        Some(
-            self.index
-                .note(path)
-                .map_or(path.stem(), |note| note.title()),
-        )
-    }
-
-    /// Whether `text` differs from what was last read or saved.
-    pub fn is_dirty(&self, text: &str) -> bool {
-        self.open.as_ref().is_some_and(|open| open.saved != text)
-    }
-
-    /// Writes the open note if `text` differs from the saved text and
-    /// re-indexes it. Returns whether anything was written.
-    pub fn save(&mut self, text: &str) -> Result<bool, VaultError> {
-        let Some(open) = self.open.as_mut() else {
-            return Ok(false);
-        };
-        if open.saved == text {
+    /// Writes a note if `text` differs from its saved text and re-indexes
+    /// it. Returns whether anything was written.
+    pub fn save(&mut self, document: &mut Document, text: &str) -> Result<bool, VaultError> {
+        if document.saved == text {
             return Ok(false);
         }
-        self.vault.write(&open.path, text)?;
-        open.saved = text.to_owned();
-        self.index.upsert(open.path.clone(), text);
+        self.vault.write(&document.path, text)?;
+        text.clone_into(&mut document.saved);
+        self.index.upsert(document.path.clone(), text);
         Ok(true)
     }
 
-    /// Finds the link under `offset` in `text`, the open note's current
-    /// text, and reports where it leads. See [`Session::follow_target`].
-    pub fn follow(&mut self, text: &str, offset: usize) -> Result<Follow, VaultError> {
+    /// Finds the link under `offset` in `text`, the current text of the
+    /// note at `from`, and reports where it leads. See
+    /// [`Session::follow_target`].
+    pub fn follow(
+        &mut self,
+        from: &VaultPath,
+        text: &str,
+        offset: usize,
+    ) -> Result<Follow, VaultError> {
         let meta = diamond_parse::parse(text);
         match meta
             .links
             .iter()
             .find(|link| link.range.start <= offset && offset <= link.range.end)
         {
-            Some(link) => self.follow_target(&link.target),
+            Some(link) => self.follow_target(from, &link.target),
             None => Ok(Follow::NoLink),
         }
     }
 
-    /// Reports where a link target written in the open note leads. Anything
-    /// after a `#` (a heading or block) is ignored for now.
+    /// Reports where a link target written in the note at `from` leads.
+    /// Anything after a `#` (a heading or block) is ignored for now.
     ///
     /// A link to a note that does not exist creates that note, empty, at the
     /// path the link names from the vault root, which is what makes
     /// "write the link first, fill the note in later" work.
-    pub fn follow_target(&mut self, target: &str) -> Result<Follow, VaultError> {
+    pub fn follow_target(&mut self, from: &VaultPath, target: &str) -> Result<Follow, VaultError> {
         let target = target.split('#').next().unwrap_or(target).trim();
-        let Some(from) = self.current().cloned() else {
-            return Ok(Follow::NoLink);
-        };
         if target.is_empty() {
             return Ok(Follow::NoLink);
         }
 
-        match self.index.resolve(&from, target) {
+        match self.index.resolve(from, target) {
             LinkTarget::Note(path) => Ok(Follow::Note {
                 path: path.clone(),
                 created: false,
@@ -277,14 +315,15 @@ impl Session {
         }
     }
 
-    /// Rewrites a note's text into plain Markdown for the reading view.
+    /// Rewrites the text of the note at `from` into plain Markdown for the
+    /// reading view.
     ///
     /// The properties block is dropped. Wikilinks become ordinary links with
     /// a `diamond://note/` address the window recognizes, image embeds become
     /// Markdown images pointing at the file, and other embeds become links.
     /// Everything else, including code that merely looks like a link, is
     /// passed through untouched.
-    pub fn reading_markdown(&self, text: &str) -> String {
+    pub fn reading_markdown(&self, from: &VaultPath, text: &str) -> String {
         let meta = diamond_parse::parse(text);
         let mut output = String::with_capacity(text.len() + 64);
         let mut position = meta
@@ -319,12 +358,10 @@ impl Session {
                 output.push_str(&format!("[{label}]({address})"));
                 continue;
             }
-            let image =
-                self.current()
-                    .and_then(|from| match self.index.resolve(from, &link.target) {
-                        LinkTarget::File(file) if is_image(file) => self.vault.resolve(file).ok(),
-                        _ => None,
-                    });
+            let image = match self.index.resolve(from, &link.target) {
+                LinkTarget::File(file) if is_image(file) => self.vault.resolve(file).ok(),
+                _ => None,
+            };
             match image {
                 // Angle brackets let the path contain spaces.
                 Some(absolute) => output.push_str(&format!("![{label}](<{}>)", absolute.display())),
@@ -343,49 +380,40 @@ impl Session {
         self.vault.watch(on_change)
     }
 
-    /// Brings the index up to date with files a watcher reported as changed
-    /// and reports what that means for the sidebar and the open note.
+    /// Brings the index up to date with files a watcher reported as
+    /// changed. Returns whether files or folders appeared or disappeared,
+    /// which makes the sidebar stale.
     ///
-    /// The open note's saved text is left alone: the caller decides whether
-    /// to take the version on disk ([`Session::accept_disk_text`]) or keep
-    /// what is in the editor.
-    pub fn apply_changes(&mut self, paths: &[VaultPath]) -> Result<Applied, VaultError> {
-        let refresh = self.index.refresh(&self.vault, paths)?;
-        let open = match &self.open {
-            None => OpenChange::Unchanged,
-            Some(open) if !self.vault.exists(&open.path) => OpenChange::Removed,
-            Some(open) => match self.vault.read(&open.path) {
-                Ok(text) if text != open.saved => OpenChange::Changed(text),
-                _ => OpenChange::Unchanged,
-            },
-        };
-        Ok(Applied {
-            structure_changed: refresh.structure_changed,
-            open,
-        })
+    /// Open notes are not touched: ask [`Session::disk_change`] about each.
+    pub fn apply_changes(&mut self, paths: &[VaultPath]) -> Result<bool, VaultError> {
+        Ok(self.index.refresh(&self.vault, paths)?.structure_changed)
     }
 
-    /// Records that the editor now shows `text` as read from disk.
-    pub fn accept_disk_text(&mut self, text: &str) {
-        if let Some(open) = self.open.as_mut() {
-            text.clone_into(&mut open.saved);
+    /// Compares an open note with its file. The note's saved text is left
+    /// alone: the caller decides whether to take the version on disk
+    /// ([`Document::accept_disk_text`]) or keep what is in the editor.
+    pub fn disk_change(&self, document: &Document) -> OpenChange {
+        if !self.vault.exists(&document.path) {
+            return OpenChange::Removed;
+        }
+        match self.vault.read(&document.path) {
+            Ok(text) if text != document.saved => OpenChange::Changed(text),
+            _ => OpenChange::Unchanged,
         }
     }
 
-    /// Closes the open note without writing anything.
-    pub fn close(&mut self) {
-        self.open = None;
-    }
-
-    /// Writes `text` to a new note beside the open one, named after it with
+    /// Writes `text` to a new note beside `document`, named after it with
     /// "(conflict)" added, and returns the new note's path. Used when the
     /// editor and the disk disagree and the editor's text must not be lost.
-    pub fn save_conflict_copy(&mut self, text: &str) -> Result<VaultPath, VaultError> {
-        let Some(open) = self.open.as_ref() else {
-            return Err(VaultError::InvalidPath("no note is open".into()));
-        };
-        let stem = format!("{} (conflict)", open.path.stem());
-        let copy = self.vault.unused_path(open.path.parent(), &stem, "md")?;
+    pub fn save_conflict_copy(
+        &mut self,
+        document: &Document,
+        text: &str,
+    ) -> Result<VaultPath, VaultError> {
+        let stem = format!("{} (conflict)", document.path.stem());
+        let copy = self
+            .vault
+            .unused_path(document.path.parent(), &stem, "md")?;
         self.vault.create(&copy, text)?;
         self.index.upsert(copy.clone(), text);
         Ok(copy)
@@ -400,21 +428,13 @@ impl Session {
         Ok(path)
     }
 
-    /// Moves a file or folder to the vault's trash. Returns whether the open
-    /// note went with it, in which case no note is open any more.
-    pub fn delete(&mut self, path: &VaultPath) -> Result<bool, VaultError> {
+    /// Moves a file or folder to the vault's trash. Notes open from it must
+    /// be closed by the caller; see [`is_at_or_under`].
+    pub fn delete(&mut self, path: &VaultPath) -> Result<(), VaultError> {
         self.vault.trash(path)?;
         self.index
             .refresh(&self.vault, std::slice::from_ref(path))?;
-        let under = format!("{}/", path.as_str());
-        let closes_open = self
-            .open
-            .as_ref()
-            .is_some_and(|open| open.path == *path || open.path.as_str().starts_with(&under));
-        if closes_open {
-            self.open = None;
-        }
-        Ok(closes_open)
+        Ok(())
     }
 
     /// The name to show and edit for an entry: a note's name without `.md`,
@@ -457,33 +477,28 @@ impl Session {
     /// Renames or moves a file or folder, and rewrites the links in other
     /// notes that would otherwise stop leading to it.
     ///
-    /// Links are rewritten in each note's text as last saved, so the open
-    /// note must be saved before this is called.
+    /// Links are rewritten in each note's text as last saved, so every open
+    /// note must be saved before this is called, and afterwards each must
+    /// [`Document::follow_rename`].
+    ///
+    /// An error means nothing was renamed. Once the rename has happened the
+    /// result is `Ok`, with [`Renamed::failed`] set if a link could not be
+    /// rewritten.
     pub fn rename(&mut self, from: &VaultPath, to: &VaultPath) -> Result<Renamed, VaultError> {
-        if from == to {
-            return Ok(Renamed {
-                to: to.clone(),
-                notes_updated: 0,
-                open_text: None,
-            });
-        }
-        // Where a path ends up: the entry itself, or something inside it
-        // when the entry is a folder.
-        let moved = |path: &VaultPath| -> Option<VaultPath> {
-            if path == from {
-                return Some(to.clone());
-            }
-            let rest = path
-                .as_str()
-                .strip_prefix(from.as_str())?
-                .strip_prefix('/')?;
-            to.join(rest).ok()
+        let mut renamed = Renamed {
+            from: from.clone(),
+            to: to.clone(),
+            edits: Vec::new(),
+            failed: None,
         };
+        if from == to {
+            return Ok(renamed);
+        }
         let moves: Vec<(VaultPath, VaultPath)> = self
             .index
             .notes()
             .iter()
-            .filter_map(|note| Some((note.path.clone(), moved(&note.path)?)))
+            .filter_map(|note| Some((note.path.clone(), moved_path(from, to, &note.path)?)))
             .collect();
         let edits = self.index.rename_edits(&moves);
 
@@ -493,30 +508,16 @@ impl Session {
         // is reported, but the rest are still done and the index is brought
         // up to date either way.
         let mut touched = vec![from.clone(), to.clone()];
-        let mut failure = None;
-        let mut open_text = None;
-        for edit in &edits {
-            let target = moved(&edit.path).unwrap_or_else(|| edit.path.clone());
+        for edit in edits {
+            let target = moved_path(from, to, &edit.path).unwrap_or(edit.path);
             match self.vault.write(&target, &edit.text) {
                 Ok(()) => {
-                    if self
-                        .open
-                        .as_ref()
-                        .is_some_and(|open| open.path == edit.path)
-                    {
-                        open_text = Some(edit.text.clone());
-                    }
-                    touched.push(target);
+                    touched.push(target.clone());
+                    renamed.edits.push((target, edit.text));
                 }
-                Err(error) => failure = failure.or(Some(error)),
-            }
-        }
-        if let Some(open) = self.open.as_mut() {
-            if let Some(path) = moved(&open.path) {
-                open.path = path;
-            }
-            if let Some(text) = &open_text {
-                text.clone_into(&mut open.saved);
+                Err(error) => {
+                    renamed.failed.get_or_insert_with(|| error.to_string());
+                }
             }
         }
 
@@ -528,14 +529,7 @@ impl Session {
         } else {
             self.index.refresh(&self.vault, &touched)?;
         }
-        match failure {
-            Some(error) => Err(error),
-            None => Ok(Renamed {
-                to: to.clone(),
-                notes_updated: edits.len(),
-                open_text,
-            }),
-        }
+        Ok(renamed)
     }
 
     /// The notes that best match `query`, best first, as `(path, label)`.
@@ -609,15 +603,16 @@ impl Session {
             .collect()
     }
 
-    /// A template's text with its placeholders filled in for the open note.
+    /// A template's text with its placeholders filled in for the note at
+    /// `into`.
     pub fn template_text(
         &self,
         template: &VaultPath,
+        into: &VaultPath,
         moment: Moment,
     ) -> Result<String, VaultError> {
         let text = self.vault.read(template)?;
-        let title = self.current_title().unwrap_or_default();
-        Ok(notes::fill_template(&text, title, moment))
+        Ok(notes::fill_template(&text, self.title(into), moment))
     }
 
     /// Whether `path` is a note in the index.
@@ -625,33 +620,23 @@ impl Session {
         self.index.note(path).is_some()
     }
 
-    /// Notes that link to the open note, as `(path, title)`.
-    pub fn backlinks(&self) -> Vec<(VaultPath, String)> {
-        let Some(path) = self.current() else {
-            return Vec::new();
-        };
+    /// Notes that link to the note at `path`, as `(path, title)`.
+    pub fn backlinks(&self, path: &VaultPath) -> Vec<(VaultPath, String)> {
         self.index
             .backlinks(path)
             .into_iter()
-            .map(|source| {
-                let title = self
-                    .index
-                    .note(source)
-                    .map_or(source.stem(), |note| note.title());
-                (source.clone(), title.to_owned())
-            })
+            .map(|source| (source.clone(), self.title(source).to_owned()))
             .collect()
     }
 
-    /// How many of the open note's links lead nowhere, as of its last save.
-    pub fn unresolved_link_count(&self) -> usize {
-        self.current().map_or(0, |path| {
-            self.index
-                .outgoing(path)
-                .iter()
-                .filter(|target| matches!(target, LinkTarget::Unresolved(_)))
-                .count()
-        })
+    /// How many links in the note at `path` lead nowhere, as of its last
+    /// save.
+    pub fn unresolved_link_count(&self, path: &VaultPath) -> usize {
+        self.index
+            .outgoing(path)
+            .iter()
+            .filter(|target| matches!(target, LinkTarget::Unresolved(_)))
+            .count()
     }
 }
 
@@ -693,6 +678,14 @@ mod tests {
         out
     }
 
+    const MOMENT: Moment = Moment {
+        year: 2026,
+        month: 11,
+        day: 11,
+        hour: 6,
+        minute: 30,
+    };
+
     #[test]
     fn tree_nests_folders_first_and_sorts_without_case() {
         let (_dir, session) = session(&[
@@ -722,34 +715,54 @@ mod tests {
     #[test]
     fn open_edit_save_updates_disk_and_index() {
         let (dir, mut session) = session(&[("Home.md", "# Home\n"), ("Plan.md", "# Plan\n")]);
-        assert!(session.current().is_none());
-        assert!(!session.save("ignored").unwrap());
-
-        let text = session.open_note(&path("Home.md")).unwrap();
-        assert_eq!(text, "# Home\n");
-        assert_eq!(session.current_title(), Some("Home"));
-        assert!(!session.is_dirty(&text));
-        assert!(!session.save(&text).unwrap());
+        let mut home = session.open_note(&path("Home.md")).unwrap();
+        assert_eq!(home.saved(), "# Home\n");
+        assert_eq!(home.path(), &path("Home.md"));
+        assert_eq!(session.title(home.path()), "Home");
+        assert!(!home.is_dirty("# Home\n"));
+        assert!(!session.save(&mut home, "# Home\n").unwrap());
 
         let edited = "---\ntitle: Start Here\n---\n# Home\n\nSee [[Plan]] and [[Nowhere]] #inbox\n";
-        assert!(session.is_dirty(edited));
-        assert!(session.save(edited).unwrap());
-        assert!(!session.is_dirty(edited));
+        assert!(home.is_dirty(edited));
+        assert!(session.save(&mut home, edited).unwrap());
+        assert!(!home.is_dirty(edited));
         assert_eq!(
             std::fs::read_to_string(dir.path().join("Home.md")).unwrap(),
             edited
         );
-        assert_eq!(session.current_title(), Some("Start Here"));
-        assert_eq!(session.unresolved_link_count(), 1);
+        assert_eq!(session.title(home.path()), "Start Here");
+        assert_eq!(session.unresolved_link_count(home.path()), 1);
         assert_eq!(
             session.search("tag:inbox", 10),
             vec![(path("Home.md"), "Start Here".to_owned(), None)]
         );
-
-        session.open_note(&path("Plan.md")).unwrap();
         assert_eq!(
-            session.backlinks(),
+            session.backlinks(&path("Plan.md")),
             vec![(path("Home.md"), "Start Here".to_owned())]
+        );
+        // A note that is not in the index yet is titled by its name.
+        assert_eq!(session.title(&path("Deep/Not Yet.md")), "Not Yet");
+    }
+
+    #[test]
+    fn two_documents_are_saved_independently() {
+        let (dir, mut session) = session(&[("A.md", "a\n"), ("B.md", "b\n")]);
+        let mut a = session.open_note(&path("A.md")).unwrap();
+        let mut b = session.open_note(&path("B.md")).unwrap();
+        assert!(session.save(&mut b, "b [[A]]\n").unwrap());
+        assert!(!a.is_dirty("a\n"));
+        assert!(session.save(&mut a, "a2\n").unwrap());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("A.md")).unwrap(),
+            "a2\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("B.md")).unwrap(),
+            "b [[A]]\n"
+        );
+        assert_eq!(
+            session.backlinks(a.path()),
+            vec![(path("B.md"), "B".to_owned())]
         );
     }
 
@@ -758,30 +771,33 @@ mod tests {
         let text = "To [[Plan]], [[Ideas/New One|new]], ![[pic.png]], [[#Top]] and plain text.";
         let (dir, mut session) =
             session(&[("Home.md", text), ("Work/Plan.md", ""), ("pic.png", "")]);
+        let home = path("Home.md");
         let at = |needle: &str| text.find(needle).unwrap() + 3;
 
-        // Nothing is open yet, so there is nothing to follow from.
-        assert_eq!(session.follow(text, at("[[Plan")).unwrap(), Follow::NoLink);
-        session.open_note(&path("Home.md")).unwrap();
-
         assert_eq!(
-            session.follow(text, at("[[Plan")).unwrap(),
+            session.follow(&home, text, at("[[Plan")).unwrap(),
             Follow::Note {
                 path: path("Work/Plan.md"),
                 created: false
             }
         );
-        assert_eq!(session.follow(text, at("plain")).unwrap(), Follow::NoLink);
-        assert_eq!(session.follow(text, at("[[#Top")).unwrap(), Follow::NoLink);
         assert_eq!(
-            session.follow(text, at("![[pic")).unwrap(),
+            session.follow(&home, text, at("plain")).unwrap(),
+            Follow::NoLink
+        );
+        assert_eq!(
+            session.follow(&home, text, at("[[#Top")).unwrap(),
+            Follow::NoLink
+        );
+        assert_eq!(
+            session.follow(&home, text, at("![[pic")).unwrap(),
             Follow::Attachment(path("pic.png"))
         );
 
         let new_note = path("Ideas/New One.md");
         assert!(!dir.path().join("Ideas/New One.md").exists());
         assert_eq!(
-            session.follow(text, at("[[Ideas")).unwrap(),
+            session.follow(&home, text, at("[[Ideas")).unwrap(),
             Follow::Note {
                 path: new_note.clone(),
                 created: true
@@ -793,7 +809,7 @@ mod tests {
         );
         // The second time it is an ordinary existing note.
         assert_eq!(
-            session.follow(text, at("[[Ideas")).unwrap(),
+            session.follow(&home, text, at("[[Ideas")).unwrap(),
             Follow::Note {
                 path: new_note,
                 created: false
@@ -804,22 +820,25 @@ mod tests {
     #[test]
     fn reading_markdown_turns_wikilinks_into_ordinary_links() {
         let text = "---\ntitle: T\n---\n# Head\n\nSee [[Plan]], [[Work/Plan#Budget|the budget]] and [[A (b) c]].\n\n![[pic one.png]]\n\n![[Plan]]\n\n`[[code]]` and [web](https://example.com).\n";
-        let (dir, mut session) = session(&[
+        let (dir, session) = session(&[
             ("Home.md", text),
             ("Work/Plan.md", ""),
             ("img/pic one.png", ""),
         ]);
-        session.open_note(&path("Home.md")).unwrap();
+        let home = path("Home.md");
         let image = dir.path().canonicalize().unwrap().join("img/pic one.png");
         assert_eq!(
-            session.reading_markdown(text),
+            session.reading_markdown(&home, text),
             format!(
                 "\n# Head\n\nSee [Plan](diamond://note/Plan), [the budget](diamond://note/Work/Plan%23Budget) and [A (b) c](diamond://note/A%20%28b%29%20c).\n\n![pic one.png](<{}>)\n\n[↪ Plan](diamond://note/Plan)\n\n`[[code]]` and [web](https://example.com).\n",
                 image.display()
             )
         );
         // Text without links or properties passes through unchanged.
-        assert_eq!(session.reading_markdown("plain *text*\n"), "plain *text*\n");
+        assert_eq!(
+            session.reading_markdown(&home, "plain *text*\n"),
+            "plain *text*\n"
+        );
     }
 
     #[test]
@@ -850,20 +869,12 @@ mod tests {
         assert!(session.search("", 10).is_empty());
     }
 
-    const MOMENT: Moment = Moment {
-        year: 2026,
-        month: 11,
-        day: 11,
-        hour: 6,
-        minute: 30,
-    };
-
     #[test]
     fn daily_note_is_created_once_from_its_template() {
         let (dir, mut session) = session(&[
             ("Templates/Daily.md", "# {{title}}\n\nStarted {{time}}\n"),
             ("Templates/Meeting.md", "## {{title}} on {{date}}\n"),
-            ("Home.md", ""),
+            ("Home.md", "---\ntitle: Base\n---\n"),
         ]);
         assert_eq!(session.settings_problem(), None);
         let (daily, created) = session.daily_note(MOMENT).unwrap();
@@ -888,12 +899,12 @@ mod tests {
                 (path("Templates/Meeting.md"), "Meeting".to_owned()),
             ]
         );
-        session.open_note(&path("Home.md")).unwrap();
+        // The title filled in is the receiving note's display title.
         assert_eq!(
             session
-                .template_text(&path("Templates/Meeting.md"), MOMENT)
+                .template_text(&path("Templates/Meeting.md"), &path("Home.md"), MOMENT)
                 .unwrap(),
-            "## Home on 2026-11-11\n"
+            "## Base on 2026-11-11\n"
         );
     }
 
@@ -941,84 +952,79 @@ mod tests {
     #[test]
     fn follow_target_ignores_the_heading_part() {
         let (_dir, mut session) = session(&[("Home.md", ""), ("Plan.md", "")]);
-        session.open_note(&path("Home.md")).unwrap();
+        let home = path("Home.md");
         assert_eq!(
-            session.follow_target("Plan#Budget").unwrap(),
+            session.follow_target(&home, "Plan#Budget").unwrap(),
             Follow::Note {
                 path: path("Plan.md"),
                 created: false
             }
         );
-        assert_eq!(session.follow_target("#Top").unwrap(), Follow::NoLink);
+        assert_eq!(
+            session.follow_target(&home, "#Top").unwrap(),
+            Follow::NoLink
+        );
     }
 
     #[test]
     fn follow_rejects_a_link_that_would_leave_the_vault() {
         let text = "[[../../outside]]";
         let (dir, mut session) = session(&[("Home.md", text)]);
-        session.open_note(&path("Home.md")).unwrap();
-        assert!(session.follow(text, 4).is_err());
+        assert!(session.follow(&path("Home.md"), text, 4).is_err());
         assert!(!dir.path().parent().unwrap().join("outside.md").exists());
     }
 
     #[test]
-    fn apply_changes_reports_outside_edits_and_removals() {
+    fn disk_change_reports_outside_edits_and_removals() {
         let (dir, mut session) = session(&[("Home.md", "one"), ("Other.md", "")]);
         let home = path("Home.md");
-        assert_eq!(
-            session
-                .apply_changes(std::slice::from_ref(&home))
-                .unwrap()
-                .open,
-            OpenChange::Unchanged
-        );
-        session.open_note(&home).unwrap();
+        let mut document = session.open_note(&home).unwrap();
+        assert_eq!(session.disk_change(&document), OpenChange::Unchanged);
 
         // Our own save comes back from the watcher as "unchanged".
-        session.save("two").unwrap();
-        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
-        assert_eq!(
-            applied,
-            Applied {
-                structure_changed: false,
-                open: OpenChange::Unchanged
-            }
-        );
+        session.save(&mut document, "two").unwrap();
+        assert!(!session.apply_changes(std::slice::from_ref(&home)).unwrap());
+        assert_eq!(session.disk_change(&document), OpenChange::Unchanged);
 
         // Another program edits the file.
         std::fs::write(dir.path().join("Home.md"), "three [[Other]]").unwrap();
-        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
-        assert_eq!(applied.open, OpenChange::Changed("three [[Other]]".into()));
-        assert!(session.is_dirty("three [[Other]]"));
-        session.accept_disk_text("three [[Other]]");
-        assert!(!session.is_dirty("three [[Other]]"));
+        assert!(!session.apply_changes(std::slice::from_ref(&home)).unwrap());
         assert_eq!(
-            session
-                .apply_changes(std::slice::from_ref(&home))
-                .unwrap()
-                .open,
-            OpenChange::Unchanged
+            session.disk_change(&document),
+            OpenChange::Changed("three [[Other]]".into())
         );
+        // The index already has the new text, whatever the editor decides.
+        assert_eq!(session.backlinks(&path("Other.md")).len(), 1);
+        assert!(document.is_dirty("three [[Other]]"));
+        document.accept_disk_text("three [[Other]]");
+        assert!(!document.is_dirty("three [[Other]]"));
+        assert_eq!(session.disk_change(&document), OpenChange::Unchanged);
 
         // Another program adds a file, then deletes the open note.
         std::fs::write(dir.path().join("Added.md"), "").unwrap();
-        assert!(
-            session
-                .apply_changes(&[path("Added.md")])
-                .unwrap()
-                .structure_changed
-        );
+        assert!(session.apply_changes(&[path("Added.md")]).unwrap());
         std::fs::remove_file(dir.path().join("Home.md")).unwrap();
-        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
+        assert!(session.apply_changes(std::slice::from_ref(&home)).unwrap());
+        assert_eq!(session.disk_change(&document), OpenChange::Removed);
+        // Saving the document puts the note back.
+        assert!(session.save(&mut document, "back").unwrap());
         assert_eq!(
-            applied,
-            Applied {
-                structure_changed: true,
-                open: OpenChange::Removed
-            }
+            std::fs::read_to_string(dir.path().join("Home.md")).unwrap(),
+            "back"
         );
-        // The note stays open so its text can still be saved back.
-        assert_eq!(session.current(), Some(&home));
+    }
+
+    #[test]
+    fn a_conflict_copy_goes_beside_the_note() {
+        let (dir, mut session) = session(&[("Work/Plan.md", "p"), ("Work/Plan (conflict).md", "")]);
+        let document = session.open_note(&path("Work/Plan.md")).unwrap();
+        let copy = session.save_conflict_copy(&document, "mine").unwrap();
+        assert_eq!(copy, path("Work/Plan (conflict) 1.md"));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Work/Plan (conflict) 1.md")).unwrap(),
+            "mine"
+        );
+        assert!(session.is_note(&copy));
     }
 
     #[test]
@@ -1038,25 +1044,43 @@ mod tests {
     }
 
     #[test]
-    fn delete_trashes_and_closes_the_open_note_when_it_goes() {
+    fn delete_trashes_files_and_folders() {
         let (dir, mut session) = session(&[
             ("Keep.md", "[[Gone]]"),
             ("Folder/Gone.md", "x"),
             ("Folder/Also.md", ""),
         ]);
-        session.open_note(&path("Keep.md")).unwrap();
-        assert!(!session.delete(&path("Folder/Also.md")).unwrap());
-        assert_eq!(session.current(), Some(&path("Keep.md")));
-
-        session.open_note(&path("Folder/Gone.md")).unwrap();
-        assert!(session.delete(&path("Folder")).unwrap());
-        assert!(session.current().is_none());
+        session.delete(&path("Folder/Also.md")).unwrap();
+        assert!(!session.is_note(&path("Folder/Also.md")));
+        session.delete(&path("Folder")).unwrap();
         assert!(!session.is_note(&path("Folder/Gone.md")));
+        assert_eq!(session.unresolved_link_count(&path("Keep.md")), 1);
         assert_eq!(
             std::fs::read_to_string(dir.path().join(".diamond/trash/Folder/Gone.md")).unwrap(),
             "x"
         );
         assert!(session.delete(&path("Folder")).is_err());
+    }
+
+    #[test]
+    fn paths_are_followed_through_renames_of_files_and_folders() {
+        let moved = |from: &str, to: &str, at: &str| {
+            moved_path(&path(from), &path(to), &path(at)).map(|moved| moved.to_string())
+        };
+        assert_eq!(moved("A.md", "B.md", "A.md").as_deref(), Some("B.md"));
+        assert_eq!(moved("A.md", "B.md", "C.md"), None);
+        assert_eq!(
+            moved("Old", "New/Place", "Old/Deep/C.md").as_deref(),
+            Some("New/Place/Deep/C.md")
+        );
+        // A name that merely starts the same is something else.
+        assert_eq!(moved("Old", "New", "Older/C.md"), None);
+        assert_eq!(moved("Old", "New", "Old.md"), None);
+
+        assert!(is_at_or_under(&path("Old"), &path("Old")));
+        assert!(is_at_or_under(&path("Old"), &path("Old/Deep/C.md")));
+        assert!(!is_at_or_under(&path("Old"), &path("Older/C.md")));
+        assert!(!is_at_or_under(&path("Old/C.md"), &path("Old")));
     }
 
     #[test]
@@ -1096,7 +1120,7 @@ mod tests {
     }
 
     #[test]
-    fn rename_rewrites_links_and_follows_the_open_note() {
+    fn rename_rewrites_links_and_open_documents_follow() {
         let (dir, mut session) = session(&[
             ("Home.md", "See [[Plan]] and [[Work/Plan|the plan]].\n"),
             (
@@ -1106,44 +1130,47 @@ mod tests {
             ("Work/Notes.md", "n\n"),
         ]);
         let read = |name: &str| std::fs::read_to_string(dir.path().join(name)).unwrap();
-        session.open_note(&path("Home.md")).unwrap();
+        let mut home = session.open_note(&path("Home.md")).unwrap();
+        let mut plan = session.open_note(&path("Work/Plan.md")).unwrap();
 
-        // A note: links that name it are rewritten, including in the open
-        // note, whose new text is handed back for the editor.
+        // A note: links that name it are rewritten. The open note that
+        // links to it gets its new text; the renamed one gets its new path.
         let renamed = session
             .rename(&path("Work/Plan.md"), &path("Work/Budget.md"))
             .unwrap();
         assert_eq!(renamed.to, path("Work/Budget.md"));
-        assert_eq!(renamed.notes_updated, 1);
-        let home = "See [[Budget]] and [[Work/Budget|the plan]].\n";
-        assert_eq!(renamed.open_text.as_deref(), Some(home));
-        assert_eq!(read("Home.md"), home);
-        assert!(!session.is_dirty(home));
+        assert_eq!(renamed.edits.len(), 1);
+        let home_text = "See [[Budget]] and [[Work/Budget|the plan]].\n";
+        assert_eq!(home.follow_rename(&renamed), Some(home_text));
+        assert_eq!(read("Home.md"), home_text);
+        assert!(!home.is_dirty(home_text));
+        assert_eq!(plan.follow_rename(&renamed), None);
+        assert_eq!(plan.path(), &path("Work/Budget.md"));
         assert!(!dir.path().join("Work/Plan.md").exists());
         assert!(session.is_note(&path("Work/Budget.md")));
         assert!(!session.is_note(&path("Work/Plan.md")));
-        assert_eq!(session.unresolved_link_count(), 0);
+        assert_eq!(session.unresolved_link_count(home.path()), 0);
 
-        // The open note itself: it stays open under its new name.
-        let renamed = session.rename(&path("Home.md"), &path("Start.md")).unwrap();
-        assert_eq!(renamed.open_text, None);
-        assert_eq!(session.current(), Some(&path("Start.md")));
-        assert_eq!(
-            read("Work/Budget.md"),
-            "Back to [[Start]] and on to [[Work/Notes]].\n"
-        );
-        assert!(session.save(&format!("{home}more\n")).unwrap());
-        assert_eq!(read("Start.md"), format!("{home}more\n"));
+        // The moved document saves to its new place.
+        let plan_text = format!("{}more\n", plan.saved());
+        assert!(session.save(&mut plan, &plan_text).unwrap());
+        assert_eq!(read("Work/Budget.md"), plan_text);
 
         // A folder: every note in it moves, and links that spelled out the
-        // folder follow.
-        session.open_note(&path("Work/Budget.md")).unwrap();
+        // folder follow. A document that both moved and was rewritten gets
+        // its new path and its new text.
         let renamed = session.rename(&path("Work"), &path("Projects")).unwrap();
-        assert_eq!(session.current(), Some(&path("Projects/Budget.md")));
-        let budget = "Back to [[Start]] and on to [[Projects/Notes]].\n";
-        assert_eq!(renamed.open_text.as_deref(), Some(budget));
-        assert_eq!(read("Projects/Budget.md"), budget);
-        assert!(read("Start.md").contains("[[Projects/Budget|the plan]]"));
+        let plan_text = plan.follow_rename(&renamed).map(str::to_owned);
+        assert_eq!(plan.path(), &path("Projects/Budget.md"));
+        assert_eq!(
+            plan_text.as_deref(),
+            Some("Back to [[Home]] and on to [[Projects/Notes]].\nmore\n")
+        );
+        assert_eq!(read("Projects/Budget.md"), plan_text.unwrap());
+        assert_eq!(
+            home.follow_rename(&renamed),
+            Some("See [[Budget]] and [[Projects/Budget|the plan]].\n")
+        );
         assert!(session.is_note(&path("Projects/Notes.md")));
         assert!(!dir.path().join("Work").exists());
     }
@@ -1161,21 +1188,22 @@ mod tests {
         );
         assert!(session.is_note(&path("A.md")));
         // Renaming to the same name is nothing at all.
-        assert_eq!(
+        assert!(
             session
                 .rename(&path("A.md"), &path("A.md"))
                 .unwrap()
-                .notes_updated,
-            0
+                .edits
+                .is_empty()
         );
     }
 
     #[test]
     fn rename_can_change_only_the_capitals() {
         let (dir, mut session) = session(&[("note.md", "n"), ("Other.md", "[[note]]")]);
-        session.open_note(&path("note.md")).unwrap();
-        session.rename(&path("note.md"), &path("Note.md")).unwrap();
-        assert_eq!(session.current(), Some(&path("Note.md")));
+        let mut document = session.open_note(&path("note.md")).unwrap();
+        let renamed = session.rename(&path("note.md"), &path("Note.md")).unwrap();
+        document.follow_rename(&renamed);
+        assert_eq!(document.path(), &path("Note.md"));
         assert!(session.is_note(&path("Note.md")));
         assert!(!session.is_note(&path("note.md")));
         let names: Vec<String> = std::fs::read_dir(dir.path())
@@ -1187,10 +1215,9 @@ mod tests {
     }
 
     #[test]
-    fn opening_a_missing_note_keeps_the_current_one() {
-        let (_dir, mut session) = session(&[("Home.md", "x")]);
-        session.open_note(&path("Home.md")).unwrap();
+    fn opening_a_missing_note_is_an_error() {
+        let (_dir, session) = session(&[("Home.md", "x")]);
         assert!(session.open_note(&path("Gone.md")).is_err());
-        assert_eq!(session.current(), Some(&path("Home.md")));
+        assert!(session.open_note(&path("Home.md")).is_ok());
     }
 }

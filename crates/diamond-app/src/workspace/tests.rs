@@ -65,7 +65,7 @@ fn open_type_save_autosave_and_switch(cx: &mut TestAppContext) {
         Root::new(view, window, cx)
     });
     let workspace = workspace.unwrap();
-    let editor = workspace.read_with(cx, |workspace, _| workspace.editor.clone());
+    let editor = workspace.read_with(cx, |workspace, _| workspace.tab().editor.clone());
     let text = |cx: &mut VisualTestContext| editor.read_with(cx, |editor, _| editor.value());
 
     // Opening a note loads it without marking it edited.
@@ -77,11 +77,11 @@ fn open_type_save_autosave_and_switch(cx: &mut TestAppContext) {
     assert_eq!(text(cx).as_ref(), "# Plan\n");
     workspace.read_with(cx, |workspace, _| {
         assert_eq!(
-            workspace.session.backlinks(),
+            workspace.backlinks(),
             vec![(path("Home.md"), "Home".to_owned())]
         );
-        assert!(!workspace.session.is_dirty("# Plan\n"));
-        assert!(workspace.autosave.is_none());
+        assert!(!workspace.tab().is_dirty("# Plan\n"));
+        assert!(workspace.tab().autosave.is_none());
     });
 
     // Typing changes the editor, not the file.
@@ -89,12 +89,16 @@ fn open_type_save_autosave_and_switch(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("x");
     assert_eq!(text(cx).as_ref(), "x# Plan\n");
     assert_eq!(fs::read_to_string(&plan).unwrap(), "# Plan\n");
-    workspace.read_with(cx, |workspace, _| assert!(workspace.autosave.is_some()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().autosave.is_some())
+    });
 
     // The save shortcut writes immediately.
     cx.simulate_keystrokes(primary!("s"));
     assert_eq!(fs::read_to_string(&plan).unwrap(), "x# Plan\n");
-    workspace.read_with(cx, |workspace, _| assert!(workspace.autosave.is_none()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().autosave.is_none())
+    });
 
     // Otherwise the note is written shortly after the last keystroke.
     cx.simulate_keystrokes("y");
@@ -151,8 +155,8 @@ fn a_missing_note_shows_an_error_and_keeps_the_editor(cx: &mut TestAppContext) {
                 .as_ref()
                 .is_some_and(|error| error.contains("Gone.md"))
         );
-        assert_eq!(workspace.session.current(), Some(&path("Home.md")));
-        assert_eq!(workspace.editor.read(cx).value().as_ref(), "home\n");
+        assert_eq!(workspace.current(), Some(&path("Home.md")));
+        assert_eq!(workspace.tab().editor.read(cx).value().as_ref(), "home\n");
     });
 }
 
@@ -233,7 +237,7 @@ fn alt_enter_follows_the_link_under_the_cursor(cx: &mut TestAppContext) {
         Root::new(view, window, cx)
     });
     let workspace = workspace.unwrap();
-    let editor = workspace.read_with(cx, |workspace, _| workspace.editor.clone());
+    let editor = workspace.read_with(cx, |workspace, _| workspace.tab().editor.clone());
     let open_home_with_cursor_on = |needle: &str, cx: &mut VisualTestContext| {
         let offset = home_text.find(needle).unwrap() + 3;
         cx.update(|window, cx| {
@@ -247,7 +251,7 @@ fn alt_enter_follows_the_link_under_the_cursor(cx: &mut TestAppContext) {
         });
     };
     let current = |cx: &mut VisualTestContext| {
-        workspace.read_with(cx, |workspace, _| workspace.session.current().cloned())
+        workspace.read_with(cx, |workspace, _| workspace.current().cloned())
     };
 
     // An existing note opens.
@@ -318,6 +322,7 @@ fn open_note(workspace: &gpui_kit::Entity<Workspace>, name: &str, cx: &mut Visua
         workspace.update(cx, |workspace, cx| {
             workspace.open_note(&path(name), window, cx);
             workspace
+                .tab()
                 .editor
                 .update(cx, |editor, cx| editor.focus(window, cx));
         });
@@ -334,7 +339,7 @@ fn changed(workspace: &gpui_kit::Entity<Workspace>, name: &str, cx: &mut VisualT
 
 fn editor_text(workspace: &gpui_kit::Entity<Workspace>, cx: &mut VisualTestContext) -> String {
     workspace.read_with(cx, |workspace, cx| {
-        workspace.editor.read(cx).value().to_string()
+        workspace.tab().editor.read(cx).value().to_string()
     })
 }
 
@@ -347,8 +352,8 @@ fn an_outside_edit_reloads_a_note_without_unsaved_changes(cx: &mut TestAppContex
     changed(&workspace, "Home.md", cx);
     assert_eq!(editor_text(&workspace, cx), "second, from elsewhere\n");
     workspace.read_with(cx, |workspace, _| {
-        assert!(workspace.conflict.is_none());
-        assert!(!workspace.session.is_dirty("second, from elsewhere\n"));
+        assert!(workspace.tab().conflict.is_none());
+        assert!(!workspace.tab().is_dirty("second, from elsewhere\n"));
     });
 
     // A new file elsewhere shows up in the sidebar.
@@ -377,8 +382,8 @@ fn an_outside_edit_never_overwrites_or_loses_unsaved_changes(cx: &mut TestAppCon
     // The editor keeps the user's text and autosave stands down.
     assert_eq!(editor_text(&workspace, cx), "minebase\n");
     workspace.read_with(cx, |workspace, _| {
-        assert!(workspace.conflict.is_some());
-        assert!(workspace.autosave.is_none());
+        assert!(workspace.tab().conflict.is_some());
+        assert!(workspace.tab().autosave.is_none());
     });
     cx.simulate_keystrokes("!");
     cx.executor().advance_clock(AUTOSAVE_DELAY * 3);
@@ -393,7 +398,9 @@ fn an_outside_edit_never_overwrites_or_loses_unsaved_changes(cx: &mut TestAppCon
         fs::read_to_string(dir.path().join("Home (conflict).md")).unwrap(),
         "mine!base\n"
     );
-    workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_none()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().conflict.is_none())
+    });
 }
 
 #[gpui_kit::test]
@@ -407,7 +414,9 @@ fn saving_settles_a_conflict_in_the_editors_favour(cx: &mut TestAppContext) {
 
     cx.simulate_keystrokes(primary!("s"));
     assert_eq!(fs::read_to_string(&home).unwrap(), "xbase\n");
-    workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_none()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().conflict.is_none())
+    });
     assert!(!dir.path().join("Home (conflict).md").exists());
 }
 
@@ -418,16 +427,16 @@ fn a_note_removed_elsewhere_closes_unless_it_has_unsaved_changes(cx: &mut TestAp
     fs::remove_file(dir.path().join("A.md")).unwrap();
     changed(&workspace, "A.md", cx);
     assert_eq!(editor_text(&workspace, cx), "");
-    workspace.read_with(cx, |workspace, _| {
-        assert!(workspace.session.current().is_none())
-    });
+    workspace.read_with(cx, |workspace, _| assert!(workspace.current().is_none()));
 
     open_note(&workspace, "B.md", cx);
     cx.simulate_keystrokes("x");
     fs::remove_file(dir.path().join("B.md")).unwrap();
     changed(&workspace, "B.md", cx);
     assert_eq!(editor_text(&workspace, cx), "xb\n");
-    workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_some()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().conflict.is_some())
+    });
     // Saving puts the note back.
     cx.simulate_keystrokes(primary!("s"));
     assert_eq!(fs::read_to_string(dir.path().join("B.md")).unwrap(), "xb\n");
@@ -441,7 +450,7 @@ fn the_new_note_shortcut_creates_and_opens_untitled(cx: &mut TestAppContext) {
     cx.simulate_keystrokes(primary!("n"));
 
     workspace.read_with(cx, |workspace, cx| {
-        assert_eq!(workspace.session.current(), Some(&path("Untitled.md")));
+        assert_eq!(workspace.current(), Some(&path("Untitled.md")));
         assert!(
             workspace
                 .tree
@@ -477,7 +486,7 @@ fn deleting_the_open_note_trashes_its_latest_text(cx: &mut TestAppContext) {
     );
     assert_eq!(editor_text(&workspace, cx), "");
     workspace.read_with(cx, |workspace, cx| {
-        assert!(workspace.session.current().is_none());
+        assert!(workspace.current().is_none());
         assert!(workspace.error.is_none(), "{:?}", workspace.error);
         let tree = workspace.tree.read(cx);
         assert!(tree.index_of(&"Home.md".into()).is_none());
@@ -529,7 +538,7 @@ fn the_quick_switcher_finds_and_opens_a_note(cx: &mut TestAppContext) {
     workspace.read_with(cx, |workspace, _| {
         assert!(workspace.overlay.is_none());
         assert_eq!(
-            workspace.session.current(),
+            workspace.current(),
             Some(&path("Projects/Quarterly Plan.md"))
         );
     });
@@ -552,7 +561,7 @@ fn escape_closes_the_quick_switcher_without_changing_notes(cx: &mut TestAppConte
     cx.simulate_keystrokes("escape");
     workspace.read_with(cx, |workspace, _| {
         assert!(workspace.overlay.is_none());
-        assert_eq!(workspace.session.current(), Some(&path("Home.md")));
+        assert_eq!(workspace.current(), Some(&path("Home.md")));
     });
     cx.simulate_keystrokes("z");
     assert_eq!(editor_text(&workspace, cx), "zhome\n");
@@ -572,7 +581,7 @@ fn reading_view_shows_the_note_and_follows_its_links(cx: &mut TestAppContext) {
 
     cx.simulate_keystrokes(primary!("e"));
     workspace.read_with(cx, |workspace, _| {
-        let (source, rendered) = workspace.reading.as_ref().expect("reading view on");
+        let (source, rendered) = workspace.tab().reading.as_ref().expect("reading view on");
         assert_eq!(source.as_ref(), "x# Home\n\nGo to [[Plan]] or [[Brand New]].\n");
         assert_eq!(
             rendered.as_ref(),
@@ -597,8 +606,8 @@ fn reading_view_shows_the_note_and_follows_its_links(cx: &mut TestAppContext) {
     };
     click("diamond://note/Plan", cx);
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!(workspace.session.current(), Some(&path("Plan.md")));
-        assert!(workspace.reading.is_some());
+        assert_eq!(workspace.current(), Some(&path("Plan.md")));
+        assert!(workspace.tab().reading.is_some());
     });
     assert!(
         fs::read_to_string(dir.path().join("Home.md"))
@@ -607,19 +616,24 @@ fn reading_view_shows_the_note_and_follows_its_links(cx: &mut TestAppContext) {
     );
     cx.update(|window, cx| window.render_frame(cx));
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!(workspace.reading.as_ref().unwrap().1.as_ref(), "# Plan\n");
+        assert_eq!(
+            workspace.tab().reading.as_ref().unwrap().1.as_ref(),
+            "# Plan\n"
+        );
     });
 
     // A link to a note that does not exist creates it.
     click("diamond://note/Brand%20New", cx);
     assert!(dir.path().join("Brand New.md").exists());
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!(workspace.session.current(), Some(&path("Brand New.md")));
+        assert_eq!(workspace.current(), Some(&path("Brand New.md")));
     });
 
     // Back to editing: typing reaches the editor again.
     cx.simulate_keystrokes(primary!("e"));
-    workspace.read_with(cx, |workspace, _| assert!(workspace.reading.is_none()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_none())
+    });
     cx.simulate_keystrokes("h i");
     assert_eq!(editor_text(&workspace, cx), "hi");
 }
@@ -660,9 +674,9 @@ fn the_search_palette_opens_a_note_at_the_matching_line(cx: &mut TestAppContext)
     cx.simulate_keystrokes("enter");
     workspace.read_with(cx, |workspace, cx| {
         assert!(workspace.overlay.is_none());
-        assert_eq!(workspace.session.current(), Some(&path("Deep/Report.md")));
+        assert_eq!(workspace.current(), Some(&path("Deep/Report.md")));
         let text = "# Report\n\nintro\n";
-        assert_eq!(workspace.editor.read(cx).cursor(), text.len());
+        assert_eq!(workspace.tab().editor.read(cx).cursor(), text.len());
     });
     // Typing lands on the matching line.
     cx.simulate_keystrokes("x");
@@ -674,18 +688,18 @@ fn the_search_palette_opens_a_note_at_the_matching_line(cx: &mut TestAppContext)
 
 fn current(workspace: &gpui_kit::Entity<Workspace>, cx: &mut VisualTestContext) -> Option<String> {
     workspace.read_with(cx, |workspace, _| {
-        workspace.session.current().map(ToString::to_string)
+        workspace.current().map(ToString::to_string)
     })
 }
 
 fn cursor(workspace: &gpui_kit::Entity<Workspace>, cx: &mut VisualTestContext) -> usize {
-    workspace.read_with(cx, |workspace, cx| workspace.editor.read(cx).cursor())
+    workspace.read_with(cx, |workspace, cx| workspace.tab().editor.read(cx).cursor())
 }
 
 fn set_cursor(workspace: &gpui_kit::Entity<Workspace>, offset: usize, cx: &mut VisualTestContext) {
     cx.update(|_, cx| {
         workspace.update(cx, |workspace, cx| {
-            workspace.editor.update(cx, |editor, cx| {
+            workspace.tab().editor.update(cx, |editor, cx| {
                 editor.set_selected_range(offset..offset, cx);
             });
         });
@@ -765,6 +779,7 @@ fn the_daily_note_shortcut_opens_the_same_note_again(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         workspace.update(cx, |workspace, cx| {
             workspace
+                .tab()
                 .editor
                 .update(cx, |editor, cx| editor.focus(window, cx));
         });
@@ -846,8 +861,8 @@ fn f2_renames_the_open_note_and_rewrites_the_links_to_it(cx: &mut TestAppContext
         );
         assert!(
             !workspace
-                .session
-                .is_dirty(&workspace.editor.read(cx).value())
+                .tab()
+                .is_dirty(&workspace.tab().editor.read(cx).value())
         );
         let tree = workspace.tree.read(cx);
         assert!(tree.index_of(&"index.md".into()).is_some());
@@ -951,7 +966,7 @@ fn renaming_waits_for_a_conflict_to_be_settled(cx: &mut TestAppContext) {
     });
     workspace.read_with(cx, |workspace, _| {
         assert!(workspace.error.is_some());
-        assert!(workspace.conflict.is_some());
+        assert!(workspace.tab().conflict.is_some());
     });
     assert_eq!(
         fs::read_to_string(dir.path().join("Home.md")).unwrap(),
@@ -983,8 +998,8 @@ fn back_and_forward_return_to_earlier_notes_and_cursors(cx: &mut TestAppContext)
     set_cursor(&workspace, 5, cx);
     open_note(&workspace, "C.md", cx);
     workspace.read_with(cx, |workspace, _| {
-        assert!(workspace.history.can_go_back());
-        assert!(!workspace.history.can_go_forward());
+        assert!(workspace.tab().history.can_go_back());
+        assert!(!workspace.tab().history.can_go_forward());
     });
 
     cx.simulate_keystrokes(back);
@@ -1033,7 +1048,7 @@ fn deleting_the_open_note_takes_it_out_of_the_history(cx: &mut TestAppContext) {
     });
     assert_eq!(current(&workspace, cx), None);
     workspace.read_with(cx, |workspace, _| {
-        assert!(!workspace.history.can_go_forward());
+        assert!(!workspace.tab().history.can_go_forward());
         assert_eq!(workspace.notice.as_deref(), Some("Moved B.md to the trash"));
     });
 }
@@ -1076,7 +1091,7 @@ fn a_template_is_inserted_at_the_cursor_and_saved(cx: &mut TestAppContext) {
         assert!(workspace.overlay.is_none());
         assert!(workspace.error.is_none(), "{:?}", workspace.error);
         // Inserted text is saved like typed text.
-        assert!(workspace.autosave.is_some());
+        assert!(workspace.tab().autosave.is_some());
     });
     // The cursor is after what was inserted.
     cx.simulate_keystrokes("x");
@@ -1121,6 +1136,7 @@ fn the_outline_tags_and_counts_follow_what_is_typed(cx: &mut TestAppContext) {
     let outline = |cx: &mut VisualTestContext| {
         workspace.read_with(cx, |workspace, _| {
             workspace
+                .tab()
                 .live
                 .meta
                 .headings
@@ -1131,15 +1147,18 @@ fn the_outline_tags_and_counts_follow_what_is_typed(cx: &mut TestAppContext) {
     };
     // Nothing is open: nothing to count.
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!((workspace.live.words, workspace.live.characters), (0, 0));
+        assert_eq!(
+            (workspace.tab().live.words, workspace.tab().live.characters),
+            (0, 0)
+        );
     });
 
     open_note(&workspace, "Home.md", cx);
     assert_eq!(outline(cx), vec!["Top", "Sub"]);
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!(workspace.live.meta.all_tags(), vec!["meta", "alpha"]);
+        assert_eq!(workspace.tab().live.meta.all_tags(), vec!["meta", "alpha"]);
         // The properties block and bare markers are not words.
-        assert_eq!(workspace.live.words, 6);
+        assert_eq!(workspace.tab().live.words, 6);
     });
 
     // Typing a new heading shows up before anything is saved.
@@ -1147,17 +1166,21 @@ fn the_outline_tags_and_counts_follow_what_is_typed(cx: &mut TestAppContext) {
     set_cursor(&workspace, end, cx);
     cx.simulate_keystrokes("# space n e w");
     assert_eq!(outline(cx), vec!["Top", "Sub", "new"]);
-    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.live.words, 7));
+    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.tab().live.words, 7));
 
     // Clicking a heading puts the cursor on it, leaving the reading view
     // if that is where the click came from.
     cx.simulate_keystrokes(primary!("e"));
-    workspace.read_with(cx, |workspace, _| assert!(workspace.reading.is_some()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_some())
+    });
     let sub = home.find("## Sub").unwrap();
     cx.update(|window, cx| {
         workspace.update(cx, |workspace, cx| workspace.jump_to(sub, window, cx));
     });
-    workspace.read_with(cx, |workspace, _| assert!(workspace.reading.is_none()));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_none())
+    });
     assert_eq!(cursor(&workspace, cx), sub);
     cx.simulate_keystrokes("x");
     assert!(editor_text(&workspace, cx).contains("\nx## Sub\n"));
@@ -1170,7 +1193,7 @@ fn the_outline_tags_and_counts_follow_what_is_typed(cx: &mut TestAppContext) {
         });
     });
     assert!(outline(cx).is_empty());
-    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.live.words, 0));
+    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.tab().live.words, 0));
 }
 
 #[gpui_kit::test]
@@ -1291,7 +1314,7 @@ fn the_status_line_and_its_parts_are_laid_out(cx: &mut TestAppContext) {
     );
     open_note(&workspace, "Home.md", cx);
     workspace.read_with(cx, |workspace, _| {
-        assert_eq!(workspace.live.words, 4);
+        assert_eq!(workspace.tab().live.words, 4);
         // A settings file that cannot be read is reported, not ignored.
         assert!(workspace.session.settings_problem().is_some());
     });
@@ -1325,4 +1348,346 @@ fn the_status_line_and_its_parts_are_laid_out(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes(primary!("shift-d"));
     assert!(current(&workspace, cx).unwrap().starts_with("Journal/"));
+}
+
+fn tab_titles(
+    workspace: &gpui_kit::Entity<Workspace>,
+    cx: &mut VisualTestContext,
+) -> Vec<Vec<String>> {
+    workspace.read_with(cx, |workspace, _| {
+        workspace
+            .panes
+            .iter()
+            .map(|pane| {
+                pane.tabs
+                    .iter()
+                    .map(|tab| {
+                        let name = tab.path().map_or("-", |path| path.stem());
+                        let front = std::ptr::eq(tab, pane.tab());
+                        format!("{}{name}", if front { "*" } else { "" })
+                    })
+                    .collect()
+            })
+            .collect()
+    })
+}
+
+fn open_in_new_tab(
+    workspace: &gpui_kit::Entity<Workspace>,
+    name: &str,
+    cx: &mut VisualTestContext,
+) {
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.open_in_new_tab(&path(name), window, cx);
+        });
+    });
+}
+
+#[gpui_kit::test]
+fn tabs_open_switch_and_close_keeping_each_notes_text(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(
+        &[
+            ("A.md", "alpha\n"),
+            ("B.md", "bravo\n"),
+            ("C.md", "charlie\n"),
+        ],
+        cx,
+    );
+    let read = |name: &str| fs::read_to_string(dir.path().join(name)).unwrap();
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*-"]]);
+
+    open_note(&workspace, "A.md", cx);
+    open_in_new_tab(&workspace, "B.md", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["A", "*B"]]);
+    assert_eq!(editor_text(&workspace, cx), "bravo\n");
+
+    // Typing lands in the tab in front; switching tabs saves it and shows
+    // the other note with its own text.
+    cx.simulate_keystrokes("x");
+    workspace.read_with(cx, |workspace, _| assert!(workspace.tab().dirty));
+    cx.simulate_keystrokes("ctrl-tab");
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A", "B"]]);
+    assert_eq!(editor_text(&workspace, cx), "alpha\n");
+    assert_eq!(read("B.md"), "xbravo\n");
+    cx.simulate_keystrokes("y");
+    assert_eq!(editor_text(&workspace, cx), "yalpha\n");
+    cx.simulate_keystrokes("ctrl-shift-tab");
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["A", "*B"]]);
+    assert_eq!(editor_text(&workspace, cx), "xbravo\n");
+    assert_eq!(read("A.md"), "yalpha\n");
+
+    // The sidebar marks the note in front, whichever way it got there.
+    let marked = |cx: &mut VisualTestContext| {
+        workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .tree
+                .read(cx)
+                .selected_item()
+                .map(|item| item.id.to_string())
+        })
+    };
+    assert_eq!(marked(cx), Some("B.md".to_owned()));
+
+    // A new tab is empty and goes beside the one in front.
+    cx.simulate_keystrokes("ctrl-tab");
+    assert_eq!(marked(cx), Some("A.md".to_owned()));
+    cx.simulate_keystrokes(primary!("t"));
+    assert_eq!(marked(cx), None);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["A", "*-", "B"]]);
+    assert_eq!(current(&workspace, cx), None);
+    assert_eq!(editor_text(&workspace, cx), "");
+    open_note(&workspace, "C.md", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["A", "*C", "B"]]);
+
+    // Opening a note that already has a tab goes to that tab.
+    open_note(&workspace, "B.md", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["A", "C", "*B"]]);
+    open_in_new_tab(&workspace, "A.md", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A", "C", "B"]]);
+
+    // Closing saves, and the neighbour comes to the front. The cursor was
+    // where it had been left in this tab, after the "y".
+    cx.simulate_keystrokes("z");
+    cx.simulate_keystrokes(primary!("w"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*C", "B"]]);
+    assert_eq!(read("A.md"), "yzalpha\n");
+    cx.simulate_keystrokes("ctrl-tab");
+    cx.simulate_keystrokes(primary!("w"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*C"]]);
+    // The last tab is replaced by an empty one rather than leaving nothing.
+    cx.simulate_keystrokes(primary!("w"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*-"]]);
+    cx.simulate_keystrokes("q");
+    assert_eq!(editor_text(&workspace, cx), "q");
+    assert_eq!(read("C.md"), "charlie\n");
+}
+
+#[gpui_kit::test]
+fn each_tab_has_its_own_history_and_view(cx: &mut TestAppContext) {
+    let (_dir, workspace, cx) = open(&[("A.md", "a\n"), ("B.md", "b\n"), ("C.md", "c\n")], cx);
+    open_note(&workspace, "A.md", cx);
+    open_note(&workspace, "B.md", cx);
+    open_in_new_tab(&workspace, "C.md", cx);
+    // The new tab has nowhere to go back to; the first one does.
+    cx.simulate_keystrokes(BACK_FORWARD.0);
+    assert_eq!(current(&workspace, cx), Some("C.md".to_owned()));
+    cx.simulate_keystrokes(primary!("e"));
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_some())
+    });
+
+    cx.simulate_keystrokes("ctrl-tab");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_none())
+    });
+    cx.simulate_keystrokes(BACK_FORWARD.0);
+    assert_eq!(current(&workspace, cx), Some("A.md".to_owned()));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A", "C"]]);
+    // Typing still works here, and the other tab is still being read.
+    cx.simulate_keystrokes("x");
+    assert_eq!(editor_text(&workspace, cx), "xa\n");
+    cx.simulate_keystrokes("ctrl-tab");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.tab().reading.is_some())
+    });
+}
+
+#[gpui_kit::test]
+fn split_right_shows_the_same_note_twice_and_keeps_both_in_step(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(&[("A.md", "alpha\n"), ("B.md", "bravo\n")], cx);
+    let read = |name: &str| fs::read_to_string(dir.path().join(name)).unwrap();
+    open_note(&workspace, "A.md", cx);
+    cx.simulate_keystrokes("x");
+
+    cx.simulate_keystrokes(primary!("\\"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A"], vec!["*A"]]);
+    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.active_pane, 1));
+    // The split saved what was typed, so both panes start from the same text.
+    assert_eq!(read("A.md"), "xalpha\n");
+    assert_eq!(editor_text(&workspace, cx), "xalpha\n");
+
+    let texts = |cx: &mut VisualTestContext| {
+        workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .panes
+                .iter()
+                .map(|pane| pane.tab().editor.read(cx).value().to_string())
+                .collect::<Vec<_>>()
+        })
+    };
+    // Typing in the right pane shows in the left one at once, before
+    // anything is saved.
+    cx.simulate_keystrokes("y");
+    assert_eq!(texts(cx), vec!["yxalpha\n", "yxalpha\n"]);
+    assert_eq!(read("A.md"), "xalpha\n");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.panes.iter().all(|pane| pane.tab().dirty));
+    });
+    // One save settles both.
+    cx.executor()
+        .advance_clock(AUTOSAVE_DELAY + Duration::from_millis(50));
+    cx.run_until_parked();
+    assert_eq!(read("A.md"), "yxalpha\n");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.panes.iter().all(|pane| !pane.tab().dirty));
+        assert!(
+            workspace
+                .panes
+                .iter()
+                .all(|pane| pane.tab().conflict.is_none())
+        );
+    });
+
+    // F6 moves the keyboard to the other pane, which kept its own cursor.
+    cx.simulate_keystrokes("f6");
+    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.active_pane, 0));
+    cx.simulate_keystrokes("z");
+    assert_eq!(texts(cx), vec!["yzxalpha\n", "yzxalpha\n"]);
+
+    // Typing on both sides in turn never ends in a conflict.
+    cx.simulate_keystrokes("shift-f6");
+    cx.simulate_keystrokes("w");
+    cx.simulate_keystrokes(primary!("s"));
+    assert_eq!(read("A.md"), "ywzxalpha\n");
+    assert_eq!(texts(cx), vec!["ywzxalpha\n", "ywzxalpha\n"]);
+    workspace.read_with(cx, |workspace, _| {
+        assert!(
+            workspace
+                .panes
+                .iter()
+                .all(|pane| pane.tab().conflict.is_none() && !pane.tab().dirty)
+        );
+    });
+
+    // A different note can go in either pane.
+    open_note(&workspace, "B.md", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A"], vec!["*B"]]);
+
+    // Closing a pane's last tab closes the pane.
+    cx.simulate_keystrokes(primary!("w"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*A"]]);
+    workspace.read_with(cx, |workspace, _| assert_eq!(workspace.active_pane, 0));
+}
+
+#[gpui_kit::test]
+fn panes_share_the_space_between_the_side_panels(cx: &mut TestAppContext) {
+    let (_dir, workspace, cx) = open(&[("A.md", "alpha\n")], cx);
+    open_note(&workspace, "A.md", cx);
+    cx.simulate_keystrokes(primary!("\\"));
+    cx.update(|window, cx| {
+        window.render_frame(cx);
+        let whole = window.find("editor-pane").bounds();
+        let left = window.find(("pane", 0usize)).bounds();
+        let right = window.find(("pane", 1usize)).bounds();
+        let status = window.find("status-line").bounds();
+        let near = |a: Pixels, b: Pixels| (a - b).abs() <= px(3.);
+        assert!(near(left.left(), whole.left()), "{left:?} in {whole:?}");
+        assert!(near(right.right(), whole.right()), "{right:?} in {whole:?}");
+        assert!(left.right() <= right.left() + px(1.), "{left:?} {right:?}");
+        assert!(left.size.width > px(100.) && right.size.width > px(100.));
+        // Both sit above the one status line.
+        assert!(near(left.bottom(), status.top()), "{left:?} {status:?}");
+        assert!(near(right.bottom(), status.top()), "{right:?} {status:?}");
+    });
+}
+
+#[gpui_kit::test]
+fn renames_and_deletes_reach_every_tab(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(
+        &[
+            ("Work/A.md", "to [[Work/B]]\n"),
+            ("Work/B.md", "bravo\n"),
+            ("C.md", "to [[Work/A]]\n"),
+        ],
+        cx,
+    );
+    open_note(&workspace, "Work/A.md", cx);
+    open_in_new_tab(&workspace, "Work/B.md", cx);
+    open_in_new_tab(&workspace, "C.md", cx);
+    // An unsaved edit in a tab that is not in front.
+    cx.simulate_keystrokes("x");
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| workspace.activate(0, 0, window, cx));
+    });
+
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.rename_entry(&path("Work"), "Job", window, cx);
+        });
+    });
+    workspace.read_with(cx, |workspace, cx| {
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+        let paths: Vec<&str> = workspace.panes[0]
+            .tabs
+            .iter()
+            .map(|tab| tab.path().unwrap().as_str())
+            .collect();
+        assert_eq!(paths, vec!["Job/A.md", "Job/B.md", "C.md"]);
+        let texts: Vec<String> = workspace.panes[0]
+            .tabs
+            .iter()
+            .map(|tab| tab.editor.read(cx).value().to_string())
+            .collect();
+        assert_eq!(texts, vec!["to [[Job/B]]\n", "bravo\n", "xto [[Job/A]]\n"]);
+        assert!(workspace.panes[0].tabs.iter().all(|tab| !tab.dirty));
+    });
+    assert_eq!(
+        fs::read_to_string(dir.path().join("C.md")).unwrap(),
+        "xto [[Job/A]]\n"
+    );
+
+    // Deleting the folder empties the tabs that showed its notes.
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.delete_entry(&path("Job"), window, cx);
+        });
+    });
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*-", "-", "C"]]);
+    assert_eq!(editor_text(&workspace, cx), "");
+    // Nothing brings the files back.
+    cx.executor().advance_clock(AUTOSAVE_DELAY * 3);
+    cx.run_until_parked();
+    assert!(!dir.path().join("Job").exists());
+}
+
+#[gpui_kit::test]
+fn an_outside_edit_reaches_tabs_that_are_not_in_front(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(&[("A.md", "alpha\n"), ("B.md", "bravo\n")], cx);
+    open_note(&workspace, "A.md", cx);
+    open_in_new_tab(&workspace, "B.md", cx);
+    fs::write(dir.path().join("A.md"), "from elsewhere\n").unwrap();
+    changed(&workspace, "A.md", cx);
+    assert_eq!(editor_text(&workspace, cx), "bravo\n");
+    cx.simulate_keystrokes("ctrl-tab");
+    assert_eq!(editor_text(&workspace, cx), "from elsewhere\n");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(!workspace.tab().dirty);
+        assert!(workspace.tab().conflict.is_none());
+    });
+}
+
+#[gpui_kit::test]
+fn unsaved_edits_are_written_when_the_window_goes_away(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(&[("A.md", "alpha\n"), ("B.md", "bravo\n")], cx);
+    open_note(&workspace, "A.md", cx);
+    cx.simulate_keystrokes("x");
+    open_in_new_tab(&workspace, "B.md", cx);
+    cx.simulate_keystrokes("y");
+    // Neither autosave has run yet for B; A was saved on the switch.
+    assert_eq!(
+        fs::read_to_string(dir.path().join("B.md")).unwrap(),
+        "bravo\n"
+    );
+    cx.update(|_, cx| {
+        workspace.update(cx, |workspace, cx| workspace.save_on_the_way_out(cx));
+    });
+    assert_eq!(
+        fs::read_to_string(dir.path().join("A.md")).unwrap(),
+        "xalpha\n"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("B.md")).unwrap(),
+        "ybravo\n"
+    );
 }

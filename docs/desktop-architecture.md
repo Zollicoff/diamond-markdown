@@ -108,24 +108,32 @@ large vaults.
 
 The window. Its code is split by what it knows about:
 
-- `session.rs` holds the state that is not pixels (the vault, the index,
-  the open note, the vault's settings) and has no UI types, so it is tested
-  without a window. `history.rs`, `notes.rs` and `settings.rs` are the same
-  kind of code: back and forward, daily notes and templates, settings files.
+- `session.rs` holds the state that is not pixels: a `Session` is the
+  vault, its index and its settings, and a `Document` is one open note. It
+  has no UI types, so it is tested without a window. `history.rs`,
+  `notes.rs` and `settings.rs` are the same kind of code: back and forward,
+  daily notes and templates, settings files.
 - `actions.rs` lists every command: its action, its default shortcut and
   its name in the command palette.
 - `workspace/` is the view. `mod.rs` is what the window does, `panels.rs`
-  how it is drawn, and `palette.rs` the palette that finds notes, text,
-  commands and templates.
+  how it is drawn, `tab.rs` what a tab and a pane hold, and `palette.rs`
+  the palette that finds notes, text, commands and templates.
 - `app.rs` is the state every window shares: the app's settings and whether
   it is drawn light or dark.
 
-The window has three panels: the file tree, the note, and a context panel
-with the note's backlinks, outline and tags. The outline and tags follow the
-editor as it is typed in. Clicking a heading puts the cursor on it; clicking
-a tag lists the notes that carry it. A status line under the note shows what
-just happened or went wrong, the word and character counts, and the
-switches for reading view and light or dark.
+The window has three panels: the file tree, the notes, and a context panel
+with the backlinks, outline and tags of the note in front. The outline and
+tags follow the editor as it is typed in. Clicking a heading puts the cursor
+on it; clicking a tag lists the notes that carry it. A status line under the
+notes shows what just happened or went wrong, the word and character
+counts, and the switches for reading view and light or dark.
+
+Notes open in tabs, and tabs sit in panes side by side. Each tab has its
+own editor, its own back-and-forward history and its own choice of editing
+or reading. Opening a note that already has a tab goes to that tab. Split
+right opens a second view of the same note; what is typed in one view shows
+in the other at once, each keeping its own cursor. Leaving a tab saves it,
+and closing the window or quitting saves every tab.
 
 | Shortcut (Cmd on macOS, Ctrl on Linux) | Does |
 | --- | --- |
@@ -133,6 +141,10 @@ switches for reading view and light or dark.
 | Cmd-O | Go to a note by name |
 | Cmd-Shift-F | Search all notes; Enter opens the note at the matching line |
 | Cmd-N | New note |
+| Cmd-T / Cmd-W | New tab / close tab |
+| Ctrl-Tab / Ctrl-Shift-Tab | Next / previous tab |
+| Cmd-\\ | Split right |
+| F6 / Shift-F6 | Next / previous pane |
 | Cmd-Shift-D | Open today's daily note, creating it from its template |
 | Cmd-Shift-T | Insert a template at the cursor |
 | F2 | Rename or move the open note; links to it are rewritten |
@@ -142,8 +154,9 @@ switches for reading view and light or dark.
 | Cmd-S | Save now. Notes also save 800 ms after typing stops and when switching notes |
 | Cmd-Shift-O | Open another vault in a new window |
 
-Right-click a file or folder in the sidebar for a new note there, rename or
-move, and delete. A new name with a `/` in it is a path from the vault
+Right-click a file or folder in the sidebar to open it in a new tab, make a
+new note there, rename or move it, or delete it. Cmd-click a note to open it
+in a new tab. A new name with a `/` in it is a path from the vault
 root, which moves the entry. Renaming a folder moves every note in it.
 
 Changes made by other programs show up live. If the open note changes on
@@ -162,8 +175,9 @@ Run it with `cargo run -p diamond-app`. It reopens the last vault, or asks
 for a folder the first time. A folder given as an argument (or in
 `DIAMOND_VAULT`) takes precedence.
 
-Not built yet: tabs and splits, a settings screen, scrolling the reading
-view to a heading (the outline switches to the editor for now).
+Not built yet: dragging tabs between panes, splitting downwards, a settings
+screen, scrolling the reading view to a heading (the outline switches to
+the editor for now). Undo does not cross between two views of one note.
 
 ### Settings
 
@@ -283,18 +297,19 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-143 tests so far; `cargo test --workspace` runs them all.
+153 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (72): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (41): the session, history, daily notes and templates, settings
+- App logic (44): the session, history, daily notes and templates, settings
   files and the remembered-vaults list, tested without a window.
-- App UI (30): headless window tests drive the real views with real
+- App UI (37): headless window tests drive the real views with real
   keystrokes. They open, type, save and autosave; follow and create links;
   reload after outside edits and keep both versions in a conflict; use the
   palette for notes, search, commands and templates; rename with links
-  rewritten; go back and forward; switch light and dark; and measure where
-  the panels are laid out.
+  rewritten in every tab; go back and forward; open, switch and close tabs;
+  split a note into two views that stay in step; switch light and dark; and
+  measure where the panels and panes are laid out.
 
 Dependencies: `scripts/release-age.py` lists locked dependencies published
 in the last 14 days, and `--pin` moves them back to older releases. As of
@@ -304,7 +319,7 @@ target and is not part of the macOS or Linux build.
 
 The rendered window has been looked at on the development Mac (dark
 appearance): the three panels, a note in the editor and in the reading view,
-and the command palette. Not checked by eye yet: the light appearance,
+the command palette, and tabs in two panes. Not checked by eye yet: the light appearance,
 Linux, and anything under load.
 
 ## Milestones
