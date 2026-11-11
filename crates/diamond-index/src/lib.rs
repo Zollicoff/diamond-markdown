@@ -21,6 +21,8 @@
 //! the one in the linking note's own folder wins, then the one with the
 //! shortest path, then alphabetical order.
 
+pub mod fuzzy;
+
 use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
@@ -96,6 +98,18 @@ impl BuildReport {
     pub fn total(&self) -> Duration {
         self.walk + self.parse + self.graph
     }
+}
+
+/// A note offered by the quick switcher.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Suggestion<'a> {
+    /// The note.
+    pub path: &'a VaultPath,
+    /// The note's display title.
+    pub title: &'a str,
+    /// The alias that matched, when the match was on an alias and not on the
+    /// title or path.
+    pub alias: Option<&'a str>,
 }
 
 /// What [`VaultIndex::refresh`] found.
@@ -413,6 +427,84 @@ impl VaultIndex {
             }
         }
         unresolved
+    }
+
+    /// The notes that best match `query` for the quick switcher, best first.
+    ///
+    /// A note matches fuzzily on its title, its file name or one of its
+    /// aliases, or because the query appears in its path as written. Name and
+    /// alias matches rank first. An empty query lists notes in path order.
+    pub fn quick_switch(&self, query: &str, limit: usize) -> Vec<Suggestion<'_>> {
+        if query.trim().is_empty() {
+            return self
+                .notes
+                .iter()
+                .take(limit)
+                .map(|note| Suggestion {
+                    path: &note.path,
+                    title: note.title(),
+                    alias: None,
+                })
+                .collect();
+        }
+
+        // A match on a name or alias always ranks above a match that is
+        // only somewhere in the path.
+        const NAME_TIER: i32 = 100_000;
+        let lowered_query = query.trim().to_lowercase();
+
+        let mut scored: Vec<(i32, Suggestion<'_>)> = self
+            .notes
+            .par_iter()
+            .zip(&self.keys)
+            .filter_map(|(note, key)| {
+                let title = note.title();
+                let by_name = [
+                    fuzzy::score(query, title),
+                    fuzzy::score(query, note.path.stem()),
+                ]
+                .into_iter()
+                .flatten()
+                .max()
+                .map(|score| (NAME_TIER + score, None));
+                let by_alias = note
+                    .meta
+                    .frontmatter
+                    .iter()
+                    .flat_map(|frontmatter| &frontmatter.aliases)
+                    .filter_map(|alias| {
+                        // Slightly below an equal name match.
+                        Some((
+                            NAME_TIER + fuzzy::score(query, alias)? - 5,
+                            Some(alias.as_str()),
+                        ))
+                    })
+                    .max_by_key(|(score, _)| *score);
+                // Paths are long, so scattered letters would match almost
+                // anything. The query has to appear in the path as written.
+                let by_path = key
+                    .contains(&lowered_query)
+                    .then(|| (-(key.len() as i32), None));
+                let (score, alias) = [by_name, by_alias, by_path]
+                    .into_iter()
+                    .flatten()
+                    .max_by_key(|(score, _)| *score)?;
+                Some((
+                    score,
+                    Suggestion {
+                        path: &note.path,
+                        title,
+                        alias,
+                    },
+                ))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.path.cmp(b.1.path)));
+        scored.truncate(limit);
+        scored
+            .into_iter()
+            .map(|(_, suggestion)| suggestion)
+            .collect()
     }
 
     /// Every tag with the number of notes carrying exactly that tag, sorted

@@ -312,3 +312,47 @@ fn refresh_follows_changes_on_disk() {
     assert_eq!(resolved(&index, "Home.md", "Plan"), "Work/Plan.md");
     assert_eq!(index.len(), 2);
 }
+
+#[test]
+fn quick_switch_ranks_names_aliases_and_paths() {
+    let index = index(&[
+        ("Projects/Quarterly Plan.md", ""),
+        ("Plan.md", ""),
+        ("People/Samantha Carter.md", "---\naliases: [Sam]\n---\n"),
+        ("Archive/Titled.md", "---\ntitle: Planning Retro\n---\n"),
+        ("Planets/Mars.md", ""),
+    ]);
+    let paths = |query: &str| -> Vec<String> {
+        index
+            .quick_switch(query, 10)
+            .into_iter()
+            .map(|suggestion| suggestion.path.to_string())
+            .collect()
+    };
+
+    // Name matches come first, best first; a match only in the folder
+    // name comes last.
+    assert_eq!(
+        paths("plan"),
+        vec![
+            "Plan.md",
+            "Archive/Titled.md",
+            "Projects/Quarterly Plan.md",
+            "Planets/Mars.md",
+        ]
+    );
+    // An exact alias beats a name that merely starts with the query, and
+    // the suggestion says which alias matched.
+    let by_alias = index.quick_switch("sam", 10);
+    assert_eq!(by_alias[0].path.as_str(), "People/Samantha Carter.md");
+    assert_eq!(by_alias[0].alias, Some("Sam"));
+    // Otherwise the name is the better match.
+    let by_name = index.quick_switch("sm", 10);
+    assert_eq!(by_name[0].title, "Samantha Carter");
+    assert_eq!(by_name[0].alias, None);
+
+    assert!(paths("zzz").is_empty());
+    assert_eq!(paths("").len(), 5);
+    assert_eq!(index.quick_switch("", 2).len(), 2);
+    assert_eq!(paths("plan").len(), index.quick_switch("plan", 3).len() + 1);
+}
