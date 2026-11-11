@@ -1260,6 +1260,7 @@ dependencies = [
 name = "diamond-app"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "diamond-index",
  "diamond-parse",
  "diamond-vault",
@@ -1289,6 +1290,7 @@ dependencies = [
 name = "diamond-vault"
 version = "0.1.0"
 dependencies = [
+ "notify",
  "tempfile",
  "thiserror 2.0.21",
  "walkdir",

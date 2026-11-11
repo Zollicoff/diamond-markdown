@@ -63,7 +63,11 @@ fn main() {
             ..WindowOptions::default()
         };
         gpui_kit::open_window(options, cx, |window, cx| {
-            cx.new(|cx| Workspace::new(session, window, cx))
+            cx.new(|cx| {
+                let mut workspace = Workspace::new(session, window, cx);
+                workspace.watch(window, cx);
+                workspace
+            })
         })
         .expect("failed to open the main window");
         cx.activate(true);

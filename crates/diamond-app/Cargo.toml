@@ -11,6 +11,7 @@ name = "diamond"
 path = "src/main.rs"
 
 [dependencies]
+async-channel = "2.5.0"
 diamond-index.workspace = true
 diamond-parse.workspace = true
 diamond-vault.workspace = true

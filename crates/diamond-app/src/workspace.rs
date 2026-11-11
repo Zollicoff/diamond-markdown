@@ -3,12 +3,13 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use diamond_vault::{EntryKind, VaultPath};
+use diamond_vault::{EntryKind, VaultPath, VaultWatcher};
 use gpui_kit::component::{
     ActiveTheme as _, StyledExt as _, h_flex,
     input::{Editor, EditorState, InputEvent},
     label::Label,
     list::ListItem,
+    menu::PopupMenuItem,
     resizable::{h_resizable, resizable_panel},
     scroll::ScrollableElement as _,
     tree::{TreeEvent, TreeItem, TreeState, tree},
@@ -17,9 +18,9 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::session::{Follow, Session, TreeNode};
+use crate::session::{Follow, OpenChange, Session, TreeNode};
 
-actions!(diamond, [SaveNote, FollowLink]);
+actions!(diamond, [SaveNote, FollowLink, NewNote]);
 
 const CONTEXT: &str = "Workspace";
 
@@ -28,6 +29,10 @@ const SIDE_PANEL_WIDTH: f32 = 260.;
 
 /// How long after the last keystroke an edited note is written to disk.
 const AUTOSAVE_DELAY: Duration = Duration::from_millis(800);
+
+/// How long to keep collecting file-change reports before acting on them.
+/// One save by another program arrives as several reports.
+const WATCH_SETTLE: Duration = Duration::from_millis(150);
 
 /// The platform's main shortcut modifier: Command on macOS, Control elsewhere.
 #[cfg(target_os = "macos")]
@@ -48,6 +53,7 @@ pub(crate) use primary;
 pub fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new(primary!("s"), SaveNote, Some(CONTEXT)),
+        KeyBinding::new(primary!("n"), NewNote, Some(CONTEXT)),
         KeyBinding::new("alt-enter", FollowLink, Some(CONTEXT)),
     ]);
 }
@@ -62,7 +68,12 @@ pub struct Workspace {
     expanded: HashSet<SharedString>,
     /// The last failure, shown in the status bar until the next success.
     error: Option<SharedString>,
+    /// Set when the open note changed or vanished on disk while the editor
+    /// held unsaved edits. Nothing is written automatically until the user
+    /// saves, so neither version is lost without a decision.
+    conflict: Option<SharedString>,
     autosave: Option<Task<()>>,
+    watcher: Option<(VaultWatcher, Task<()>)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -109,14 +120,103 @@ impl Workspace {
             editor,
             expanded,
             error,
+            conflict: None,
             autosave: None,
+            watcher: None,
             _subscriptions: subscriptions,
         }
     }
 
+    /// Starts following changes other programs make to the vault folder.
+    pub fn watch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (sender, receiver) = async_channel::unbounded::<Vec<VaultPath>>();
+        let watcher = match self.session.watch(move |paths| {
+            // The receiver only goes away when the window closes.
+            let _ = sender.try_send(paths);
+        }) {
+            Ok(watcher) => watcher,
+            Err(failure) => {
+                self.error = Some(failure.to_string().into());
+                return;
+            }
+        };
+        let task = cx.spawn_in(window, async move |this, cx| {
+            while let Ok(mut paths) = receiver.recv().await {
+                cx.background_executor().timer(WATCH_SETTLE).await;
+                while let Ok(more) = receiver.try_recv() {
+                    paths.extend(more);
+                }
+                paths.sort();
+                paths.dedup();
+                let applied = this.update_in(cx, |this, window, cx| {
+                    this.handle_changes(&paths, window, cx);
+                });
+                if applied.is_err() {
+                    break;
+                }
+            }
+        });
+        self.watcher = Some((watcher, task));
+    }
+
+    /// Reacts to files changing on disk.
+    ///
+    /// A note open without unsaved edits is reloaded. With unsaved edits the
+    /// editor keeps its text and autosave stops, so the other version is not
+    /// overwritten until the user decides by saving.
+    pub fn handle_changes(
+        &mut self,
+        paths: &[VaultPath],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let applied = match self.session.apply_changes(paths) {
+            Ok(applied) => applied,
+            Err(failure) => {
+                self.error = Some(failure.to_string().into());
+                cx.notify();
+                return;
+            }
+        };
+        if applied.structure_changed {
+            self.refresh_tree(cx);
+        }
+
+        let in_editor = self.editor.read(cx).value();
+        let unsaved = self.session.is_dirty(&in_editor);
+        match applied.open {
+            OpenChange::Unchanged => {}
+            OpenChange::Changed(on_disk) if on_disk == in_editor.as_ref() => {
+                self.session.accept_disk_text(&on_disk);
+            }
+            OpenChange::Changed(_) if unsaved => {
+                self.autosave = None;
+                self.conflict = Some("Changed on disk. Save to keep this version.".into());
+            }
+            OpenChange::Changed(on_disk) => {
+                self.session.accept_disk_text(&on_disk);
+                self.editor.update(cx, |editor, cx| {
+                    let cursor = editor.cursor().min(on_disk.len());
+                    editor.set_value(on_disk, window, cx);
+                    editor.set_selected_range(cursor..cursor, cx);
+                });
+            }
+            OpenChange::Removed if unsaved => {
+                self.autosave = None;
+                self.conflict = Some("Removed on disk. Save to keep this note.".into());
+            }
+            OpenChange::Removed => {
+                self.session.close();
+                self.editor
+                    .update(cx, |editor, cx| editor.set_value("", window, cx));
+            }
+        }
+        cx.notify();
+    }
+
     /// Opens a note in the editor, saving the current one first.
     pub fn open_note(&mut self, path: &VaultPath, window: &mut Window, cx: &mut Context<Self>) {
-        self.save(cx);
+        self.leave_current(cx);
         match self.session.open_note(path) {
             Ok(text) => {
                 self.error = None;
@@ -128,9 +228,11 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Writes the open note now if it has unsaved changes.
+    /// Writes the open note now if it has unsaved changes. This is the
+    /// user's explicit save: it settles a conflict in the editor's favour.
     pub fn save(&mut self, cx: &mut Context<Self>) {
         self.autosave = None;
+        self.conflict = None;
         let text = self.editor.read(cx).value();
         match self.session.save(&text) {
             Ok(_) => self.error = None,
@@ -139,11 +241,28 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Makes sure the open note's edits are on disk before the editor shows
+    /// something else. In a conflict the edits go to a copy beside the note,
+    /// so neither version is lost.
+    fn leave_current(&mut self, cx: &mut Context<Self>) {
+        if self.conflict.take().is_none() {
+            self.save(cx);
+            return;
+        }
+        self.autosave = None;
+        let text = self.editor.read(cx).value();
+        match self.session.save_conflict_copy(&text) {
+            Ok(copy) => {
+                self.reveal_in_tree(&copy, cx);
+                self.error = Some(format!("Your edits were kept in {copy}").into());
+            }
+            Err(failure) => self.error = Some(failure.to_string().into()),
+        }
+    }
+
     /// Opens the note that the link under the cursor leads to, creating it
     /// if the link names a note that does not exist yet.
     pub fn follow_link(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Save first, so the note being left is on disk and indexed.
-        self.save(cx);
         let (text, cursor) = {
             let editor = self.editor.read(cx);
             (editor.value(), editor.cursor())
@@ -164,13 +283,58 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Rebuilds the sidebar from disk with `path`'s folders opened.
-    fn reveal_in_tree(&mut self, path: &VaultPath, cx: &mut Context<Self>) {
-        let mut folder = path.parent();
-        while let Some(current) = folder {
-            self.expanded.insert(current.to_owned().into());
-            folder = current.rfind('/').map(|slash| &current[..slash]);
+    /// Creates an empty note and opens it.
+    pub fn new_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.session.new_note() {
+            Ok(path) => {
+                self.reveal_in_tree(&path, cx);
+                self.open_note(&path, window, cx);
+                self.editor
+                    .update(cx, |editor, cx| editor.focus(window, cx));
+            }
+            Err(failure) => self.error = Some(failure.to_string().into()),
         }
+        cx.notify();
+    }
+
+    /// Moves a file or folder to the vault's trash.
+    pub fn delete_entry(&mut self, path: &VaultPath, window: &mut Window, cx: &mut Context<Self>) {
+        // Unsaved edits to a note that is about to go are written first, so
+        // the trashed copy is the latest text.
+        if self.conflict.is_none() {
+            self.save(cx);
+        }
+        match self.session.delete(path) {
+            Ok(closed_open_note) => {
+                self.error = None;
+                if closed_open_note {
+                    self.conflict = None;
+                    self.autosave = None;
+                    self.editor
+                        .update(cx, |editor, cx| editor.set_value("", window, cx));
+                }
+                self.refresh_tree(cx);
+            }
+            Err(failure) => self.error = Some(failure.to_string().into()),
+        }
+        cx.notify();
+    }
+
+    /// Handles a click on a sidebar row.
+    fn open_entry(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Ok(path) = VaultPath::new(id) else {
+            return;
+        };
+        if self.session.is_note(&path) {
+            self.open_note(&path, window, cx);
+        } else if path.extension().is_some() {
+            self.error = Some(format!("{path} is not a note; it cannot be opened yet").into());
+            cx.notify();
+        }
+    }
+
+    /// Rebuilds the sidebar from disk, keeping opened folders open.
+    fn refresh_tree(&mut self, cx: &mut Context<Self>) {
         match self.session.tree() {
             Ok(nodes) => {
                 let items = tree_items(&nodes, &self.expanded);
@@ -180,17 +344,35 @@ impl Workspace {
         }
     }
 
+    /// Rebuilds the sidebar with `path`'s folders opened.
+    fn reveal_in_tree(&mut self, path: &VaultPath, cx: &mut Context<Self>) {
+        let mut folder = path.parent();
+        while let Some(current) = folder {
+            self.expanded.insert(current.to_owned().into());
+            folder = current.rfind('/').map(|slash| &current[..slash]);
+        }
+        self.refresh_tree(cx);
+    }
+
     fn schedule_autosave(&mut self, cx: &mut Context<Self>) {
+        if self.conflict.is_some() {
+            return;
+        }
         // Replacing the task drops the previous one, which cancels it.
         self.autosave = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(AUTOSAVE_DELAY).await;
-            _ = this.update(cx, |this, cx| this.save(cx));
+            _ = this.update(cx, |this, cx| {
+                if this.conflict.is_none() {
+                    this.save(cx);
+                }
+            });
         }));
         cx.notify();
     }
 
     fn render_sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let view = cx.entity();
+        let menu_view = view.clone();
         let current = self.session.current().map(|path| path.to_string());
         v_flex()
             .size_full()
@@ -227,11 +409,18 @@ impl Workspace {
                     }
                     view.update(cx, |_, cx| {
                         row.on_click(cx.listener(move |this, _, window, cx| {
-                            if let Ok(path) = VaultPath::new(&id) {
-                                this.open_note(&path, window, cx);
-                            }
+                            this.open_entry(&id, window, cx);
                         }))
                     })
+                })
+                .context_menu(move |_ix, entry, menu, _window, _cx| {
+                    let view = menu_view.clone();
+                    let id = entry.item().id.clone();
+                    menu.item(PopupMenuItem::new("Delete").on_click(move |_, window, cx| {
+                        if let Ok(path) = VaultPath::new(&id) {
+                            view.update(cx, |this, cx| this.delete_entry(&path, window, cx));
+                        }
+                    }))
                 })
                 .flex_1()
                 .p_1(),
@@ -244,34 +433,34 @@ impl Workspace {
             .current_title()
             .unwrap_or("No note open")
             .to_owned();
-        let state = match (&self.error, self.session.current()) {
-            (Some(error), _) => error.clone(),
-            (None, None) => SharedString::default(),
-            (None, Some(_)) if self.session.is_dirty(&self.editor.read(cx).value()) => {
-                "Edited".into()
-            }
-            (None, Some(_)) => "Saved".into(),
+        let theme = cx.theme();
+        let (state, color) = if let Some(error) = &self.error {
+            (error.clone(), theme.danger)
+        } else if let Some(conflict) = &self.conflict {
+            (conflict.clone(), theme.warning)
+        } else if self.session.current().is_none() {
+            (SharedString::default(), theme.muted_foreground)
+        } else if self.session.is_dirty(&self.editor.read(cx).value()) {
+            ("Edited".into(), theme.muted_foreground)
+        } else {
+            ("Saved".into(), theme.muted_foreground)
         };
         v_flex()
             .size_full()
-            .bg(cx.theme().background)
+            .bg(theme.background)
             .child(
                 h_flex()
                     .h_9()
                     .px_4()
                     .justify_between()
                     .border_b_1()
-                    .border_color(cx.theme().border)
+                    .border_color(theme.border)
                     .child(Label::new(title).font_semibold())
                     .child(
                         div()
                             .id("save-state")
                             .text_sm()
-                            .text_color(if self.error.is_some() {
-                                cx.theme().danger
-                            } else {
-                                cx.theme().muted_foreground
-                            })
+                            .text_color(color)
                             .child(state),
                     ),
             )
@@ -352,6 +541,9 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &SaveNote, _, cx| this.save(cx)))
             .on_action(cx.listener(|this, _: &FollowLink, window, cx| {
                 this.follow_link(window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &NewNote, window, cx| {
+                this.new_note(window, cx);
             }))
             .size_full()
             .text_color(cx.theme().foreground)
@@ -654,5 +846,212 @@ mod tests {
             fs::read_to_string(dir.path().join("Home.md")).unwrap(),
             home_text
         );
+    }
+
+    /// Opens a workspace on a vault holding `files` and returns the pieces
+    /// the tests poke at.
+    fn open<'a>(
+        files: &[(&str, &str)],
+        cx: &'a mut TestAppContext,
+    ) -> (
+        tempfile::TempDir,
+        gpui_kit::Entity<Workspace>,
+        &'a mut VisualTestContext,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, contents) in files {
+            let absolute = dir.path().join(name);
+            fs::create_dir_all(absolute.parent().unwrap()).unwrap();
+            fs::write(absolute, contents).unwrap();
+        }
+        let (session, _) = Session::open(dir.path()).unwrap();
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            init(cx);
+        });
+        let mut session = Some(session);
+        let mut workspace = None;
+        let (_root, cx) = cx.add_window_view(|window, cx| {
+            let view = cx.new(|cx| Workspace::new(session.take().unwrap(), window, cx));
+            workspace = Some(view.clone());
+            Root::new(view, window, cx)
+        });
+        (dir, workspace.unwrap(), cx)
+    }
+
+    fn open_note(workspace: &gpui_kit::Entity<Workspace>, name: &str, cx: &mut VisualTestContext) {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.open_note(&path(name), window, cx);
+                workspace
+                    .editor
+                    .update(cx, |editor, cx| editor.focus(window, cx));
+            });
+        });
+    }
+
+    fn changed(workspace: &gpui_kit::Entity<Workspace>, name: &str, cx: &mut VisualTestContext) {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.handle_changes(&[path(name)], window, cx);
+            });
+        });
+    }
+
+    fn editor_text(workspace: &gpui_kit::Entity<Workspace>, cx: &mut VisualTestContext) -> String {
+        workspace.read_with(cx, |workspace, cx| {
+            workspace.editor.read(cx).value().to_string()
+        })
+    }
+
+    #[gpui_kit::test]
+    fn an_outside_edit_reloads_a_note_without_unsaved_changes(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("Home.md", "first\n")], cx);
+        open_note(&workspace, "Home.md", cx);
+
+        fs::write(dir.path().join("Home.md"), "second, from elsewhere\n").unwrap();
+        changed(&workspace, "Home.md", cx);
+        assert_eq!(editor_text(&workspace, cx), "second, from elsewhere\n");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.conflict.is_none());
+            assert!(!workspace.session.is_dirty("second, from elsewhere\n"));
+        });
+
+        // A new file elsewhere shows up in the sidebar.
+        fs::write(dir.path().join("Added.md"), "").unwrap();
+        changed(&workspace, "Added.md", cx);
+        workspace.read_with(cx, |workspace, cx| {
+            assert!(
+                workspace
+                    .tree
+                    .read(cx)
+                    .index_of(&"Added.md".into())
+                    .is_some()
+            );
+        });
+    }
+
+    #[gpui_kit::test]
+    fn an_outside_edit_never_overwrites_or_loses_unsaved_changes(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("Home.md", "base\n"), ("Other.md", "")], cx);
+        let home = dir.path().join("Home.md");
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("m i n e");
+        fs::write(&home, "theirs\n").unwrap();
+        changed(&workspace, "Home.md", cx);
+
+        // The editor keeps the user's text and autosave stands down.
+        assert_eq!(editor_text(&workspace, cx), "minebase\n");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.conflict.is_some());
+            assert!(workspace.autosave.is_none());
+        });
+        cx.simulate_keystrokes("!");
+        cx.executor().advance_clock(AUTOSAVE_DELAY * 3);
+        cx.run_until_parked();
+        assert_eq!(fs::read_to_string(&home).unwrap(), "theirs\n");
+
+        // Leaving the note keeps both versions: theirs in place, the user's
+        // in a copy beside it.
+        open_note(&workspace, "Other.md", cx);
+        assert_eq!(fs::read_to_string(&home).unwrap(), "theirs\n");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("Home (conflict).md")).unwrap(),
+            "mine!base\n"
+        );
+        workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_none()));
+    }
+
+    #[gpui_kit::test]
+    fn saving_settles_a_conflict_in_the_editors_favour(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("Home.md", "base\n")], cx);
+        let home = dir.path().join("Home.md");
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("x");
+        fs::write(&home, "theirs\n").unwrap();
+        changed(&workspace, "Home.md", cx);
+
+        cx.simulate_keystrokes(super::primary!("s"));
+        assert_eq!(fs::read_to_string(&home).unwrap(), "xbase\n");
+        workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_none()));
+        assert!(!dir.path().join("Home (conflict).md").exists());
+    }
+
+    #[gpui_kit::test]
+    fn a_note_removed_elsewhere_closes_unless_it_has_unsaved_changes(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("A.md", "a\n"), ("B.md", "b\n")], cx);
+        open_note(&workspace, "A.md", cx);
+        fs::remove_file(dir.path().join("A.md")).unwrap();
+        changed(&workspace, "A.md", cx);
+        assert_eq!(editor_text(&workspace, cx), "");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.session.current().is_none())
+        });
+
+        open_note(&workspace, "B.md", cx);
+        cx.simulate_keystrokes("x");
+        fs::remove_file(dir.path().join("B.md")).unwrap();
+        changed(&workspace, "B.md", cx);
+        assert_eq!(editor_text(&workspace, cx), "xb\n");
+        workspace.read_with(cx, |workspace, _| assert!(workspace.conflict.is_some()));
+        // Saving puts the note back.
+        cx.simulate_keystrokes(super::primary!("s"));
+        assert_eq!(fs::read_to_string(dir.path().join("B.md")).unwrap(), "xb\n");
+    }
+
+    #[gpui_kit::test]
+    fn the_new_note_shortcut_creates_and_opens_untitled(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("Home.md", "home\n")], cx);
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("x");
+        cx.simulate_keystrokes(super::primary!("n"));
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(workspace.session.current(), Some(&path("Untitled.md")));
+            assert!(
+                workspace
+                    .tree
+                    .read(cx)
+                    .index_of(&"Untitled.md".into())
+                    .is_some()
+            );
+        });
+        // The note being left was saved, and typing goes into the new one.
+        assert_eq!(
+            fs::read_to_string(dir.path().join("Home.md")).unwrap(),
+            "xhome\n"
+        );
+        cx.simulate_keystrokes("h i");
+        assert_eq!(editor_text(&workspace, cx), "hi");
+    }
+
+    #[gpui_kit::test]
+    fn deleting_the_open_note_trashes_its_latest_text(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(&[("Home.md", "home\n"), ("Keep.md", "")], cx);
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("x");
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.delete_entry(&path("Home.md"), window, cx);
+            });
+        });
+
+        assert!(!dir.path().join("Home.md").exists());
+        assert_eq!(
+            fs::read_to_string(dir.path().join(".trash/Home.md")).unwrap(),
+            "xhome\n"
+        );
+        assert_eq!(editor_text(&workspace, cx), "");
+        workspace.read_with(cx, |workspace, cx| {
+            assert!(workspace.session.current().is_none());
+            assert!(workspace.error.is_none(), "{:?}", workspace.error);
+            let tree = workspace.tree.read(cx);
+            assert!(tree.index_of(&"Home.md".into()).is_none());
+            assert!(tree.index_of(&"Keep.md".into()).is_some());
+        });
+        // Nothing brings the file back afterwards.
+        cx.executor().advance_clock(AUTOSAVE_DELAY * 3);
+        cx.run_until_parked();
+        assert!(!dir.path().join("Home.md").exists());
     }
 }

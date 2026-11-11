@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use diamond_index::{BuildReport, LinkTarget, VaultIndex};
-use diamond_vault::{EntryKind, Vault, VaultError, VaultPath};
+use diamond_vault::{EntryKind, Vault, VaultError, VaultPath, VaultWatcher};
 
 /// A file or folder in the sidebar tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,6 +48,27 @@ pub enum Follow {
     },
     /// A file that is not a note, which the app cannot show yet.
     Attachment(VaultPath),
+}
+
+/// What a change on disk means for the note that is open.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum OpenChange {
+    /// The open note's file is as it was last read or saved.
+    Unchanged,
+    /// The file now holds this text, which differs from what was last read
+    /// or saved.
+    Changed(String),
+    /// The file is gone: deleted, moved or renamed outside the app.
+    Removed,
+}
+
+/// The result of [`Session::apply_changes`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Applied {
+    /// Files or folders appeared or disappeared, so the sidebar is stale.
+    pub structure_changed: bool,
+    /// What happened to the open note.
+    pub open: OpenChange,
 }
 
 struct OpenNote {
@@ -201,6 +222,93 @@ impl Session {
                 Ok(Follow::Note { path, created })
             }
         }
+    }
+
+    /// Watches the vault folder; see [`Vault::watch`].
+    pub fn watch<F>(&self, on_change: F) -> Result<VaultWatcher, VaultError>
+    where
+        F: Fn(Vec<VaultPath>) + Send + 'static,
+    {
+        self.vault.watch(on_change)
+    }
+
+    /// Brings the index up to date with files a watcher reported as changed
+    /// and reports what that means for the sidebar and the open note.
+    ///
+    /// The open note's saved text is left alone: the caller decides whether
+    /// to take the version on disk ([`Session::accept_disk_text`]) or keep
+    /// what is in the editor.
+    pub fn apply_changes(&mut self, paths: &[VaultPath]) -> Result<Applied, VaultError> {
+        let refresh = self.index.refresh(&self.vault, paths)?;
+        let open = match &self.open {
+            None => OpenChange::Unchanged,
+            Some(open) if !self.vault.exists(&open.path) => OpenChange::Removed,
+            Some(open) => match self.vault.read(&open.path) {
+                Ok(text) if text != open.saved => OpenChange::Changed(text),
+                _ => OpenChange::Unchanged,
+            },
+        };
+        Ok(Applied {
+            structure_changed: refresh.structure_changed,
+            open,
+        })
+    }
+
+    /// Records that the editor now shows `text` as read from disk.
+    pub fn accept_disk_text(&mut self, text: &str) {
+        if let Some(open) = self.open.as_mut() {
+            text.clone_into(&mut open.saved);
+        }
+    }
+
+    /// Closes the open note without writing anything.
+    pub fn close(&mut self) {
+        self.open = None;
+    }
+
+    /// Writes `text` to a new note beside the open one, named after it with
+    /// "(conflict)" added, and returns the new note's path. Used when the
+    /// editor and the disk disagree and the editor's text must not be lost.
+    pub fn save_conflict_copy(&mut self, text: &str) -> Result<VaultPath, VaultError> {
+        let Some(open) = self.open.as_ref() else {
+            return Err(VaultError::InvalidPath("no note is open".into()));
+        };
+        let stem = format!("{} (conflict)", open.path.stem());
+        let copy = self.vault.unused_path(open.path.parent(), &stem, "md")?;
+        self.vault.create(&copy, text)?;
+        self.index.upsert(copy.clone(), text);
+        Ok(copy)
+    }
+
+    /// Creates an empty `Untitled` note at the vault root and returns its
+    /// path. The caller opens it.
+    pub fn new_note(&mut self) -> Result<VaultPath, VaultError> {
+        let path = self.vault.unused_path(None, "Untitled", "md")?;
+        self.vault.create(&path, "")?;
+        self.index.upsert(path.clone(), "");
+        Ok(path)
+    }
+
+    /// Moves a file or folder to the vault's trash. Returns whether the open
+    /// note went with it, in which case no note is open any more.
+    pub fn delete(&mut self, path: &VaultPath) -> Result<bool, VaultError> {
+        self.vault.trash(path)?;
+        self.index
+            .refresh(&self.vault, std::slice::from_ref(path))?;
+        let under = format!("{}/", path.as_str());
+        let closes_open = self
+            .open
+            .as_ref()
+            .is_some_and(|open| open.path == *path || open.path.as_str().starts_with(&under));
+        if closes_open {
+            self.open = None;
+        }
+        Ok(closes_open)
+    }
+
+    /// Whether `path` is a note in the index.
+    pub fn is_note(&self, path: &VaultPath) -> bool {
+        self.index.note(path).is_some()
     }
 
     /// Notes that link to the open note, as `(path, title)`.
@@ -423,6 +531,100 @@ mod tests {
         session.open_note(&path("Home.md")).unwrap();
         assert!(session.follow(text, 4).is_err());
         assert!(!dir.path().parent().unwrap().join("outside.md").exists());
+    }
+
+    #[test]
+    fn apply_changes_reports_outside_edits_and_removals() {
+        let (dir, mut session) = session(&[("Home.md", "one"), ("Other.md", "")]);
+        let home = path("Home.md");
+        assert_eq!(
+            session
+                .apply_changes(std::slice::from_ref(&home))
+                .unwrap()
+                .open,
+            OpenChange::Unchanged
+        );
+        session.open_note(&home).unwrap();
+
+        // Our own save comes back from the watcher as "unchanged".
+        session.save("two").unwrap();
+        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
+        assert_eq!(
+            applied,
+            Applied {
+                structure_changed: false,
+                open: OpenChange::Unchanged
+            }
+        );
+
+        // Another program edits the file.
+        std::fs::write(dir.path().join("Home.md"), "three [[Other]]").unwrap();
+        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
+        assert_eq!(applied.open, OpenChange::Changed("three [[Other]]".into()));
+        assert!(session.is_dirty("three [[Other]]"));
+        session.accept_disk_text("three [[Other]]");
+        assert!(!session.is_dirty("three [[Other]]"));
+        assert_eq!(
+            session
+                .apply_changes(std::slice::from_ref(&home))
+                .unwrap()
+                .open,
+            OpenChange::Unchanged
+        );
+
+        // Another program adds a file, then deletes the open note.
+        std::fs::write(dir.path().join("Added.md"), "").unwrap();
+        assert!(
+            session
+                .apply_changes(&[path("Added.md")])
+                .unwrap()
+                .structure_changed
+        );
+        std::fs::remove_file(dir.path().join("Home.md")).unwrap();
+        let applied = session.apply_changes(std::slice::from_ref(&home)).unwrap();
+        assert_eq!(
+            applied,
+            Applied {
+                structure_changed: true,
+                open: OpenChange::Removed
+            }
+        );
+        // The note stays open so its text can still be saved back.
+        assert_eq!(session.current(), Some(&home));
+    }
+
+    #[test]
+    fn new_note_picks_an_unused_name() {
+        let (dir, mut session) = session(&[("Untitled.md", "taken")]);
+        let created = session.new_note().unwrap();
+        assert_eq!(created, path("Untitled 1.md"));
+        assert!(session.is_note(&created));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Untitled.md")).unwrap(),
+            "taken"
+        );
+    }
+
+    #[test]
+    fn delete_trashes_and_closes_the_open_note_when_it_goes() {
+        let (dir, mut session) = session(&[
+            ("Keep.md", "[[Gone]]"),
+            ("Folder/Gone.md", "x"),
+            ("Folder/Also.md", ""),
+        ]);
+        session.open_note(&path("Keep.md")).unwrap();
+        assert!(!session.delete(&path("Folder/Also.md")).unwrap());
+        assert_eq!(session.current(), Some(&path("Keep.md")));
+
+        session.open_note(&path("Folder/Gone.md")).unwrap();
+        assert!(session.delete(&path("Folder")).unwrap());
+        assert!(session.current().is_none());
+        assert!(!session.is_note(&path("Folder/Gone.md")));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(".trash/Folder/Gone.md")).unwrap(),
+            "x"
+        );
+        assert!(session.delete(&path("Folder")).is_err());
     }
 
     #[test]
