@@ -25,7 +25,14 @@ use crate::session::{Follow, NOTE_SCHEME, OpenChange, Session, TreeNode};
 
 actions!(
     diamond,
-    [SaveNote, FollowLink, NewNote, QuickSwitch, ToggleReading]
+    [
+        SaveNote,
+        FollowLink,
+        NewNote,
+        QuickSwitch,
+        SearchVault,
+        ToggleReading
+    ]
 );
 
 const CONTEXT: &str = "Workspace";
@@ -61,6 +68,10 @@ pub fn init(cx: &mut App) {
         KeyBinding::new(primary!("s"), SaveNote, Some(CONTEXT)),
         KeyBinding::new(primary!("n"), NewNote, Some(CONTEXT)),
         KeyBinding::new(primary!("o"), QuickSwitch, Some(CONTEXT)),
+        KeyBinding::new(primary!("shift-f"), SearchVault, Some(CONTEXT)),
+        // The text input has its own binding for this key. This more
+        // specific one, registered after it, wins while the editor has focus.
+        KeyBinding::new(primary!("shift-f"), SearchVault, Some("Workspace > Input")),
         KeyBinding::new(primary!("e"), ToggleReading, Some(CONTEXT)),
         // Off macOS the text input claims Ctrl-E for "move to end of line".
         // This more specific binding, registered after it, takes it back.
@@ -73,11 +84,30 @@ pub fn init(cx: &mut App) {
 /// How many notes the quick switcher lists at once.
 const SWITCHER_LIMIT: usize = 50;
 
-/// The quick switcher while it is open.
+/// What the palette is looking through.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PaletteMode {
+    /// Note names, for jumping to a note.
+    Notes,
+    /// The text of every note.
+    Search,
+}
+
+/// One row in the palette.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PaletteRow {
+    path: VaultPath,
+    label: SharedString,
+    /// The line to put the cursor on, for a search result.
+    line: Option<usize>,
+}
+
+/// The quick switcher or search palette while it is open.
 struct Switcher {
+    mode: PaletteMode,
     state: Entity<CommandState>,
-    /// The notes currently listed, best match first.
-    results: Vec<(VaultPath, SharedString)>,
+    /// The rows currently listed, best match first.
+    results: Vec<PaletteRow>,
 }
 
 /// The main window's root view.
@@ -374,6 +404,8 @@ impl Workspace {
     pub fn new_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match self.session.new_note() {
             Ok(path) => {
+                // A new note is for writing in, so leave the reading view.
+                self.reading = None;
                 self.reveal_in_tree(&path, cx);
                 self.open_note(&path, window, cx);
                 self.editor
@@ -407,13 +439,15 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Opens the quick switcher: type part of a note's name, press Enter.
-    pub fn open_switcher(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens the palette: type, then press Enter on a row. In `Notes` mode
+    /// it jumps to a note by name; in `Search` mode it searches note text.
+    fn open_switcher(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
         let state = cx.new(|cx| CommandState::new(window, cx));
         state.update(cx, |state, cx| state.focus(window, cx));
         self.switcher = Some(Switcher {
+            mode,
             state,
-            results: self.switcher_results(""),
+            results: self.switcher_results(mode, ""),
         });
         cx.notify();
     }
@@ -427,12 +461,43 @@ impl Workspace {
         }
     }
 
-    fn switcher_results(&self, query: &str) -> Vec<(VaultPath, SharedString)> {
-        self.session
-            .quick_switch(query, SWITCHER_LIMIT)
-            .into_iter()
-            .map(|(path, label)| (path, label.into()))
-            .collect()
+    fn switcher_results(&self, mode: PaletteMode, query: &str) -> Vec<PaletteRow> {
+        match mode {
+            PaletteMode::Notes => self
+                .session
+                .quick_switch(query, SWITCHER_LIMIT)
+                .into_iter()
+                .map(|(path, label)| PaletteRow {
+                    path,
+                    label: label.into(),
+                    line: None,
+                })
+                .collect(),
+            PaletteMode::Search => self
+                .session
+                .search(query, SWITCHER_LIMIT)
+                .into_iter()
+                .map(|(path, label, line)| PaletteRow {
+                    path,
+                    label: label.into(),
+                    line,
+                })
+                .collect(),
+        }
+    }
+
+    /// Opens the note a palette row names and, for a search result, puts
+    /// the cursor at the start of the matching line.
+    fn open_row(&mut self, row: &PaletteRow, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_note(&row.path, window, cx);
+        let Some(line) = row.line else {
+            return;
+        };
+        self.editor.update(cx, |editor, cx| {
+            let text = editor.value();
+            let offset: usize = text.split_inclusive('\n').take(line).map(str::len).sum();
+            editor.set_selected_range(offset..offset, cx);
+        });
     }
 
     fn render_switcher(&self, switcher: &Switcher, cx: &mut Context<Self>) -> impl IntoElement {
@@ -442,17 +507,23 @@ impl Workspace {
         let palette = Command::new(&switcher.state)
             // Ranking is ours, so the list shows exactly what we hand it.
             .filterable(false)
-            .placeholder("Find a note")
+            .placeholder(match switcher.mode {
+                PaletteMode::Notes => "Find a note",
+                PaletteMode::Search => "Search in all notes",
+            })
             .max_h(px(420.))
             .items(
                 switcher
                     .results
                     .iter()
-                    .map(|(_, label)| CommandItem::new().label(label.clone())),
+                    .map(|row| CommandItem::new().label(row.label.clone())),
             )
             .on_query(move |query, _, cx| {
                 on_query.update(cx, |this, cx| {
-                    let results = this.switcher_results(query);
+                    let Some(mode) = this.switcher.as_ref().map(|switcher| switcher.mode) else {
+                        return;
+                    };
+                    let results = this.switcher_results(mode, query);
                     if let Some(switcher) = this.switcher.as_mut() {
                         switcher.results = results;
                     }
@@ -461,14 +532,14 @@ impl Workspace {
             })
             .on_confirm(move |chosen, window, cx| {
                 on_confirm.update(cx, |this, cx| {
-                    let path = this
+                    let row = this
                         .switcher
                         .as_ref()
                         .and_then(|switcher| switcher.results.get(chosen.row))
-                        .map(|(path, _)| path.clone());
+                        .cloned();
                     this.close_switcher(window, cx);
-                    if let Some(path) = path {
-                        this.open_note(&path, window, cx);
+                    if let Some(row) = row {
+                        this.open_row(&row, window, cx);
                     }
                 });
             })
@@ -752,7 +823,10 @@ impl Render for Workspace {
                 this.new_note(window, cx);
             }))
             .on_action(cx.listener(|this, _: &QuickSwitch, window, cx| {
-                this.open_switcher(window, cx);
+                this.open_switcher(PaletteMode::Notes, window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &SearchVault, window, cx| {
+                this.open_switcher(PaletteMode::Search, window, cx);
             }))
             .on_action(cx.listener(|this, _: &ToggleReading, window, cx| {
                 this.toggle_reading(window, cx);
@@ -1298,8 +1372,8 @@ mod tests {
         workspace.read_with(cx, |workspace, _| {
             let results = &workspace.switcher.as_ref().unwrap().results;
             assert_eq!(results.len(), 1, "{results:?}");
-            assert_eq!(results[0].0, path("Projects/Quarterly Plan.md"));
-            assert_eq!(results[0].1.as_ref(), "Quarterly Plan  ·  Projects");
+            assert_eq!(results[0].path, path("Projects/Quarterly Plan.md"));
+            assert_eq!(results[0].label.as_ref(), "Quarterly Plan  ·  Projects");
         });
 
         cx.simulate_keystrokes("enter");
@@ -1399,5 +1473,51 @@ mod tests {
         workspace.read_with(cx, |workspace, _| assert!(workspace.reading.is_none()));
         cx.simulate_keystrokes("h i");
         assert_eq!(editor_text(&workspace, cx), "hi");
+    }
+
+    #[gpui_kit::test]
+    fn the_search_palette_opens_a_note_at_the_matching_line(cx: &mut TestAppContext) {
+        let (_dir, workspace, cx) = open(
+            &[
+                ("Home.md", "home\n"),
+                (
+                    "Deep/Report.md",
+                    "# Report\n\nintro\nthe needle is here\nend\n",
+                ),
+            ],
+            cx,
+        );
+        open_note(&workspace, "Home.md", cx);
+
+        // The shortcut works from inside the editor, which has its own
+        // binding for the same key.
+        cx.simulate_keystrokes(super::primary!("shift-f"));
+        workspace.read_with(cx, |workspace, _| {
+            let palette = workspace.switcher.as_ref().expect("palette open");
+            assert_eq!(palette.mode, super::PaletteMode::Search);
+            assert!(palette.results.is_empty());
+        });
+
+        cx.simulate_keystrokes("n e e d l e");
+        workspace.read_with(cx, |workspace, _| {
+            let results = &workspace.switcher.as_ref().unwrap().results;
+            assert_eq!(results.len(), 1, "{results:?}");
+            assert_eq!(results[0].label.as_ref(), "Report  ·  the needle is here");
+            assert_eq!(results[0].line, Some(3));
+        });
+
+        cx.simulate_keystrokes("enter");
+        workspace.read_with(cx, |workspace, cx| {
+            assert!(workspace.switcher.is_none());
+            assert_eq!(workspace.session.current(), Some(&path("Deep/Report.md")));
+            let text = "# Report\n\nintro\n";
+            assert_eq!(workspace.editor.read(cx).cursor(), text.len());
+        });
+        // Typing lands on the matching line.
+        cx.simulate_keystrokes("x");
+        assert_eq!(
+            editor_text(&workspace, cx),
+            "# Report\n\nintro\nxthe needle is here\nend\n"
+        );
     }
 }

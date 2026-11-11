@@ -406,6 +406,25 @@ impl Session {
             .collect()
     }
 
+    /// Searches the text of every note; see [`diamond_index::search`] for
+    /// the query syntax. Returns one row per matching line, as
+    /// `(path, label, line)`, with at most `limit` notes. A note that
+    /// matched only by name has one row and no line.
+    pub fn search(&self, query: &str, limit: usize) -> Vec<(VaultPath, String, Option<usize>)> {
+        let mut rows = Vec::new();
+        for hit in diamond_index::search::search(&self.index, query, limit) {
+            if hit.lines.is_empty() {
+                rows.push((hit.path, hit.title, None));
+                continue;
+            }
+            for matched in hit.lines {
+                let label = format!("{}  ·  {}", hit.title, matched.excerpt);
+                rows.push((hit.path.clone(), label, Some(matched.line)));
+            }
+        }
+        rows
+    }
+
     /// Whether `path` is a note in the index.
     pub fn is_note(&self, path: &VaultPath) -> bool {
         self.index.note(path).is_some()
@@ -643,6 +662,34 @@ mod tests {
         );
         // Text without links or properties passes through unchanged.
         assert_eq!(session.reading_markdown("plain *text*\n"), "plain *text*\n");
+    }
+
+    #[test]
+    fn search_lists_one_row_per_matching_line() {
+        let (_dir, session) = session(&[
+            ("Budget.md", "nothing\n"),
+            (
+                "Notes/Plan.md",
+                "---\ntitle: The Plan\n---\nfirst budget line\n\nsecond Budget line\n",
+            ),
+        ]);
+        assert_eq!(
+            session.search("budget", 10),
+            vec![
+                (path("Budget.md"), "Budget".to_owned(), None),
+                (
+                    path("Notes/Plan.md"),
+                    "The Plan  ·  first budget line".to_owned(),
+                    Some(3)
+                ),
+                (
+                    path("Notes/Plan.md"),
+                    "The Plan  ·  second Budget line".to_owned(),
+                    Some(5)
+                ),
+            ]
+        );
+        assert!(session.search("", 10).is_empty());
     }
 
     #[test]
