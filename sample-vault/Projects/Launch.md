@@ -6,8 +6,7 @@ tags: [project]
 ---
 # Launch
 
-The plan for the spring launch. The money is in [[Budget]]; loose thoughts
-are in [[Ideas]].
+The plan for the spring launch. The money is in [[Budget]]; loose thoughts are in [[Ideas]].
 
 ## To do
 

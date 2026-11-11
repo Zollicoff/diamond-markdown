@@ -126,7 +126,7 @@ impl Plugin for Properties {
                 );
             }))
         };
-        let mut rows: Vec<Row> = session
+        let rows: Vec<Row> = session
             .properties(current)
             .into_iter()
             .map(|(key, value)| Row {
@@ -134,13 +134,13 @@ impl Plugin for Properties {
                 action: ask(Some(key), value),
             })
             .collect();
-        rows.push(Row {
-            label: "+ Add a property".to_owned(),
-            action: ask(None, String::new()),
-        });
         vec![Section {
             title: "Properties",
             rows,
+            footer: Some(Row {
+                label: "+ Add a property".to_owned(),
+                action: ask(None, String::new()),
+            }),
         }]
     }
 }

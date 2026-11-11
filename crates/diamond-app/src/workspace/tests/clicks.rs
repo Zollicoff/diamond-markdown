@@ -149,6 +149,15 @@ fn the_context_panel_answers_to_clicks(cx: &mut TestAppContext) {
     open_note(&workspace, "Other.md", cx);
     click(("plugin-row", 10_000usize), cx);
     assert_eq!(current(&workspace, cx), Some("Home.md".to_owned()));
+
+    // The row under the properties adds one. Home has one property, so
+    // the row sits in the place after it.
+    click(("plugin-footer", 1usize), cx);
+    workspace.read_with(cx, |workspace, _| match &workspace.overlay {
+        Some(Overlay::Prompt(prompt)) => assert_eq!(prompt.title.as_ref(), "Add a property"),
+        _ => panic!("the row under the properties should ask for one"),
+    });
+    cx.simulate_keystrokes("escape");
 }
 
 #[gpui_kit::test]

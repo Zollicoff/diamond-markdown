@@ -113,16 +113,17 @@ The window. Its code is split by what it knows about:
   has no UI types, so it is tested without a window. `history.rs`,
   `notes.rs` and `settings.rs` are the same kind of code: back and forward,
   daily notes and templates, settings files.
-- `actions.rs` lists every command: its action, its default shortcut and
-  its name in the command palette.
+- `actions.rs` registers the shortcuts, and holds the two actions that work
+  without a window: open a vault, and quit.
 - `workspace/` is the view. `mod.rs` is what the window does, `panels.rs`
   how it is drawn, `tab.rs` what a tab and a pane hold, and `palette.rs`
   the palette that finds notes, text, commands and templates.
 - `app.rs` is the state every window shares: the app's settings and whether
   it is drawn light or dark.
 - `plugin.rs` is the plugin interface, and `plugins/` holds the core
-  plugins built on it: properties, bookmarks, tasks, calendar, preview,
-  graph, boards, canvas, tables and git.
+  plugins built on it: the workbench (the window's own commands),
+  properties, bookmarks, tasks, calendar, preview, graph, boards, canvas,
+  tables, git and files.
 
 The window has three panels: the file tree, the notes, and a context panel
 with the backlinks, outline and tags of the note in front. The outline and
@@ -205,6 +206,9 @@ context panel:
   under the cursor, and add a row or a column.
 - **Git.** Commands start keeping versions of the vault, save a version and
   sync with a remote, using the git that is installed.
+
+A file that is not a note opens too: a picture in a tab, a canvas in its
+view, and anything else in the app the system uses for it.
 
 A fenced `query` block in a note is replaced, in the reading view, by the
 table it computes. Its first lines choose notes in the search syntax; the
@@ -323,8 +327,9 @@ Features are modules. A plugin adds to the app only through one interface
   way typing would, and rewriting any note whether or not it is open.
 
 Core plugins are Rust modules compiled into the app. They use nothing but
-that interface, which keeps it honest. The older built-in commands are
-still wired directly into the window and are to move onto the interface.
+that interface, which keeps it honest. Every command in the app, the
+window's own included, is added by a plugin. They all reach the palette and
+the keyboard the same way: one list, one action, one handler in the window.
 
 Third-party plugins come later as sandboxed WebAssembly modules. They are
 written in any language that compiles to WebAssembly, get only the
@@ -374,19 +379,25 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-204 tests so far; `cargo test --workspace` runs them all.
+210 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (79): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (79): the session, history, daily notes and templates, settings
-  files and the remembered-vaults list, tested without a window.
-- App UI (46): headless window tests drive the real views with real
-  keystrokes. They open, type, save and autosave; follow and create links;
-  reload after outside edits and keep both versions in a conflict; use the
-  palette for notes, search, commands and templates; rename with links
-  rewritten in every tab; go back and forward; open, switch and close tabs;
-  split a note into two views that stay in step; switch light and dark; and
-  measure where the panels and panes are laid out.
+- App logic (80): the session, history, daily notes and templates, settings
+  files, the remembered-vaults list and each plugin's own logic, tested
+  without a window. One of them opens `sample-vault` and checks that every
+  feature it points at works on it.
+- App UI (51): headless window tests on the real views.
+  - With keystrokes: open, type, save and autosave; follow and create
+    links; reload after outside edits and keep both versions in a conflict;
+    the palette for notes, search, commands and templates; rename with
+    links rewritten in every tab; back and forward; tabs and split panes;
+    light and dark.
+  - With the mouse, through the window's own hit testing: sidebar rows and
+    their right-click menu, tabs, the buttons in the bars, every kind of row
+    in the context panel, and the task, board, calendar, graph and canvas
+    views, including dragging a card.
+  - Layout: where the panels and panes are placed.
 
 Dependencies: `scripts/release-age.py` lists locked dependencies published
 in the last 14 days, and `--pin` moves them back to older releases. As of
@@ -394,12 +405,15 @@ in the last 14 days, and `--pin` moves them back to older releases. As of
 seven are the `wasm-bindgen` family, which is only compiled for the browser
 target and is not part of the macOS or Linux build.
 
-The rendered window has been looked at on the development Mac (dark
-appearance): the three panels, a note in the editor and in the reading view,
-the command palette, tabs in two panes, the calendar, the task list, a
-board, the graph and a canvas. Dragging a card on a canvas has not been
-tried by hand. Not checked by eye yet: the light appearance,
-Linux, and anything under load.
+The rendered window has been looked at on the development Mac in both the
+dark and the light appearance: the three panels, a note in the editor and
+in the reading view, the command palette, tabs in two panes, the live
+preview with a computed table, the calendar, the task list, a board, the
+graph and a canvas.
+
+Not verified: Linux. The app has never been built or run there. CI has a
+Linux job, but it has not completed: on each run so far the runner could not
+reach Ubuntu's package mirrors to install the system libraries.
 
 ## Milestones
 

@@ -494,14 +494,17 @@ impl Workspace {
                 |(section_ix, plugin_section)| {
                     let heading =
                         section(plugin_section.title, plugin_section.rows.len()).into_any_element();
+                    // Rows are named by section and place; the footer takes
+                    // the place after the last row.
                     let rows = plugin_section
                         .rows
                         .into_iter()
+                        .map(|row| ("plugin-row", row))
+                        .chain(plugin_section.footer.map(|row| ("plugin-footer", row)))
                         .enumerate()
-                        .map(move |(row_ix, row)| (section_ix * 10_000 + row_ix, row))
-                        .map(|(id, row)| {
+                        .map(|(row_ix, (name, row))| {
                             let action = row.action;
-                            ListItem::new(("plugin-row", id))
+                            ListItem::new((name, section_ix * 10_000 + row_ix))
                                 .child(row.label)
                                 .on_click(cx.listener(move |this, _, window, cx| match &action {
                                     RowAction::Open(path) => this.open_note(path, window, cx),

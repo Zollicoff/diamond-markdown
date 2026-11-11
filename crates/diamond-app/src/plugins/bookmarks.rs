@@ -102,6 +102,7 @@ impl Plugin for Bookmarks {
                     action: RowAction::Open(path.clone()),
                 })
                 .collect(),
+            footer: None,
         }]
     }
 

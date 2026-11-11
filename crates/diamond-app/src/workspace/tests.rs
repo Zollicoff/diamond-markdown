@@ -1984,10 +1984,7 @@ fn properties_are_listed_and_changed_from_the_context_panel(cx: &mut TestAppCont
                 .collect::<Vec<_>>()
         })
     };
-    assert_eq!(
-        rows(cx),
-        vec!["status: open", "tags: [a, b]", "+ Add a property"]
-    );
+    assert_eq!(rows(cx), vec!["status: open", "tags: [a, b]"]);
     // Clicking a row asks for the new value, with the old one selected.
     let click = |row: usize, cx: &mut VisualTestContext| {
         cx.update(|window, cx| {
@@ -2018,8 +2015,18 @@ fn properties_are_listed_and_changed_from_the_context_panel(cx: &mut TestAppCont
     assert_eq!(read(), "---\nstatus: done\ntags: [a, b]\n---\nbody\n");
     assert_eq!(rows(cx)[0], "status: done");
 
-    // Adding one, then removing one by clearing its value.
-    click(2, cx);
+    // Adding one with the row under the list, then removing one by clearing
+    // its value.
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            let section = &Properties.sections(&workspace.session, workspace.current())[0];
+            let footer = section.footer.clone().expect("a row to add a property");
+            assert_eq!(footer.label, "+ Add a property");
+            if let RowAction::Run(run) = footer.action {
+                run(workspace, window, cx);
+            }
+        });
+    });
     cx.simulate_keystrokes("d u e : space 2 0 2 6 enter");
     save(cx);
     assert_eq!(
@@ -2030,10 +2037,7 @@ fn properties_are_listed_and_changed_from_the_context_panel(cx: &mut TestAppCont
     cx.simulate_keystrokes("backspace enter");
     save(cx);
     assert_eq!(read(), "---\nstatus: done\ndue: 2026\n---\nbody\n");
-    assert_eq!(
-        rows(cx),
-        vec!["status: done", "due: 2026", "+ Add a property"]
-    );
+    assert_eq!(rows(cx), vec!["status: done", "due: 2026"]);
     // Typing goes back to the note afterwards.
     workspace.read_with(cx, |workspace, _| {
         assert!(workspace.overlay.is_none());

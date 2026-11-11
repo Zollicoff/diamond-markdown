@@ -90,6 +90,9 @@ pub struct Section {
     pub title: &'static str,
     /// The rows, top to bottom.
     pub rows: Vec<Row>,
+    /// A last row that is not one of the things listed, and so is not
+    /// counted in the heading: "Add a property".
+    pub footer: Option<Row>,
 }
 
 /// A feature of the app.

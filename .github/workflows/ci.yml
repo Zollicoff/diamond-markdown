@@ -40,12 +40,16 @@ jobs:
 
       - name: Install Linux libraries
         if: runner.os == 'Linux'
+        # A package mirror that does not answer must fail the job soon,
+        # not hold it for half an hour.
+        timeout-minutes: 10
         # Nothing may stop to ask a question: there is nobody to answer.
         env:
           DEBIAN_FRONTEND: noninteractive
+          APT: -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15
         run: |
-          sudo apt-get update
-          sudo --preserve-env=DEBIAN_FRONTEND apt-get install --no-install-recommends -y \
+          sudo apt-get $APT update
+          sudo --preserve-env=DEBIAN_FRONTEND apt-get $APT install --no-install-recommends -y \
             build-essential clang cmake pkg-config \
             libasound2-dev libfontconfig-dev libfreetype-dev libssl-dev \
             libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev \
