@@ -766,15 +766,26 @@ impl Session {
         tasks
     }
 
-    /// Ticks or unticks the task on a line of a note that is not open, by
-    /// rewriting its file.
-    pub fn toggle_task(&mut self, path: &VaultPath, line: usize) -> Result<(), VaultError> {
+    /// Rewrites the file of a note that is not open. `change` gets its text
+    /// and returns the new text, or `None` to leave it alone. Returns
+    /// whether the note was changed.
+    pub fn rewrite_note(
+        &mut self,
+        path: &VaultPath,
+        change: impl FnOnce(&str) -> Option<String>,
+    ) -> Result<bool, VaultError> {
         let text = self.vault.read(path)?;
-        let toggled = notes::toggle_task(&text, line)
-            .ok_or_else(|| VaultError::InvalidPath(format!("{path} has no task on that line")))?;
-        self.vault.write(path, &toggled)?;
-        self.index.upsert(path.clone(), &toggled);
-        Ok(())
+        let Some(rewritten) = change(&text) else {
+            return Ok(false);
+        };
+        self.vault.write(path, &rewritten)?;
+        self.index.upsert(path.clone(), &rewritten);
+        Ok(true)
+    }
+
+    /// A note's text as of its last save.
+    pub fn note_text(&self, path: &VaultPath) -> Option<&str> {
+        self.index.note(path).map(|note| note.text.as_str())
     }
 
     /// Whether `path` is a note in the index.
@@ -1448,7 +1459,10 @@ mod tests {
             ]
         );
 
-        session.toggle_task(&path("Work/Plan.md"), 3).unwrap();
+        let toggle = |session: &mut Session, name: &str, line: usize| {
+            session.rewrite_note(&path(name), |text| notes::toggle_task(text, line))
+        };
+        assert!(toggle(&mut session, "Work/Plan.md", 3).unwrap());
         assert!(
             std::fs::read_to_string(dir.path().join("Work/Plan.md"))
                 .unwrap()
@@ -1456,8 +1470,10 @@ mod tests {
         );
         assert!(session.tasks()[1].done);
         // A line that is not a task changes nothing.
-        assert!(session.toggle_task(&path("Work/Plan.md"), 5).is_err());
-        assert!(session.toggle_task(&path("Missing.md"), 0).is_err());
+        assert!(!toggle(&mut session, "Work/Plan.md", 5).unwrap());
+        assert!(toggle(&mut session, "Missing.md", 0).is_err());
+        assert_eq!(session.note_text(&path("Empty.md")), Some("nothing\n"));
+        assert_eq!(session.note_text(&path("Missing.md")), None);
     }
 
     #[test]

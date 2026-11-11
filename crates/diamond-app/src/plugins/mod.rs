@@ -1,8 +1,10 @@
 //! The core plugins: features compiled into the app, each in its own module
 //! and each using only the plugin interface.
 
+pub mod board;
 pub mod bookmarks;
 pub mod calendar;
+pub mod git;
 pub mod properties;
 pub mod tables;
 pub mod tasks;
@@ -16,6 +18,8 @@ pub fn core() -> Vec<Box<dyn Plugin>> {
         Box::new(bookmarks::Bookmarks::default()),
         Box::new(tasks::Tasks),
         Box::new(calendar::Calendar),
+        Box::new(board::Boards),
         Box::new(tables::Tables),
+        Box::new(git::Git),
     ]
 }

@@ -213,12 +213,13 @@ impl Workspace {
     /// called.
     pub fn open_view<V: Render>(
         &mut self,
-        key: &'static str,
-        title: &'static str,
+        key: impl Into<SharedString>,
+        title: impl Into<SharedString>,
         window: &mut Window,
         cx: &mut Context<Self>,
         build: impl FnOnce(&mut Self, &mut Context<Self>) -> Entity<V>,
     ) {
+        let key: SharedString = key.into();
         let existing = self.panes.iter().enumerate().find_map(|(pane_ix, pane)| {
             let tab_ix = pane
                 .tabs
@@ -236,7 +237,7 @@ impl Workspace {
         }
         let content = build(self, cx);
         self.tab_mut().view = Some(ViewTab {
-            key: key.into(),
+            key,
             title: title.into(),
             content: content.into(),
         });
@@ -244,8 +245,47 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Ticks or unticks the task on a line of a note, in the editor if the
-    /// note is open and in its file otherwise.
+    /// Rewrites a note, whether or not it is open: in its editor if it is,
+    /// where the change is saved at once and can be undone, and in its file
+    /// otherwise. `change` gets the note's text and returns the new text, or
+    /// `None` to leave it alone. Returns whether the note was changed.
+    pub fn rewrite_note(
+        &mut self,
+        path: &VaultPath,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        change: impl FnOnce(&str) -> Option<String>,
+    ) -> bool {
+        cx.notify();
+        let Some((pane, tab)) = self.locate_note(path) else {
+            return match self.session.rewrite_note(path, change) {
+                Ok(changed) => changed,
+                Err(failure) => {
+                    self.error = Some(failure.to_string().into());
+                    false
+                }
+            };
+        };
+        let tab = &self.panes[pane].tabs[tab];
+        let (id, editor) = (tab.id, tab.editor.clone());
+        let text = editor.read(cx).value();
+        let Some(rewritten) = change(&text) else {
+            return false;
+        };
+        // Replacing everything through the editor's own editing path keeps
+        // the change undoable.
+        editor.update(cx, |editor, cx| {
+            let cursor = editor.cursor().min(rewritten.len());
+            editor.set_selected_range(0..text.len(), cx);
+            editor.replace(rewritten, window, cx);
+            editor.set_selected_range(cursor..cursor, cx);
+        });
+        self.refresh_live(id, cx);
+        self.mirror(id, window, cx);
+        self.save_tab(id, window, cx)
+    }
+
+    /// Ticks or unticks the task on a line of a note.
     pub fn toggle_task(
         &mut self,
         path: &VaultPath,
@@ -253,21 +293,7 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        cx.notify();
-        let Some((pane, tab)) = self.locate_note(path) else {
-            if let Err(failure) = self.session.toggle_task(path, line) {
-                self.error = Some(failure.to_string().into());
-            }
-            return;
-        };
-        let tab = &self.panes[pane].tabs[tab];
-        let id = tab.id;
-        let text = tab.editor.read(cx).value();
-        if let Some(toggled) = notes::toggle_task(&text, line) {
-            self.replace_tab_text(id, toggled, window, cx);
-            self.mirror(id, window, cx);
-            self.save_tab(id, window, cx);
-        }
+        self.rewrite_note(path, window, cx, |text| notes::toggle_task(text, line));
     }
 
     /// Opens the daily note for a date, creating it if needed.
@@ -872,7 +898,7 @@ impl Workspace {
 
     /// Writes every tab's unsaved changes. Returns whether all of them are
     /// now on disk.
-    fn save_all(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    pub fn save_all(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let mut all_saved = true;
         for id in self.tab_ids() {
             all_saved &= self.save_tab(id, window, cx);

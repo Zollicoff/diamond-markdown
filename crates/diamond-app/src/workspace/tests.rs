@@ -2037,3 +2037,64 @@ fn properties_are_listed_and_changed_from_the_context_panel(cx: &mut TestAppCont
         assert!(workspace.error.is_none(), "{:?}", workspace.error);
     });
 }
+
+#[gpui_kit::test]
+fn a_note_opens_as_a_board_and_moving_a_card_rewrites_the_note(cx: &mut TestAppContext) {
+    use crate::plugins::board::Board;
+
+    let text = "# Launch\n\n## To do\n\n- Write copy\n- Book venue\n\n## Done\n";
+    let (dir, workspace, cx) = open(
+        &[("Launch.md", text), ("Other.md", "## A\n- x\n## B\n")],
+        cx,
+    );
+    // Without a note there is nothing to show as a board.
+    run_command("as a board", &workspace, cx);
+    workspace.read_with(cx, |workspace, _| assert!(workspace.error.is_some()));
+
+    open_note(&workspace, "Launch.md", cx);
+    run_command("as a board", &workspace, cx);
+    assert_eq!(
+        tab_titles(&workspace, cx),
+        vec![vec!["Launch", "*Launch board"]]
+    );
+    cx.update(|window, cx| window.render_frame(cx));
+
+    // What the arrows on a card do: the change goes through the window, so
+    // the open editor and the file both get it.
+    let change = |name: &str, change: fn(&mut Board) -> bool, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.rewrite_note(&path(name), window, cx, |text| {
+                    let mut board = Board::parse(text);
+                    change(&mut board).then(|| board.write())
+                })
+            })
+        })
+    };
+    assert!(change("Launch.md", |board| board.move_card(0, 0, 1), cx));
+    let moved = "# Launch\n\n## To do\n\n- Book venue\n\n## Done\n- Write copy\n";
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Launch.md")).unwrap(),
+        moved
+    );
+    workspace.read_with(cx, |workspace, cx| {
+        let note = &workspace.panes[0].tabs[0];
+        assert_eq!(note.editor.read(cx).value().as_ref(), moved);
+        assert!(!note.dirty);
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+    });
+    // A change that does nothing leaves the note alone.
+    assert!(!change("Launch.md", |board| board.move_card(0, 5, 1), cx));
+
+    // A note that is not open is changed in its file.
+    assert!(change("Other.md", |board| board.move_card(0, 0, 1), cx));
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Other.md")).unwrap(),
+        "## A\n## B\n- x\n"
+    );
+
+    // The move made in the open note can be undone there like any edit.
+    cx.simulate_keystrokes("ctrl-shift-tab");
+    cx.simulate_keystrokes(primary!("z"));
+    assert_eq!(editor_text(&workspace, cx), text);
+}
