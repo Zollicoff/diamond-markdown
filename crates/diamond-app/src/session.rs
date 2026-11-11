@@ -306,6 +306,28 @@ impl Session {
         Ok(closes_open)
     }
 
+    /// The notes that best match `query`, best first, as `(path, label)`.
+    ///
+    /// The label is the note's title, with the folder added for notes below
+    /// the vault root and the alias shown when an alias is what matched.
+    pub fn quick_switch(&self, query: &str, limit: usize) -> Vec<(VaultPath, String)> {
+        self.index
+            .quick_switch(query, limit)
+            .into_iter()
+            .map(|suggestion| {
+                let mut label = match suggestion.alias {
+                    Some(alias) => format!("{alias} → {}", suggestion.title),
+                    None => suggestion.title.to_owned(),
+                };
+                if let Some(folder) = suggestion.path.parent() {
+                    label.push_str("  ·  ");
+                    label.push_str(folder);
+                }
+                (suggestion.path.clone(), label)
+            })
+            .collect()
+    }
+
     /// Whether `path` is a note in the index.
     pub fn is_note(&self, path: &VaultPath) -> bool {
         self.index.note(path).is_some()

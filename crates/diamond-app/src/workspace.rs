@@ -5,7 +5,9 @@ use std::time::Duration;
 
 use diamond_vault::{EntryKind, VaultPath, VaultWatcher};
 use gpui_kit::component::{
-    ActiveTheme as _, StyledExt as _, h_flex,
+    ActiveTheme as _, StyledExt as _,
+    command::{Command, CommandItem, CommandState},
+    h_flex,
     input::{Editor, EditorState, InputEvent},
     label::Label,
     list::ListItem,
@@ -20,7 +22,7 @@ use gpui_kit::*;
 
 use crate::session::{Follow, OpenChange, Session, TreeNode};
 
-actions!(diamond, [SaveNote, FollowLink, NewNote]);
+actions!(diamond, [SaveNote, FollowLink, NewNote, QuickSwitch]);
 
 const CONTEXT: &str = "Workspace";
 
@@ -54,8 +56,19 @@ pub fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new(primary!("s"), SaveNote, Some(CONTEXT)),
         KeyBinding::new(primary!("n"), NewNote, Some(CONTEXT)),
+        KeyBinding::new(primary!("o"), QuickSwitch, Some(CONTEXT)),
         KeyBinding::new("alt-enter", FollowLink, Some(CONTEXT)),
     ]);
+}
+
+/// How many notes the quick switcher lists at once.
+const SWITCHER_LIMIT: usize = 50;
+
+/// The quick switcher while it is open.
+struct Switcher {
+    state: Entity<CommandState>,
+    /// The notes currently listed, best match first.
+    results: Vec<(VaultPath, SharedString)>,
 }
 
 /// The main window's root view.
@@ -73,6 +86,7 @@ pub struct Workspace {
     /// saves, so neither version is lost without a decision.
     conflict: Option<SharedString>,
     autosave: Option<Task<()>>,
+    switcher: Option<Switcher>,
     watcher: Option<(VaultWatcher, Task<()>)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -122,6 +136,7 @@ impl Workspace {
             error,
             conflict: None,
             autosave: None,
+            switcher: None,
             watcher: None,
             _subscriptions: subscriptions,
         }
@@ -318,6 +333,99 @@ impl Workspace {
             Err(failure) => self.error = Some(failure.to_string().into()),
         }
         cx.notify();
+    }
+
+    /// Opens the quick switcher: type part of a note's name, press Enter.
+    pub fn open_switcher(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let state = cx.new(|cx| CommandState::new(window, cx));
+        state.update(cx, |state, cx| state.focus(window, cx));
+        self.switcher = Some(Switcher {
+            state,
+            results: self.switcher_results(""),
+        });
+        cx.notify();
+    }
+
+    /// Closes the quick switcher and puts the cursor back in the editor.
+    fn close_switcher(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.switcher.take().is_some() {
+            self.editor
+                .update(cx, |editor, cx| editor.focus(window, cx));
+            cx.notify();
+        }
+    }
+
+    fn switcher_results(&self, query: &str) -> Vec<(VaultPath, SharedString)> {
+        self.session
+            .quick_switch(query, SWITCHER_LIMIT)
+            .into_iter()
+            .map(|(path, label)| (path, label.into()))
+            .collect()
+    }
+
+    fn render_switcher(&self, switcher: &Switcher, cx: &mut Context<Self>) -> impl IntoElement {
+        let on_query = cx.entity();
+        let on_confirm = cx.entity();
+        let on_cancel = cx.entity();
+        let palette = Command::new(&switcher.state)
+            // Ranking is ours, so the list shows exactly what we hand it.
+            .filterable(false)
+            .placeholder("Find a note")
+            .max_h(px(420.))
+            .items(
+                switcher
+                    .results
+                    .iter()
+                    .map(|(_, label)| CommandItem::new().label(label.clone())),
+            )
+            .on_query(move |query, _, cx| {
+                on_query.update(cx, |this, cx| {
+                    let results = this.switcher_results(query);
+                    if let Some(switcher) = this.switcher.as_mut() {
+                        switcher.results = results;
+                    }
+                    cx.notify();
+                });
+            })
+            .on_confirm(move |chosen, window, cx| {
+                on_confirm.update(cx, |this, cx| {
+                    let path = this
+                        .switcher
+                        .as_ref()
+                        .and_then(|switcher| switcher.results.get(chosen.row))
+                        .map(|(path, _)| path.clone());
+                    this.close_switcher(window, cx);
+                    if let Some(path) = path {
+                        this.open_note(&path, window, cx);
+                    }
+                });
+            })
+            .on_cancel(move |window, cx| {
+                on_cancel.update(cx, |this, cx| this.close_switcher(window, cx));
+            });
+
+        div()
+            .id("switcher-backdrop")
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .flex()
+            .justify_center()
+            .pt(px(72.))
+            .bg(cx.theme().background.opacity(0.6))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, cx| this.close_switcher(window, cx)),
+            )
+            .child(
+                div()
+                    .id("switcher")
+                    .w(px(560.))
+                    // Clicks inside the palette must not reach the backdrop.
+                    .occlude()
+                    .child(palette),
+            )
     }
 
     /// Handles a click on a sidebar row.
@@ -545,6 +653,10 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &NewNote, window, cx| {
                 this.new_note(window, cx);
             }))
+            .on_action(cx.listener(|this, _: &QuickSwitch, window, cx| {
+                this.open_switcher(window, cx);
+            }))
+            .relative()
             .size_full()
             .text_color(cx.theme().foreground)
             .child(
@@ -562,6 +674,11 @@ impl Render for Workspace {
                             .size_range(px(180.)..px(480.))
                             .child(panel("context-pane", self.render_context(cx))),
                     ),
+            )
+            .children(
+                self.switcher
+                    .as_ref()
+                    .map(|switcher| self.render_switcher(switcher, cx)),
             )
     }
 }
@@ -1053,5 +1170,67 @@ mod tests {
         cx.executor().advance_clock(AUTOSAVE_DELAY * 3);
         cx.run_until_parked();
         assert!(!dir.path().join("Home.md").exists());
+    }
+
+    #[gpui_kit::test]
+    fn the_quick_switcher_finds_and_opens_a_note(cx: &mut TestAppContext) {
+        let (dir, workspace, cx) = open(
+            &[
+                ("Home.md", "home\n"),
+                ("Projects/Quarterly Plan.md", "# Plan\n"),
+                ("Projects/Budget.md", "# Budget\n"),
+            ],
+            cx,
+        );
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes("x");
+
+        cx.simulate_keystrokes(super::primary!("o"));
+        workspace.read_with(cx, |workspace, _| {
+            let switcher = workspace.switcher.as_ref().expect("switcher open");
+            assert_eq!(switcher.results.len(), 3);
+        });
+
+        // Typing goes to the switcher, not the note, and narrows the list.
+        cx.simulate_keystrokes("q p l");
+        assert_eq!(editor_text(&workspace, cx), "xhome\n");
+        workspace.read_with(cx, |workspace, _| {
+            let results = &workspace.switcher.as_ref().unwrap().results;
+            assert_eq!(results.len(), 1, "{results:?}");
+            assert_eq!(results[0].0, path("Projects/Quarterly Plan.md"));
+            assert_eq!(results[0].1.as_ref(), "Quarterly Plan  ·  Projects");
+        });
+
+        cx.simulate_keystrokes("enter");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.switcher.is_none());
+            assert_eq!(
+                workspace.session.current(),
+                Some(&path("Projects/Quarterly Plan.md"))
+            );
+        });
+        assert_eq!(editor_text(&workspace, cx), "# Plan\n");
+        // The note that was left got saved, and typing is back in the editor.
+        assert_eq!(
+            fs::read_to_string(dir.path().join("Home.md")).unwrap(),
+            "xhome\n"
+        );
+        cx.simulate_keystrokes("y");
+        assert_eq!(editor_text(&workspace, cx), "y# Plan\n");
+    }
+
+    #[gpui_kit::test]
+    fn escape_closes_the_quick_switcher_without_changing_notes(cx: &mut TestAppContext) {
+        let (_dir, workspace, cx) = open(&[("Home.md", "home\n"), ("Other.md", "")], cx);
+        open_note(&workspace, "Home.md", cx);
+        cx.simulate_keystrokes(super::primary!("o"));
+        workspace.read_with(cx, |workspace, _| assert!(workspace.switcher.is_some()));
+        cx.simulate_keystrokes("escape");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.switcher.is_none());
+            assert_eq!(workspace.session.current(), Some(&path("Home.md")));
+        });
+        cx.simulate_keystrokes("z");
+        assert_eq!(editor_text(&workspace, cx), "zhome\n");
     }
 }
