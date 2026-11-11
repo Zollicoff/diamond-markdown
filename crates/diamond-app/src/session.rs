@@ -17,7 +17,8 @@ use crate::settings::VaultSettings;
 /// address is the percent-encoded link target as written in the note.
 pub const NOTE_SCHEME: &str = "diamond://note/";
 
-fn is_image(path: &VaultPath) -> bool {
+/// Whether a file is a picture the app can show, going by its name.
+pub fn is_image(path: &VaultPath) -> bool {
     path.extension().is_some_and(|extension| {
         ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]
             .iter()
@@ -51,7 +52,7 @@ pub enum Follow {
         /// Whether the note was created just now.
         created: bool,
     },
-    /// A file that is not a note, which the app cannot show yet.
+    /// A file that is not a note.
     Attachment(VaultPath),
 }
 
@@ -810,6 +811,12 @@ impl Session {
     /// A number that changes whenever the notes or their links do.
     pub fn revision(&self) -> u64 {
         self.index.revision()
+    }
+
+    /// Where a file is on disk. Fails for a path that leaves the vault
+    /// through a symlink.
+    pub fn absolute(&self, path: &VaultPath) -> Result<std::path::PathBuf, VaultError> {
+        self.vault.resolve(path)
     }
 
     /// Reads a file that is not a note, for a plugin that shows such files.

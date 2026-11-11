@@ -5,18 +5,21 @@ pub mod board;
 pub mod bookmarks;
 pub mod calendar;
 pub mod canvas;
+pub mod files;
 pub mod git;
 pub mod graph;
 pub mod preview;
 pub mod properties;
 pub mod tables;
 pub mod tasks;
+pub mod workbench;
 
 use crate::plugin::Plugin;
 
 /// Every core plugin, in the order their commands and panel sections appear.
 pub fn core() -> Vec<Box<dyn Plugin>> {
     vec![
+        Box::new(workbench::Workbench),
         Box::new(properties::Properties),
         Box::new(bookmarks::Bookmarks::default()),
         Box::new(tasks::Tasks),
@@ -27,6 +30,8 @@ pub fn core() -> Vec<Box<dyn Plugin>> {
         Box::new(canvas::Canvases),
         Box::new(tables::Tables),
         Box::new(git::Git),
+        // Last: it opens whatever no plugin before it does.
+        Box::new(files::Files),
     ]
 }
 

@@ -67,14 +67,9 @@ impl Command {
 
 /// What a click on a row in a plugin's section does.
 #[derive(Clone)]
-#[allow(dead_code)] // The interface offers more than today's plugins use.
 pub enum RowAction {
-    /// Nothing: the row only shows something.
-    None,
     /// Opens a note.
     Open(VaultPath),
-    /// Opens a note with the cursor at the start of a zero-based line.
-    OpenAt(VaultPath, usize),
     /// Anything else.
     Run(Run),
 }

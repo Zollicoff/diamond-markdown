@@ -9,7 +9,6 @@ use gpui_kit::component::{
 use gpui_kit::*;
 
 use super::{Overlay, Workspace};
-use crate::actions::COMMANDS;
 use crate::plugin::RunCommand;
 
 /// How many notes the palette lists at once.
@@ -44,10 +43,8 @@ pub(super) enum RowTarget {
         path: VaultPath,
         line: Option<usize>,
     },
-    /// Runs the command at this position in [`COMMANDS`].
+    /// Runs the command at this position in the window's list.
     Command(usize),
-    /// Runs the plugin command at this position in the window's list.
-    PluginCommand(usize),
     /// Inserts this template into the open note.
     Template(VaultPath),
 }
@@ -91,6 +88,26 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Asks for a note to go to, by name.
+    pub fn find_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(PaletteMode::Notes, "", window, cx);
+    }
+
+    /// Asks for words to search every note for.
+    pub fn search_notes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(PaletteMode::Search, "", window, cx);
+    }
+
+    /// Lists every command.
+    pub fn show_commands(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(PaletteMode::Commands, "", window, cx);
+    }
+
+    /// Asks for a template to insert at the cursor.
+    pub fn choose_template(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(PaletteMode::Templates, "", window, cx);
+    }
+
     /// Lists the notes carrying a tag, for a click on the tag.
     pub fn search_tag(&mut self, tag: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.open_palette(PaletteMode::Search, &format!("tag:{tag}"), window, cx);
@@ -116,22 +133,14 @@ impl Workspace {
                     target: RowTarget::Note { path, line },
                 })
                 .collect(),
-            PaletteMode::Commands => COMMANDS
+            PaletteMode::Commands => self
+                .commands
                 .iter()
                 .enumerate()
                 .map(|(index, command)| PaletteRow {
                     label: command.title.into(),
                     target: RowTarget::Command(index),
                 })
-                .chain(
-                    self.commands
-                        .iter()
-                        .enumerate()
-                        .map(|(index, command)| PaletteRow {
-                            label: command.title.into(),
-                            target: RowTarget::PluginCommand(index),
-                        }),
-                )
                 .collect(),
             PaletteMode::Templates => self
                 .session
@@ -183,7 +192,7 @@ impl Workspace {
             Some(RowTarget::Note { path, line }) => self.open_at(&path, line, window, cx),
             Some(RowTarget::Template(path)) => self.insert_template(&path, window, cx),
             // The palette dispatched the command's action itself.
-            Some(RowTarget::Command(_) | RowTarget::PluginCommand(_)) | None => {}
+            Some(RowTarget::Command(_)) | None => {}
         }
     }
 
@@ -221,11 +230,6 @@ impl Workspace {
                 // Carrying the action makes the row show its shortcut, and
                 // makes the palette dispatch it when the row is chosen.
                 RowTarget::Command(index) => {
-                    let command = &COMMANDS[index];
-                    item.keywords(command.keywords.iter().copied())
-                        .action((command.action)())
-                }
-                RowTarget::PluginCommand(index) => {
                     let command = &self.commands[index];
                     item.keywords(command.keywords.iter().copied())
                         .action(Box::new(RunCommand { index }))

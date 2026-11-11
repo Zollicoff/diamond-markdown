@@ -182,7 +182,7 @@ impl Workspace {
     }
 
     /// A plugin, by its type.
-    #[allow(dead_code)] // Part of the interface; not every core plugin needs it.
+    #[cfg(test)]
     pub fn plugin<T: Plugin>(&self) -> Option<&T> {
         self.plugins.iter().find_map(|plugin| {
             let any: &dyn std::any::Any = plugin.as_ref();
@@ -329,6 +329,17 @@ impl Workspace {
             .map_err(|error| error.to_string())?;
         self.refresh_tree(cx);
         Ok(path)
+    }
+
+    /// Opens a file that is not a note with the first plugin that shows
+    /// files like it.
+    pub fn open_file(&mut self, path: &VaultPath, window: &mut Window, cx: &mut Context<Self>) {
+        self.error = None;
+        let opener = self.plugins.iter().find_map(|plugin| plugin.opener(path));
+        match opener {
+            Some(open) => open(self, window, cx),
+            None => self.report(format!("Nothing can open {path}"), cx),
+        }
     }
 
     /// Follows a link target as written in the file at `from`, which need
@@ -1065,9 +1076,7 @@ impl Workspace {
                 }
                 self.open_note(&path, window, cx);
             }
-            Ok(Follow::Attachment(path)) => {
-                self.error = Some(format!("{path} is not a note; it cannot be opened yet").into());
-            }
+            Ok(Follow::Attachment(path)) => self.open_file(&path, window, cx),
             Err(failure) => self.error = Some(failure.to_string().into()),
         }
         cx.notify();
@@ -1460,13 +1469,7 @@ impl Workspace {
             return;
         };
         if !self.session.is_note(&path) {
-            let opener = self.plugins.iter().find_map(|plugin| plugin.opener(&path));
-            if let Some(open) = opener {
-                open(self, window, cx);
-            } else if path.extension().is_some() {
-                self.error = Some(format!("{path} is not a note; it cannot be opened yet").into());
-                cx.notify();
-            }
+            self.open_file(&path, window, cx);
         } else if new_tab {
             self.open_in_new_tab(&path, window, cx);
         } else {

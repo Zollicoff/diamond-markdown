@@ -20,14 +20,8 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::palette::PaletteMode;
 use super::{Overlay, Prompt, SIDE_PANEL_WIDTH, Workspace};
-use crate::actions::{
-    CloseTab, CommandPalette, DeleteNote, FollowLink, GoBack, GoForward, InsertTemplate, NewNote,
-    NewTab, NextPane, NextTab, OpenDailyNote, PreviousPane, PreviousTab, QuickSwitch,
-    ReloadSettings, RenameNote, SaveNote, SearchVault, SplitRight, ToggleReading, ToggleTheme,
-    UseSystemTheme, WORKSPACE,
-};
+use crate::actions::WORKSPACE;
 use crate::plugin::{RowAction, RunCommand};
 
 /// "1 word", "2 words".
@@ -509,11 +503,7 @@ impl Workspace {
                             ListItem::new(("plugin-row", id))
                                 .child(row.label)
                                 .on_click(cx.listener(move |this, _, window, cx| match &action {
-                                    RowAction::None => {}
                                     RowAction::Open(path) => this.open_note(path, window, cx),
-                                    RowAction::OpenAt(path, line) => {
-                                        this.open_at(path, Some(*line), window, cx);
-                                    }
                                     RowAction::Run(run) => run(this, window, cx),
                                 }))
                                 .into_any_element()
@@ -582,79 +572,7 @@ impl Render for Workspace {
             .id("workspace")
             .track_focus(&self.focus)
             .key_context(WORKSPACE)
-            .on_action(cx.listener(|this, _: &SaveNote, window, cx| {
-                this.save(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &NewNote, window, cx| {
-                this.new_note(None, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &RenameNote, window, cx| {
-                if let Some(path) = this.current().cloned() {
-                    this.start_rename(&path, window, cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &DeleteNote, window, cx| {
-                if let Some(path) = this.current().cloned() {
-                    this.delete_entry(&path, window, cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &QuickSwitch, window, cx| {
-                this.open_palette(PaletteMode::Notes, "", window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &SearchVault, window, cx| {
-                this.open_palette(PaletteMode::Search, "", window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &CommandPalette, window, cx| {
-                this.open_palette(PaletteMode::Commands, "", window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &InsertTemplate, window, cx| {
-                this.open_palette(PaletteMode::Templates, "", window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &GoBack, window, cx| {
-                this.go_back(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &GoForward, window, cx| {
-                this.go_forward(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &FollowLink, window, cx| {
-                this.follow_link(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ToggleReading, window, cx| {
-                this.toggle_reading(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &NewTab, window, cx| {
-                this.new_tab(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                this.close_current_tab(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &NextTab, window, cx| {
-                this.cycle_tab(true, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &PreviousTab, window, cx| {
-                this.cycle_tab(false, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &SplitRight, window, cx| {
-                this.split_right(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &NextPane, window, cx| {
-                this.cycle_pane(true, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &PreviousPane, window, cx| {
-                this.cycle_pane(false, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &OpenDailyNote, window, cx| {
-                this.open_daily_note(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ToggleTheme, window, cx| {
-                this.toggle_theme(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &UseSystemTheme, window, cx| {
-                this.use_system_theme(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| {
-                this.reload_settings(cx);
-            }))
+            // Every command, whichever plugin added it, arrives here.
             .on_action(cx.listener(|this, command: &RunCommand, window, cx| {
                 this.run_command(command.index, window, cx);
             }))

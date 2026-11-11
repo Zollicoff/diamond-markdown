@@ -17,7 +17,7 @@ use gpui_kit::component::theme::Theme;
 
 use super::palette::{Palette, PaletteMode, RowTarget};
 use super::{AUTOSAVE_DELAY, Overlay, SIDE_PANEL_WIDTH, Workspace};
-use crate::actions::{BACK_FORWARD, COMMANDS, bind_keys as init, primary};
+use crate::actions::{BACK_FORWARD, bind_keys as init, primary};
 use crate::notes::Moment;
 use crate::session::Session;
 
@@ -733,15 +733,15 @@ fn the_command_palette_lists_every_command_and_runs_the_chosen_one(cx: &mut Test
     workspace.read_with(cx, |workspace, _| {
         let palette = workspace.palette().expect("palette open");
         assert_eq!(palette.mode, PaletteMode::Commands);
-        // The built-in commands and the ones plugins add, in one list.
-        assert_eq!(
-            palette.rows.len(),
-            COMMANDS.len() + workspace.commands.len()
+        // Every command there is, whichever plugin added it.
+        assert_eq!(palette.rows.len(), workspace.commands.len());
+        assert!(
+            workspace.commands.len() > 30,
+            "{}",
+            workspace.commands.len()
         );
-        assert!(!workspace.commands.is_empty());
     });
-    let every_command =
-        workspace.read_with(cx, |workspace, _| COMMANDS.len() + workspace.commands.len());
+    let every_command = workspace.read_with(cx, |workspace, _| workspace.commands.len());
     assert_eq!(matched(&workspace, cx), every_command);
 
     // Typing narrows the list, by name or by keyword, and leaves the note
@@ -2234,17 +2234,25 @@ fn a_canvas_is_a_file_of_its_own_that_opens_in_a_tab(cx: &mut TestAppContext) {
         fs::read_to_string(dir.path().join("Broken.canvas.toml")).unwrap(),
         "[[card]]\nid = \"one\"\n"
     );
-    // Other files still say they cannot be opened.
+    // A picture opens in a tab of its own.
     click("picture.png", cx);
+    assert_eq!(
+        tab_titles(&workspace, cx),
+        vec![vec!["Ideas", "Plan", "*picture.png"]]
+    );
     workspace.read_with(cx, |workspace, _| {
-        assert!(workspace.error.as_ref().unwrap().contains("is not a note"));
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+    });
+    cx.update(|window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("image-view").is_some());
     });
 
     // A new canvas gets a file and a tab, and shows in the sidebar.
     run_command("new canvas", &workspace, cx);
     assert_eq!(
         tab_titles(&workspace, cx),
-        vec![vec!["Ideas", "Plan", "*Untitled"]]
+        vec![vec!["Ideas", "Plan", "picture.png", "*Untitled"]]
     );
     assert_eq!(
         fs::read_to_string(dir.path().join("Untitled.canvas.toml")).unwrap(),
