@@ -153,9 +153,10 @@ impl Workspace {
             .tabs
             .iter()
             .map(|tab| {
-                let title = match tab.path() {
-                    Some(path) => self.session.title(path).to_owned(),
-                    None => "New tab".to_owned(),
+                let title = match (tab.path(), &tab.view) {
+                    (Some(path), _) => self.session.title(path).to_owned(),
+                    (None, Some(view)) => view.title.to_string(),
+                    (None, None) => "New tab".to_owned(),
                 };
                 // A dot marks a tab with changes that are not on disk yet.
                 let label = if tab.dirty {
@@ -194,9 +195,10 @@ impl Workspace {
                     })),
             );
 
-        let title = match tab.path() {
-            Some(path) => self.session.title(path).to_owned(),
-            None => "No note open".to_owned(),
+        let title = match (tab.path(), &tab.view) {
+            (Some(path), _) => self.session.title(path).to_owned(),
+            (None, Some(view)) => view.title.to_string(),
+            (None, None) => "No note open".to_owned(),
         };
         let save_state = match (tab.document.is_some(), tab.dirty) {
             (false, _) => "",
@@ -250,6 +252,11 @@ impl Workspace {
             );
 
         let body = div().flex_1().min_h_0().child(match &tab.reading {
+            _ if tab.view.is_some() => tab
+                .view
+                .as_ref()
+                .map(|view| view.content.clone().into_any_element())
+                .unwrap_or_else(|| div().into_any_element()),
             // An empty tab says how to fill it, rather than offering an
             // editor whose text would have nowhere to go.
             _ if tab.document.is_none() => v_flex()
@@ -383,16 +390,19 @@ impl Workspace {
                         .child(counts),
                 )
             })
-            .right(
-                Button::new("toggle-reading")
-                    .ghost()
-                    .xsmall()
-                    .label(mode)
-                    .tooltip("Switch between editing and reading")
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.toggle_reading(window, cx);
-                    })),
-            )
+            // Only a note can be read or edited; a view has no such choice.
+            .when(tab.document.is_some(), |bar| {
+                bar.right(
+                    Button::new("toggle-reading")
+                        .ghost()
+                        .xsmall()
+                        .label(mode)
+                        .tooltip("Switch between editing and reading")
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.toggle_reading(window, cx);
+                        })),
+                )
+            })
             .right(
                 Button::new("toggle-theme")
                     .ghost()

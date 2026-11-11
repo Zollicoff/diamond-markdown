@@ -120,6 +120,8 @@ The window. Its code is split by what it knows about:
   the palette that finds notes, text, commands and templates.
 - `app.rs` is the state every window shares: the app's settings and whether
   it is drawn light or dark.
+- `plugin.rs` is the plugin interface, and `plugins/` holds the core
+  plugins built on it: bookmarks, tasks and the calendar so far.
 
 The window has three panels: the file tree, the notes, and a context panel
 with the backlinks, outline and tags of the note in front. The outline and
@@ -164,9 +166,23 @@ disk while the editor has unsaved edits, the editor keeps them, autosave
 stops, and leaving the note writes the edits to a "(conflict)" copy, so
 neither version is lost.
 
-Templates are the notes in the templates folder. `{{title}}`, `{{date}}`
-and `{{time}}` in a template are filled in when it is inserted or when a
-daily note is made from it.
+Templates are the notes in the templates folder. Placeholders in double
+braces are filled in when a template is inserted or a daily note is made
+from it: `{{title}}`, `{{date}}`, `{{time}}`, `{{weekday}}`, `{{year}}`,
+`{{month}}`, `{{day}}`, `{{yesterday}}`, `{{tomorrow}}`, and `{{date+7}}`
+or `{{date-1}}` for a date some days away.
+
+Three features are plugins, reached from the command palette:
+
+- **Bookmarks.** Cmd-D bookmarks the note in front. The list is in the
+  context panel and follows renames.
+- **Tasks.** "Show tasks" lists every task in the vault in a tab. A task is
+  an ordinary Markdown task item; `due:2026-11-20` in it gives it a due
+  date. Dated tasks come first, overdue ones in red, and ticking a task in
+  the list ticks it in its note.
+- **Calendar.** "Show calendar" shows a month in a tab, with the days that
+  have a daily note marked. Clicking a day opens its daily note, creating
+  it from the template if needed.
 
 The editor highlights Markdown syntax (Tree-sitter) but does not render it
 in place yet. The reading view renders the note with clickable wikilinks.
@@ -244,15 +260,23 @@ rough order of difficulty:
 
 ## Plugins
 
-Features are modules. A core plugin is a Rust module compiled into the app
-that registers what it adds (commands, panels, views, settings, syntax)
-through one plugin interface. The built-in features use the same interface,
-which keeps it honest.
+Features are modules. A plugin adds to the app only through one interface
+(`crates/diamond-app/src/plugin.rs`):
 
-Third-party plugins come later as sandboxed WebAssembly modules, the approach
-Zed uses for extensions. They are written in any language that compiles to
-WebAssembly, get only the capabilities the user grants, and draw UI through
-an API we define, since there is no DOM to hand them.
+- commands, which appear in the palette and can have a default shortcut;
+- sections in the context panel;
+- views that open in a tab;
+- a file of its own in the vault's `.diamond` folder;
+- being told when a note is renamed or deleted.
+
+Core plugins are Rust modules compiled into the app. They use nothing but
+that interface, which keeps it honest. The older built-in commands are
+still wired directly into the window and are to move onto the interface.
+
+Third-party plugins come later as sandboxed WebAssembly modules. They are
+written in any language that compiles to WebAssembly, get only the
+capabilities the user grants, and draw UI through an API we define, since
+there is no DOM to hand them.
 
 ### Core feature areas
 
@@ -261,12 +285,12 @@ core plugin on the interface above:
 
 | Area | What it does |
 | --- | --- |
-| Templating | Templates with variables and date math |
+| Templating | Templates with variables and date math (built) |
 | Queries | Lists and tables computed from notes and their properties |
-| Tasks | Tasks across the vault, with due dates and recurrence |
+| Tasks | Tasks across the vault with due dates (built); recurrence |
 | Git sync | Version history and sync through git |
 | Tables | Editing Markdown tables as tables |
-| Calendar | A calendar of daily notes |
+| Calendar | A calendar of daily notes (built) |
 | Kanban | Boards stored as Markdown |
 
 ## Performance
@@ -297,13 +321,13 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-153 tests so far; `cargo test --workspace` runs them all.
+167 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (72): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (44): the session, history, daily notes and templates, settings
+- App logic (55): the session, history, daily notes and templates, settings
   files and the remembered-vaults list, tested without a window.
-- App UI (37): headless window tests drive the real views with real
+- App UI (40): headless window tests drive the real views with real
   keystrokes. They open, type, save and autosave; follow and create links;
   reload after outside edits and keep both versions in a conflict; use the
   palette for notes, search, commands and templates; rename with links
@@ -319,7 +343,7 @@ target and is not part of the macOS or Linux build.
 
 The rendered window has been looked at on the development Mac (dark
 appearance): the three panels, a note in the editor and in the reading view,
-the command palette, and tabs in two panes. Not checked by eye yet: the light appearance,
+the command palette, tabs in two panes, the calendar and the task list. Not checked by eye yet: the light appearance,
 Linux, and anything under load.
 
 ## Milestones

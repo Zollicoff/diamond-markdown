@@ -40,6 +40,65 @@ impl Moment {
     pub fn time(&self) -> String {
         format!("{:02}:{:02}", self.hour, self.minute)
     }
+
+    /// The same time of day `days` days later, or earlier when negative.
+    /// A date that cannot be represented leaves the moment as it is.
+    pub fn shifted(&self, days: i64) -> Self {
+        use chrono::Datelike as _;
+        chrono::NaiveDate::from_ymd_opt(self.year, self.month, self.day)
+            .and_then(|date| date.checked_add_signed(chrono::Duration::days(days)))
+            .map_or(*self, |date| Self {
+                year: date.year(),
+                month: date.month(),
+                day: date.day(),
+                ..*self
+            })
+    }
+
+    /// `Wednesday`
+    pub fn weekday(&self) -> &'static str {
+        use chrono::Datelike as _;
+        const NAMES: [&str; 7] = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ];
+        chrono::NaiveDate::from_ymd_opt(self.year, self.month, self.day).map_or("", |date| {
+            NAMES[date.weekday().num_days_from_monday() as usize]
+        })
+    }
+}
+
+/// What a placeholder stands for, or `None` if it is not one of ours.
+///
+/// Besides the plain names, `date` takes a number of days to add or take
+/// away: `date+7`, `date - 1`.
+fn placeholder(name: &str, title: &str, moment: Moment) -> Option<String> {
+    Some(match name {
+        "title" => title.to_owned(),
+        "date" => moment.date(),
+        "time" => moment.time(),
+        "yesterday" => moment.shifted(-1).date(),
+        "tomorrow" => moment.shifted(1).date(),
+        "weekday" => moment.weekday().to_owned(),
+        "year" => format!("{:04}", moment.year),
+        "month" => format!("{:02}", moment.month),
+        "day" => format!("{:02}", moment.day),
+        _ => {
+            let rest = name.strip_prefix("date")?.trim_start();
+            let (sign, days) = match rest.chars().next()? {
+                '+' => (1, &rest[1..]),
+                '-' => (-1, &rest[1..]),
+                _ => return None,
+            };
+            let days: i64 = days.trim().parse().ok()?;
+            moment.shifted(sign * days).date()
+        }
+    })
 }
 
 /// A folder setting as the start of a vault path: `""` for the vault root,
@@ -93,9 +152,11 @@ pub fn templates_prefix(settings: &VaultSettings) -> String {
     }
 }
 
-/// Fills in a template's placeholders: `{{title}}`, `{{date}}` and
-/// `{{time}}`, with optional spaces inside the braces. Anything else in
-/// double braces is left as written.
+/// Fills in a template's placeholders, written in double braces with
+/// optional spaces inside: `{{title}}`, `{{date}}`, `{{time}}`,
+/// `{{weekday}}`, `{{year}}`, `{{month}}`, `{{day}}`, `{{yesterday}}`,
+/// `{{tomorrow}}`, and `{{date+7}}` or `{{date-1}}` for a date some days
+/// away. Anything else in double braces is left as written.
 pub fn fill_template(template: &str, title: &str, moment: Moment) -> String {
     let mut output = String::with_capacity(template.len());
     let mut rest = template;
@@ -106,16 +167,61 @@ pub fn fill_template(template: &str, title: &str, moment: Moment) -> String {
             output.push_str(&rest[open..]);
             return output;
         };
-        match after[..close].trim() {
-            "title" => output.push_str(title),
-            "date" => output.push_str(&moment.date()),
-            "time" => output.push_str(&moment.time()),
-            _ => output.push_str(&rest[open..open + 2 + close + 2]),
+        match placeholder(after[..close].trim(), title, moment) {
+            Some(value) => output.push_str(&value),
+            None => output.push_str(&rest[open..open + 2 + close + 2]),
         }
         rest = &after[close + 2..];
     }
     output.push_str(rest);
     output
+}
+
+/// Ticks or unticks the task on a zero-based line: `- [ ]` becomes `- [x]`
+/// and back. Returns the whole new text, or `None` if the line is not a
+/// task.
+pub fn toggle_task(text: &str, line: usize) -> Option<String> {
+    let mut start = 0;
+    for (number, content) in text.split_inclusive('\n').enumerate() {
+        if number != line {
+            start += content.len();
+            continue;
+        }
+        let indent = content.len() - content.trim_start().len();
+        let after_indent = &content[indent..];
+        // A bullet (`-`, `*`, `+`) or a number (`1.`, `1)`), then a space.
+        let bullet = match after_indent.chars().next()? {
+            '-' | '*' | '+' => 1,
+            digit if digit.is_ascii_digit() => {
+                let digits = after_indent
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .count();
+                match after_indent[digits..].chars().next()? {
+                    '.' | ')' => digits + 1,
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        };
+        let rest = &after_indent[bullet..];
+        let spaces = rest.len() - rest.trim_start_matches(' ').len();
+        let marker = start + indent + bullet + spaces;
+        let flipped = match text.get(marker..marker + 3)? {
+            "[ ]" => "[x]",
+            "[x]" | "[X]" => "[ ]",
+            _ => return None,
+        };
+        if spaces == 0 {
+            return None;
+        }
+        return Some(format!(
+            "{}{flipped}{}",
+            &text[..marker],
+            &text[marker + 3..]
+        ));
+    }
+    None
 }
 
 /// Words and characters in a note, not counting the properties block.
@@ -225,6 +331,59 @@ mod tests {
         assert_eq!(
             fill_template("no placeholders", "T", MOMENT),
             "no placeholders"
+        );
+    }
+
+    #[test]
+    fn templates_can_work_with_dates() {
+        // 7 March 2026 is a Saturday.
+        let filled = |template: &str| fill_template(template, "T", MOMENT);
+        assert_eq!(
+            filled("{{weekday}} {{year}}/{{month}}/{{day}}"),
+            "Saturday 2026/03/07"
+        );
+        assert_eq!(
+            filled("{{yesterday}} to {{tomorrow}}"),
+            "2026-03-06 to 2026-03-08"
+        );
+        assert_eq!(
+            filled("{{date+7}} {{ date - 7 }} {{date+0}}"),
+            "2026-03-14 2026-02-28 2026-03-07"
+        );
+        // Across a year, and a leap day.
+        assert_eq!(filled("{{date+300}}"), "2027-01-01");
+        assert_eq!(MOMENT.shifted(-371).date(), "2025-03-01");
+        // Not ours: left exactly as written.
+        assert_eq!(
+            filled("{{date+}} {{date*2}} {{dates}} {{date+x}}"),
+            "{{date+}} {{date*2}} {{dates}} {{date+x}}"
+        );
+    }
+
+    #[test]
+    fn toggle_task_flips_only_the_box_on_the_named_line() {
+        let text =
+            "# List\n- [ ] one\n  * [x] two [ ] not this\n3. [X] three\n- plain\n-[ ] no space\n";
+        assert_eq!(
+            toggle_task(text, 1).unwrap(),
+            text.replacen("- [ ] one", "- [x] one", 1)
+        );
+        assert_eq!(
+            toggle_task(text, 2).unwrap(),
+            text.replacen("* [x] two", "* [ ] two", 1)
+        );
+        assert_eq!(
+            toggle_task(text, 3).unwrap(),
+            text.replacen("3. [X] three", "3. [ ] three", 1)
+        );
+        // Not tasks: a heading, a plain item, a box without its space, and
+        // a line past the end.
+        for line in [0, 4, 5, 99] {
+            assert_eq!(toggle_task(text, line), None, "line {line}");
+        }
+        assert_eq!(
+            toggle_task("- [ ] last line without newline", 0).unwrap(),
+            "- [x] last line without newline"
         );
     }
 

@@ -7,7 +7,7 @@
 use diamond_parse::NoteMeta;
 use diamond_vault::VaultPath;
 use gpui_kit::component::input::EditorState;
-use gpui_kit::{Entity, SharedString, Subscription, Task};
+use gpui_kit::{AnyView, Entity, SharedString, Subscription, Task};
 
 use crate::history::History;
 use crate::session::Document;
@@ -21,6 +21,15 @@ pub(super) struct Live {
     pub characters: usize,
 }
 
+/// Something other than a note shown in a tab: a plugin's view, such as
+/// the calendar.
+pub(super) struct ViewTab {
+    /// Names the view, so asking for it again goes to the tab it is in.
+    pub key: SharedString,
+    pub title: SharedString,
+    pub content: AnyView,
+}
+
 /// One tab.
 pub(super) struct Tab {
     /// Names the tab for as long as the window is open. Positions change as
@@ -28,6 +37,9 @@ pub(super) struct Tab {
     pub id: usize,
     /// The note in the tab. A new tab has none until one is opened in it.
     pub document: Option<Document>,
+    /// A plugin's view, shown instead of a note. A tab has a note, a view
+    /// or neither, never both.
+    pub view: Option<ViewTab>,
     pub editor: Entity<EditorState>,
     /// Whether the editor holds changes that are not on disk yet. Kept up
     /// to date as the text changes, so drawing the window never has to

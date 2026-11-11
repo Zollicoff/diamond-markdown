@@ -27,7 +27,7 @@ use crate::plugin::{Command, Plugin};
 use crate::session::{Follow, NOTE_SCHEME, OpenChange, Session, TreeNode, is_at_or_under};
 use crate::settings::Appearance;
 use palette::Palette;
-use tab::{Live, Pane, Tab};
+use tab::{Live, Pane, Tab, ViewTab};
 
 /// Starting width of the sidebar and of the context panel.
 const SIDE_PANEL_WIDTH: f32 = 260.;
@@ -159,7 +159,6 @@ impl Workspace {
     // ---- What plugins work with -------------------------------------------
 
     /// The open vault.
-    #[allow(dead_code)] // Part of the interface; not every core plugin needs it.
     pub fn session(&self) -> &Session {
         &self.session
     }
@@ -202,6 +201,87 @@ impl Workspace {
         }
         cx.notify();
         Some(result)
+    }
+
+    /// Shows a plugin's view in a tab. `key` names the view: if a tab
+    /// already shows it, that tab comes to the front and `build` is not
+    /// called.
+    pub fn open_view<V: Render>(
+        &mut self,
+        key: &'static str,
+        title: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        build: impl FnOnce(&mut Self, &mut Context<Self>) -> Entity<V>,
+    ) {
+        let existing = self.panes.iter().enumerate().find_map(|(pane_ix, pane)| {
+            let tab_ix = pane
+                .tabs
+                .iter()
+                .position(|tab| tab.view.as_ref().is_some_and(|view| view.key == key))?;
+            Some((pane_ix, tab_ix))
+        });
+        if let Some((pane, tab)) = existing {
+            self.activate(pane, tab, window, cx);
+            return;
+        }
+        // An empty tab is used as it is; anything else is left alone.
+        if self.tab().document.is_some() || self.tab().view.is_some() {
+            self.new_tab(window, cx);
+        }
+        let content = build(self, cx);
+        self.tab_mut().view = Some(ViewTab {
+            key: key.into(),
+            title: title.into(),
+            content: content.into(),
+        });
+        self.focus_content(window, cx);
+        cx.notify();
+    }
+
+    /// Ticks or unticks the task on a line of a note, in the editor if the
+    /// note is open and in its file otherwise.
+    pub fn toggle_task(
+        &mut self,
+        path: &VaultPath,
+        line: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        cx.notify();
+        let Some((pane, tab)) = self.locate_note(path) else {
+            if let Err(failure) = self.session.toggle_task(path, line) {
+                self.error = Some(failure.to_string().into());
+            }
+            return;
+        };
+        let tab = &self.panes[pane].tabs[tab];
+        let id = tab.id;
+        let text = tab.editor.read(cx).value();
+        if let Some(toggled) = notes::toggle_task(&text, line) {
+            self.replace_tab_text(id, toggled, window, cx);
+            self.mirror(id, window, cx);
+            self.save_tab(id, window, cx);
+        }
+    }
+
+    /// Opens the daily note for a date, creating it if needed.
+    pub fn open_daily_note_for(
+        &mut self,
+        moment: Moment,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match self.session.daily_note(moment) {
+            Ok((path, created)) => {
+                if created {
+                    self.reveal_in_tree(&path, cx);
+                }
+                self.open_note(&path, window, cx);
+            }
+            Err(failure) => self.error = Some(failure.to_string().into()),
+        }
+        cx.notify();
     }
 
     /// Runs the plugin command at `index` in the window's command list.
@@ -251,6 +331,7 @@ impl Workspace {
         Tab {
             id,
             document: None,
+            view: None,
             editor,
             dirty: false,
             conflict: None,
@@ -577,6 +658,10 @@ impl Workspace {
         {
             self.activate(pane, tab, window, cx);
             return;
+        }
+        // A plugin's view keeps its tab; the note goes beside it.
+        if self.tab().view.is_some() {
+            self.new_tab(window, cx);
         }
         self.remember_cursor(cx);
         if self.show_note(path, window, cx) {
@@ -1007,16 +1092,7 @@ impl Workspace {
 
     /// Opens today's daily note, creating it from its template if needed.
     pub fn open_daily_note(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        match self.session.daily_note(Moment::now()) {
-            Ok((path, created)) => {
-                if created {
-                    self.reveal_in_tree(&path, cx);
-                }
-                self.open_note(&path, window, cx);
-            }
-            Err(failure) => self.error = Some(failure.to_string().into()),
-        }
-        cx.notify();
+        self.open_daily_note_for(Moment::now(), window, cx);
     }
 
     /// Inserts a template at the cursor, with its placeholders filled in

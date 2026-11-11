@@ -67,6 +67,21 @@ pub enum OpenChange {
     Removed,
 }
 
+/// One task list item, as [`Session::tasks`] reports it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TaskItem {
+    /// The note the task is in.
+    pub path: VaultPath,
+    /// That note's display title.
+    pub note: String,
+    /// Zero-based line of the task in the note.
+    pub line: usize,
+    /// Whether its box is ticked.
+    pub done: bool,
+    /// The task's text, without the bullet and the box.
+    pub text: String,
+}
+
 /// What [`Session::rename`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Renamed {
@@ -633,6 +648,48 @@ impl Session {
     ) -> Result<String, VaultError> {
         let text = self.vault.read(template)?;
         Ok(notes::fill_template(&text, self.title(into), moment))
+    }
+
+    /// Every task in the vault, as of each note's last save, in order of
+    /// note path and then line.
+    pub fn tasks(&self) -> Vec<TaskItem> {
+        let mut tasks = Vec::new();
+        for note in self.index.notes() {
+            if note.meta.tasks.is_empty() {
+                continue;
+            }
+            let lines: Vec<&str> = note.text.lines().collect();
+            for task in &note.meta.tasks {
+                let Some(line) = lines.get(task.line) else {
+                    continue;
+                };
+                // What follows the box is the task's text.
+                let text = line
+                    .split_once(']')
+                    .map_or(*line, |(_, text)| text)
+                    .trim()
+                    .to_owned();
+                tasks.push(TaskItem {
+                    path: note.path.clone(),
+                    note: note.title().to_owned(),
+                    line: task.line,
+                    done: task.checked,
+                    text,
+                });
+            }
+        }
+        tasks
+    }
+
+    /// Ticks or unticks the task on a line of a note that is not open, by
+    /// rewriting its file.
+    pub fn toggle_task(&mut self, path: &VaultPath, line: usize) -> Result<(), VaultError> {
+        let text = self.vault.read(path)?;
+        let toggled = notes::toggle_task(&text, line)
+            .ok_or_else(|| VaultError::InvalidPath(format!("{path} has no task on that line")))?;
+        self.vault.write(path, &toggled)?;
+        self.index.upsert(path.clone(), &toggled);
+        Ok(())
     }
 
     /// Whether `path` is a note in the index.
@@ -1232,6 +1289,47 @@ mod tests {
             .filter(|name| name.to_lowercase() == "note.md")
             .collect();
         assert_eq!(names, vec!["Note.md".to_owned()]);
+    }
+
+    #[test]
+    fn tasks_are_listed_across_the_vault_and_can_be_ticked() {
+        let (dir, mut session) = session(&[
+            (
+                "Work/Plan.md",
+                "---\ntitle: The Plan\n---\n- [ ] Call Sam due:2026-11-20\n- [x] Done already\n- not a task\n",
+            ),
+            ("Home.md", "Intro\n\n1. [ ] Numbered\n"),
+            ("Empty.md", "nothing\n"),
+        ]);
+        let listed: Vec<(String, usize, bool, String)> = session
+            .tasks()
+            .into_iter()
+            .map(|task| (task.note, task.line, task.done, task.text))
+            .collect();
+        assert_eq!(
+            listed,
+            vec![
+                ("Home".to_owned(), 2, false, "Numbered".to_owned()),
+                (
+                    "The Plan".to_owned(),
+                    3,
+                    false,
+                    "Call Sam due:2026-11-20".to_owned()
+                ),
+                ("The Plan".to_owned(), 4, true, "Done already".to_owned()),
+            ]
+        );
+
+        session.toggle_task(&path("Work/Plan.md"), 3).unwrap();
+        assert!(
+            std::fs::read_to_string(dir.path().join("Work/Plan.md"))
+                .unwrap()
+                .contains("- [x] Call Sam due:2026-11-20\n")
+        );
+        assert!(session.tasks()[1].done);
+        // A line that is not a task changes nothing.
+        assert!(session.toggle_task(&path("Work/Plan.md"), 5).is_err());
+        assert!(session.toggle_task(&path("Missing.md"), 0).is_err());
     }
 
     #[test]

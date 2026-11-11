@@ -746,7 +746,7 @@ fn the_command_palette_lists_every_command_and_runs_the_chosen_one(cx: &mut Test
 
     // Typing narrows the list, by name or by keyword, and leaves the note
     // alone.
-    cx.simulate_keystrokes("j o u r n a l");
+    cx.simulate_keystrokes("d i a r y");
     assert_eq!(matched(&workspace, cx), 1);
     assert_eq!(editor_text(&workspace, cx), "home\n");
 
@@ -1369,7 +1369,11 @@ fn tab_titles(
                 pane.tabs
                     .iter()
                     .map(|tab| {
-                        let name = tab.path().map_or("-", |path| path.stem());
+                        let name = match (tab.path(), &tab.view) {
+                            (Some(path), _) => path.stem(),
+                            (None, Some(view)) => view.title.as_ref(),
+                            (None, None) => "-",
+                        };
                         let front = std::ptr::eq(tab, pane.tab());
                         format!("{}{name}", if front { "*" } else { "" })
                     })
@@ -1770,4 +1774,144 @@ fn a_plugin_adds_a_command_a_shortcut_and_a_panel_section(cx: &mut TestAppContex
     open_note(&workspace, "Job/Plan.md", cx);
     cx.simulate_keystrokes(primary!("d"));
     assert!(bookmarked(cx).is_empty());
+}
+
+/// Runs the one command the palette finds for `words`.
+fn run_command(words: &str, workspace: &gpui_kit::Entity<Workspace>, cx: &mut VisualTestContext) {
+    cx.simulate_keystrokes(primary!("shift-p"));
+    let keys: Vec<String> = words
+        .chars()
+        .map(|c| {
+            if c == ' ' {
+                "space".to_owned()
+            } else {
+                c.to_string()
+            }
+        })
+        .collect();
+    cx.simulate_keystrokes(&keys.join(" "));
+    assert_eq!(matched(workspace, cx), 1, "commands matching {words:?}");
+    cx.simulate_keystrokes("enter");
+}
+
+#[gpui_kit::test]
+fn the_tasks_view_opens_in_a_tab_and_ticks_tasks_in_their_notes(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(
+        &[
+            (
+                "Home.md",
+                "- [ ] Water plants\n- [ ] Call Sam due:2026-11-20\n",
+            ),
+            ("Work/Plan.md", "# Plan\n\n- [ ] Ship it\n"),
+        ],
+        cx,
+    );
+    let read = |name: &str| fs::read_to_string(dir.path().join(name)).unwrap();
+    open_note(&workspace, "Home.md", cx);
+    run_command("show tasks", &workspace, cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["Home", "*Tasks"]]);
+    cx.update(|window, cx| window.render_frame(cx));
+
+    // Asking again goes to the same tab rather than opening another.
+    cx.simulate_keystrokes("ctrl-tab");
+    run_command("show tasks", &workspace, cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["Home", "*Tasks"]]);
+
+    let toggle = |name: &str, line: usize, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.toggle_task(&path(name), line, window, cx);
+            });
+        });
+    };
+    // A note that is not open is changed in its file.
+    toggle("Work/Plan.md", 2, cx);
+    assert_eq!(read("Work/Plan.md"), "# Plan\n\n- [x] Ship it\n");
+    // A note that is open is changed in its editor and saved, so the tab
+    // and the file agree.
+    toggle("Home.md", 1, cx);
+    assert_eq!(
+        read("Home.md"),
+        "- [ ] Water plants\n- [x] Call Sam due:2026-11-20\n"
+    );
+    workspace.read_with(cx, |workspace, cx| {
+        let home = &workspace.panes[0].tabs[0];
+        assert_eq!(
+            home.editor.read(cx).value().as_ref(),
+            "- [ ] Water plants\n- [x] Call Sam due:2026-11-20\n"
+        );
+        assert!(!home.dirty && home.conflict.is_none());
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+        let done: Vec<bool> = workspace
+            .session
+            .tasks()
+            .iter()
+            .map(|task| task.done)
+            .collect();
+        assert_eq!(done, vec![false, true, true]);
+    });
+
+    // Opening a note from the view keeps the view in its tab.
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.open_at(&path("Work/Plan.md"), Some(2), window, cx);
+        });
+    });
+    assert_eq!(
+        tab_titles(&workspace, cx),
+        vec![vec!["Home", "Tasks", "*Plan"]]
+    );
+    assert_eq!(cursor(&workspace, cx), "# Plan\n\n".len());
+    // The view's tab closes like any other; the tab after it takes its place.
+    cx.simulate_keystrokes("ctrl-shift-tab");
+    cx.simulate_keystrokes(primary!("w"));
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["Home", "*Plan"]]);
+}
+
+#[gpui_kit::test]
+fn the_calendar_opens_the_daily_note_of_a_chosen_day(cx: &mut TestAppContext) {
+    let (dir, workspace, cx) = open(
+        &[
+            ("Templates/Daily.md", "# {{weekday}} {{date}}\n"),
+            ("Daily/2026-11-10.md", "earlier\n"),
+        ],
+        cx,
+    );
+    // The command works from an empty window: the view takes the empty tab.
+    run_command("show calendar", &workspace, cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*Calendar"]]);
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let open_day = |day: u32, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                let moment = Moment {
+                    year: 2026,
+                    month: 11,
+                    day,
+                    hour: 9,
+                    minute: 0,
+                };
+                workspace.open_daily_note_for(moment, window, cx);
+            });
+        });
+    };
+    // A day without a note gets one from the template, in a tab beside the
+    // calendar.
+    open_day(12, cx);
+    assert_eq!(
+        tab_titles(&workspace, cx),
+        vec![vec!["Calendar", "*2026-11-12"]]
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Daily/2026-11-12.md")).unwrap(),
+        "# Thursday 2026-11-12\n"
+    );
+    // A day that has a note opens it as it is.
+    cx.simulate_keystrokes("ctrl-shift-tab");
+    open_day(10, cx);
+    assert_eq!(editor_text(&workspace, cx), "earlier\n");
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.error.is_none(), "{:?}", workspace.error);
+    });
 }

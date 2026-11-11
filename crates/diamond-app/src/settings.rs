@@ -53,6 +53,27 @@ pub struct VaultSettings {
     pub daily: Daily,
     /// Templates.
     pub templates: Templates,
+    /// The calendar.
+    pub calendar: CalendarSettings,
+}
+
+/// How the calendar is laid out.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CalendarSettings {
+    /// The day a week starts on.
+    pub week_starts: WeekStart,
+}
+
+/// The first day of the week.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WeekStart {
+    /// Monday first.
+    #[default]
+    Monday,
+    /// Sunday first.
+    Sunday,
 }
 
 /// Where daily notes go and what they start from.
@@ -207,6 +228,18 @@ mod tests {
         assert_eq!(loaded.settings.daily.folder, "Daily");
         assert_eq!(loaded.settings.daily.template, "Daily");
         assert_eq!(loaded.settings.templates.folder, "Templates");
+        assert_eq!(loaded.settings.calendar.week_starts, WeekStart::Monday);
+    }
+
+    #[test]
+    fn the_week_can_start_on_sunday() {
+        let (_dir, vault) = vault(&[(
+            ".diamond/settings.toml",
+            "[calendar]\nweek_starts = \"sunday\"\n",
+        )]);
+        let loaded = VaultSettings::load(&vault);
+        assert_eq!(loaded.problem, None);
+        assert_eq!(loaded.settings.calendar.week_starts, WeekStart::Sunday);
     }
 
     #[test]
