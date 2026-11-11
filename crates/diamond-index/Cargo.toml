@@ -1,0 +1,18 @@
+[package]
+name = "diamond-index"
+description = "Vault index for Diamond Markdown: link resolution, backlinks, tags."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+diamond-parse.workspace = true
+diamond-vault.workspace = true
+rayon = "1.12.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
