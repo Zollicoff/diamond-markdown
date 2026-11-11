@@ -4,7 +4,9 @@
 //! touches that folder: it validates paths, lists entries, reads notes and
 //! writes them atomically. It has no UI and no index.
 
+mod ops;
 mod path;
+mod watch;
 
 use std::fs;
 use std::io::{self, Write};
@@ -15,6 +17,7 @@ use std::time::SystemTime;
 use walkdir::WalkDir;
 
 pub use path::VaultPath;
+pub use watch::VaultWatcher;
 
 /// Errors from vault operations.
 #[derive(Debug, thiserror::Error)]
@@ -25,6 +28,12 @@ pub enum VaultError {
     /// The path resolves outside the vault, usually through a symlink.
     #[error("{0} is outside the vault")]
     OutsideVault(String),
+    /// Something already exists where a new file or a rename would go.
+    #[error("{0} already exists")]
+    AlreadyExists(String),
+    /// The vault folder could not be watched for changes.
+    #[error("cannot watch the vault for changes: {0}")]
+    Watch(String),
     /// The vault root does not exist or is not a folder.
     #[error("vault folder not found: {}", .0.display())]
     NotAVault(PathBuf),
