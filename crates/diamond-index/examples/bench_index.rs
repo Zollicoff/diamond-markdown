@@ -161,5 +161,26 @@ fn main() {
         index.unresolved().len()
     );
 
+    for query in [
+        "budget quarter",
+        "\"project meeting\"",
+        "tag:idea plan -draft",
+        "zzzznotthere",
+    ] {
+        let started = Instant::now();
+        let hits = diamond_index::search::search(&index, query, 50);
+        println!(
+            "search {query:<24} {:>9.2?}  ({} hits shown)",
+            started.elapsed(),
+            hits.len()
+        );
+    }
+    let started = Instant::now();
+    let suggestions = index.quick_switch("nt 042", 50).len();
+    println!(
+        "quick switch \"nt 042\"      {:>9.2?}  ({suggestions} suggestions)",
+        started.elapsed()
+    );
+
     fs::remove_dir_all(&root).expect("remove bench folder");
 }

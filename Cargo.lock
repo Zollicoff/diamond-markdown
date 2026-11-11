@@ -1274,6 +1274,7 @@ version = "0.1.0"
 dependencies = [
  "diamond-parse",
  "diamond-vault",
+ "memchr",
  "rayon",
  "tempfile",
 ]

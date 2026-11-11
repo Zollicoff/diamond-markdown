@@ -22,6 +22,7 @@
 //! shortest path, then alphabetical order.
 
 pub mod fuzzy;
+pub mod search;
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
@@ -48,9 +49,22 @@ pub struct Note {
     pub path: VaultPath,
     /// What the parser extracted from it.
     pub meta: NoteMeta,
+    /// The note's full text as last read or saved. Keeping it in memory
+    /// makes search a scan of memory instead of thousands of file reads; it
+    /// costs about as much memory as the vault's Markdown takes on disk.
+    pub text: String,
 }
 
 impl Note {
+    /// Parses `text` into a note at `path`.
+    fn new(path: VaultPath, text: String) -> Self {
+        Self {
+            meta: diamond_parse::parse(&text),
+            path,
+            text,
+        }
+    }
+
     /// The note's display title: its `title` property, or its file name
     /// without the extension.
     pub fn title(&self) -> &str {
@@ -172,13 +186,11 @@ impl VaultIndex {
                 EntryKind::Folder => {}
             }
         }
+        let reader = vault.reader();
         let parsed: Vec<Result<Note, (VaultPath, String)>> = note_paths
             .into_par_iter()
-            .map(|path| match vault.read(&path) {
-                Ok(source) => Ok(Note {
-                    meta: diamond_parse::parse(&source),
-                    path,
-                }),
+            .map(|path| match reader.read(&path) {
+                Ok(source) => Ok(Note::new(path, source)),
                 Err(error) => Err((path, error.to_string())),
             })
             .collect();
@@ -209,10 +221,7 @@ impl VaultIndex {
     {
         let notes = sources
             .into_iter()
-            .map(|(path, source)| Note {
-                meta: diamond_parse::parse(source.as_ref()),
-                path,
-            })
+            .map(|(path, source)| Note::new(path, source.as_ref().to_owned()))
             .collect();
         Self::from_parts(notes, Vec::new())
     }
@@ -257,10 +266,7 @@ impl VaultIndex {
     /// note can change where other notes' links lead. It is a pass of hash
     /// lookups over metadata already in memory; no file is re-read.
     pub fn upsert(&mut self, path: VaultPath, source: &str) {
-        let note = Note {
-            meta: diamond_parse::parse(source),
-            path,
-        };
+        let note = Note::new(path, source.to_owned());
         match self
             .notes
             .binary_search_by(|probe| probe.path.cmp(&note.path))
@@ -322,10 +328,7 @@ impl VaultIndex {
                     // of the index, as it does in a full build.
                     match vault.read(path) {
                         Ok(source) => {
-                            let note = Note {
-                                meta: diamond_parse::parse(&source),
-                                path: path.clone(),
-                            };
+                            let note = Note::new(path.clone(), source);
                             match note_position {
                                 Ok(existing) => self.notes[existing] = note,
                                 Err(insert_at) => {
