@@ -316,6 +316,7 @@ impl Render for GraphView {
                 let path = path.clone();
                 h_flex()
                     .id(("graph-note", index))
+                    .test_support()
                     .absolute()
                     .left(relative(x))
                     .top(relative(y))

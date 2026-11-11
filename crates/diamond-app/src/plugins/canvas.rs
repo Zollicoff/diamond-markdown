@@ -34,7 +34,6 @@ use gpui_kit::component::{
     label::Label,
     v_flex,
 };
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 
@@ -191,12 +190,10 @@ fn show(
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
-    let canvas = match workspace.session().read_file(path) {
-        Ok(text) => Canvas::parse(&text),
-        Err(problem) => Err(problem),
-    };
-    let canvas = match canvas {
-        Ok(canvas) => canvas,
+    let read = workspace.session().read_file(path);
+    let parsed = read.and_then(|text| Canvas::parse(&text).map(|canvas| (canvas, text)));
+    let (canvas, saved) = match parsed {
+        Ok(read) => read,
         Err(problem) => {
             workspace.report(format!("{path} cannot be shown: {problem}"), cx);
             return;
@@ -214,6 +211,7 @@ fn show(
             workspace: handle,
             path,
             canvas,
+            saved,
             drag: None,
             linking: None,
         })
@@ -247,6 +245,35 @@ impl Plugin for Canvases {
     }
 }
 
+/// Writes a canvas file unless another program changed it since it was last
+/// read or written here. In that case nothing is written and the file's
+/// text is returned, so that what the other program wrote is never lost.
+/// Either way a problem is shown in the window.
+fn write_checked(
+    workspace: &mut Workspace,
+    path: &VaultPath,
+    saved: &str,
+    text: &str,
+    cx: &mut Context<Workspace>,
+) -> Result<Option<String>, String> {
+    let session = workspace.session();
+    let outcome = session.read_file(path).and_then(|on_disk| {
+        if on_disk != saved {
+            return Ok(Some(on_disk));
+        }
+        session.write_file(path, text).map(|()| None)
+    });
+    match &outcome {
+        Ok(None) => {}
+        Ok(Some(_)) => workspace.report(
+            format!("{path} was changed by another program. It was read again, and your last change was not made."),
+            cx,
+        ),
+        Err(problem) => workspace.report(problem.clone(), cx),
+    }
+    outcome
+}
+
 /// A card being dragged: which one, and where it and the pointer started.
 struct Drag {
     card: u32,
@@ -259,23 +286,50 @@ pub struct CanvasView {
     workspace: WeakEntity<Workspace>,
     path: VaultPath,
     canvas: Canvas,
+    /// The file's text as last read or written here, to tell when another
+    /// program has changed it.
+    saved: String,
     drag: Option<Drag>,
     /// The card a line is being drawn from, until its other end is chosen.
     linking: Option<u32>,
 }
 
 impl CanvasView {
-    /// Writes the canvas to its file, reporting a failure in the window.
-    fn store(&self, cx: &mut Context<Self>) {
+    /// Writes the canvas to its file and takes in what came of it.
+    fn store(&mut self, cx: &mut Context<Self>) {
         let Some(workspace) = self.workspace.upgrade() else {
             return;
         };
-        let (path, text) = (self.path.clone(), self.canvas.write());
-        workspace.update(cx, |workspace, cx| {
-            if let Err(problem) = workspace.session().write_file(&path, &text) {
-                workspace.report(problem, cx);
-            }
+        let text = self.canvas.write();
+        let outcome = workspace.update(cx, |workspace, cx| {
+            write_checked(workspace, &self.path, &self.saved, &text, cx)
         });
+        self.settle(outcome, text);
+    }
+
+    /// Records a write, or takes the file's version when it had changed.
+    fn settle(&mut self, outcome: Result<Option<String>, String>, written: String) {
+        match outcome {
+            Ok(None) => self.saved = written,
+            Ok(Some(on_disk)) => {
+                if let Ok(canvas) = Canvas::parse(&on_disk) {
+                    self.canvas = canvas;
+                }
+                self.saved = on_disk;
+                self.linking = None;
+            }
+            // The canvas stays as it is on screen; the next change tries
+            // again.
+            Err(_) => {}
+        }
+    }
+
+    /// Ends a drag, writing the card's new place to the file.
+    fn drop_card(&mut self, cx: &mut Context<Self>) {
+        if self.drag.take().is_some() {
+            self.store(cx);
+            cx.notify();
+        }
     }
 
     /// Handles a click on a card's link button: the first click picks one
@@ -339,6 +393,7 @@ impl Render for CanvasView {
                         let note = note.clone();
                         div()
                             .id(("canvas-note", id as usize))
+                            .test_support()
                             .cursor_pointer()
                             .font_semibold()
                             .text_color(accent)
@@ -371,6 +426,7 @@ impl Render for CanvasView {
                         // The strip a card is dragged by.
                         h_flex()
                             .id(("canvas-handle", id as usize))
+                            .test_support()
                             .h(px(22.))
                             .px_1()
                             .justify_end()
@@ -453,12 +509,25 @@ impl Render for CanvasView {
                                         "",
                                         window,
                                         cx,
-                                        move |_, typed, _, cx| {
-                                            _ = view.update(cx, |this, cx| {
+                                        // This runs inside the window's own
+                                        // update, so the file is written
+                                        // through the window handed in, not
+                                        // by asking for the window again.
+                                        move |workspace, typed, _, cx| {
+                                            let pending = view.update(cx, |this, cx| {
                                                 let (x, y) = this.canvas.next_spot();
-                                                if this.canvas.add(&typed, x, y).is_some() {
-                                                    this.store(cx);
-                                                }
+                                                let added = this.canvas.add(&typed, x, y).is_some();
+                                                cx.notify();
+                                                added.then(|| {
+                                                    (this.path.clone(), this.saved.clone(), this.canvas.write())
+                                                })
+                                            });
+                                            let Ok(Some((path, saved, text))) = pending else {
+                                                return;
+                                            };
+                                            let outcome = write_checked(workspace, &path, &saved, &text, cx);
+                                            _ = view.update(cx, |this, cx| {
+                                                this.settle(outcome, text);
                                                 cx.notify();
                                             });
                                         },
@@ -485,31 +554,28 @@ impl Render for CanvasView {
                     .flex_1()
                     .min_h_0()
                     .overflow_hidden()
-                    .when(self.drag.is_some(), |surface| {
-                        // While a card is held, the whole surface follows the
-                        // pointer, so a fast drag cannot outrun the card.
-                        surface
-                            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
-                                let Some(drag) = &this.drag else {
-                                    return;
-                                };
-                                let moved = event.position - drag.pointer_start;
-                                let (x, y) = drag.card_start;
-                                let card = drag.card;
-                                this.canvas
-                                    .place(card, x + f32::from(moved.x), y + f32::from(moved.y));
-                                cx.notify();
-                            }))
-                            .on_mouse_up(
-                                MouseButton::Left,
-                                cx.listener(|this, _, _, cx| {
-                                    if this.drag.take().is_some() {
-                                        this.store(cx);
-                                    }
-                                    cx.notify();
-                                }),
-                            )
-                    })
+                    // The whole surface follows the pointer while a card is
+                    // held, so a fast drag cannot outrun the card.
+                    .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
+                        let Some(drag) = &this.drag else {
+                            return;
+                        };
+                        let moved = event.position - drag.pointer_start;
+                        let (x, y) = drag.card_start;
+                        let card = drag.card;
+                        this.canvas
+                            .place(card, x + f32::from(moved.x), y + f32::from(moved.y));
+                        cx.notify();
+                    }))
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| this.drop_card(cx)),
+                    )
+                    // Letting go outside the surface drops the card too.
+                    .on_mouse_up_out(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| this.drop_card(cx)),
+                    )
                     .child(lines)
                     .children(cards),
             )

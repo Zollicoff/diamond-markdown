@@ -178,44 +178,43 @@ impl Render for CalendarView {
         let weeks = month_grid(year, month, self.starts)
             .into_iter()
             .map(|week| {
-                h_flex()
-                    .gap_1()
-                    .children(week.into_iter().enumerate().map(|(slot, day)| {
-                        let Some(day) = day else {
-                            return div().w(px(44.)).h(px(36.)).into_any_element();
-                        };
-                        let has_note = self.with_notes.contains(&day);
-                        let is_today = (now.year, now.month, now.day) == (year, month, day);
-                        div()
-                            .id(("calendar-day", day as usize * 10 + slot))
-                            .w(px(44.))
-                            .h(px(36.))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(6.))
-                            .cursor_pointer()
-                            .border_1()
-                            .border_color(if is_today { primary } else { border })
-                            .when(has_note, |cell| cell.font_semibold().text_color(primary))
-                            .when(!has_note, |cell| cell.text_color(muted))
-                            .child(day.to_string())
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                let Some(workspace) = this.workspace.upgrade() else {
-                                    return;
-                                };
-                                let moment = Moment {
-                                    year,
-                                    month,
-                                    day,
-                                    ..Moment::now()
-                                };
-                                workspace.update(cx, |workspace, cx| {
-                                    workspace.open_daily_note_for(moment, window, cx);
-                                });
-                            }))
-                            .into_any_element()
-                    }))
+                h_flex().gap_1().children(week.into_iter().map(|day| {
+                    let Some(day) = day else {
+                        return div().w(px(44.)).h(px(36.)).into_any_element();
+                    };
+                    let has_note = self.with_notes.contains(&day);
+                    let is_today = (now.year, now.month, now.day) == (year, month, day);
+                    div()
+                        .id(("calendar-day", day as usize))
+                        .test_support()
+                        .w(px(44.))
+                        .h(px(36.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(6.))
+                        .cursor_pointer()
+                        .border_1()
+                        .border_color(if is_today { primary } else { border })
+                        .when(has_note, |cell| cell.font_semibold().text_color(primary))
+                        .when(!has_note, |cell| cell.text_color(muted))
+                        .child(day.to_string())
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            let Some(workspace) = this.workspace.upgrade() else {
+                                return;
+                            };
+                            let moment = Moment {
+                                year,
+                                month,
+                                day,
+                                ..Moment::now()
+                            };
+                            workspace.update(cx, |workspace, cx| {
+                                workspace.open_daily_note_for(moment, window, cx);
+                            });
+                        }))
+                        .into_any_element()
+                }))
             })
             .collect::<Vec<_>>();
 

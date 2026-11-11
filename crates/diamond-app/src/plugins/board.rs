@@ -272,13 +272,16 @@ impl Plugin for Boards {
                             workspace: handle.downgrade(),
                             path: path.clone(),
                             board,
+                            revision: 0,
+                            // Read the note again when a note has changed,
+                            // and only then.
                             _watch: cx.observe(&handle, |this: &mut BoardView, workspace, cx| {
-                                this.board = workspace
-                                    .read(cx)
-                                    .session()
-                                    .note_text(&this.path)
-                                    .map(Board::parse);
-                                cx.notify();
+                                let session = workspace.read(cx).session();
+                                if session.revision() != this.revision {
+                                    this.revision = session.revision();
+                                    this.board = session.note_text(&this.path).map(Board::parse);
+                                    cx.notify();
+                                }
                             }),
                         })
                     },
@@ -294,6 +297,8 @@ pub struct BoardView {
     path: VaultPath,
     /// `None` once the note is gone.
     board: Option<Board>,
+    /// The index revision the board was read at.
+    revision: u64,
     _watch: Subscription,
 }
 

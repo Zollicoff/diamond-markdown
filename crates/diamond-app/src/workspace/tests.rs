@@ -21,6 +21,9 @@ use crate::actions::{BACK_FORWARD, bind_keys as init, primary};
 use crate::notes::Moment;
 use crate::session::Session;
 
+/// Tests that work the window with the mouse.
+mod clicks;
+
 impl Workspace {
     /// The palette, when that is what is open over the window.
     fn palette(&self) -> Option<&Palette> {

@@ -85,6 +85,8 @@ pub struct TasksView {
     workspace: WeakEntity<Workspace>,
     tasks: Vec<TaskItem>,
     with_done: bool,
+    /// The index revision the tasks were read at.
+    revision: u64,
     _watch: Subscription,
 }
 
@@ -94,10 +96,16 @@ impl TasksView {
             workspace: workspace.downgrade(),
             tasks,
             with_done: false,
-            // Whenever the window changes anything, read the tasks again.
+            revision: 0,
+            // Read the tasks again when a note has changed, and only then:
+            // the window reports every keystroke.
             _watch: cx.observe(workspace, |this, workspace, cx| {
-                this.tasks = workspace.read(cx).session().tasks();
-                cx.notify();
+                let session = workspace.read(cx).session();
+                if session.revision() != this.revision {
+                    this.revision = session.revision();
+                    this.tasks = session.tasks();
+                    cx.notify();
+                }
             }),
         }
     }

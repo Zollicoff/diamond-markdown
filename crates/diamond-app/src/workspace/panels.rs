@@ -76,7 +76,8 @@ impl Workspace {
                     } else {
                         "▸ "
                     };
-                    let row = ListItem::new(ix)
+                    // Named, so a row can be told from the list slot it sits in.
+                    let row = ListItem::new(("file", ix))
                         .w_full()
                         .pl(px(14.) * entry.depth() + px(10.))
                         .pr_2()
