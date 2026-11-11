@@ -31,15 +31,12 @@ impl Bookmarks {
     /// Bookmarks a note, or removes its bookmark. Returns whether it is
     /// bookmarked now.
     pub fn toggle(&mut self, path: &VaultPath) -> bool {
-        match self.notes.iter().position(|note| note == path) {
-            Some(position) => {
-                self.notes.remove(position);
-                false
-            }
-            None => {
-                self.notes.push(path.clone());
-                true
-            }
+        if self.contains(path) {
+            self.notes.retain(|note| note != path);
+            false
+        } else {
+            self.notes.push(path.clone());
+            true
         }
     }
 }

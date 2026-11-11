@@ -178,6 +178,7 @@ impl Workspace {
     }
 
     /// A plugin, by its type.
+    #[allow(dead_code)] // Part of the interface; not every core plugin needs it.
     pub fn plugin<T: Plugin>(&self) -> Option<&T> {
         self.plugins.iter().find_map(|plugin| {
             let any: &dyn std::any::Any = plugin.as_ref();
