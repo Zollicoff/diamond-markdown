@@ -23,6 +23,7 @@ use gpui_kit::*;
 
 use crate::history::History;
 use crate::notes::{self, Moment};
+use crate::plugin::{Command, Plugin};
 use crate::session::{Follow, NOTE_SCHEME, OpenChange, Session, TreeNode, is_at_or_under};
 use crate::settings::Appearance;
 use palette::Palette;
@@ -74,6 +75,10 @@ pub struct Workspace {
     /// Shown in the status line until the user does something else.
     notice: Option<SharedString>,
     overlay: Option<Overlay>,
+    /// The features built on the plugin interface.
+    plugins: Vec<Box<dyn Plugin>>,
+    /// The commands the plugins added, in the order of the plugins.
+    commands: Vec<Command>,
     watcher: Option<(VaultWatcher, Task<()>)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -116,6 +121,15 @@ impl Workspace {
             }),
         ];
 
+        let mut plugins = crate::plugins::core();
+        for plugin in &mut plugins {
+            plugin.load(&session);
+        }
+        let commands = plugins
+            .iter()
+            .flat_map(|plugin| plugin.commands())
+            .collect();
+
         let mut workspace = Self {
             session,
             tree,
@@ -127,6 +141,8 @@ impl Workspace {
             error,
             notice: None,
             overlay: None,
+            plugins,
+            commands,
             watcher: None,
             _subscriptions: subscriptions,
         };
@@ -135,7 +151,76 @@ impl Workspace {
             tabs: vec![first],
             active: 0,
         });
+        // Shortcuts work from the first moment, before anything is clicked.
+        workspace.focus.focus(window, cx);
         workspace
+    }
+
+    // ---- What plugins work with -------------------------------------------
+
+    /// The open vault.
+    #[allow(dead_code)] // Part of the interface; not every core plugin needs it.
+    pub fn session(&self) -> &Session {
+        &self.session
+    }
+
+    /// Shows a failure in the status line.
+    pub fn report(&mut self, problem: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.error = Some(problem.into());
+        cx.notify();
+    }
+
+    /// Shows what just happened in the status line.
+    pub fn note(&mut self, notice: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.error = None;
+        self.notice = Some(notice.into());
+        cx.notify();
+    }
+
+    /// A plugin, by its type.
+    pub fn plugin<T: Plugin>(&self) -> Option<&T> {
+        self.plugins.iter().find_map(|plugin| {
+            let any: &dyn std::any::Any = plugin.as_ref();
+            any.downcast_ref::<T>()
+        })
+    }
+
+    /// Changes what a plugin keeps and writes it to the vault.
+    pub fn update_plugin<T: Plugin, R>(
+        &mut self,
+        cx: &mut Context<Self>,
+        change: impl FnOnce(&mut T) -> R,
+    ) -> Option<R> {
+        let plugin = self.plugins.iter_mut().find_map(|plugin| {
+            let any: &mut dyn std::any::Any = plugin.as_mut();
+            any.downcast_mut::<T>()
+        })?;
+        let result = change(plugin);
+        if let Err(problem) = plugin.store(&self.session) {
+            self.error = Some(problem.into());
+        }
+        cx.notify();
+        Some(result)
+    }
+
+    /// Runs the plugin command at `index` in the window's command list.
+    pub fn run_command(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(command) = self.commands.get(index) {
+            let run = command.run.clone();
+            run(self, window, cx);
+        }
+    }
+
+    /// Tells every plugin about a rename or a delete, and writes what any
+    /// of them changed in response.
+    fn tell_plugins(&mut self, tell: impl Fn(&mut dyn Plugin) -> bool) {
+        for plugin in &mut self.plugins {
+            if tell(plugin.as_mut())
+                && let Err(problem) = plugin.store(&self.session)
+            {
+                self.error = Some(problem.into());
+            }
+        }
     }
 
     // ---- Tabs and panes ---------------------------------------------------
@@ -529,9 +614,7 @@ impl Workspace {
                 let text = document.saved().to_owned();
                 self.tab_mut().document = Some(document);
                 self.set_tab_text(id, text, window, cx);
-                if self.tab().reading.is_some() {
-                    self.focus.focus(window, cx);
-                }
+                self.focus_content(window, cx);
                 true
             }
             Err(failure) => {
@@ -876,9 +959,10 @@ impl Workspace {
     }
 
     /// Gives the keyboard to whatever shows the note in front: its editor,
-    /// or the window itself in the reading view.
+    /// or the window itself in the reading view and in an empty tab.
     fn focus_content(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.tab().reading.is_some() {
+        let tab = self.tab();
+        if tab.reading.is_some() || tab.document.is_none() {
             self.focus.focus(window, cx);
         } else {
             self.tab()
@@ -889,9 +973,8 @@ impl Workspace {
 
     /// Leaves the reading view, for actions that need the editor.
     fn start_editing(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let tab = self.tab_mut();
-        tab.reading = None;
-        tab.editor.update(cx, |editor, cx| editor.focus(window, cx));
+        self.tab_mut().reading = None;
+        self.focus_content(window, cx);
     }
 
     /// Puts the cursor at a byte offset in the note in front, for a click
@@ -985,6 +1068,7 @@ impl Workspace {
         }
         self.error = None;
         self.notice = Some(format!("Moved {path} to the trash").into());
+        self.tell_plugins(|plugin| plugin.removed(path));
         for pane in &mut self.panes {
             for tab in &mut pane.tabs {
                 tab.history.removed(path);
@@ -1078,6 +1162,7 @@ impl Workspace {
             }
         };
         self.rename_expanded(from, &to);
+        self.tell_plugins(|plugin| plugin.renamed(from, &to));
         for id in self.tab_ids() {
             let Some(tab) = self.tab_by_id_mut(id) else {
                 continue;

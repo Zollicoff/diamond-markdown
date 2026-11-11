@@ -55,8 +55,6 @@ macro_rules! primary {
         concat!("ctrl-", $key)
     };
 }
-// Window tests press the shortcuts by the same names.
-#[cfg(test)]
 pub(crate) use primary;
 
 /// Back and forward. Alt with an arrow moves by word in a text field on
@@ -97,6 +95,23 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(primary!("shift-o"), OpenVault, None),
         KeyBinding::new(primary!("q"), Quit, None),
     ]);
+
+    // Plugin commands are numbered in the order of the core plugins, which
+    // is the same in every window.
+    let plugin_shortcuts: Vec<KeyBinding> = crate::plugins::core()
+        .iter()
+        .flat_map(|plugin| plugin.commands())
+        .enumerate()
+        .filter_map(|(index, command)| {
+            let keys = command.shortcut?;
+            Some(KeyBinding::new(
+                keys,
+                crate::plugin::RunCommand { index },
+                Some(WORKSPACE),
+            ))
+        })
+        .collect();
+    cx.bind_keys(plugin_shortcuts);
 }
 
 /// A command as the palette lists it.

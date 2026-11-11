@@ -10,6 +10,7 @@ use gpui_kit::*;
 
 use super::{Overlay, Workspace};
 use crate::actions::COMMANDS;
+use crate::plugin::RunCommand;
 
 /// How many notes the palette lists at once.
 const LIMIT: usize = 50;
@@ -45,6 +46,8 @@ pub(super) enum RowTarget {
     },
     /// Runs the command at this position in [`COMMANDS`].
     Command(usize),
+    /// Runs the plugin command at this position in the window's list.
+    PluginCommand(usize),
     /// Inserts this template into the open note.
     Template(VaultPath),
 }
@@ -120,6 +123,15 @@ impl Workspace {
                     label: command.title.into(),
                     target: RowTarget::Command(index),
                 })
+                .chain(
+                    self.commands
+                        .iter()
+                        .enumerate()
+                        .map(|(index, command)| PaletteRow {
+                            label: command.title.into(),
+                            target: RowTarget::PluginCommand(index),
+                        }),
+                )
                 .collect(),
             PaletteMode::Templates => self
                 .session
@@ -171,12 +183,12 @@ impl Workspace {
             Some(RowTarget::Note { path, line }) => self.open_at(&path, line, window, cx),
             Some(RowTarget::Template(path)) => self.insert_template(&path, window, cx),
             // The palette dispatched the command's action itself.
-            Some(RowTarget::Command(_)) | None => {}
+            Some(RowTarget::Command(_) | RowTarget::PluginCommand(_)) | None => {}
         }
     }
 
     /// Opens a note and, given a line, puts the cursor at its start.
-    fn open_at(
+    pub fn open_at(
         &mut self,
         path: &VaultPath,
         line: Option<usize>,
@@ -212,6 +224,11 @@ impl Workspace {
                     let command = &COMMANDS[index];
                     item.keywords(command.keywords.iter().copied())
                         .action((command.action)())
+                }
+                RowTarget::PluginCommand(index) => {
+                    let command = &self.commands[index];
+                    item.keywords(command.keywords.iter().copied())
+                        .action(Box::new(RunCommand { index }))
                 }
                 _ => item,
             }

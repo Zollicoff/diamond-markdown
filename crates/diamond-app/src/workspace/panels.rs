@@ -28,6 +28,7 @@ use crate::actions::{
     ReloadSettings, RenameNote, SaveNote, SearchVault, SplitRight, ToggleReading, ToggleTheme,
     UseSystemTheme, WORKSPACE,
 };
+use crate::plugin::{RowAction, RunCommand};
 
 /// "1 word", "2 words".
 fn counted(count: usize, noun: &str) -> String {
@@ -249,6 +250,18 @@ impl Workspace {
             );
 
         let body = div().flex_1().min_h_0().child(match &tab.reading {
+            // An empty tab says how to fill it, rather than offering an
+            // editor whose text would have nowhere to go.
+            _ if tab.document.is_none() => v_flex()
+                .size_full()
+                .items_center()
+                .justify_center()
+                .gap_1()
+                .text_sm()
+                .text_color(muted)
+                .child("No note open")
+                .child("Pick one in the sidebar, or run a command from the palette.")
+                .into_any_element(),
             None => Editor::new(&tab.editor)
                 .appearance(false)
                 .bordered(false)
@@ -416,6 +429,12 @@ impl Workspace {
             .map(str::to_owned)
             .collect();
 
+        let plugin_sections: Vec<_> = self
+            .plugins
+            .iter()
+            .flat_map(|plugin| plugin.sections(&self.session, self.current()))
+            .collect();
+
         let section = |title: &str, count: usize| {
             div()
                 .pt_3()
@@ -466,6 +485,33 @@ impl Workspace {
                         this.search_tag(&tag, window, cx);
                     }))
             }))
+            .children(plugin_sections.into_iter().enumerate().flat_map(
+                |(section_ix, plugin_section)| {
+                    let heading =
+                        section(plugin_section.title, plugin_section.rows.len()).into_any_element();
+                    let rows = plugin_section
+                        .rows
+                        .into_iter()
+                        .enumerate()
+                        .map(move |(row_ix, row)| (section_ix * 10_000 + row_ix, row))
+                        .map(|(id, row)| {
+                            let action = row.action;
+                            ListItem::new(("plugin-row", id))
+                                .child(row.label)
+                                .on_click(cx.listener(move |this, _, window, cx| match &action {
+                                    RowAction::None => {}
+                                    RowAction::Open(path) => this.open_note(path, window, cx),
+                                    RowAction::OpenAt(path, line) => {
+                                        this.open_at(path, Some(*line), window, cx);
+                                    }
+                                    RowAction::Run(run) => run(this, window, cx),
+                                }))
+                                .into_any_element()
+                        })
+                        .collect::<Vec<_>>();
+                    std::iter::once(heading).chain(rows)
+                },
+            ))
             .when(unresolved > 0, |panel| {
                 panel.child(
                     div()
@@ -602,6 +648,9 @@ impl Render for Workspace {
             }))
             .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| {
                 this.reload_settings(cx);
+            }))
+            .on_action(cx.listener(|this, command: &RunCommand, window, cx| {
+                this.run_command(command.index, window, cx);
             }))
             .relative()
             .size_full()

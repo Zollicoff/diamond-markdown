@@ -4,6 +4,8 @@ mod actions;
 mod app;
 mod history;
 mod notes;
+mod plugin;
+mod plugins;
 mod recent;
 mod session;
 mod settings;

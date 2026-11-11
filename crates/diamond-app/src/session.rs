@@ -185,6 +185,26 @@ impl Session {
         self.settings_problem.as_deref()
     }
 
+    /// Where a plugin keeps what it stores: a TOML file named after it in
+    /// the vault's `.diamond` folder.
+    fn plugin_file(id: &str) -> Option<VaultPath> {
+        VaultPath::new(&format!("{}/{id}.toml", diamond_vault::APP_FOLDER)).ok()
+    }
+
+    /// The text of a plugin's file, if it has written one.
+    pub fn read_plugin_file(&self, id: &str) -> Option<String> {
+        let path = Self::plugin_file(id)?;
+        self.vault.read(&path).ok()
+    }
+
+    /// Replaces a plugin's file.
+    pub fn write_plugin_file(&self, id: &str, text: &str) -> Result<(), String> {
+        let path = Self::plugin_file(id).ok_or_else(|| format!("{id} cannot name a file"))?;
+        self.vault
+            .write(&path, text)
+            .map_err(|error| error.to_string())
+    }
+
     /// Reads the vault's settings file again, after it was edited.
     pub fn reload_settings(&mut self) {
         let loaded = VaultSettings::load(&self.vault);

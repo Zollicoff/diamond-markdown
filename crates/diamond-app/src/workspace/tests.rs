@@ -733,9 +733,16 @@ fn the_command_palette_lists_every_command_and_runs_the_chosen_one(cx: &mut Test
     workspace.read_with(cx, |workspace, _| {
         let palette = workspace.palette().expect("palette open");
         assert_eq!(palette.mode, PaletteMode::Commands);
-        assert_eq!(palette.rows.len(), COMMANDS.len());
+        // The built-in commands and the ones plugins add, in one list.
+        assert_eq!(
+            palette.rows.len(),
+            COMMANDS.len() + workspace.commands.len()
+        );
+        assert!(!workspace.commands.is_empty());
     });
-    assert_eq!(matched(&workspace, cx), COMMANDS.len());
+    let every_command =
+        workspace.read_with(cx, |workspace, _| COMMANDS.len() + workspace.commands.len());
+    assert_eq!(matched(&workspace, cx), every_command);
 
     // Typing narrows the list, by name or by keyword, and leaves the note
     // alone.
@@ -1458,9 +1465,12 @@ fn tabs_open_switch_and_close_keeping_each_notes_text(cx: &mut TestAppContext) {
     // The last tab is replaced by an empty one rather than leaving nothing.
     cx.simulate_keystrokes(primary!("w"));
     assert_eq!(tab_titles(&workspace, cx), vec![vec!["*-"]]);
+    // An empty tab has no editor to type into, but shortcuts still work.
     cx.simulate_keystrokes("q");
-    assert_eq!(editor_text(&workspace, cx), "q");
+    assert_eq!(editor_text(&workspace, cx), "");
     assert_eq!(read("C.md"), "charlie\n");
+    cx.simulate_keystrokes(primary!("o"));
+    workspace.read_with(cx, |workspace, _| assert!(workspace.palette().is_some()));
 }
 
 #[gpui_kit::test]
@@ -1690,4 +1700,74 @@ fn unsaved_edits_are_written_when_the_window_goes_away(cx: &mut TestAppContext) 
         fs::read_to_string(dir.path().join("B.md")).unwrap(),
         "ybravo\n"
     );
+}
+
+#[gpui_kit::test]
+fn a_plugin_adds_a_command_a_shortcut_and_a_panel_section(cx: &mut TestAppContext) {
+    use crate::plugins::bookmarks::Bookmarks;
+
+    let (dir, workspace, cx) = open(
+        &[
+            ("Home.md", "home\n"),
+            ("Work/Plan.md", "---\ntitle: The Plan\n---\n"),
+        ],
+        cx,
+    );
+    let stored = dir.path().join(".diamond/bookmarks.toml");
+    let bookmarked = |cx: &mut VisualTestContext| {
+        workspace.read_with(cx, |workspace, _| {
+            workspace.plugins[0].sections(&workspace.session, None)[0]
+                .rows
+                .iter()
+                .map(|row| row.label.clone())
+                .collect::<Vec<_>>()
+        })
+    };
+    // With no note open the command explains itself instead of failing.
+    cx.simulate_keystrokes(primary!("d"));
+    workspace.read_with(cx, |workspace, _| assert!(workspace.error.is_some()));
+    assert!(!stored.exists());
+
+    // The shortcut bookmarks the note in front and writes the plugin's file.
+    open_note(&workspace, "Work/Plan.md", cx);
+    cx.simulate_keystrokes(primary!("d"));
+    assert_eq!(bookmarked(cx), vec!["The Plan"]);
+    assert_eq!(
+        fs::read_to_string(&stored).unwrap(),
+        "notes = [\"Work/Plan.md\"]\n"
+    );
+    workspace.read_with(cx, |workspace, _| {
+        assert!(
+            workspace
+                .plugin::<Bookmarks>()
+                .unwrap()
+                .contains(&path("Work/Plan.md"))
+        );
+        assert_eq!(workspace.notice.as_deref(), Some("Bookmarked Work/Plan.md"));
+    });
+
+    // The same command is in the palette, found by a keyword.
+    open_note(&workspace, "Home.md", cx);
+    cx.simulate_keystrokes(primary!("shift-p"));
+    cx.simulate_keystrokes("f a v o u r");
+    assert_eq!(matched(&workspace, cx), 1);
+    cx.simulate_keystrokes("enter");
+    assert_eq!(bookmarked(cx), vec!["The Plan", "Home"]);
+    workspace.read_with(cx, |workspace, _| assert!(workspace.overlay.is_none()));
+
+    // Bookmarks follow a rename and forget a deleted note.
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.rename_entry(&path("Work"), "Job", window, cx);
+            workspace.delete_entry(&path("Home.md"), window, cx);
+        });
+    });
+    assert_eq!(
+        fs::read_to_string(&stored).unwrap(),
+        "notes = [\"Job/Plan.md\"]\n"
+    );
+    // Pressing the shortcut again removes the bookmark.
+    open_note(&workspace, "Job/Plan.md", cx);
+    cx.simulate_keystrokes(primary!("d"));
+    assert!(bookmarked(cx).is_empty());
 }
