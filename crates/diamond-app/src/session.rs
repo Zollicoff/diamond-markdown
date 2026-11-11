@@ -111,6 +111,11 @@ impl Session {
         ))
     }
 
+    /// The vault's folder on disk.
+    pub fn vault_root(&self) -> &Path {
+        self.vault.root()
+    }
+
     /// The vault's display name.
     pub fn vault_name(&self) -> &str {
         self.vault.name()

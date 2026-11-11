@@ -110,6 +110,7 @@ note's backlinks, outline and tags.
 | Cmd-Shift-F | Search all notes; Enter opens the note at the matching line |
 | Cmd-E | Switch between editing and the rendered reading view |
 | Alt-Enter | Follow the link under the cursor, creating the note if it is missing |
+| Cmd-Shift-O | Open another vault in a new window |
 
 Right-click a file or folder in the sidebar to delete it.
 
@@ -121,10 +122,13 @@ neither version is lost.
 The editor highlights Markdown syntax (Tree-sitter) but does not render it
 in place yet. The reading view renders the note with clickable wikilinks.
 
-Run it with `cargo run -p diamond-app -- <vault folder>`.
+Run it with `cargo run -p diamond-app`. It reopens the last vault, or asks
+for a folder the first time. A folder given as an argument (or in
+`DIAMOND_VAULT`) takes precedence. Opened vaults are remembered in a plain
+text file in the platform's settings folder.
 
 Not built yet: rename in the app (the link-rewriting logic exists in the
-index), tabs and splits, a vault picker, settings.
+index), tabs and splits, settings.
 
 ## UI stack
 
@@ -222,11 +226,12 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-97 tests so far; `cargo test --workspace` runs them all.
+101 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (72): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (11): `session.rs` tests without a window.
+- App logic (15): `session.rs` and the remembered-vaults list, tested
+  without a window.
 - App UI (14): headless window tests drive the real views. They open, type,
   save and autosave; follow and create links; reload after outside edits
   and keep both versions in a conflict; use the quick switcher, the search
@@ -246,7 +251,7 @@ looked at the rendered window yet.
 
 0. **Foundation** (nearly done). Done: workspace, core crates, app shell,
    file watching, create and delete, quick switcher, search, reading view,
-   benchmark. Left: rename in the app, vault picker, CI for macOS and Linux.
+   vault picker, benchmark. Left: rename in the app, CI for macOS and Linux.
 1. **Core notes.** Markdown-aware editor with Live Preview and Reading view,
    clickable links, tabs and splits, command palette, quick switcher,
    full-text search, properties, settings, hotkeys, themes.
