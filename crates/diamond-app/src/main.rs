@@ -1,5 +1,6 @@
 //! Diamond Markdown desktop application.
 
+mod notes;
 mod recent;
 mod session;
 mod workspace;

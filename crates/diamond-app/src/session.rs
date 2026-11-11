@@ -430,6 +430,56 @@ impl Session {
         rows
     }
 
+    /// Finds today's daily note, creating it from the daily-note template
+    /// if it does not exist yet. Returns its path and whether it was created.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn daily_note(
+        &mut self,
+        moment: crate::notes::Moment,
+    ) -> Result<(VaultPath, bool), VaultError> {
+        let (path, template) = crate::notes::daily_note(&self.vault, moment);
+        let path = path.ok_or_else(|| VaultError::InvalidPath("daily notes folder".into()))?;
+        if self.vault.exists(&path) {
+            return Ok((path, false));
+        }
+        // A template that is set but missing is not an error: the note is
+        // created empty, as Obsidian does.
+        let text = template
+            .and_then(|template| self.vault.read(&template).ok())
+            .map(|template| crate::notes::fill_template(&template, path.stem(), moment))
+            .unwrap_or_default();
+        self.vault.create(&path, &text)?;
+        self.index.upsert(path.clone(), &text);
+        Ok((path, true))
+    }
+
+    /// The notes in the templates folder, as `(path, name)`, sorted by path.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn templates(&self) -> Vec<(VaultPath, String)> {
+        let folder = format!(
+            "{}/",
+            crate::notes::templates_folder(&self.vault).to_lowercase()
+        );
+        self.index
+            .notes()
+            .iter()
+            .filter(|note| note.path.as_str().to_lowercase().starts_with(&folder))
+            .map(|note| (note.path.clone(), note.path.stem().to_owned()))
+            .collect()
+    }
+
+    /// A template's text with its placeholders filled in for the open note.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn template_text(
+        &self,
+        template: &VaultPath,
+        moment: crate::notes::Moment,
+    ) -> Result<String, VaultError> {
+        let text = self.vault.read(template)?;
+        let title = self.current_title().unwrap_or_default();
+        Ok(crate::notes::fill_template(&text, title, moment))
+    }
+
     /// Whether `path` is a note in the index.
     pub fn is_note(&self, path: &VaultPath) -> bool {
         self.index.note(path).is_some()
@@ -695,6 +745,65 @@ mod tests {
             ]
         );
         assert!(session.search("", 10).is_empty());
+    }
+
+    #[test]
+    fn daily_note_is_created_once_from_its_template() {
+        let moment = crate::notes::Moment {
+            year: 2026,
+            month: 11,
+            day: 11,
+            hour: 6,
+            minute: 30,
+        };
+        let (dir, mut session) = session(&[
+            (
+                ".obsidian/daily-notes.json",
+                r#"{"folder": "Daily", "template": "Templates/Day"}"#,
+            ),
+            ("Templates/Day.md", "# {{title}}\n\nStarted {{time}}\n"),
+            ("Templates/Meeting.md", "## {{title}} on {{date}}\n"),
+            ("Home.md", ""),
+        ]);
+        let (path, created) = session.daily_note(moment).unwrap();
+        assert_eq!((path.as_str(), created), ("Daily/2026-11-11.md", true));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Daily/2026-11-11.md")).unwrap(),
+            "# 2026-11-11\n\nStarted 06:30\n"
+        );
+        // The second time it is found, not recreated or overwritten.
+        std::fs::write(dir.path().join("Daily/2026-11-11.md"), "edited").unwrap();
+        assert_eq!(session.daily_note(moment).unwrap(), (path, false));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Daily/2026-11-11.md")).unwrap(),
+            "edited"
+        );
+
+        assert_eq!(
+            session.templates(),
+            vec![
+                (
+                    super::VaultPath::new("Templates/Day.md").unwrap(),
+                    "Day".to_owned()
+                ),
+                (
+                    super::VaultPath::new("Templates/Meeting.md").unwrap(),
+                    "Meeting".to_owned()
+                ),
+            ]
+        );
+        session
+            .open_note(&super::VaultPath::new("Home.md").unwrap())
+            .unwrap();
+        assert_eq!(
+            session
+                .template_text(
+                    &super::VaultPath::new("Templates/Meeting.md").unwrap(),
+                    moment
+                )
+                .unwrap(),
+            "## Home on 2026-11-11\n"
+        );
     }
 
     #[test]

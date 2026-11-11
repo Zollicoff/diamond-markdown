@@ -1261,10 +1261,12 @@ name = "diamond-app"
 version = "0.1.0"
 dependencies = [
  "async-channel",
+ "chrono",
  "diamond-index",
  "diamond-parse",
  "diamond-vault",
  "gpui-kit",
+ "serde_json",
  "tempfile",
 ]
 
