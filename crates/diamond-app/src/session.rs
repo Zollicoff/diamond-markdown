@@ -812,6 +812,33 @@ impl Session {
         self.index.revision()
     }
 
+    /// Reads a file that is not a note, for a plugin that shows such files.
+    pub fn read_file(&self, path: &VaultPath) -> Result<String, String> {
+        self.vault.read(path).map_err(|error| error.to_string())
+    }
+
+    /// Replaces a file that is not a note.
+    pub fn write_file(&self, path: &VaultPath, text: &str) -> Result<(), String> {
+        self.vault
+            .write(path, text)
+            .map_err(|error| error.to_string())
+    }
+
+    /// Creates a file that is not a note at the vault root, under a name
+    /// nothing else has, and returns its path.
+    pub fn new_file(
+        &mut self,
+        stem: &str,
+        extension: &str,
+        contents: &str,
+    ) -> Result<VaultPath, VaultError> {
+        let path = self.vault.unused_path(None, stem, extension)?;
+        self.vault.create(&path, contents)?;
+        self.index
+            .refresh(&self.vault, std::slice::from_ref(&path))?;
+        Ok(path)
+    }
+
     /// A note's text as of its last save.
     pub fn note_text(&self, path: &VaultPath) -> Option<&str> {
         self.index.note(path).map(|note| note.text.as_str())

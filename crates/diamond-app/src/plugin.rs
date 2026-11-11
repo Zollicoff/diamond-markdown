@@ -119,6 +119,12 @@ pub trait Plugin: Any {
         Vec::new()
     }
 
+    /// What opens a file that is not a note, if this plugin shows files
+    /// like it. Asked when such a file is clicked in the sidebar.
+    fn opener(&self, _path: &VaultPath) -> Option<Run> {
+        None
+    }
+
     /// A file or folder was renamed or moved. Returns whether the plugin
     /// changed something it keeps, so it can be written.
     fn renamed(&mut self, _from: &VaultPath, _to: &VaultPath) -> bool {

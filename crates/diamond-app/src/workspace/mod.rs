@@ -315,6 +315,35 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Creates a file that is not a note and shows it in the sidebar.
+    pub fn new_file(
+        &mut self,
+        stem: &str,
+        extension: &str,
+        contents: &str,
+        cx: &mut Context<Self>,
+    ) -> Result<VaultPath, String> {
+        let path = self
+            .session
+            .new_file(stem, extension, contents)
+            .map_err(|error| error.to_string())?;
+        self.refresh_tree(cx);
+        Ok(path)
+    }
+
+    /// Follows a link target as written in the file at `from`, which need
+    /// not be a note: a card on a canvas, say.
+    pub fn follow_from(
+        &mut self,
+        from: &VaultPath,
+        target: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let followed = self.session.follow_target(from, target);
+        self.go(followed, window, cx);
+    }
+
     /// Runs the plugin command at `index` in the window's command list.
     pub fn run_command(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(command) = self.commands.get(index) {
@@ -1431,7 +1460,10 @@ impl Workspace {
             return;
         };
         if !self.session.is_note(&path) {
-            if path.extension().is_some() {
+            let opener = self.plugins.iter().find_map(|plugin| plugin.opener(&path));
+            if let Some(open) = opener {
+                open(self, window, cx);
+            } else if path.extension().is_some() {
                 self.error = Some(format!("{path} is not a note; it cannot be opened yet").into());
                 cx.notify();
             }

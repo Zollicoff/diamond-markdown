@@ -121,8 +121,8 @@ The window. Its code is split by what it knows about:
 - `app.rs` is the state every window shares: the app's settings and whether
   it is drawn light or dark.
 - `plugin.rs` is the plugin interface, and `plugins/` holds the core
-  plugins built on it: properties, bookmarks, tasks, calendar, graph,
-  boards, tables and git.
+  plugins built on it: properties, bookmarks, tasks, calendar, preview,
+  graph, boards, canvas, tables and git.
 
 The window has three panels: the file tree, the notes, and a context panel
 with the backlinks, outline and tags of the note in front. The outline and
@@ -194,6 +194,13 @@ context panel:
 - **Boards.** "Show this note as a board" shows any note as columns of
   cards: each `## Heading` is a column and each list item under it a card.
   Moving or adding a card rewrites only those lines of the note.
+- **Canvas.** "New canvas" makes a surface for cards laid out freely, with
+  lines between them. A card holds text or stands for a note. Cards are
+  dragged by their top strip. A canvas is a file of its own,
+  `Name.canvas.toml`, in a small TOML format described in
+  `plugins/canvas.rs`; clicking it in the sidebar opens it.
+- **Preview.** Cmd-Shift-E opens the note rendered in a pane beside its
+  editor, following every keystroke.
 - **Tables.** Commands insert a table, line up the columns of the table
   under the cursor, and add a row or a column.
 - **Git.** Commands start keeping versions of the vault, save a version and
@@ -221,9 +228,11 @@ Run it with `cargo run -p diamond-app`. It reopens the last vault, or asks
 for a folder the first time. A folder given as an argument (or in
 `DIAMOND_VAULT`) takes precedence.
 
-Not built yet: dragging tabs between panes, splitting downwards, a settings
-screen, scrolling the reading view to a heading (the outline switches to
-the editor for now). Undo does not cross between two views of one note.
+Not built yet: Markdown rendered in place in the editor, dragging tabs
+between panes, splitting downwards, a settings screen, scrolling the
+reading view to a heading (the outline switches to the editor for now).
+Undo does not cross between two views of one note. A canvas does not yet
+pan or zoom, and a note card does not follow its note when it is renamed.
 
 ### Settings
 
@@ -264,17 +273,28 @@ Zed's own editor, rope and Markdown crates are GPL-3.0 and are not used.
 
 ### The editor is the largest piece of work
 
-Today the app uses GPUI Kit's code editor as a plain text editor. Live
-Preview (Markdown that renders in place as you type) does not exist in any
-Rust library. We build it: a Markdown-aware display layer over the text
-buffer that hides markers off the cursor line and draws headings, links,
-embeds, tables and checkboxes inline.
+Today the app uses GPUI Kit's code editor as a plain text editor, with a
+live preview in a pane beside it (Cmd-Shift-E). Live Preview proper,
+Markdown that renders in place as you type, does not exist in any Rust
+library. We build it: a Markdown-aware display layer over the text buffer
+that hides markers off the cursor line and draws headings, links, embeds,
+tables and checkboxes inline.
 
-A starting point exists. GPUI Kit's Markdown renderer has an "editor host"
-interface: an outside editor hands it a tree of rendered blocks and gets
-back the geometry needed for caret placement, hit-testing and input. That
-is the rendering half of Live Preview; the document model, editing rules and
-cursor movement are ours to write.
+A starting point exists, and its limits are now clear. GPUI Kit's Markdown
+renderer has an "editor host" interface (`gpui-base`, `text/editor_host.rs`):
+an outside editor hands it a tree of rendered blocks and gets back, per
+piece of text, the geometry needed for caret placement, hit-testing and
+input. That is the rendering half only. By its own description the host
+owns everything else: the document model, editing rules, cursor movement,
+selection, undo, the clipboard and native input (IME). So Live Preview
+means writing an editor, not configuring one. The order to build it in:
+
+1. a document model that maps the Markdown source to rendered blocks and
+   back, so every caret position has a source offset;
+2. caret movement and selection over the rendered blocks;
+3. typing, deleting and undo, each as an edit to the source;
+4. revealing the raw Markdown of the block the caret is in;
+5. native input, the clipboard and accessibility.
 
 ### Rendering that needs a native answer
 
@@ -295,7 +315,7 @@ Features are modules. A plugin adds to the app only through one interface
 
 - commands, which appear in the palette and can have a default shortcut;
 - sections in the context panel, whose rows can open a note or run code;
-- views that open in a tab;
+- views that open in a tab, and opening files of a kind the plugin shows;
 - a file of its own in the vault's `.diamond` folder;
 - being told when a note is renamed or deleted;
 - the window's own tools: a one-line prompt, editing the note in front the
@@ -353,13 +373,13 @@ search-as-you-type under 50 ms.
 
 ## Testing
 
-199 tests so far; `cargo test --workspace` runs them all.
+204 tests so far; `cargo test --workspace` runs them all.
 
 - Core crates (79): unit tests per crate, including symlink escapes, the
   file watcher and real vaults on disk.
-- App logic (76): the session, history, daily notes and templates, settings
+- App logic (79): the session, history, daily notes and templates, settings
   files and the remembered-vaults list, tested without a window.
-- App UI (44): headless window tests drive the real views with real
+- App UI (46): headless window tests drive the real views with real
   keystrokes. They open, type, save and autosave; follow and create links;
   reload after outside edits and keep both versions in a conflict; use the
   palette for notes, search, commands and templates; rename with links
@@ -376,7 +396,8 @@ target and is not part of the macOS or Linux build.
 The rendered window has been looked at on the development Mac (dark
 appearance): the three panels, a note in the editor and in the reading view,
 the command palette, tabs in two panes, the calendar, the task list, a
-board and the graph. Not checked by eye yet: the light appearance,
+board, the graph and a canvas. Dragging a card on a canvas has not been
+tried by hand. Not checked by eye yet: the light appearance,
 Linux, and anything under load.
 
 ## Milestones

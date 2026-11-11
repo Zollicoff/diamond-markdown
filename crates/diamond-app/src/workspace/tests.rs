@@ -2139,3 +2139,120 @@ fn the_graph_opens_in_a_tab_and_draws(cx: &mut TestAppContext) {
         assert!(workspace.error.is_none(), "{:?}", workspace.error);
     });
 }
+
+#[gpui_kit::test]
+fn the_side_preview_follows_what_is_typed(cx: &mut TestAppContext) {
+    let (_dir, workspace, cx) = open(
+        &[("Home.md", "# Home\n\nSee [[Plan]].\n"), ("Plan.md", "")],
+        cx,
+    );
+    // Nothing to preview yet.
+    cx.simulate_keystrokes(primary!("shift-e"));
+    workspace.read_with(cx, |workspace, _| {
+        assert_eq!(workspace.panes.len(), 1);
+        assert!(workspace.error.is_some());
+    });
+
+    open_note(&workspace, "Home.md", cx);
+    cx.simulate_keystrokes(primary!("shift-e"));
+    let preview = |cx: &mut VisualTestContext| {
+        cx.update(|window, cx| window.render_frame(cx));
+        workspace.read_with(cx, |workspace, _| {
+            let (_, rendered) = workspace.panes[1]
+                .tab()
+                .reading
+                .as_ref()
+                .expect("the right pane is a reading view");
+            rendered.to_string()
+        })
+    };
+    workspace.read_with(cx, |workspace, _| {
+        assert_eq!(workspace.panes.len(), 2);
+        // The keyboard stays with the editor on the left.
+        assert_eq!(workspace.active_pane, 0);
+        assert!(workspace.panes[0].tab().reading.is_none());
+    });
+    assert_eq!(preview(cx), "# Home\n\nSee [Plan](diamond://note/Plan).\n");
+
+    // Typing on the left shows on the right at once, before any save.
+    cx.simulate_keystrokes("n e w space");
+    assert_eq!(
+        preview(cx),
+        "new # Home\n\nSee [Plan](diamond://note/Plan).\n"
+    );
+    workspace.read_with(cx, |workspace, _| assert!(workspace.panes[0].tab().dirty));
+}
+
+#[gpui_kit::test]
+fn a_canvas_is_a_file_of_its_own_that_opens_in_a_tab(cx: &mut TestAppContext) {
+    let board = "[[card]]\nid = 1\nx = 40.0\ny = 40.0\ntext = \"An idea\"\n\n[[card]]\nid = 2\nx = 320.0\ny = 40.0\nnote = \"Plan\"\n\n[[link]]\nfrom = 1\nto = 2\n";
+    let (dir, workspace, cx) = open(
+        &[
+            ("Plan.md", "# Plan\n"),
+            ("Ideas.canvas.toml", board),
+            ("Broken.canvas.toml", "[[card]]\nid = \"one\"\n"),
+            ("picture.png", ""),
+        ],
+        cx,
+    );
+    let click = |name: &str, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            workspace.update(cx, |workspace, cx| {
+                workspace.open_entry(name, false, window, cx)
+            });
+        });
+    };
+    // Clicking a canvas file in the sidebar shows it in a tab.
+    click("Ideas.canvas.toml", cx);
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["*Ideas"]]);
+    cx.update(|window, cx| {
+        window.render_frame(cx);
+        let view = window.find("canvas-view").bounds();
+        assert!(
+            view.size.width > px(100.) && view.size.height > px(100.),
+            "{view:?}"
+        );
+    });
+    // A note card leads to its note, which opens beside the canvas.
+    cx.update(|window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.follow_from(&path("Ideas.canvas.toml"), "Plan", window, cx);
+        });
+    });
+    assert_eq!(tab_titles(&workspace, cx), vec![vec!["Ideas", "*Plan"]]);
+
+    // A file that is not a canvas of ours is reported, never rewritten.
+    click("Broken.canvas.toml", cx);
+    workspace.read_with(cx, |workspace, _| {
+        let error = workspace.error.as_ref().expect("an error is shown");
+        assert!(
+            error.starts_with("Broken.canvas.toml cannot be shown"),
+            "{error}"
+        );
+    });
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Broken.canvas.toml")).unwrap(),
+        "[[card]]\nid = \"one\"\n"
+    );
+    // Other files still say they cannot be opened.
+    click("picture.png", cx);
+    workspace.read_with(cx, |workspace, _| {
+        assert!(workspace.error.as_ref().unwrap().contains("is not a note"));
+    });
+
+    // A new canvas gets a file and a tab, and shows in the sidebar.
+    run_command("new canvas", &workspace, cx);
+    assert_eq!(
+        tab_titles(&workspace, cx),
+        vec![vec!["Ideas", "Plan", "*Untitled"]]
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("Untitled.canvas.toml")).unwrap(),
+        ""
+    );
+    workspace.read_with(cx, |workspace, cx| {
+        let tree = workspace.tree.read(cx);
+        assert!(tree.index_of(&"Untitled.canvas.toml".into()).is_some());
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+}
