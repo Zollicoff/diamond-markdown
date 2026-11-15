@@ -182,7 +182,7 @@ impl Workspace {
             return;
         };
         // A command that put something else over the window, such as the
-        // rename field, has already taken this palette's place.
+        // rename prompt, has already taken this palette's place.
         if palette.state.entity_id() != id {
             return;
         }

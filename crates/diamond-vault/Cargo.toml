@@ -1,6 +1,6 @@
 [package]
 name = "diamond-vault"
-description = "Vault file access for Diamond Markdown: safe paths, listing, atomic writes."
+description = "Vault file access for Diamond: safe paths, listing, atomic writes, trash, watching."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

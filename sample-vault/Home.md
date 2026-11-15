@@ -6,7 +6,7 @@ tags: [start]
 
 This is a small vault for trying things out. Everything in it is a plain file, so change whatever you like.
 
-Press **Cmd-Shift-P** (Ctrl-Shift-P on Linux) to see every command.
+Press **Cmd-Shift-P** (Ctrl-Shift-P on Linux) to see every command. The guide in the repository, `docs/guide.md`, explains each one.
 
 ## Start here
 

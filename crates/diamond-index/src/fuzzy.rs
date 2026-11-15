@@ -1,4 +1,4 @@
-//! Fuzzy matching for the quick switcher.
+//! Fuzzy matching for "Go to note".
 //!
 //! A query matches a candidate when its characters appear in the candidate
 //! in order, ignoring case: `qpl` matches `Quarterly Plan`. The score ranks

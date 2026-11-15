@@ -1454,7 +1454,7 @@ impl Workspace {
 
     // ---- The sidebar and what is shown over the window --------------------
 
-    /// Dismisses the palette or rename field and hands the keyboard back.
+    /// Dismisses the palette or the prompt and hands the keyboard back.
     fn close_overlay(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.overlay.take().is_some() {
             self.focus_content(window, cx);

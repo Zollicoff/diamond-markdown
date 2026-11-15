@@ -1,6 +1,6 @@
 [package]
 name = "diamond-app"
-description = "Diamond Markdown desktop application."
+description = "Diamond, a Markdown knowledge-base app for macOS and Linux."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

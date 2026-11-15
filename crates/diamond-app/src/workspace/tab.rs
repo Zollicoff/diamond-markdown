@@ -1,8 +1,8 @@
 //! Tabs and panes.
 //!
-//! A tab holds one note with its own editor, history and unsaved state. A
-//! pane is a row of tabs with one of them showing. The window holds one or
-//! more panes side by side.
+//! A tab holds one note with its own editor, history and unsaved state, or
+//! a plugin's view, or nothing yet. A pane is a row of tabs with one of them
+//! showing. The window holds one or more panes side by side.
 
 use diamond_parse::NoteMeta;
 use diamond_vault::VaultPath;

@@ -1,9 +1,11 @@
 //! The vault index.
 //!
-//! [`VaultIndex`] holds the parsed metadata of every note and the graph
-//! between them: which note each link points at, which notes link back, and
-//! which notes carry each tag. It is rebuilt from the files on disk and holds
-//! nothing that the files do not.
+//! [`VaultIndex`] holds the text and parsed metadata of every note and the
+//! graph between them: which note each link points at, which notes link
+//! back, and which notes carry each tag. Search ([`search`]), queries
+//! ([`query`]) and the matching behind "Go to note" ([`fuzzy`]) all read
+//! from it. It is rebuilt from the files on disk and holds nothing that the
+//! files do not.
 //!
 //! # How a link finds its note
 //!
@@ -118,7 +120,7 @@ impl BuildReport {
     }
 }
 
-/// A note offered by the quick switcher.
+/// A note offered by "Go to note".
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion<'a> {
     /// The note.
@@ -468,7 +470,7 @@ impl VaultIndex {
         unresolved
     }
 
-    /// The notes that best match `query` for the quick switcher, best first.
+    /// The notes that best match `query` for "Go to note", best first.
     ///
     /// A note matches fuzzily on its title, its file name or one of its
     /// aliases, or because the query appears in its path as written. Name and

@@ -3,6 +3,9 @@
 Diamond is young and early decisions are expensive to undo, so please open
 an issue before starting anything larger than a bug fix.
 
+[docs/architecture.md](docs/architecture.md) explains how the code is laid
+out, and [docs/guide.md](docs/guide.md) what the app does.
+
 ## Rules that do not bend
 
 - **Written from scratch.** Never copy, decompile or reverse-engineer
@@ -22,20 +25,37 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-All three must pass; CI runs the same commands on macOS and Linux.
+All three must pass. CI runs the same commands on macOS and Linux.
 
-- A change in behaviour comes with a test. Logic is tested without a window;
-  what the window does is tested in `crates/diamond-app/src/workspace/tests.rs`,
-  which drives the real views with real keystrokes and clicks.
-- Only `diamond-vault` touches the vault folder. Everything else names files
-  through `VaultPath`, which cannot leave the vault.
-- A feature is a plugin: a module in `crates/diamond-app/src/plugins` that
-  uses only the interface in `plugin.rs`.
+- **A change in behaviour comes with a test.** Logic is tested without a
+  window. What the window does is tested on the real views in a headless
+  window: with the keyboard in `crates/diamond-app/src/workspace/tests.rs`,
+  and with clicks and drags in `workspace/tests/clicks.rs`.
+- **Only `diamond-vault` touches the vault folder.** Everything else names
+  files through `VaultPath`, which cannot leave the vault.
+- **A feature is a plugin:** a module in `crates/diamond-app/src/plugins`
+  that uses only the interface in `plugin.rs`. The architecture document
+  has a worked example.
+- **Never lose what a person wrote.** Do not write over a file that changed
+  underneath you, and delete by moving to the trash.
+
+## Documentation
+
+The documentation is part of the change. If you add or rename a command,
+change a shortcut or add a setting, update `docs/guide.md` in the same
+commit. Tests in `crates/diamond-app/src/docs.rs` fail when the guide's
+command table or settings disagree with the app, when a link between the
+documents is broken, or when a library is missing from
+`ACKNOWLEDGMENTS.md`. They cannot check prose, so read what you changed.
+
+When something is not built, say so plainly, in the guide's "Not built yet"
+list.
 
 ## Dependencies
 
-Add one only with a good reason. A release must be at least 14 days old
-before it is locked: after any `cargo update`, run
+Add one only with a good reason, and name it in `ACKNOWLEDGMENTS.md` with
+its license. A release must be at least 14 days old before it is locked:
+after any `cargo update`, run
 
 ```sh
 python3 scripts/release-age.py --pin

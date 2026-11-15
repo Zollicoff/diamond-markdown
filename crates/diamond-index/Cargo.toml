@@ -1,6 +1,6 @@
 [package]
 name = "diamond-index"
-description = "Vault index for Diamond Markdown: link resolution, backlinks, tags."
+description = "Vault index for Diamond: link resolution, backlinks, tags, search and queries."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

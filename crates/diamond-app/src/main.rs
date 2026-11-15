@@ -1,7 +1,9 @@
-//! Diamond Markdown desktop application.
+//! Diamond, the desktop app: opening vaults and their windows.
 
 mod actions;
 mod app;
+#[cfg(test)]
+mod docs;
 mod history;
 mod notes;
 mod plugin;

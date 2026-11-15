@@ -3,10 +3,13 @@
 //! A plugin is a feature kept in its own module: bookmarks, the calendar,
 //! tasks. It adds to the app only through what is declared here: commands
 //! for the palette and the keyboard, sections in the context panel, views
-//! that open in a tab, and files of its own in the vault's `.diamond`
-//! folder. The core plugins in `crate::plugins` are compiled into the app
-//! and use nothing else, which keeps the interface honest for the day
-//! plugins come from outside.
+//! that open in a tab, a way to open a kind of file, and a file of its own
+//! in the vault's `.diamond` folder. Every command the app has is added
+//! this way, the window's own included. The core plugins in
+//! `crate::plugins` are compiled into the app and use nothing else, which
+//! keeps the interface honest for the day plugins come from outside.
+//!
+//! `docs/architecture.md` has the overview and a worked example.
 
 use std::any::Any;
 use std::rc::Rc;

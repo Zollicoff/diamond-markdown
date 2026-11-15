@@ -1,6 +1,6 @@
 [package]
 name = "diamond-parse"
-description = "Note metadata extraction for Diamond Markdown: links, embeds, headings, tags, properties, blocks, tasks."
+description = "Note metadata extraction for Diamond: links, embeds, headings, tags, properties, blocks, tasks."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
