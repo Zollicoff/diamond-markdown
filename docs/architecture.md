@@ -110,6 +110,7 @@ src/
   plugin.rs        the plugin interface
   plugins/         the features, one module each
   docs.rs          tests that keep the documentation true
+  screenshots.rs   pictures of the window, drawn off screen (a cargo feature)
   workspace/
     mod.rs         what the window does
     panels.rs      how it is drawn
@@ -336,10 +337,21 @@ the window itself behaves with a very large vault.
 CI (`.github/workflows/ci.yml`) runs rustfmt, clippy with warnings as errors
 and the tests on macOS and on Ubuntu 24.04, and both pass.
 
-What tests cannot show is how the window looks. It has been looked at on
-macOS, in the dark and the light appearance, for each view. On Linux the app
-compiles and its tests pass in CI, but nobody has yet looked at it on a
-display there.
+What tests cannot show is how the window looks. For that, on macOS,
+
+```sh
+cargo run -p diamond-app --features screenshots -- --screenshots sample-vault pictures
+```
+
+draws the real views off screen, by the same code that draws them on
+screen, and saves a picture of each: the editor with its preview in dark and
+in light, a board, the task list, the graph, a canvas, the calendar, a query
+and the command palette. It needs no display and no permission to record the
+screen. `docs/pictures/` holds the one the README shows.
+
+The window has also been looked at on a display on macOS, in both
+appearances, for each view. On Linux the app compiles and its tests pass in
+CI, but nobody has yet looked at it on a display there.
 
 ## Dependencies
 

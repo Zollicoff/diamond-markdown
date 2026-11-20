@@ -21,6 +21,11 @@ gpui-kit = { version = "=0.8.1", features = ["tree-sitter-markdown"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.8"
 
+[features]
+# Adds `diamond --screenshots <vault> <folder>`, which draws the window off
+# screen and saves pictures of it. See src/screenshots.rs. macOS only.
+screenshots = ["gpui-kit/test-support"]
+
 [dev-dependencies]
 gpui-kit = { version = "=0.8.1", features = ["test-support", "tree-sitter-markdown"] }
 tempfile = "3.27.0"

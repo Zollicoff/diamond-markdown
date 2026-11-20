@@ -9,6 +9,8 @@ mod notes;
 mod plugin;
 mod plugins;
 mod recent;
+#[cfg(all(feature = "screenshots", target_os = "macos"))]
+mod screenshots;
 mod session;
 mod settings;
 mod workspace;
@@ -107,6 +109,25 @@ fn choose_vault(quit_if_cancelled: bool, cx: &mut App) {
 }
 
 fn main() {
+    #[cfg(all(feature = "screenshots", target_os = "macos"))]
+    {
+        let mut arguments = std::env::args_os().skip(1);
+        if arguments
+            .next()
+            .is_some_and(|first| first == "--screenshots")
+        {
+            let (Some(vault), Some(out)) = (arguments.next(), arguments.next()) else {
+                eprintln!("usage: diamond --screenshots <vault> <folder for the pictures>");
+                std::process::exit(2);
+            };
+            if let Err(problem) = screenshots::run(Path::new(&vault), Path::new(&out)) {
+                eprintln!("diamond: {problem}");
+                std::process::exit(1);
+            }
+            return;
+        }
+    }
+
     let requested = requested_vault();
 
     let app = gpui_kit::application().with_assets(gpui_kit::assets::Assets);

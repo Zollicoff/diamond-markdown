@@ -51,6 +51,9 @@ documents is broken, or when a library is missing from
 When something is not built, say so plainly, in the guide's "Not built yet"
 list.
 
+If you change how the window looks, make the pictures again (the README says
+how) and replace `docs/pictures/editor-and-preview.png`.
+
 ## Dependencies
 
 Add one only with a good reason, and name it in `ACKNOWLEDGMENTS.md` with

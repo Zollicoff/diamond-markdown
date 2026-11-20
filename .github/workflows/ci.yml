@@ -77,3 +77,8 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --locked
+
+      # The screenshots mode is a cargo feature that only exists on macOS.
+      - name: Lint the screenshots mode
+        if: runner.os == 'macOS'
+        run: cargo clippy -p diamond-app --features screenshots --locked -- -D warnings

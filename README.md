@@ -7,6 +7,8 @@ to write, find and connect them.
 Diamond is a native app written in Rust and drawn on the GPU with
 [GPUI](https://www.gpui.rs). There is no web view in it. It is MIT licensed.
 
+![Diamond with a project note open: the Markdown on the left, the same note rendered on the right, and beside them the notes that link to it, its outline, tags and properties.](docs/pictures/editor-and-preview.png)
+
 **Status:** in development. Nothing is released yet, so you build it from
 source. This is the `desktop-rewrite` branch; `main` still holds the
 project's earlier web app, which this replaces.
@@ -98,6 +100,15 @@ cargo test --workspace --locked
 
 CI runs the same three on macOS and Linux. The window tests run headless,
 so none of this needs a display.
+
+To see how the window looks without opening it, on macOS:
+
+```sh
+cargo run -p diamond-app --features screenshots -- --screenshots sample-vault pictures
+```
+
+That draws the app's views off screen and saves a picture of each. The
+picture at the top of this page is one of them.
 
 ## License
 
